@@ -1,0 +1,9 @@
+# Default LLM Config
+[llm]
+model = "deepseek-chat"
+base_url = "https://api.deepseek.com/v1"
+api_key = "sk-6a90e9a4546d4a738c68653d56c1ab8a"
+max_tokens = 4096
+temperature = 0.7
+
+
