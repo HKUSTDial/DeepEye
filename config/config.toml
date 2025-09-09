@@ -6,4 +6,5 @@ api_key = "sk-6a90e9a4546d4a738c68653d56c1ab8a"
 max_tokens = 4096
 temperature = 0.7
 
-
+[sqlite_database]
+path = "/hpc2hdd/home/bli303/boyan_project/label/dev_databases/california_schools/california_schools.sqlite"

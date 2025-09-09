@@ -1,7 +1,7 @@
 import json
 import tomllib
 import threading
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Optional, Literal, Any
 from pathlib import Path
 from pydantic import BaseModel, Field
 
@@ -24,9 +24,14 @@ class LLMConfig(BaseModel):
     api_version: Optional[str] = Field(default=None, description="The version of the Azure API")
 
 
+class SQLiteDatabaseConfig(BaseModel):
+    path: Optional[str] = Field(default=None, description="The path of the sqlite database")
+
+
 class AppConfig(BaseModel):
     llm: Dict[str, LLMConfig] = Field(default_factory=dict, description="The llm config")
-    
+    sqlite_database: SQLiteDatabaseConfig = Field(default_factory=SQLiteDatabaseConfig, description="The sqlite database config")
+
 
 class Config:
     _app_config: AppConfig = None
@@ -72,13 +77,21 @@ class Config:
         specific_llms = {
             k: v for k, v in config.get("llm", {}).items() if isinstance(v, dict)
         }
+        
+        # sqlite database config
+        sqlite_database_config = config.get("sqlite_database", {})
+        sqlite_database_settings = {
+            "path": sqlite_database_config.get("path", None),
+        }
+        
         self._app_config = AppConfig(
             llm={
                 "default": LLMConfig(**default_llm_settings),
                 **{
                     f"{k}": LLMConfig(**v) for k, v in specific_llms.items()
                 },
-            }
+            },
+            sqlite_database=SQLiteDatabaseConfig(**sqlite_database_settings),
         )
 
     @property
@@ -88,7 +101,10 @@ class Config:
     @property
     def llm_config(self):
         return self._app_config.llm
-
+    
+    @property
+    def sqlite_database_config(self):
+        return self._app_config.sqlite_database
 
 # global config instance
 config = Config()
