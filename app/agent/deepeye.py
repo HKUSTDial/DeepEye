@@ -4,6 +4,7 @@ from app.tool.base import ToolCollection
 from app.tool.terminate import Terminate
 from app.tool.text2sql import Text2SQL
 from app.tool.sqlite_database import SQLiteDatabase
+from app.tool.file_system import FileSystem
 from pydantic import Field
 from typing import Literal, List, overload
 import json
@@ -33,6 +34,7 @@ class DeepEyeAgent(BaseAgent):
         default_factory=lambda: ToolCollection([
             Text2SQL(),
             SQLiteDatabase(),
+            FileSystem(),
             Terminate()
         ]),
         description="The available tools of the agent"
