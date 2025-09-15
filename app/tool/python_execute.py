@@ -8,7 +8,7 @@ from app.logger import logger
 
 class PythonExecute(BaseTool):
     name: str = "python_execute"
-    description: str = "A tool to execute Python code safely and return the output."
+    description: str = "Execute existing Python code safely and return the output. Use this only when you have specific Python code that needs to be run."
     parameters: dict = {
         "type": "object",
         "properties": {

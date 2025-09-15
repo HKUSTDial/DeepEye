@@ -38,8 +38,8 @@ class DeepEyeAgent(BaseAgent):
             SQLiteDatabase(),
             FileSystem(),
             Terminate(),
-            PythonExecute(),
-            Text2Code()
+            Text2Code(),
+            PythonExecute()
         ]),
         description="The available tools of the agent"
     )

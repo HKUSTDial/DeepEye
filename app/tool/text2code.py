@@ -4,10 +4,12 @@ from app.llm import LLM
 from pydantic import Field, model_validator, ConfigDict
 import re
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 _TEXT2CODE_DESCRIPTION = """
-A tool to convert user's natural language question to Python code with intent analysis, data format detection, and execution capabilities.
+Generate Python code from natural language descriptions. 
+This is the primary tool for creating Python functions, scripts, and programs based on user requirements. 
+It analyzes intent, detects data formats, and generates executable code.
 """
 
 
@@ -62,7 +64,7 @@ Output format:
 <analysis>
 {{
     "intent": "Brief description of what the user wants to accomplish",
-    "data_format": "Detected or implied data format (CSV, JSON, Excel, etc.)",
+    "data_format": "Detected data format (CSV, JSON, Excel, etc.) or 'not_specified' if no specific format mentioned",
     "operations": ["list", "of", "required", "operations"],
     "expected_output": "Description of expected output",
     "dependencies": ["pandas", "numpy", "matplotlib", "etc"],
@@ -79,7 +81,7 @@ Output format:
             # Fallback analysis
             return {
                 "intent": "Generate Python code",
-                "data_format": "unknown",
+                "data_format": "not_specified",
                 "operations": ["process"],
                 "expected_output": "Code execution result",
                 "dependencies": [],
@@ -93,7 +95,7 @@ Output format:
             # Fallback if JSON parsing fails
             return {
                 "intent": "Generate Python code",
-                "data_format": "unknown", 
+                "data_format": "not_specified", 
                 "operations": ["process"],
                 "expected_output": "Code execution result",
                 "dependencies": [],
@@ -111,7 +113,7 @@ Output format:
         Returns:
             Enhanced prompt for the LLM
         """
-        data_format = analysis.get("data_format", "unknown")
+        data_format = analysis.get("data_format", "not_specified")
         operations = analysis.get("operations", [])
         dependencies = analysis.get("dependencies", [])
         complexity = analysis.get("complexity", "medium")
@@ -135,6 +137,12 @@ Output format:
 - Use pandas.read_excel() for Excel files
 - Specify sheet names if needed
 - Handle multiple sheets appropriately
+"""
+        elif data_format.lower() == "not_specified":
+            data_guidance = """
+- No specific data format requirements detected
+- Use appropriate data structures based on the task
+- Consider using standard Python data types (list, dict, etc.)
 """
         
         # Build operations guidance
@@ -188,118 +196,17 @@ Now, please convert the question to Python code, strictly follow the output form
         
         return prompt
     
-    async def post_process_reflection(self, code: str, question: str, analysis: Dict[str, Any], execution_result: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Post-process reflection on the generated code and execution results.
-        
-        Args:
-            code: Generated Python code
-            question: Original question
-            analysis: Intent analysis results
-            execution_result: Optional execution results
-            
-        Returns:
-            Dict containing reflection results
-        """
-        reflection_prompt = f"""
-Reflect on the generated Python code and provide feedback on its quality and effectiveness.
-
-Original Question: {question}
-Generated Code:
-{code}
-
-Intent Analysis:
-{json.dumps(analysis, indent=2)}
-
-Execution Results:
-{json.dumps(execution_result, indent=2) if execution_result else "Not executed"}
-
-Please provide:
-1. Code Quality Assessment
-2. Potential Issues or Improvements
-3. Suggestions for Optimization
-4. Whether the code meets the original requirements
-
-Output format:
-<reflection>
-{{
-    "code_quality": "excellent|good|fair|poor",
-    "meets_requirements": true|false,
-    "potential_issues": ["list", "of", "issues"],
-    "improvements": ["list", "of", "suggestions"],
-    "optimization_tips": ["list", "of", "optimization", "suggestions"],
-    "overall_assessment": "Brief overall assessment"
-}}
-</reflection>
-        """
-        
-        response = await self.llm.ask([{"role": "user", "content": reflection_prompt}])
-        
-        # Extract reflection from response
-        reflection_match = re.search(r"<reflection>(.*?)</reflection>", response.content, re.DOTALL)
-        if not reflection_match:
-            return {
-                "code_quality": "good",
-                "meets_requirements": True,
-                "potential_issues": [],
-                "improvements": [],
-                "optimization_tips": [],
-                "overall_assessment": "Code generated successfully"
-            }
-        
-        try:
-            reflection = json.loads(reflection_match.group(1).strip())
-            return reflection
-        except json.JSONDecodeError:
-            return {
-                "code_quality": "good",
-                "meets_requirements": True,
-                "potential_issues": [],
-                "improvements": [],
-                "optimization_tips": [],
-                "overall_assessment": "Code generated successfully"
-            }
     
-    async def generate_code_prompt(self, question: str) -> str:
-        """
-        Generate a prompt for Python code generation based on the question.
-        
-        Args:
-            question: Natural language question describing what Python code should be generated
-            
-        Returns:
-            Formatted prompt for the LLM
-        """
-        prompt = f"""
-You are a helpful assistant that converts natural language questions to Python code.
-
-Here is the natural language question:
-{question}
-
-Output format:
-<think>
-YOUR THINKING HERE
-</think>
-<code>
-YOUR COMPLETED PYTHON CODE HERE
-</code>
-
-Now, please convert the natural language question to Python code, strictly follow the output format.
-        """
-        
-        return prompt
-    
-    async def execute(self, question: str, execute_code: bool = True, include_reflection: bool = True):
+    async def execute(self, question: str, execute_code: bool = True):
         """
         Convert natural language question to Python code with enhanced analysis and execution.
         
         Args:
             question: Natural language question describing what Python code should be generated
             execute_code: Whether to execute the generated code
-            include_reflection: Whether to include post-processing reflection
             
         Returns:
-            Dict containing generated code, analysis, execution results, and reflection
+            Dict containing generated code and execution results
         """
         # Step 1: Intent Analysis
         analysis = await self.analyze_intent(question)
@@ -317,27 +224,24 @@ Now, please convert the natural language question to Python code, strictly follo
         
         code = code_match.group(1).strip()
         
-        # Step 5: Extract explanation if available
-        explanation_match = re.search(r"<explanation>(.*?)</explanation>", response.content, re.DOTALL)
-        explanation = explanation_match.group(1).strip() if explanation_match else "No explanation provided"
-        
-        # Step 6: Execute code if requested
+        # Step 5: Execute code if requested
         execution_result = None
         if execute_code:
             execution_result = await self.python_execute.execute(code)
         
-        # Step 7: Post-process reflection if requested
-        reflection = None
-        if include_reflection:
-            reflection = await self.post_process_reflection(code, question, analysis, execution_result)
-        
-        # Return code directly (like text2sql AI)
-        return code
+        # Return JSON with code and execution result
+        return {
+            "code": code,
+            "execution_result": execution_result
+        }
     
 
 
 if __name__ == "__main__":
     import asyncio
     text2code = Text2Code()
-    code = asyncio.run(text2code.execute("Create a function that calculates the factorial of a number"))
-    print(code)
+    result = asyncio.run(text2code.execute("Create a function that calculates the factorial of a number"))
+    print("Generated Code:")
+    print(result["code"])
+    print("\nExecution Result:")
+    print(result["execution_result"])
