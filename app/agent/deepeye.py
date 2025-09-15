@@ -5,6 +5,7 @@ from app.tool.terminate import Terminate
 from app.tool.text2sql import Text2SQL
 from app.tool.sqlite_database import SQLiteDatabase
 from app.tool.file_system import FileSystem
+from app.tool.chart_generation import ChartGeneration
 from pydantic import Field
 from typing import Literal, List, overload
 import json
@@ -35,6 +36,7 @@ class DeepEyeAgent(BaseAgent):
             Text2SQL(),
             SQLiteDatabase(),
             FileSystem(),
+            ChartGeneration(),
             Terminate()
         ]),
         description="The available tools of the agent"
