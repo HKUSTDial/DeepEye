@@ -5,6 +5,8 @@ from app.tool.terminate import Terminate
 from app.tool.text2sql import Text2SQL
 from app.tool.sqlite_database import SQLiteDatabase
 from app.tool.file_system import FileSystem
+from app.tool.python_execute import PythonExecute
+from app.tool.text2code import Text2Code
 from pydantic import Field
 from typing import Literal, List, overload
 import json
@@ -35,7 +37,9 @@ class DeepEyeAgent(BaseAgent):
             Text2SQL(),
             SQLiteDatabase(),
             FileSystem(),
-            Terminate()
+            Terminate(),
+            PythonExecute(),
+            Text2Code()
         ]),
         description="The available tools of the agent"
     )
