@@ -70,7 +70,7 @@ Output format:
 {{
     "intent": "Brief description of what the user wants to accomplish",
     "data_format": "Detected data format (CSV, JSON, Excel, etc.) or 'not_specified' if no specific format mentioned",
-    "operations": ["data_analysis", "file_processing", "visualization"],
+    "operations": ["data_analysis", "file_processing", "visualization", "etc"],
     "expected_output": "Description of expected output",
     "dependencies": ["pandas", "numpy", "matplotlib", "etc"],
     "complexity": "simple|medium|complex"
