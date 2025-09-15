@@ -60,12 +60,17 @@ Please analyze and provide:
 4. Output: What should be the expected output?
 5. Dependencies: What Python libraries might be needed?
 
+Guidelines:
+- If no specific data format is mentioned, use 'not_specified'
+- Be specific about operations (e.g., 'data_analysis', 'visualization', 'file_processing')
+- Consider both standard library and third-party packages
+
 Output format:
 <analysis>
 {{
     "intent": "Brief description of what the user wants to accomplish",
     "data_format": "Detected data format (CSV, JSON, Excel, etc.) or 'not_specified' if no specific format mentioned",
-    "operations": ["list", "of", "required", "operations"],
+    "operations": ["data_analysis", "file_processing", "visualization"],
     "expected_output": "Description of expected output",
     "dependencies": ["pandas", "numpy", "matplotlib", "etc"],
     "complexity": "simple|medium|complex"
@@ -187,9 +192,6 @@ YOUR THINKING PROCESS HERE - analyze the requirements and plan the code structur
 <code>
 YOUR COMPLETED PYTHON CODE HERE
 </code>
-<explanation>
-Brief explanation of what the code does and key features
-</explanation>
 
 Now, please convert the question to Python code, strictly follow the output format.
         """
