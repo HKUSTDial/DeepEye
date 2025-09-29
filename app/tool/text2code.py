@@ -7,9 +7,9 @@ import json
 from typing import Dict, Any
 
 _TEXT2CODE_DESCRIPTION = """
-Generate Python code from natural language descriptions. 
+Generate Python code with results from natural language descriptions.
 This is the primary tool for creating Python functions, scripts, and programs based on user requirements. 
-It analyzes intent, detects data formats, and generates executable code.
+It analyzes intent, detects data formats, and generates code with results.
 """
 
 
@@ -184,6 +184,17 @@ Requirements:
 - Make the code readable and maintainable
 - Handle edge cases appropriately
 - Follow Python best practices
+
+CRITICAL FILE PATH REQUIREMENTS:
+- The code execution runs from DeepEye project root directory
+- For reading files: use 'workspace/files/filename' format
+- For saving files: ALWAYS save directly to 'workspace/files/filename' format
+- NEVER save to current directory - save directly to workspace/files/
+- Examples:
+  * Reading: df = pd.read_csv('workspace/files/data.csv')
+  * Saving charts: plt.savefig('workspace/files/chart.png')
+  * Saving reports: with open('workspace/files/report.txt', 'w') as f: ...
+- Always ensure target directory exists: os.makedirs('workspace/files', exist_ok=True)
 
 Output format:
 <think>
