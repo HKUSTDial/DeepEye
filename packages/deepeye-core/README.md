@@ -173,40 +173,6 @@ pip install deepeye-core
 
 ---
 
-## 🗺️ 开发路线图
-
-### ✅ Phase 1: 核心基础 (进行中)
-- [x] 项目初始化和目录结构
-- [x] 异常系统和基础配置
-- [ ] 节点系统基础 (BaseNode, Registry)
-- [ ] 工作流引擎 (Graph, Builder, Validator)
-- [ ] 执行运行时 (Executor, Scheduler)
-
-### 🚧 Phase 2: 基础节点 (Q1 2025)
-- [ ] 数据源节点 (CSV, SQL, API)
-- [ ] 数据处理节点 (Transform, Filter, Aggregate)
-- [ ] 可视化节点 (Plotly, ECharts)
-
-### 🔮 Phase 3: AI 能力 (Q2 2025)
-- [ ] LLM 集成 (OpenAI, Anthropic, 本地模型)
-- [ ] NL2SQL 节点
-- [ ] NL2Code 节点
-- [ ] RAG 增强节点
-
-### 🤖 Phase 4: 智能编排 (Q3 2025)
-- [ ] ReAct 策略
-- [ ] Planner-Executor 策略
-- [ ] 任务规划器
-- [ ] 策略自动选择
-
-### 🚀 Phase 5: 优化和扩展 (Q4 2025)
-- [ ] 并行执行优化
-- [ ] 智能缓存系统
-- [ ] 插件市场
-- [ ] 低代码可视化编辑器
-
----
-
 ## 🌍 社区
 
 加入我们的社区，与其他开发者交流：
@@ -228,7 +194,6 @@ pip install deepeye-core
 
 DeepEye 站在巨人的肩膀上，感谢以下优秀的开源项目：
 
-- [LangChain](https://github.com/langchain-ai/langchain) - LLM 应用框架
 - [NetworkX](https://github.com/networkx/networkx) - 图结构处理
 - [Pydantic](https://github.com/pydantic/pydantic) - 数据验证
 - [FastAPI](https://github.com/tiangolo/fastapi) - API 框架
