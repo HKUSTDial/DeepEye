@@ -1,0 +1,12 @@
+product_id,product_name,category,price,stock,supplier
+P001,Laptop,Electronics,999.99,50,TechCorp
+P002,Mouse,Electronics,29.99,200,TechCorp
+P003,Keyboard,Electronics,79.99,150,TechCorp
+P004,Monitor,Electronics,299.99,75,DisplayInc
+P005,Desk Chair,Furniture,199.99,100,FurnishCo
+P006,Standing Desk,Furniture,499.99,30,FurnishCo
+P007,Notebook,Stationery,4.99,500,PaperPlus
+P008,Pen Set,Stationery,12.99,300,PaperPlus
+P009,Water Bottle,Accessories,19.99,250,LifeStyle
+P010,Coffee Mug,Accessories,9.99,400,LifeStyle
+

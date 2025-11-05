@@ -1,0 +1,6 @@
+[
+  {"product": "iPhone", "price": 799, "quantity": 100},
+  {"product": "iPad", "price": 599, "quantity": 150},
+  {"product": "MacBook", "price": 1299, "quantity": 50}
+]
+
