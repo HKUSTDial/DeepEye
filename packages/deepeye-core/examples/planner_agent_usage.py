@@ -31,16 +31,8 @@ from deepeye.nodes.dataplot import DataPlotNode
 from deepeye.nodes.datasource import (
     MemoryDataSourceNode,
     FileDataSourceNode,
-    CSVDataSourceNode,
-    JSONDataSourceNode,
-    ExcelDataSourceNode,
 )
-from deepeye.nodes.processing import (
-    FilterNode,
-    RowFilterNode,
-    ColumnSelectNode,
-    TransformNode,
-)
+# FilterNode 和 TransformNode 已移除，请使用 DataCoderNode 代替
 
 
 def _print_execution_result(exec_result: dict) -> None:
@@ -232,10 +224,7 @@ def setup_global_config():
         "orient": "records",
     })
     
-    # 配置 Filter 节点的默认参数
-    global_config.set_node_config("Filter", {
-        "drop_na": False,  # 默认不删除 NA 值
-    })
+    # FilterNode 已移除，请使用 DataCoderNode 代替
     
     # 配置 MemoryDataSource 的示例数据（用于测试）
     sample_data = pd.DataFrame({
@@ -277,7 +266,6 @@ def setup_global_config():
     print(f"    - CSVDataSource: {os.path.basename(os.path.join(data_dir, 'employees.csv'))}")
     print(f"    - ExcelDataSource: {os.path.basename(os.path.join(data_dir, 'company_data.xlsx'))} (Employees sheet)")
     print(f"    - JSONDataSource: {os.path.basename(os.path.join(data_dir, 'sales.json'))}")
-    print("    - Filter: drop_na=False")
     print("    - MemoryDataSource: 示例员工数据 (5行)")
     if api_key:
         print(f"    - LLM 节点 (DataCoder/DataPlot/NL2SQL):")
@@ -336,9 +324,6 @@ def create_planner_agent() -> PlannerAgent:
     # 数据源节点
     agent.register_node(MemoryDataSourceNode)
     agent.register_node(FileDataSourceNode)
-    agent.register_node(CSVDataSourceNode)
-    agent.register_node(JSONDataSourceNode)
-    agent.register_node(ExcelDataSourceNode)
     
     registered_tools = agent.tool_registry.get_tool_names()
     print(f"  ✓ 已注册 {len(registered_tools)} 个节点工具:")

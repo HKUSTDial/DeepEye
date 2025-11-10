@@ -3,7 +3,7 @@
 管理所有节点类型的注册和创建。
 """
 
-from typing import Dict, Type, Optional, List
+from typing import Dict, Type, Optional, List, Union, Callable, overload
 from deepeye.nodes.base import BaseNode
 from deepeye.exceptions import NodeError
 
@@ -26,13 +26,24 @@ class NodeRegistry:
     """
     
     _instance: Optional["NodeRegistry"] = None
-    _nodes: Dict[str, Type[BaseNode]] = {}
     
     def __new__(cls) -> "NodeRegistry":
         """单例模式"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            # 初始化实例变量（而不是类变量）
+            cls._instance._nodes: Dict[str, Type[BaseNode]] = {}
         return cls._instance
+    
+    def __init__(self):
+        """初始化注册表
+        
+        注意：由于单例模式，此方法可能被多次调用，但只会初始化一次。
+        实际的初始化在 __new__ 中完成。
+        """
+        # 确保 _nodes 存在（防止模块重新加载时丢失）
+        if not hasattr(self, '_nodes'):
+            self._nodes: Dict[str, Type[BaseNode]] = {}
     
     def register(
         self, 
@@ -66,10 +77,19 @@ class NodeRegistry:
         
         type_name = node_type or getattr(node_class, "node_type", node_class.__name__)
         
-        if type_name in self._nodes and not override:
-            raise NodeError(
-                f"节点类型 '{type_name}' 已存在，如需覆盖请设置 override=True"
-            )
+        # 检查是否已经注册了相同的类（防止模块重新加载时的重复注册）
+        existing_class = self._nodes.get(type_name)
+        if existing_class is not None:
+            # 如果已经注册了相同的类，静默跳过（避免重复注册）
+            if existing_class is node_class:
+                return
+            
+            # 如果注册了不同的类，且不允许覆盖，抛出异常
+            if not override:
+                raise NodeError(
+                    f"节点类型 '{type_name}' 已存在（已注册类: {existing_class.__name__}），"
+                    f"如需覆盖请设置 override=True"
+                )
         
         self._nodes[type_name] = node_class
     
@@ -112,6 +132,7 @@ class NodeRegistry:
         node_type: str,
         node_id: Optional[str] = None,
         config: Optional[dict] = None,
+        validate_on_init: bool = False,
     ) -> BaseNode:
         """创建节点实例
         
@@ -119,6 +140,7 @@ class NodeRegistry:
             node_type: 节点类型名称
             node_id: 节点ID，如果为None则自动生成
             config: 节点配置
+            validate_on_init: 是否在初始化时验证配置（默认False）
             
         Returns:
             节点实例
@@ -137,7 +159,7 @@ class NodeRegistry:
         node_class = self.get_node_class(node_type)
         
         try:
-            return node_class(node_id=node_id, config=config)
+            return node_class(node_id=node_id, config=config, validate_on_init=validate_on_init)
         except Exception as e:
             raise NodeError(
                 f"创建节点 '{node_type}' 失败: {type(e).__name__}: {str(e)}"
@@ -224,19 +246,40 @@ class NodeRegistry:
 _global_registry = NodeRegistry()
 
 
+@overload
 def register_node(
     node_class: Type[BaseNode],
     node_type: Optional[str] = None,
     override: bool = False
-) -> None:
+) -> Type[BaseNode]:
+    """直接注册节点类"""
+    ...
+
+@overload
+def register_node(
+    node_class: None = None,
+    node_type: Optional[str] = None,
+    override: bool = False
+) -> Callable[[Type[BaseNode]], Type[BaseNode]]:
+    """作为装饰器使用（带参数）"""
+    ...
+
+def register_node(
+    node_class: Optional[Type[BaseNode]] = None,
+    node_type: Optional[str] = None,
+    override: bool = False
+) -> Union[Type[BaseNode], Callable[[Type[BaseNode]], Type[BaseNode]]]:
     """注册节点类到全局注册表
     
     这是一个便捷函数，可以作为装饰器使用。
     
     Args:
-        node_class: 节点类
+        node_class: 节点类（装饰器模式下为None）
         node_type: 节点类型名称
         override: 是否覆盖已存在的节点类型
+        
+    Returns:
+        装饰器模式下返回被装饰的类或装饰器函数，否则返回类本身
         
     Example:
         >>> @register_node
@@ -244,8 +287,24 @@ def register_node(
         ...     node_type = "MyNode"
         ...     def execute(self, inputs):
         ...         return NodeOutput(data=inputs.data)
+        
+        >>> @register_node(node_type="CustomNode", override=True)
+        ... class AnotherNode(BaseNode):
+        ...     def execute(self, inputs):
+        ...         return NodeOutput(data=inputs.data)
     """
-    _global_registry.register(node_class, node_type, override)
+    def decorator(cls: Type[BaseNode]) -> Type[BaseNode]:
+        """装饰器内部函数"""
+        _global_registry.register(cls, node_type, override)
+        return cls
+    
+    # 如果直接调用（作为装饰器不带括号），node_class 是类
+    if node_class is not None:
+        _global_registry.register(node_class, node_type, override)
+        return node_class
+    
+    # 如果带参数调用（作为装饰器带括号），返回装饰器函数
+    return decorator
 
 
 def get_registry() -> NodeRegistry:

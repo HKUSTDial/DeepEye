@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: deepeye-postgres
+    environment:
+      # PostgreSQL 配置 - 从环境变量读取，默认值在 env.example 中定义
+      POSTGRES_DB: ${POSTGRES_DB:-deepeye}
+      POSTGRES_USER: ${POSTGRES_USER:-deepeye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-deepeye}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deepeye}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - deepeye-network
+
+  # 可选：pgAdmin 管理界面
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: deepeye-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@deepeye.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - deepeye-network
+    profiles:
+      - tools  # 使用 docker-compose --profile tools up 启动
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  deepeye-network:
+    driver: bridge
+

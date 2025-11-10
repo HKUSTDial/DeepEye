@@ -7,8 +7,6 @@ from pandas.testing import assert_frame_equal
 
 from deepeye.nodes.datasource import (
     FileDataSourceNode,
-    CSVDataSourceNode,
-    JSONDataSourceNode,
 )
 from deepeye.nodes.io import NodeStatus
 
@@ -32,7 +30,7 @@ class TestFileDataSourceNode:
     def test_init_without_path_raises(self):
         """测试缺少文件路径时抛出错误"""
         with pytest.raises(ValueError, match="file_path 参数不能为空"):
-            FileDataSourceNode(node_id="test", config={"file_path": None})
+            FileDataSourceNode(node_id="test", config={"file_path": None}, validate_on_init=True)
     
     def test_init_with_url(self):
         """测试使用URL初始化"""
@@ -49,7 +47,8 @@ class TestFileDataSourceNode:
                 config={
                     "file_path": "https://example.com/data.csv",
                     "allow_remote": False
-                }
+                },
+                validate_on_init=True
             )
     
     def test_init_with_negative_nrows_raises(self):
@@ -60,7 +59,8 @@ class TestFileDataSourceNode:
                 config={
                     "file_path": str(CSV_FILE),
                     "nrows": -10
-                }
+                },
+                validate_on_init=True
             )
     
     def test_init_with_nrows_exceeds_max_raises(self):
@@ -72,7 +72,8 @@ class TestFileDataSourceNode:
                     "file_path": str(CSV_FILE),
                     "nrows": 200000,
                     "max_rows": 100000
-                }
+                },
+                validate_on_init=True
             )
     
     def test_detect_file_type_csv(self):
@@ -261,13 +262,13 @@ class TestFileDataSourceJSON:
 
 
 class TestCSVDataSource:
-    """测试CSVDataSource便捷类"""
+    """测试CSV文件读取（使用FileDataSourceNode）"""
     
     def test_csv_datasource(self):
-        """测试CSVDataSource"""
-        node = CSVDataSourceNode(
+        """测试CSV文件读取"""
+        node = FileDataSourceNode(
             node_id="test",
-            config={"file_path": str(CSV_FILE)}
+            config={"file_path": str(CSV_FILE), "file_type": "csv"}
         )
         
         assert node.config.file_type == "csv"
@@ -280,13 +281,13 @@ class TestCSVDataSource:
 
 
 class TestJSONDataSource:
-    """测试JSONDataSource便捷类"""
+    """测试JSON文件读取（使用FileDataSourceNode）"""
     
     def test_json_datasource(self):
-        """测试JSONDataSource"""
-        node = JSONDataSourceNode(
+        """测试JSON文件读取"""
+        node = FileDataSourceNode(
             node_id="test",
-            config={"file_path": str(JSON_FILE)}
+            config={"file_path": str(JSON_FILE), "file_type": "json"}
         )
         
         assert node.config.file_type == "json"

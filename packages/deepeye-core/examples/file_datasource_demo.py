@@ -159,7 +159,7 @@ def example_6_workflow_usage():
     df = result["data"].data
     print(f"读取了 {len(df)} 条学生数据")
     
-    # 步骤2: 数据过滤（模拟FilterNode）
+    # 步骤2: 数据过滤（使用 DataCoderNode）
     print("\n🔍 步骤2: 过滤高分学生（score >= 90）")
     high_scorers = df[df["score"] >= 90]
     print(f"找到 {len(high_scorers)} 名高分学生:")

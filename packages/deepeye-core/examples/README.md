@@ -106,16 +106,11 @@ uv run python examples/planner_agent_usage.py
 
 - **数据源节点**
   - `MemoryDataSourceNode`: 内存数据源
-  - `FileDataSourceNode`: 通用文件数据源
-  - `CSVDataSourceNode`: CSV 文件数据源
-  - `JSONDataSourceNode`: JSON 文件数据源
-  - `ExcelDataSourceNode`: Excel 文件数据源
+  - `FileDataSourceNode`: 通用文件数据源（支持 CSV、JSON、Excel）
 
 - **处理节点**
-  - `FilterNode`: 通用过滤节点
-  - `RowFilterNode`: 行过滤节点
-  - `ColumnSelectNode`: 列选择节点
-  - `TransformNode`: 数据转换节点
+  - 已移除 `FilterNode`、`RowFilterNode`、`ColumnSelectNode` 和 `TransformNode`
+  - 请使用 `DataCoderNode` 代替，它提供了更强大的智能数据处理能力
 
 ### 输出说明
 

@@ -31,6 +31,9 @@ def mock_openai():
         
         mock_response.model = "gpt-4"
         
+        # 明确设置error为None，避免Mock对象默认的error属性被误判为错误
+        mock_response.error = None
+        
         # 配置mock client
         mock_client_instance = Mock()
         mock_client_instance.chat.completions.create.return_value = mock_response
@@ -280,6 +283,7 @@ class TestLLMClientRetries:
         mock_response.usage.completion_tokens = 20
         mock_response.usage.total_tokens = 30
         mock_response.model = "gpt-4"
+        mock_response.error = None  # 明确设置error为None
         
         mock_openai.return_value.chat.completions.create.side_effect = [
             OpenAIError("Temporary error"),

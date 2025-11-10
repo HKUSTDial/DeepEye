@@ -147,18 +147,25 @@ class BaseNode(ABC):
         self,
         node_id: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
+        validate_on_init: bool = False,
     ) -> None:
         """初始化节点
         
         Args:
             node_id: 节点实例ID（唯一标识），如果为None则自动生成
             config: 节点配置字典（会与全局配置合并，优先级高于全局配置）
+            validate_on_init: 是否在初始化时验证配置（默认False，延迟到执行时验证）
         
         Note:
             配置优先级（从高到低）：
             1. init 方法的 config 参数（显式传递）
             2. 全局配置（GlobalConfig）
             3. 节点的默认值
+            
+            配置验证：
+            - 默认情况下，配置验证会延迟到 execute 方法执行前
+            - 如果 validate_on_init=True，则在初始化时立即验证
+            - 这允许节点在运行时动态配置（如上传文件后设置文件路径）
         """
         self.node_id = node_id or str(uuid4())
         
@@ -176,6 +183,10 @@ class BaseNode(ABC):
         # 执行状态
         self._status = NodeStatus.PENDING
         self._outputs: Dict[str, NodeOutput] = {}
+        
+        # 如果指定在初始化时验证，则立即验证
+        if validate_on_init:
+            self._validate_config()
     
     def _merge_global_config(self, user_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """合并全局配置和用户配置
@@ -207,6 +218,58 @@ class BaseNode(ABC):
         """
         # 默认使用基础配置类，子类可以重写此方法来使用自定义配置类
         return NodeConfig(**config)
+    
+    def _validate_config(self) -> None:
+        """验证节点配置
+        
+        子类可以重写此方法来添加自定义配置验证逻辑。
+        默认实现为空（不进行验证）。
+        
+        注意：
+        - 此方法默认在 execute 执行前调用
+        - 如果 validate_on_init=True，也会在 __init__ 时调用
+        - 子类应该重写此方法来验证必需的配置参数
+        
+        Raises:
+            ValueError: 如果配置无效
+        """
+        pass
+    
+    def update_config(self, config_updates: Dict[str, Any], merge: bool = True) -> None:
+        """更新节点配置（运行时配置）
+        
+        允许在节点创建后动态更新配置，这对于运行时配置场景非常有用。
+        例如：用户上传文件后，动态设置 FileNode 的 file_path。
+        
+        Args:
+            config_updates: 要更新的配置字典
+            merge: 是否与现有配置合并（默认True），False则完全替换
+        
+        Example:
+            >>> # 创建节点时不提供配置
+            >>> node = FileDataSourceNode(node_id="file1")
+            >>> 
+            >>> # 用户上传文件后，动态更新配置
+            >>> node.update_config({"file_path": "/uploads/user_file.csv"})
+            >>> 
+            >>> # 执行节点
+            >>> result = node.run(inputs={})
+        
+        Note:
+            - 更新后的配置会立即生效
+            - 如果节点已经执行过，需要调用 reset() 重置状态
+            - 配置更新不会触发验证，验证会在 execute 时进行
+        """
+        if merge:
+            # 合并配置：将新配置更新到现有配置
+            current_config = self.config.model_dump() if hasattr(self.config, "model_dump") else {}
+            updated_config = {**current_config, **config_updates}
+        else:
+            # 完全替换
+            updated_config = config_updates
+        
+        # 重新解析配置
+        self.config = self._parse_config(updated_config)
     
     @abstractmethod
     def execute(self, inputs: Dict[str, NodeInput]) -> Dict[str, NodeOutput]:
@@ -384,6 +447,10 @@ class BaseNode(ABC):
         try:
             # 更新状态
             self._status = NodeStatus.RUNNING
+            
+            # 验证配置（延迟验证，允许运行时配置）
+            self._validate_config()
+            execution_logs.append(f"配置验证通过")
             
             # 验证输入
             self.validate_inputs(inputs)

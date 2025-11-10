@@ -17,8 +17,8 @@ class DummyNodeA(BaseNode):
     
     node_type = "DummyNodeA"
     
-    def __init__(self, node_id=None, config=None):
-        super().__init__(node_id, config)
+    def __init__(self, node_id=None, config=None, validate_on_init=False):
+        super().__init__(node_id, config, validate_on_init=validate_on_init)
         from deepeye.nodes.io import NodeInputPort, NodeOutputPort
         self.input_ports = [
             NodeInputPort(name="data", label="数据输入", required=True)
@@ -36,8 +36,8 @@ class DummyNodeB(BaseNode):
     
     node_type = "DummyNodeB"
     
-    def __init__(self, node_id=None, config=None):
-        super().__init__(node_id, config)
+    def __init__(self, node_id=None, config=None, validate_on_init=False):
+        super().__init__(node_id, config, validate_on_init=validate_on_init)
         from deepeye.nodes.io import NodeInputPort, NodeOutputPort
         self.input_ports = [
             NodeInputPort(name="data", label="数据输入", required=True)
@@ -90,8 +90,18 @@ def test_register_duplicate_error():
     
     registry.register(DummyNodeA)
     
+    # 注册相同的类会静默跳过（不抛出错误）
+    registry.register(DummyNodeA)  # 应该成功，静默跳过
+    
+    # 但如果注册不同的类且不允许覆盖，应该抛出错误
+    class DummyNodeA2(BaseNode):
+        node_type = "DummyNodeA"  # 相同的 node_type
+        
+        def execute(self, inputs: dict) -> dict:
+            return self.create_single_output(data="A2")
+    
     with pytest.raises(NodeError, match="已存在"):
-        registry.register(DummyNodeA)
+        registry.register(DummyNodeA2)  # 不同的类，相同的 node_type，应该失败
 
 
 def test_register_with_override():

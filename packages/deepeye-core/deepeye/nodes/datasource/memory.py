@@ -9,6 +9,7 @@ import pandas as pd
 
 from deepeye.nodes.base import NodeMetadata
 from deepeye.nodes.datasource.base import BaseDataSourceNode, DataSourceConfig
+from deepeye.nodes.registry import register_node
 
 
 class MemoryDataSourceConfig(DataSourceConfig):
@@ -23,6 +24,7 @@ class MemoryDataSourceConfig(DataSourceConfig):
     columns: Optional[List[str]] = None
 
 
+@register_node
 class MemoryDataSourceNode(BaseDataSourceNode):
     """内存数据源节点
     
@@ -79,6 +81,7 @@ class MemoryDataSourceNode(BaseDataSourceNode):
         self,
         node_id: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
+        validate_on_init: bool = False,
     ):
         """初始化内存数据源节点
         
@@ -89,11 +92,12 @@ class MemoryDataSourceNode(BaseDataSourceNode):
                 - columns: 列名（仅当data为二维数组时需要）
                 - max_rows: 最大行数限制
                 - preview_rows: 预览行数
+            validate_on_init: 是否在初始化时验证配置（默认False，延迟到执行时验证）
         
         Raises:
             ValueError: 数据格式不支持
         """
-        super().__init__(node_id, config)
+        super().__init__(node_id, config, validate_on_init=validate_on_init)
         
         # 设置节点元数据
         self.metadata = NodeMetadata(

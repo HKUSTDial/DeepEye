@@ -25,6 +25,7 @@ from deepeye.nodes.datacoder.prompt import (
     format_fix_prompt,
     extract_response_parts,
 )
+from deepeye.nodes.registry import register_node
 
 
 class DataCoderConfig(NodeConfig):
@@ -44,6 +45,7 @@ class DataCoderConfig(NodeConfig):
     verbose: bool = False
 
 
+@register_node
 class DataCoderNode(BaseNode):
     """DataCoder 节点 - 智能 DataFrame 处理
     
@@ -99,6 +101,7 @@ class DataCoderNode(BaseNode):
         self,
         node_id: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
+        validate_on_init: bool = False,
     ):
         """初始化 DataCoder 节点
         
@@ -114,11 +117,12 @@ class DataCoderNode(BaseNode):
                 - keep_template: 是否保持 Docker 模板
                 - verbose: 是否输出详细日志
                 - timeout: 代码执行超时时间
+            validate_on_init: 是否在初始化时验证配置（默认False，延迟到执行时验证）
         
         Raises:
             ValueError: API Key 未提供且环境变量也未设置
         """
-        super().__init__(node_id, config)
+        super().__init__(node_id, config, validate_on_init=validate_on_init)
         
         # 设置节点元数据
         self.metadata = NodeMetadata(
@@ -184,10 +188,6 @@ class DataCoderNode(BaseNode):
         
         # 初始化 LLM 客户端
         api_key = self.config.api_key or os.getenv("DEEPEYE_LLM_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "未提供 API Key。请通过配置传入或设置环境变量 DEEPEYE_LLM_API_KEY"
-            )
         
         self.llm_client = LLMClient(
             api_key=api_key,

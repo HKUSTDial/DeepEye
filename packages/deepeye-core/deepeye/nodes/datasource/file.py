@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from deepeye.nodes.base import NodeMetadata
 from deepeye.nodes.datasource.base import BaseDataSourceNode, DataSourceConfig
+from deepeye.nodes.registry import register_node
 
 
 class FileDataSourceConfig(DataSourceConfig):
@@ -61,6 +62,7 @@ class FileDataSourceConfig(DataSourceConfig):
     allow_remote: bool = True
 
 
+@register_node
 class FileDataSourceNode(BaseDataSourceNode):
     """文件数据源节点
     
@@ -109,6 +111,7 @@ class FileDataSourceNode(BaseDataSourceNode):
         self,
         node_id: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
+        validate_on_init: bool = False,
     ):
         """初始化文件数据源节点
         
@@ -126,11 +129,12 @@ class FileDataSourceNode(BaseDataSourceNode):
                 - usecols: 读取的列名列表
                 - max_rows: 绝对最大行数限制
                 - allow_remote: 是否允许从URL读取
+            validate_on_init: 是否在初始化时验证配置（默认False，延迟到执行时验证）
         
         Raises:
             ValueError: 文件路径为空或格式不支持
         """
-        super().__init__(node_id, config)
+        super().__init__(node_id, config, validate_on_init=validate_on_init)
         
         # 设置节点元数据
         self.metadata = NodeMetadata(
@@ -143,8 +147,7 @@ class FileDataSourceNode(BaseDataSourceNode):
             author="DeepEye"
         )
         
-        # 验证配置
-        self._validate_config()
+        # 注意：配置验证已延迟到 execute 时进行，允许运行时动态配置
     
     def _parse_config(self, config: Dict[str, Any]) -> FileDataSourceConfig:
         """解析配置
@@ -360,124 +363,3 @@ class FileDataSourceNode(BaseDataSourceNode):
             }
         
         return info
-
-
-class CSVDataSourceNode(FileDataSourceNode):
-    """CSV文件数据源节点
-    
-    预配置为CSV格式的FileDataSourceNode。
-    
-    Example:
-        >>> node = CSVDataSourceNode(
-        ...     node_id="sales",
-        ...     config={
-        ...         "file_path": "data/sales.csv",
-        ...         "delimiter": ",",
-        ...         "encoding": "utf-8"
-        ...     }
-        ... )
-    """
-    
-    node_type = "CSVDataSource"
-    
-    def __init__(
-        self,
-        node_id: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
-    ):
-        """初始化CSV数据源节点
-        
-        Args:
-            node_id: 节点实例ID
-            config: 节点配置字典
-        """
-        # 强制设置为CSV类型
-        if config is None:
-            config = {}
-        config["file_type"] = "csv"
-        
-        super().__init__(node_id, config)
-        
-        # 更新元数据
-        self.metadata.name = "CSVDataSource"
-        self.metadata.display_name = "CSV数据源"
-        self.metadata.description = "从CSV文件读取数据"
-
-
-class JSONDataSourceNode(FileDataSourceNode):
-    """JSON文件数据源节点
-    
-    预配置为JSON格式的FileDataSourceNode。
-    
-    Example:
-        >>> node = JSONDataSourceNode(
-        ...     node_id="config",
-        ...     config={"file_path": "data/config.json"}
-        ... )
-    """
-    
-    node_type = "JSONDataSource"
-    
-    def __init__(
-        self,
-        node_id: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
-    ):
-        """初始化JSON数据源节点
-        
-        Args:
-            node_id: 节点实例ID
-            config: 节点配置字典
-        """
-        # 强制设置为JSON类型
-        if config is None:
-            config = {}
-        config["file_type"] = "json"
-        
-        super().__init__(node_id, config)
-        
-        # 更新元数据
-        self.metadata.name = "JSONDataSource"
-        self.metadata.display_name = "JSON数据源"
-        self.metadata.description = "从JSON文件读取数据"
-
-
-class ExcelDataSourceNode(FileDataSourceNode):
-    """Excel文件数据源节点
-    
-    预配置为Excel格式的FileDataSourceNode。
-    
-    Example:
-        >>> node = ExcelDataSourceNode(
-        ...     node_id="report",
-        ...     config={
-        ...         "file_path": "data/report.xlsx",
-        ...         "sheet_name": "Sheet1"
-        ...     }
-        ... )
-    """
-    
-    node_type = "ExcelDataSource"
-    
-    def __init__(
-        self,
-        node_id: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
-    ):
-        """初始化Excel数据源节点
-        
-        Args:
-            node_id: 节点实例ID
-            config: 节点配置字典
-        """
-        # 强制设置为Excel类型
-        if config is None:
-            config = {}
-        config["file_type"] = "excel"
-        
-        super().__init__(node_id, config)
-        
-        # 更新元数据
-        self.metadata.name = "ExcelDataSource"
-        self.metadata.display_name = "Excel数据源"
-        self.metadata.description = "从Excel文件读取数据"

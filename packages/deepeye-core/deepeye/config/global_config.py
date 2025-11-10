@@ -2,6 +2,22 @@
 
 提供单例模式的全局配置管理，用于存储节点的默认配置。
 节点在初始化时可以从全局配置中读取配置，避免每次都手动传递配置参数。
+
+注意：
+    GlobalConfig 是**可选的**默认配置提供者，主要用于：
+    1. 为节点提供默认配置（如数据库连接字符串、API密钥等）
+    2. 在 Agent 编排场景中预先配置节点
+    
+    节点配置的优先级（从高到低）：
+    1. 运行时配置（通过 update_config() 或 execute 时的 config 参数）
+    2. 初始化时的 config 参数（显式传递）
+    3. 全局配置（GlobalConfig）- 可选
+    4. 节点的默认值
+    
+    重要：
+    - 节点不再强制要求 GlobalConfig，可以在运行时动态配置
+    - 配置验证已延迟到 execute 时，允许先创建节点后配置
+    - 使用 update_config() 方法可以在运行时动态更新配置
 """
 
 from typing import Dict, Any, Optional, Type
@@ -15,68 +31,66 @@ class GlobalConfig:
     用于管理节点类型的默认配置。节点在初始化时会先从全局配置中查找，
     如果找不到或参数不完整，再从 init 方法的 config 参数读取。
     
+    注意：
+        GlobalConfig 是**可选的**，主要用于提供默认配置。节点可以在运行时动态配置，
+        不需要依赖 GlobalConfig。
+    
     配置优先级（从高到低）：
-        1. init 方法的 config 参数（显式传递）
-        2. 全局配置（GlobalConfig）
-        3. 节点的默认值
+        1. 运行时配置（update_config() 或 execute 时的 config）
+        2. init 方法的 config 参数（显式传递）
+        3. 全局配置（GlobalConfig）- 可选
+        4. 节点的默认值
     
     特性：
         - 单例模式：整个应用共享同一个配置实例
         - 线程安全：使用锁保护配置读写
         - 深拷贝：返回配置副本，避免意外修改
         - 层级覆盖：支持部分配置覆盖
+        - 可选性：节点不强制要求全局配置，可在运行时配置
     
-    Example:
+    Example - 使用全局配置（传统方式）:
         >>> from deepeye.config import get_global_config
         >>> 
         >>> # 设置全局配置
         >>> config = get_global_config()
         >>> config.set_node_config("FileDataSource", {
-        ...     "file_path": "/data/sales.csv",
-        ...     "encoding": "utf-8"
+        ...     "encoding": "utf-8"  # 只设置默认编码
         ... })
         >>> config.set_node_config("DatabaseDataSource", {
         ...     "connection_string": "sqlite:///app.db",
         ...     "mode": "introspect"
         ... })
         >>> 
-        >>> # 使用全局配置创建节点（无需传递 config）
-        >>> node1 = FileDataSourceNode(node_id="sales")
-        >>> # 会自动使用 file_path="/data/sales.csv"
-        >>> 
-        >>> # 显式 config 会覆盖全局配置
-        >>> node2 = FileDataSourceNode(
-        ...     node_id="custom",
-        ...     config={"file_path": "/data/custom.csv"}  # 覆盖全局配置
+        >>> # 使用全局配置创建节点
+        >>> node1 = FileDataSourceNode(
+        ...     node_id="sales",
+        ...     config={"file_path": "/data/sales.csv"}  # 运行时指定文件路径
         ... )
-        >>> 
-        >>> # 部分覆盖：只覆盖指定的参数
-        >>> node3 = FileDataSourceNode(
-        ...     node_id="partial",
-        ...     config={"encoding": "gbk"}  # file_path 仍使用全局配置
-        ... )
-        >>> 
-        >>> # 清除配置
-        >>> config.clear_node_config("FileDataSource")
-        >>> config.clear_all()
     
-    Advanced Example:
-        >>> # 在 Agent 中使用
+    Example - 运行时配置（推荐方式）:
+        >>> # 创建节点时不提供配置
+        >>> node = FileDataSourceNode(node_id="file1")
+        >>> 
+        >>> # 用户上传文件后，动态更新配置
+        >>> node.update_config({"file_path": "/uploads/user_file.csv"})
+        >>> 
+        >>> # 执行节点
+        >>> result = node.run(inputs={})
+    
+    Example - 在 Agent 中使用:
+        >>> # 在 Agent 中使用全局配置提供默认值
         >>> from deepeye.agent import PlannerAgent
         >>> from deepeye.config import get_global_config
         >>> 
-        >>> # 设置工作环境的全局配置
+        >>> # 设置工作环境的全局配置（可选）
         >>> config = get_global_config()
-        >>> config.set_node_config("FileDataSource", {
-        ...     "file_path": "/workspace/data/sales.csv"
-        ... })
         >>> config.set_node_config("DatabaseDataSource", {
         ...     "connection_string": "sqlite:///workspace/app.db"
         ... })
         >>> 
-        >>> # 创建 Agent 并注册节点（不会因为缺少配置而失败）
+        >>> # 创建 Agent 并注册节点
         >>> agent = PlannerAgent(llm_client=client, model="gpt-4")
-        >>> agent.register_node(FileDataSourceNode)  # ✓ 成功
+        >>> agent.register_node(FileDataSourceNode)  # ✓ 成功，即使没有全局配置
         >>> agent.register_node(DatabaseDataSourceNode)  # ✓ 成功
     """
     

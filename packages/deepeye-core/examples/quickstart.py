@@ -12,7 +12,7 @@ from deepeye.llm import LLMClient
 from deepeye.agent import PlannerAgent
 
 # 导入节点
-from deepeye.nodes.datasource import CSVDataSourceNode
+from deepeye.nodes.datasource import FileDataSourceNode
 from deepeye.nodes.datacoder import DataCoderNode
 from deepeye.nodes.dataplot import DataPlotNode
 
@@ -55,7 +55,7 @@ def main():
     
     # 4. 注册节点
     print("🔧 注册节点...")
-    agent.register_node(CSVDataSourceNode)
+    agent.register_node(FileDataSourceNode)
     agent.register_node(DataCoderNode)
     agent.register_node(DataPlotNode)
     

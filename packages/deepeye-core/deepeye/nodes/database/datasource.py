@@ -12,6 +12,7 @@ import pandas as pd
 from deepeye.nodes.base import NodeMetadata
 from deepeye.nodes.datasource.base import BaseDataSourceNode, DataSourceConfig
 from deepeye.nodes.database.connection import DatabaseConnection
+from deepeye.nodes.registry import register_node
 from deepeye.nodes.io import (
     NodeInput,
     NodeOutput,
@@ -52,7 +53,7 @@ class DatabaseDataSourceConfig(DataSourceConfig):
         timeout: 查询超时时间（秒）
     """
     
-    connection_string: str
+    connection_string: Optional[str] = None
     mode: DatabaseSourceMode = DatabaseSourceMode.INTROSPECT
     
     # 内省模式配置
@@ -66,6 +67,7 @@ class DatabaseDataSourceConfig(DataSourceConfig):
     timeout: int = 60
 
 
+@register_node
 class DatabaseDataSourceNode(BaseDataSourceNode):
     """数据库数据源节点
     
@@ -126,17 +128,19 @@ class DatabaseDataSourceNode(BaseDataSourceNode):
         self,
         node_id: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
+        validate_on_init: bool = False,
     ):
         """初始化数据库数据源节点
         
         Args:
             node_id: 节点实例ID
             config: 节点配置字典
+            validate_on_init: 是否在初始化时验证配置（默认False，延迟到执行时验证）
         
         Raises:
             ValueError: 配置无效
         """
-        super().__init__(node_id, config)
+        super().__init__(node_id, config, validate_on_init=validate_on_init)
         
         # 设置节点元数据
         self.metadata = NodeMetadata(
@@ -413,10 +417,8 @@ class DatabaseDataSourceNode(BaseDataSourceNode):
     
     def __del__(self):
         """析构函数：关闭数据库连接"""
-        if self.db_connection:
+        if hasattr(self, 'db_connection') and self.db_connection:
             try:
                 self.db_connection.close()
             except:
                 pass
-
-

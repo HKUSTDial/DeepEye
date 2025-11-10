@@ -16,7 +16,8 @@ from deepeye.nodes.nl2sql.prompt import (
     format_statistics_info,
     extract_response_parts,
 )
-from deepeye.nodes.io import NodeInput
+from deepeye.nodes.io import NodeInput, NodeStatus
+from deepeye.llm import LLMResponse
 
 
 @pytest.fixture
@@ -194,7 +195,8 @@ class TestNL2SQLNode:
         """测试成功的 SQL 生成和执行"""
         # Mock LLM 响应
         mock_client_instance = Mock()
-        mock_client_instance.chat.return_value = """
+        mock_response = LLMResponse(
+            content="""
         <think>
         Need to select all products ordered by price descending.
         </think>
@@ -206,7 +208,10 @@ class TestNL2SQLNode:
         <explanation>
         This query retrieves all products and sorts them by price in descending order.
         </explanation>
-        """
+        """,
+            model="gpt-4"
+        )
+        mock_client_instance.generate.return_value = mock_response
         mock_llm_client.return_value = mock_client_instance
         
         # 创建节点
@@ -229,7 +234,7 @@ class TestNL2SQLNode:
         })
         
         # 验证输出 - 现在只有一个 data 端口，包含 sql、dataframe 和 explanation
-        assert outputs["data"].status == "success"
+        assert outputs["data"].status == NodeStatus.SUCCESS
         
         result = outputs["data"].data
         assert "SELECT * FROM products" in result["sql"]
@@ -244,18 +249,23 @@ class TestNL2SQLNode:
         
         # 第一次返回错误的 SQL
         # 第二次返回正确的 SQL
-        mock_client_instance.chat.side_effect = [
-            """
+        mock_response_1 = LLMResponse(
+            content="""
             <think>First attempt</think>
             <sql>SELECT * FROM nonexistent_table</sql>
             <explanation>This will fail</explanation>
             """,
-            """
+            model="gpt-4"
+        )
+        mock_response_2 = LLMResponse(
+            content="""
             <think>Fixing the error</think>
             <sql>SELECT * FROM products</sql>
             <explanation>Corrected query</explanation>
-            """
-        ]
+            """,
+            model="gpt-4"
+        )
+        mock_client_instance.generate.side_effect = [mock_response_1, mock_response_2]
         mock_llm_client.return_value = mock_client_instance
         
         node = NL2SQLNode(
@@ -277,7 +287,7 @@ class TestNL2SQLNode:
         })
         
         # 应该成功（经过1次重试）
-        assert outputs["data"].status == "success"
+        assert outputs["data"].status == NodeStatus.SUCCESS
         assert outputs["data"].metadata["retries"] == 1
         result = outputs["data"].data
         assert len(result["dataframe"]) == 3
@@ -321,14 +331,16 @@ class TestNL2SQLNode:
     
     @patch.dict(os.environ, {"OPENAI_API_KEY": ""}, clear=True)
     def test_missing_api_key(self):
-        """测试缺少 API Key"""
-        with pytest.raises(ValueError, match="需要 API Key"):
-            NL2SQLNode(
-                node_id="test_nl2sql",
-                config={
-                    "model": "gpt-4"
-                }
-            )
+        """测试缺少 API Key 时可以正常初始化（延迟验证）"""
+        # 节点应该可以正常创建，API Key 验证延迟到执行时
+        node = NL2SQLNode(
+            node_id="test_nl2sql",
+            config={
+                "model": "gpt-4"
+            }
+        )
+        assert node is not None
+        assert node.llm_client is not None
     
     @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
     def test_missing_inputs(self):

@@ -34,13 +34,9 @@ from deepeye.config import get_global_config
 # 导入节点
 from deepeye.nodes.datasource import (
     FileDataSourceNode,
-    CSVDataSourceNode,
     MemoryDataSourceNode,
 )
-from deepeye.nodes.processing import (
-    FilterNode,
-    TransformNode,
-)
+# FilterNode 和 TransformNode 已移除，请使用 DataCoderNode 代替
 from deepeye.nodes.datacoder import DataCoderNode
 from deepeye.nodes.dataplot import DataPlotNode
 
@@ -133,10 +129,7 @@ def create_agent_with_nodes() -> PlannerAgent:
     # 注册节点（不需要传递配置，会自动从 GlobalConfig 读取）
     print("\n📋 注册节点...")
     agent.register_node(FileDataSourceNode)
-    agent.register_node(CSVDataSourceNode)
     agent.register_node(MemoryDataSourceNode)
-    agent.register_node(FilterNode)
-    agent.register_node(TransformNode)
     agent.register_node(DataCoderNode)
     agent.register_node(DataPlotNode)
     

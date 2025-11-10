@@ -79,14 +79,16 @@ class BaseDataSourceNode(BaseNode):
         self,
         node_id: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
+        validate_on_init: bool = False,
     ):
         """初始化数据源节点
         
         Args:
             node_id: 节点实例ID
             config: 节点配置字典
+            validate_on_init: 是否在初始化时验证配置（默认False，延迟到执行时验证）
         """
-        super().__init__(node_id, config)
+        super().__init__(node_id, config, validate_on_init=validate_on_init)
         
         # 设置节点元数据（子类应该覆盖）
         self.metadata = NodeMetadata(

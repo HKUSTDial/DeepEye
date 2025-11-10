@@ -93,7 +93,7 @@ class TestDataPlotNodeInit:
     
     def test_init_with_env_api_key(self, mock_llm_client, mock_executor, mock_workspace_manager):
         """测试从环境变量读取 API Key"""
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "env-test-key"}):
+        with patch.dict(os.environ, {"DEEPEYE_LLM_API_KEY": "env-test-key"}):
             node = DataPlotNode(
                 node_id="plot2",
                 config={}
@@ -103,10 +103,12 @@ class TestDataPlotNodeInit:
             mock_llm_client.assert_called_once()
     
     def test_init_without_api_key(self, mock_llm_client, mock_executor, mock_workspace_manager):
-        """测试没有 API Key 时抛出异常"""
+        """测试没有 API Key 时可以正常初始化（延迟验证）"""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError, match="未提供 API Key"):
-                DataPlotNode(config={})
+            # 节点应该可以正常创建，API Key 验证延迟到执行时
+            node = DataPlotNode(config={})
+            assert node is not None
+            assert node.llm_client is not None
     
     def test_init_with_custom_params(self, mock_llm_client, mock_executor, mock_workspace_manager):
         """测试自定义参数初始化"""

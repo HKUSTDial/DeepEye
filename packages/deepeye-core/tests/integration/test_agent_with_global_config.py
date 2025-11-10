@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from deepeye.config import get_global_config
 from deepeye.agent import PlannerAgent
 from deepeye.nodes.datasource import MemoryDataSourceNode
-from deepeye.nodes.processing import TransformNode
+# TransformNode 已移除，请使用 DataCoderNode 代替
 from deepeye.runtime import WorkflowExecutor, ExecutionContext
 from deepeye.runtime.result import ExecutionStatus
 
@@ -128,12 +128,68 @@ class TestAgentWithGlobalConfig:
         output_df = node_result.outputs["data"].data["dataframe"]
         pd.testing.assert_frame_equal(output_df, test_df)
     
-    @pytest.mark.skip(reason="需要 LLM API，跳过")
     def test_agent_with_global_config_full_flow(self):
-        """测试完整的 Agent + GlobalConfig 流程（需要真实的 LLM API）"""
-        # 这个测试需要真实的 LLM API，通常在 CI 中跳过
-        # 可以在本地手动运行以验证完整流程
-        pass
+        """测试完整的 Agent + GlobalConfig 流程（使用 mock LLM）"""
+        from deepeye.llm.client import LLMClient, LLMResponse
+        
+        # 准备测试数据
+        test_df = pd.DataFrame({
+            "x": [1, 2, 3],
+            "y": [4, 5, 6]
+        })
+        
+        # 通过 GlobalConfig 配置 MemoryDataSource
+        config = get_global_config()
+        config.set_node_config("MemoryDataSource", {
+            "data": test_df,
+        })
+        
+        # Mock LLMClient - 返回一个包含执行计划的响应
+        mock_llm_client = Mock(spec=LLMClient)
+        mock_response = LLMResponse(
+            content='''{
+    "steps": [
+        {
+            "step_id": 1,
+            "tool": "MemoryDataSource",
+            "description": "加载内存中的数据",
+            "static_inputs": {},
+            "config": {}
+        }
+    ]
+}''',
+            model="gpt-3.5-turbo",
+            total_tokens=100,
+            prompt_tokens=50,
+            completion_tokens=50,
+            response_time=0.5
+        )
+        mock_llm_client.generate.return_value = mock_response
+        
+        # 创建 PlannerAgent
+        agent = PlannerAgent(mock_llm_client)
+        agent.register_node(MemoryDataSourceNode)
+        
+        # 运行 Agent
+        result = agent.run("加载内存中的数据", auto_execute=True)
+        
+        # 验证 Agent 执行成功
+        assert result.success, f"Agent执行失败: {result.error}"
+        assert result.workflow is not None
+        
+        # 验证工作流包含 MemoryDataSource 节点
+        nodes = result.workflow.list_nodes()
+        assert len(nodes) == 1
+        node_id = nodes[0]
+        node = result.workflow.get_node(node_id)
+        assert isinstance(node, MemoryDataSourceNode)
+        
+        # 验证节点配置来自 GlobalConfig
+        pd.testing.assert_frame_equal(node.config.data, test_df)
+        
+        # 验证执行结果成功
+        assert result.execution_result is not None
+        assert result.execution_result.get("success", False)
 
 
 class TestAgentGlobalConfigEdgeCases:

@@ -19,9 +19,6 @@ from deepeye.nodes.datasource.memory import (
 from deepeye.nodes.datasource.file import (
     FileDataSourceNode,
     FileDataSourceConfig,
-    CSVDataSourceNode,
-    JSONDataSourceNode,
-    ExcelDataSourceNode,
 )
 
 __all__ = [
@@ -36,7 +33,4 @@ __all__ = [
     # 文件数据源
     "FileDataSourceNode",
     "FileDataSourceConfig",
-    "CSVDataSourceNode",
-    "JSONDataSourceNode",
-    "ExcelDataSourceNode",
 ]
