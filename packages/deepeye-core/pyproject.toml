@@ -37,6 +37,8 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     # 日志和监控
     "structlog>=23.2.0",
+    # 存储
+    "minio>=7.2.0",
     # 工具库
     "networkx>=3.2.0",
     "pyyaml>=6.0.0",
