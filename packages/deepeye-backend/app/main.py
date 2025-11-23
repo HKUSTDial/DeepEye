@@ -3,7 +3,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, files, nodes, workflow
+from app.api.v1 import (
+    auth,
+    database_connections,
+    files,
+    llm_models,
+    nodes,
+    workflow,
+)
 from app.config import settings
 
 # Import deepeye-core nodes to ensure they are registered
@@ -38,6 +45,8 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(files.router, prefix=settings.API_V1_PREFIX)
 app.include_router(workflow.router, prefix=settings.API_V1_PREFIX)
 app.include_router(nodes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(database_connections.router, prefix=settings.API_V1_PREFIX)
+app.include_router(llm_models.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")
