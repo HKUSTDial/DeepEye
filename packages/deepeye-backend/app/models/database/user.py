@@ -29,6 +29,8 @@ class User(Base):
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
     workflows = relationship("Workflow", back_populates="user", cascade="all, delete-orphan")
     files = relationship("File", back_populates="user", cascade="all, delete-orphan")
+    database_connections = relationship("DatabaseConnection", back_populates="user", cascade="all, delete-orphan")
+    llm_models = relationship("LLMModel", back_populates="user", cascade="all, delete-orphan")
 
 
 class PasswordResetToken(Base):

@@ -68,9 +68,9 @@ Homepage = "https://deepeye.ai"
 Repository = "https://github.com/deepeye-ai/deepeye"
 Documentation = "https://docs.deepeye.ai"
 
-[[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
+# [[tool.uv.index]]
+# url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+# default = true
 
 [build-system]
 requires = ["hatchling"]

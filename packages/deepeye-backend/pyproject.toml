@@ -51,9 +51,9 @@ dev = [
 [tool.uv.sources]
 deepeye-core = { path = "../deepeye-core", editable = true }
 
-[[tool.uv.index]]
-name = "TencentCloud"
-url = "https://mirrors.cloud.tencent.com/pypi/simple/"
+# [[tool.uv.index]]
+# name = "TencentCloud"
+# url = "https://mirrors.cloud.tencent.com/pypi/simple/"
 
 [build-system]
 requires = ["hatchling"]
