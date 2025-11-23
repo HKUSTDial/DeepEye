@@ -29,4 +29,5 @@ class File(Base):
 
     # Relationships
     user = relationship("User", back_populates="files")
+    metadata_info = relationship("FileMetadata", back_populates="file", uselist=False, cascade="all, delete-orphan")
 
