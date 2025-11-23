@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from app.config import settings
 from app.db.base import Base
 # Import all models to register them with Base.metadata
-from app.models.database import User, PasswordResetToken, Workflow  # noqa: F401
+from app.models.database import File, PasswordResetToken, User, Workflow  # noqa: F401
 
 
 async def init_db():
