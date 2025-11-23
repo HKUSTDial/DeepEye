@@ -32,4 +32,9 @@ class DatabaseConnection(Base):
 
     # Relationships
     user = relationship("User", back_populates="database_connections")
+    
+    table_descriptions = relationship("TableDescription", back_populates="connection", cascade="all, delete-orphan")
+    business_rules = relationship("BusinessRule", back_populates="connection", cascade="all, delete-orphan")
+    business_metrics = relationship("BusinessMetric", back_populates="connection", cascade="all, delete-orphan")
+    example_queries = relationship("ExampleQuery", back_populates="connection", cascade="all, delete-orphan")
 

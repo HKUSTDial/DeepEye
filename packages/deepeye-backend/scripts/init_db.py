@@ -30,6 +30,12 @@ from app.models.database import (  # noqa: F401
     PasswordResetToken,
     User,
     Workflow,
+    FileMetadata,
+    TableDescription,
+    ColumnDescription,
+    BusinessRule,
+    BusinessMetric,
+    ExampleQuery,
 )
 
 
@@ -74,4 +80,3 @@ async def init_db():
 
 if __name__ == "__main__":
     asyncio.run(init_db())
-
