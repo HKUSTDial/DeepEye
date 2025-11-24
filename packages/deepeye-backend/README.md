@@ -72,13 +72,13 @@ uv run python scripts/init_db.py
 
 ```bash
 # 开发模式（热重载）
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --port 8001
 
 # 或使用 uv
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --port 8001
 ```
 
-访问 http://localhost:8000/docs 查看 API 文档。
+访问 http://localhost:8001/docs 查看 API 文档。
 
 ## 开发
 

@@ -13,6 +13,7 @@ import { MainLayout } from '@/features/layout'
 import { DatabaseConnectionsPage } from '@/features/connections'
 import { LLMModelsPage } from '@/features/llms'
 import { FileStoragePage } from '@/features/storage'
+import { KnowledgePage } from '@/features/knowledge'
 
 type Route =
   | { type: 'login' }
@@ -20,6 +21,7 @@ type Route =
   | { type: 'connections' }
   | { type: 'llms' }
   | { type: 'files' }
+  | { type: 'knowledge' }
   | { type: 'settings' }
   | { type: 'editor'; workflowId?: string }
 
@@ -58,7 +60,7 @@ export function Router() {
   }
 
   const handleNavigate = (page: string) => {
-    if (['workflows', 'settings', 'connections', 'llms', 'files'].includes(page)) {
+    if (['workflows', 'settings', 'connections', 'llms', 'files', 'knowledge'].includes(page)) {
       setRoute({ type: page as Route['type'] })
     }
   }
@@ -104,6 +106,8 @@ export function Router() {
       {route.type === 'llms' && <LLMModelsPage />}
 
       {route.type === 'files' && <FileStoragePage />}
+
+      {route.type === 'knowledge' && <KnowledgePage />}
 
       {route.type === 'settings' && (
         <div className="flex h-full items-center justify-center">
