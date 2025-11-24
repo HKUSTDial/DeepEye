@@ -64,15 +64,18 @@ export class APIClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
     
-    // 构建请求头
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
+    // 构建请求头（默认使用 JSON，但对 FormData 自动让浏览器处理）
+    const headers = new Headers(options.headers || undefined)
+    const isFormDataBody =
+      typeof FormData !== 'undefined' && options.body instanceof FormData
+
+    if (!isFormDataBody && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json')
     }
 
     // 添加认证 Token
     if (this.token) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`
+      headers.set('Authorization', `Bearer ${this.token}`)
     }
 
     // 创建 AbortController 用于超时控制
@@ -80,11 +83,14 @@ export class APIClient {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      })
+      const response = await fetch(
+        url,
+        {
+          ...options,
+          headers,
+          signal: controller.signal,
+        }
+      )
 
       clearTimeout(timeoutId)
 

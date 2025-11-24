@@ -12,12 +12,14 @@ import { WorkflowEditor } from '@/features/editor'
 import { MainLayout } from '@/features/layout'
 import { DatabaseConnectionsPage } from '@/features/connections'
 import { LLMModelsPage } from '@/features/llms'
+import { FileStoragePage } from '@/features/storage'
 
 type Route =
   | { type: 'login' }
   | { type: 'workflows' }
   | { type: 'connections' }
   | { type: 'llms' }
+  | { type: 'files' }
   | { type: 'settings' }
   | { type: 'editor'; workflowId?: string }
 
@@ -56,7 +58,7 @@ export function Router() {
   }
 
   const handleNavigate = (page: string) => {
-    if (['workflows', 'settings', 'connections', 'llms'].includes(page)) {
+    if (['workflows', 'settings', 'connections', 'llms', 'files'].includes(page)) {
       setRoute({ type: page as Route['type'] })
     }
   }
@@ -100,6 +102,8 @@ export function Router() {
       {route.type === 'connections' && <DatabaseConnectionsPage />}
 
       {route.type === 'llms' && <LLMModelsPage />}
+
+      {route.type === 'files' && <FileStoragePage />}
 
       {route.type === 'settings' && (
         <div className="flex h-full items-center justify-center">
