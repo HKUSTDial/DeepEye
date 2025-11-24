@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 连接测试</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #3B82F6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: #2563EB;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success {
+      border-color: #10b981;
+      background: #ecfdf5;
+    }
+    .error {
+      border-color: #ef4444;
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    .info {
+      background: #eff6ff;
+      border: 1px solid #3b82f6;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔌 DeepEye API 连接测试</h1>
+    
+    <div class="info">
+      <strong>API 地址:</strong> <span id="apiUrl">http://localhost:8123/api/v1</span>
+    </div>
+
+    <div>
+      <button onclick="testHealth()">测试健康检查</button>
+      <button onclick="testNodesList()">测试节点列表</button>
+      <button onclick="testCORS()">测试 CORS</button>
+    </div>
+
+    <div id="result" class="result" style="display: none;"></div>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:8123/api/v1'
+    const resultDiv = document.getElementById('result')
+
+    function showResult(message, isError = false) {
+      resultDiv.style.display = 'block'
+      resultDiv.className = 'result ' + (isError ? 'error' : 'success')
+      resultDiv.textContent = message
+    }
+
+    async function testHealth() {
+      try {
+        showResult('正在测试健康检查...')
+        const response = await fetch('http://localhost:8123/health')
+        const data = await response.json()
+        
+        showResult(
+          `✅ 健康检查成功！\n\n` +
+          `状态码: ${response.status}\n` +
+          `响应: ${JSON.stringify(data, null, 2)}`
+        )
+      } catch (error) {
+        showResult(
+          `❌ 健康检查失败！\n\n` +
+          `错误: ${error.message}\n\n` +
+          `请确保后端服务运行在 http://localhost:8123`,
+          true
+        )
+      }
+    }
+
+    async function testNodesList() {
+      try {
+        showResult('正在获取节点列表...')
+        const response = await fetch(`${API_BASE_URL}/nodes`)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        
+        showResult(
+          `✅ 节点列表获取成功！\n\n` +
+          `状态码: ${response.status}\n` +
+          `节点数量: ${data.total}\n` +
+          `响应数据:\n${JSON.stringify(data, null, 2)}`
+        )
+      } catch (error) {
+        showResult(
+          `❌ 节点列表获取失败！\n\n` +
+          `错误: ${error.message}\n\n` +
+          `完整 URL: ${API_BASE_URL}/nodes`,
+          true
+        )
+      }
+    }
+
+    async function testCORS() {
+      try {
+        showResult('正在测试 CORS 配置...')
+        const response = await fetch(`${API_BASE_URL}/nodes`, {
+          method: 'OPTIONS',
+        })
+        
+        const corsHeaders = {
+          'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+          'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+          'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+        }
+        
+        showResult(
+          `✅ CORS 测试完成！\n\n` +
+          `状态码: ${response.status}\n` +
+          `CORS 头信息:\n${JSON.stringify(corsHeaders, null, 2)}`
+        )
+      } catch (error) {
+        showResult(
+          `❌ CORS 测试失败！\n\n` +
+          `错误: ${error.message}`,
+          true
+        )
+      }
+    }
+
+    // 页面加载时自动测试健康检查
+    window.addEventListener('load', () => {
+      setTimeout(testHealth, 500)
+    })
+  </script>
+</body>
+</html>
+
