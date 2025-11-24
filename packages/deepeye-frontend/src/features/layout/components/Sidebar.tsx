@@ -12,6 +12,7 @@ import {
   LucideIcon,
   Database,
   Bot,
+  HardDrive,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 
@@ -39,6 +40,12 @@ const navItems: NavItem[] = [
     icon: Database,
     label: '数据库管理',
     tooltip: '管理数据库连接',
+  },
+  {
+    id: 'files',
+    icon: HardDrive,
+    label: '文件空间',
+    tooltip: '管理个人文件',
   },
   {
     id: 'llms',
