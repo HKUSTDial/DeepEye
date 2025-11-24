@@ -3,7 +3,16 @@
  */
 
 import { useState } from 'react'
-import { Workflow, Settings, LogOut, ChevronLeft, ChevronRight, LucideIcon } from 'lucide-react'
+import {
+  Workflow,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  LucideIcon,
+  Database,
+  Bot,
+} from 'lucide-react'
 import { useAuthStore } from '@/store'
 
 interface SidebarProps {
@@ -24,6 +33,18 @@ const navItems: NavItem[] = [
     icon: Workflow,
     label: '工作流',
     tooltip: '工作流管理',
+  },
+  {
+    id: 'connections',
+    icon: Database,
+    label: '数据库管理',
+    tooltip: '管理数据库连接',
+  },
+  {
+    id: 'llms',
+    icon: Bot,
+    label: '模型列表',
+    tooltip: '管理 LLM 模型',
   },
   {
     id: 'settings',

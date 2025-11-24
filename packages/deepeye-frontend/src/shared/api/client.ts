@@ -93,9 +93,28 @@ export class APIClient {
         await this.handleError(response)
       }
 
-      // 解析 JSON
-      const data = await response.json()
-      return data as T
+      // 204 无内容直接返回
+      if (response.status === 204) {
+        return undefined as T
+      }
+
+      const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+      const isJSON = contentType.includes('application/json') || contentType.includes('+json')
+      const rawText = await response.text()
+
+      if (!rawText) {
+        return undefined as T
+      }
+
+      if (isJSON) {
+        try {
+          return JSON.parse(rawText) as T
+        } catch (error) {
+          console.warn('解析 JSON 失败，返回原始文本', error)
+        }
+      }
+
+      return rawText as T
     } catch (error) {
       clearTimeout(timeoutId)
       
