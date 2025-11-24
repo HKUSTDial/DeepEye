@@ -87,3 +87,8 @@ temp/
 *.tmp
 
 cursor_docs/
+
+# Example database data files (if any local files are created)
+scripts/examples/*.db
+scripts/examples/*.sqlite
+scripts/examples/*.sqlite3

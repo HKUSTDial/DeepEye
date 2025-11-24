@@ -175,12 +175,14 @@ async def sync_database_schema(db: AsyncSession, connection_id: UUID, user_id: s
         t_desc = table_info["comment"]
         
         # Upsert Table
+        is_new_table = False
         if t_name in existing_tables:
             table_obj = existing_tables[t_name]
             # Only update description if it's currently empty and we found one in DB
             if not table_obj.description and t_desc:
                 table_obj.description = t_desc
         else:
+            is_new_table = True
             table_obj = TableDescription(
                 connection_id=str(connection_id),
                 table_name=t_name,
@@ -193,31 +195,62 @@ async def sync_database_schema(db: AsyncSession, connection_id: UUID, user_id: s
         synced_tables.append(table_obj)
         
         # Upsert Columns
-        existing_columns = {c.column_name: c for c in table_obj.columns} if table_obj.columns else {}
+        # For existing tables, columns are already loaded via selectinload
+        # For new tables, we need to explicitly load or use empty dict (new tables have no existing columns)
+        if is_new_table:
+            # New table, no existing columns
+            existing_columns = {}
+        else:
+            # Existing table, columns are already loaded via selectinload
+            existing_columns = {c.column_name: c for c in table_obj.columns} if table_obj.columns else {}
         
-        for col_info in table_info["columns"]:
+        for col_position, col_info in enumerate(table_info["columns"]):
             c_name = col_info["name"]
             c_desc = col_info["comment"]
             # We could also store the type if we added a type field to ColumnDescription
             
             if c_name in existing_columns:
                 col_obj = existing_columns[c_name]
+                # Update position if it has changed (e.g., table was altered)
+                if col_obj.position != col_position:
+                    col_obj.position = col_position
                 if not col_obj.description and c_desc:
                     col_obj.description = c_desc
             else:
                 col_obj = ColumnDescription(
                     table_description_id=table_obj.id,
                     column_name=c_name,
-                    description=c_desc
+                    description=c_desc,
+                    position=col_position
                 )
                 db.add(col_obj)
 
     await db.commit()
     
-    # Refresh to return full objects
-    for t in synced_tables:
-        await db.refresh(t, attribute_names=["columns"])
+    # Refresh to return full objects with relationships loaded
+    # Re-query to ensure relationships are properly loaded in async context
+    # This is especially important for newly created tables to avoid lazy loading issues
+    table_ids = [t.id for t in synced_tables]
+    if table_ids:
+        refresh_stmt = (
+            select(TableDescription)
+            .options(selectinload(TableDescription.columns))
+            .where(TableDescription.id.in_(table_ids))
+        )
+        result = await db.execute(refresh_stmt)
+        refreshed_tables = {t.id: t for t in result.scalars().all()}
         
+        # Verify all tables were found after commit
+        if len(refreshed_tables) != len(synced_tables):
+            missing_ids = set(table_ids) - set(refreshed_tables.keys())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to refresh all tables after commit. Missing table IDs: {missing_ids}"
+            )
+        
+        # Return in the same order as synced_tables, ensuring all tables are included with relationships loaded
+        return [refreshed_tables[t.id] for t in synced_tables]
+    
     return synced_tables
 
 

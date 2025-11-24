@@ -15,6 +15,7 @@ dependencies = [
     "sqlalchemy>=2.0.35",
     "psycopg2-binary>=2.9.9",
     "asyncpg>=0.29.0",
+    "pymysql>=1.1.0",
     
     # Auth
     "python-jose[cryptography]>=3.3.0",

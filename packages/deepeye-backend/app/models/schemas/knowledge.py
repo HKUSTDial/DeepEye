@@ -45,6 +45,7 @@ class ColumnDescriptionUpdate(BaseModel):
 class ColumnDescriptionResponse(ColumnDescriptionBase):
     id: UUID
     table_description_id: UUID
+    position: int
     created_at: datetime
     updated_at: datetime
 

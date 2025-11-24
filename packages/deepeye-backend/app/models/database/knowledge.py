@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import uuid4
 from typing import List, Optional
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text, Boolean, ARRAY
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text, Boolean, ARRAY, Integer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
@@ -50,7 +50,12 @@ class TableDescription(Base):
 
     # Relationships
     connection = relationship("DatabaseConnection", back_populates="table_descriptions")
-    columns = relationship("ColumnDescription", back_populates="table_description", cascade="all, delete-orphan")
+    columns = relationship(
+        "ColumnDescription", 
+        back_populates="table_description", 
+        cascade="all, delete-orphan",
+        order_by="ColumnDescription.position"
+    )
 
 
 class ColumnDescription(Base):
@@ -63,6 +68,7 @@ class ColumnDescription(Base):
     
     column_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    position = Column(Integer, nullable=False, default=0)  # Column position in table definition
     
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(
