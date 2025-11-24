@@ -662,8 +662,14 @@ export function DatabaseKnowledgePanel() {
                       onClick={() => void handleSaveTableDescription()}
                       disabled={savingTable}
                     >
-                      {savingTable && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      保存表描述
+                      {savingTable ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          保存中...
+                        </>
+                      ) : (
+                        '保存表描述'
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -677,20 +683,8 @@ export function DatabaseKnowledgePanel() {
                         key={column.id}
                         className="rounded-md border border-border/60 bg-background p-3"
                       >
-                        <div className="flex items-center justify-between text-sm font-semibold">
+                        <div className="text-sm font-semibold">
                           <span>{column.column_name}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleSaveColumnDescription(column.id)}
-                            disabled={savingColumnId === column.id}
-                          >
-                            {savingColumnId === column.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                            ) : (
-                              <Pencil className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
                         </div>
                         <Textarea
                           className="mt-2 min-h-[70px] text-xs"
@@ -703,6 +697,22 @@ export function DatabaseKnowledgePanel() {
                             }))
                           }
                         />
+                        <div className="mt-2 text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => void handleSaveColumnDescription(column.id)}
+                            disabled={savingColumnId === column.id}
+                          >
+                            {savingColumnId === column.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                保存中...
+                              </>
+                            ) : (
+                              '保存'
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
