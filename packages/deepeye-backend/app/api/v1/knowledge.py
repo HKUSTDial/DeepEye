@@ -3,9 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
-from app.db.session import get_db
+from app.dependencies import get_db, get_current_user
 from app.models.database import User
-from app.api.v1.auth import get_current_user
 from app.models.schemas.knowledge import (
     FileMetadataCreate,
     FileMetadataUpdate,

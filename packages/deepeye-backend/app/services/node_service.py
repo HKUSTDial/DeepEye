@@ -1,5 +1,6 @@
 """Node service for managing node operations."""
 
+import base64
 import time
 from typing import Any, Dict, List, Optional
 
@@ -127,8 +128,19 @@ class NodeService:
                 error_output = next(
                     output for output in outputs.values() if output.is_failed()
                 )
-                error_msg = error_output.error or "Node execution failed"
+
+                error_msg = error_output.error
+                if not error_msg and error_output.metadata:
+                    error_msg = error_output.metadata.get("error")
+                if not error_msg:
+                    error_msg = "Node execution failed"
+
                 execution_time = time.time() - start_time
+
+                print(f"❌ Node execution failed: {node_type}")
+                print(f"   Error: {error_msg}")
+                print(f"   Output metadata: {error_output.metadata}")
+
                 return NodeExecutionResult(
                     status="failed",
                     outputs={},
@@ -149,6 +161,13 @@ class NodeService:
             )
         except Exception as e:
             execution_time = time.time() - start_time
+
+            import traceback
+            print(f"❌ Node execution exception: {node_type}")
+            print(f"   Error: {str(e)}")
+            print(f"   Traceback:")
+            traceback.print_exc()
+
             return NodeExecutionResult(
                 status="failed",
                 outputs={},
@@ -165,6 +184,14 @@ class NodeService:
 
     def _serialize_value(self, value: Any) -> Any:
         """Serialize a single value."""
+        # Handle bytes
+        if isinstance(value, bytes):
+            try:
+                return base64.b64encode(value).decode('utf-8')
+            except Exception as e:
+                print(f"⚠️  cant serialize bytes: {e}")
+                return None
+
         # Handle pandas DataFrame
         if hasattr(value, "shape") and hasattr(value, "columns"):
             try:
@@ -176,6 +203,14 @@ class NodeService:
                 }
             except Exception:
                 return {"type": "DataFrame", "shape": list(value.shape), "columns": list(value.columns)}
+
+        # Handle dict (recursively serialize nested values)
+        if isinstance(value, dict):
+            return {k: self._serialize_value(v) for k, v in value.items()}
+
+        # Handle list (recursively serialize elements)
+        if isinstance(value, list):
+            return [self._serialize_value(item) for item in value]
 
         # Handle other types
         return value
