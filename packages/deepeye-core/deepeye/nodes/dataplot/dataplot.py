@@ -22,6 +22,7 @@ from deepeye.nodes.io import (
     NodeStatus,
 )
 from deepeye.nodes.dataplot.executor import PlotCodeExecutor
+from deepeye.nodes.utils import deserialize_dataframe
 from deepeye.llm import LLMClient, Message
 from deepeye.nodes.dataplot.prompt import (
     format_initial_prompt,
@@ -34,10 +35,10 @@ from deepeye.nodes.registry import register_node
 
 class DataPlotConfig(NodeConfig):
     """DataPlot 节点配置"""
-    
+
     # LLM 配置
     api_key: Optional[str] = None
-    base_url: str = "https://api.openai.com/v1"
+    base_url: Optional[str] = None  # 如果为 None，则从环境变量读取
     model: str = "gpt-4"
     temperature: float = 0.1
     
@@ -218,11 +219,12 @@ class DataPlotNode(BaseNode):
         ]
         
         # 初始化 LLM 客户端
-        api_key = self.config.api_key or os.getenv("DEEPEYE_LLM_API_KEY")
-        
+        api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
+        base_url = self.config.base_url or os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
         self.llm_client = LLMClient(
             api_key=api_key,
-            base_url=self.config.base_url,
+            base_url=base_url,
             timeout=self.config.timeout
         )
         
@@ -247,14 +249,16 @@ class DataPlotNode(BaseNode):
     
     def _parse_config(self, config: Dict[str, Any]) -> DataPlotConfig:
         """解析配置
-        
+
         Args:
             config: 配置字典
-            
+
         Returns:
             DataPlotConfig 对象
         """
         return DataPlotConfig(**config)
+
+
     
     def execute(self, inputs: Dict[str, NodeInput]) -> Dict[str, NodeOutput]:
         """执行可视化任务
@@ -293,14 +297,24 @@ class DataPlotNode(BaseNode):
         # 验证输入类型
         if not isinstance(dataframes, list):
             dataframes = [dataframes]
-        
+
+        # 尝试将所有数据转换为 DataFrame
+        converted_dataframes = []
         for i, df in enumerate(dataframes):
-            if not isinstance(df, pd.DataFrame):
-                return self.create_single_output(
-                    data=None,
-                    status=NodeStatus.FAILED,
-                    error=f"DataFrame {i} 必须是 pandas.DataFrame，但得到 {type(df).__name__}"
-                )
+            if isinstance(df, pd.DataFrame):
+                converted_dataframes.append(df)
+            else:
+                # 尝试反序列化
+                converted_df = deserialize_dataframe(df)
+                if converted_df is None:
+                    return self.create_single_output(
+                        data=None,
+                        status=NodeStatus.FAILED,
+                        error=f"DataFrame {i} 无法转换为 pandas.DataFrame（类型: {type(df).__name__}）"
+                    )
+                converted_dataframes.append(converted_df)
+
+        dataframes = converted_dataframes
         
         if not isinstance(task_description, str):
             return self.create_single_output(

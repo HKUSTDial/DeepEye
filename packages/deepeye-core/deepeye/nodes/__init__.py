@@ -22,6 +22,10 @@ from deepeye.nodes.registry import (
     register_node,
     get_registry,
 )
+from deepeye.nodes.utils import (
+    deserialize_dataframe,
+    deserialize_dataframe_list,
+)
 
 # 导入所有节点类以触发自动注册
 # 数据源节点
@@ -53,6 +57,9 @@ __all__ = [
     "NodeRegistry",
     "register_node",
     "get_registry",
+    # Utils
+    "deserialize_dataframe",
+    "deserialize_dataframe_list",
     # 数据源节点
     "MemoryDataSourceNode",
     "FileDataSourceNode",

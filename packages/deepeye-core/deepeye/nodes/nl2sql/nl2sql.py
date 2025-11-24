@@ -30,18 +30,18 @@ from deepeye.nodes.registry import register_node
 
 class NL2SQLConfig(NodeConfig):
     """NL2SQL 节点配置"""
-    
+
     # LLM 配置
     api_key: Optional[str] = None
-    base_url: str = "https://api.openai.com/v1"
+    base_url: Optional[str] = None  # 如果为 None，则从环境变量读取
     model: str = "gpt-4"
     temperature: float = 0.0  # 使用 0 温度以获得确定性输出
-    
+
     # 执行配置
     max_retries: int = 3
     timeout: int = 60
     max_rows: int = 100000  # 查询结果的最大行数
-    
+
     # 调试选项
     verbose: bool = False
 
@@ -203,11 +203,12 @@ class NL2SQLNode(BaseNode):
         ]
         
         # 初始化 LLM 客户端
-        api_key = self.config.api_key or os.getenv("DEEPEYE_LLM_API_KEY")
-        
+        api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
+        base_url = self.config.base_url or os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
         self.llm_client = LLMClient(
             api_key=api_key,
-            base_url=self.config.base_url,
+            base_url=base_url,
         )
         
         # 数据库连接（延迟初始化）
