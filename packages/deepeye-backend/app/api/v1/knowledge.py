@@ -90,6 +90,16 @@ async def update_column_description(
 
 # --- Business Rules ---
 
+@router.get("/database/{connection_id}/rules", response_model=List[BusinessRuleResponse])
+async def list_business_rules(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List business rules for a connection."""
+    return await knowledge_service.get_business_rules(db, connection_id, current_user.id)
+
+
 @router.post("/database/{connection_id}/rules", response_model=BusinessRuleResponse)
 async def create_business_rule(
     connection_id: UUID,
@@ -121,6 +131,16 @@ async def delete_business_rule(
 
 # --- Business Metrics ---
 
+@router.get("/database/{connection_id}/metrics", response_model=List[BusinessMetricResponse])
+async def list_business_metrics(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List business metrics for a connection."""
+    return await knowledge_service.get_business_metrics(db, connection_id, current_user.id)
+
+
 @router.post("/database/{connection_id}/metrics", response_model=BusinessMetricResponse)
 async def create_business_metric(
     connection_id: UUID,
@@ -151,6 +171,16 @@ async def delete_business_metric(
     await knowledge_service.delete_business_metric(db, metric_id, current_user.id)
 
 # --- Example Queries (Memory) ---
+
+@router.get("/database/{connection_id}/examples", response_model=List[ExampleQueryResponse])
+async def list_example_queries(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List example queries for a connection."""
+    return await knowledge_service.get_example_queries(db, connection_id, current_user.id)
+
 
 @router.post("/database/{connection_id}/examples", response_model=ExampleQueryResponse)
 async def create_example_query(

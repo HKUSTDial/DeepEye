@@ -11,6 +11,7 @@ import {
   Input,
 } from '@/shared/components/ui'
 import { toast } from '@/store'
+import { downloadFileFromUrl } from '@/shared/utils'
 import {
   Download,
   FileText,
@@ -157,16 +158,14 @@ export function FileStoragePage() {
     }
   }
 
-  const handleDownload = async (fileId: string) => {
+  const handleDownload = async (file: StoredFile) => {
     try {
-      const { url } = await filesAPI.getDownloadUrl(fileId)
-      if (url && typeof window !== 'undefined') {
-        window.open(url, '_blank', 'noopener,noreferrer')
-      } else if (url) {
-        toast.info(`下载链接已生成：${url}`)
-      } else {
+      const { url } = await filesAPI.getDownloadUrl(file.id)
+      if (!url) {
         toast.error('无法获取下载链接')
+        return
       }
+      await downloadFileFromUrl(url, file.original_name || file.filename || 'download')
     } catch (error) {
       console.error('获取下载链接失败:', error)
       toast.error('下载失败，请稍后重试')
@@ -383,7 +382,7 @@ export function FileStoragePage() {
                                 variant="ghost"
                                 size="icon"
                                 aria-label="下载文件"
-                                onClick={() => void handleDownload(file.id)}
+                                onClick={() => void handleDownload(file)}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>

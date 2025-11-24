@@ -13,6 +13,7 @@ import {
   Database,
   Bot,
   HardDrive,
+  BookOpen,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 
@@ -46,6 +47,12 @@ const navItems: NavItem[] = [
     icon: HardDrive,
     label: '文件空间',
     tooltip: '管理个人文件',
+  },
+  {
+    id: 'knowledge',
+    icon: BookOpen,
+    label: '知识库',
+    tooltip: '文件 & 数据库知识',
   },
   {
     id: 'llms',

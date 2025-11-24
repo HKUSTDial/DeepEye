@@ -9,6 +9,10 @@
 
 import { apiConfig } from '../config/api.config'
 
+export interface APIRequestOptions extends RequestInit {
+  skipErrorStatuses?: number[]
+}
+
 export interface APIError {
   message: string
   status: number
@@ -60,14 +64,15 @@ export class APIClient {
    */
   async request<T = any>(
     endpoint: string,
-    options: RequestInit = {}
+    options: APIRequestOptions = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
+    const { skipErrorStatuses, ...fetchOptions } = options
     
     // 构建请求头（默认使用 JSON，但对 FormData 自动让浏览器处理）
-    const headers = new Headers(options.headers || undefined)
+    const headers = new Headers(fetchOptions.headers || undefined)
     const isFormDataBody =
-      typeof FormData !== 'undefined' && options.body instanceof FormData
+      typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData
 
     if (!isFormDataBody && !headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json')
@@ -86,7 +91,7 @@ export class APIClient {
       const response = await fetch(
         url,
         {
-          ...options,
+          ...fetchOptions,
           headers,
           signal: controller.signal,
         }
@@ -96,6 +101,9 @@ export class APIClient {
 
       // 处理响应
       if (!response.ok) {
+        if (skipErrorStatuses?.includes(response.status)) {
+          return undefined as T
+        }
         await this.handleError(response)
       }
 

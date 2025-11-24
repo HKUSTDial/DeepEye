@@ -292,6 +292,20 @@ async def update_column_description(
 
 # --- Business Rules Services ---
 
+async def get_business_rules(
+    db: AsyncSession, connection_id: UUID, user_id: str
+) -> List[BusinessRule]:
+    await _verify_connection_access(db, connection_id, user_id)
+    
+    stmt = (
+        select(BusinessRule)
+        .where(BusinessRule.connection_id == str(connection_id))
+        .order_by(BusinessRule.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def create_business_rule(
     db: AsyncSession, connection_id: UUID, rule: BusinessRuleCreate, user_id: str
 ) -> BusinessRule:
@@ -351,6 +365,20 @@ async def delete_business_rule(db: AsyncSession, rule_id: UUID, user_id: str) ->
 
 # --- Business Metrics Services ---
 
+async def get_business_metrics(
+    db: AsyncSession, connection_id: UUID, user_id: str
+) -> List[BusinessMetric]:
+    await _verify_connection_access(db, connection_id, user_id)
+    
+    stmt = (
+        select(BusinessMetric)
+        .where(BusinessMetric.connection_id == str(connection_id))
+        .order_by(BusinessMetric.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def create_business_metric(
     db: AsyncSession, connection_id: UUID, metric: BusinessMetricCreate, user_id: str
 ) -> BusinessMetric:
@@ -409,6 +437,20 @@ async def delete_business_metric(db: AsyncSession, metric_id: UUID, user_id: str
 
 
 # --- Example Query Services ---
+
+async def get_example_queries(
+    db: AsyncSession, connection_id: UUID, user_id: str
+) -> List[ExampleQuery]:
+    await _verify_connection_access(db, connection_id, user_id)
+    
+    stmt = (
+        select(ExampleQuery)
+        .where(ExampleQuery.connection_id == str(connection_id))
+        .order_by(ExampleQuery.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
 
 async def create_example_query(
     db: AsyncSession, connection_id: UUID, example: ExampleQueryCreate, user_id: str

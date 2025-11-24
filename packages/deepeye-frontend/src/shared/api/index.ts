@@ -9,6 +9,7 @@ export * from './nodes'
 export * from './databaseConnections'
 export * from './llmModels'
 export * from './files'
+export * from './knowledge'
 
 // 导入各个 API 模块
 import { authAPI } from './auth'
@@ -17,6 +18,7 @@ import { nodesAPI } from './nodes'
 import { databaseConnectionsAPI } from './databaseConnections'
 import { llmModelsAPI } from './llmModels'
 import { filesAPI } from './files'
+import { knowledgeAPI } from './knowledge'
 
 // 统一的 API 对象（推荐使用）
 export const api = {
@@ -26,6 +28,7 @@ export const api = {
   connections: databaseConnectionsAPI,
   llms: llmModelsAPI,
   files: filesAPI,
+  knowledge: knowledgeAPI,
 }
 
 // 导出配置管理器
