@@ -1,12 +1,17 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import BytesIO
 from typing import Optional
 import logging
 
 from minio import Minio
+from minio.datatypes import PostPolicy
 from minio.error import S3Error
 
-from deepeye.storage.interface import StorageBackend
+from deepeye.storage.interface import (
+    StorageBackend,
+    StorageObjectMetadata,
+    StorageUploadPolicy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +44,8 @@ class MinioBackend(StorageBackend):
             secret_key=secret_key,
             secure=secure
         )
+        self._endpoint = endpoint
+        self._secure = secure
         logger.info(f"Minio client initialized for endpoint: {endpoint}")
 
     def bucket_exists(self, bucket_name: str) -> bool:
@@ -134,6 +141,15 @@ class MinioBackend(StorageBackend):
             logger.error(f"Error deleting '{object_name}' from '{bucket_name}': {e}")
             raise
 
+    def list_objects(self, bucket_name: str, prefix: Optional[str] = None) -> list[str]:
+        """List object names in a bucket."""
+        try:
+            objects = self._client.list_objects(bucket_name, prefix=prefix, recursive=True)
+            return [obj.object_name for obj in objects]
+        except S3Error as e:
+            logger.error(f"Error listing objects in bucket '{bucket_name}': {e}")
+            raise
+
     def delete_bucket(self, bucket_name: str) -> None:
         """Delete a bucket. The bucket must be empty."""
         try:
@@ -141,4 +157,68 @@ class MinioBackend(StorageBackend):
             logger.info(f"Successfully deleted bucket '{bucket_name}'.")
         except S3Error as e:
             logger.error(f"Error deleting bucket '{bucket_name}': {e}")
+            raise
+
+    def stat_file(self, bucket_name: str, object_name: str) -> StorageObjectMetadata:
+        """Fetch metadata for a stored object."""
+        try:
+            info = self._client.stat_object(bucket_name, object_name)
+            return StorageObjectMetadata(
+                size=info.size,
+                content_type=getattr(info, "content_type", None),
+                etag=getattr(info, "etag", None),
+                last_modified=getattr(info, "last_modified", None),
+            )
+        except S3Error as e:
+            logger.error(f"Error fetching metadata for '{object_name}': {e}")
+            raise
+
+    def generate_upload_policy(
+        self,
+        bucket_name: str,
+        object_prefix: str,
+        expires: timedelta = timedelta(minutes=15),
+        max_size: int = 50 * 1024 * 1024,
+        content_type: Optional[str] = None,
+    ) -> StorageUploadPolicy:
+        """
+        Generate a restricted upload policy for direct-to-storage uploads.
+
+        The resulting policy enforces that the uploaded object's key must start with
+        the provided prefix (e.g., "<user-id>/"), ensuring IAM-style isolation.
+        """
+        if not object_prefix:
+            raise ValueError("object_prefix must be a non-empty string")
+
+        normalized_prefix = object_prefix if object_prefix.endswith("/") else f"{object_prefix}/"
+
+        try:
+            expires_at = datetime.utcnow() + expires
+            policy = PostPolicy(bucket_name, expires_at)
+            policy.add_starts_with_condition("key", normalized_prefix)
+            policy.add_content_length_range_condition(0, max_size)
+            if content_type:
+                policy.add_equals_condition("Content-Type", content_type)
+
+            form_fields = self._client.presigned_post_policy(policy)
+            
+            # Construct upload URL manually to avoid relying on private attributes
+            scheme = "https" if self._secure else "http"
+            upload_url = f"{scheme}://{self._endpoint}"
+            
+            logger.info(
+                "Generated upload policy for bucket '%s' with prefix '%s'.",
+                bucket_name,
+                normalized_prefix,
+            )
+
+            return StorageUploadPolicy(
+                url=f"{upload_url}/{bucket_name}",
+                fields=form_fields,
+                expires_at=expires_at,
+                bucket=bucket_name,
+                prefix=normalized_prefix,
+            )
+        except S3Error as e:
+            logger.error("Error generating upload policy for prefix '%s': %s", normalized_prefix, e)
             raise

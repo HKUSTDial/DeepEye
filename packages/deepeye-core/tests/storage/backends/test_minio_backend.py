@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from io import BytesIO
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from deepeye.storage.backends.minio_backend import MinioBackend, S3Error
 
@@ -106,6 +106,79 @@ class TestMinioBackend(unittest.TestCase):
         """Test delete_bucket method."""
         self.backend.delete_bucket(self.bucket_name)
         self.mock_minio_client.remove_bucket.assert_called_once_with(self.bucket_name)
+
+    @patch('deepeye.storage.backends.minio_backend.datetime')
+    @patch('deepeye.storage.backends.minio_backend.PostPolicy')
+    def test_generate_upload_policy(self, MockPostPolicy, mock_datetime):
+        """Test generate_upload_policy method."""
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1)
+        policy_instance = MockPostPolicy.return_value
+        self.mock_minio_client.presigned_post_policy.return_value = {"policy": "value"}
+        
+        # Manually constructed the URL in the implementation, so no need to mock _base_url anymore
+        prefix = "user_123"
+        expected_normalized_prefix = "user_123/"
+
+        result = self.backend.generate_upload_policy(
+            bucket_name=self.bucket_name,
+            object_prefix=prefix,
+            expires=timedelta(minutes=5),
+            max_size=1024,
+            content_type="text/plain",
+        )
+
+        MockPostPolicy.assert_called_once()
+        # Verify starts-with condition for the key
+        policy_instance.add_starts_with_condition.assert_any_call("key", expected_normalized_prefix)
+        policy_instance.add_equals_condition.assert_any_call("Content-Type", "text/plain")
+        policy_instance.add_content_length_range_condition.assert_called_once_with(0, 1024)
+        self.mock_minio_client.presigned_post_policy.assert_called_once_with(policy_instance)
+        
+        self.assertEqual(result.url, f"http://localhost:9000/{self.bucket_name}")
+        self.assertEqual(result.fields, {"policy": "value"})
+
+    @patch('deepeye.storage.backends.minio_backend.datetime')
+    @patch('deepeye.storage.backends.minio_backend.PostPolicy')
+    def test_generate_upload_policy_multi_user_isolation(self, MockPostPolicy, mock_datetime):
+        """Test that policies generated for different users have distinct prefixes."""
+        mock_datetime.utcnow.return_value = datetime(2024, 1, 1)
+        # We need separate mock instances for each call to verify them independently
+        policy_alice = MagicMock()
+        policy_bob = MagicMock()
+        MockPostPolicy.side_effect = [policy_alice, policy_bob]
+        
+        self.mock_minio_client.presigned_post_policy.return_value = {"policy": "dummy"}
+        
+        # 1. Generate for Alice
+        self.backend.generate_upload_policy(self.bucket_name, "user_alice")
+        
+        # 2. Generate for Bob
+        self.backend.generate_upload_policy(self.bucket_name, "user_bob")
+
+        # Verify Alice's policy
+        policy_alice.add_starts_with_condition.assert_any_call("key", "user_alice/")
+        # Ensure Alice's policy definitely does NOT contain Bob's prefix (sanity check)
+        with self.assertRaises(AssertionError):
+            policy_alice.add_starts_with_condition.assert_any_call("key", "user_bob/")
+
+        # Verify Bob's policy
+        policy_bob.add_starts_with_condition.assert_any_call("key", "user_bob/")
+
+    def test_stat_file(self):
+        """Test stat_file returns metadata."""
+        mock_stat = MagicMock()
+        mock_stat.size = 128
+        mock_stat.content_type = "text/csv"
+        mock_stat.etag = "etag123"
+        mock_stat.last_modified = datetime(2024, 1, 1)
+        self.mock_minio_client.stat_object.return_value = mock_stat
+
+        metadata = self.backend.stat_file(self.bucket_name, self.object_name)
+
+        self.mock_minio_client.stat_object.assert_called_once_with(self.bucket_name, self.object_name)
+        self.assertEqual(metadata.size, 128)
+        self.assertEqual(metadata.content_type, "text/csv")
+        self.assertEqual(metadata.etag, "etag123")
 
 if __name__ == '__main__':
     unittest.main()

@@ -5,6 +5,8 @@ It has three modes, controlled by command-line arguments:
                  `python examples/storage_minio_usage.py --setup`
     --download : Downloads the file, saves it locally, and verifies its content. For example:
                  `python examples/storage_minio_usage.py --download`
+    --iam-upload : Demonstrates the IAM-optimized direct upload flow (Backend generates policy -> Frontend uploads directly).
+                   This also tests that uploading to an unauthorized folder is blocked.
     --cleanup  : Deletes the file and the bucket created by the setup process. For example:
                  `python examples/storage_minio_usage.py --cleanup`
 Prerequisites:
@@ -21,6 +23,7 @@ Prerequisites:
 import os
 import logging
 import argparse
+import requests
 from deepeye.storage.backends.minio_backend import MinioBackend
 
 # --- Configuration ---
@@ -121,17 +124,118 @@ def run_download(storage_backend):
     
     logging.info("--- Download & Verification Finished ---")
 
+def run_iam_upload(storage_backend):
+    """Demonstrate direct upload using IAM policy (simulating frontend) with multiple users."""
+    logging.info("--- Running IAM Policy Direct Upload (Multi-User Scenario) ---")
+
+    def perform_upload(user_name, policy_data, target_key, file_path, expect_success=True):
+        """Helper to perform upload and log result."""
+        upload_url = policy_data.url
+        form_fields = policy_data.fields.copy()
+        form_fields['key'] = target_key
+        
+        files = {
+            'file': (os.path.basename(file_path), open(file_path, 'rb'))
+        }
+        
+        action_desc = f"User '{user_name}' uploading to '{target_key}'"
+        logging.info(f"{action_desc}...")
+        
+        try:
+            response = requests.post(upload_url, data=form_fields, files=files)
+            if response.status_code == 204:
+                if expect_success:
+                    logging.info(f"✅ SUCCESS: {action_desc} succeeded as expected.")
+                else:
+                    logging.error(f"❌ FAILURE: {action_desc} succeeded but SHOULD HAVE FAILED!")
+            else:
+                if expect_success:
+                    logging.error(f"❌ FAILURE: {action_desc} failed: {response.status_code} - {response.text}")
+                else:
+                    logging.info(f"✅ SECURITY SUCCESS: ⚠️ {action_desc} blocked with status {response.status_code} (Expected Forbidden)")
+        except Exception as e:
+            if expect_success:
+                logging.error(f"❌ Exception during {action_desc}: {e}")
+            else:
+                logging.info(f"✅ SECURITY SUCCESS: ⚠️ {action_desc} blocked ({e})")
+
+    # --- Scenario 1: Alice uploads `company_data.xlsx` to her own folder ---
+    alice_id = "user_alice"
+    alice_prefix = f"{alice_id}/"
+    logging.info(f"\n[Step 1] Generating upload policy for Alice (prefix: '{alice_prefix}')...")
+    
+    alice_policy = storage_backend.generate_upload_policy(
+        bucket_name=BUCKET_NAME,
+        object_prefix=alice_prefix
+    )
+    alice_file = os.path.join(os.path.dirname(__file__), "data", "company_data.xlsx")
+    perform_upload(
+        user_name="Alice",
+        policy_data=alice_policy,
+        target_key=f"{alice_prefix}company_data.xlsx",
+        file_path=alice_file,
+        expect_success=True
+    )
+
+    # --- Scenario 2: Alice tries to upload `company_data.xlsx` to Bob's folder (simulating attacker, expected to be blocked) ---
+    bob_id = "user_bob"
+    bob_prefix = f"{bob_id}/"
+    logging.info(f"\n[Step 2] Security Test: Alice attempting to upload to Bob's folder ('{bob_prefix}')...")
+    perform_upload(
+        user_name="Alice (Attacker)",
+        policy_data=alice_policy,  # Using Alice's policy!
+        target_key=f"{bob_prefix}company_data.xlsx",
+        file_path=alice_file,
+        expect_success=False
+    )
+
+    # --- Scenario 3: Bob uploads `sales.json` to his own folder ---
+    logging.info(f"\n[Step 3] Generating upload policy for Bob (prefix: '{bob_prefix}')...")
+    
+    bob_policy = storage_backend.generate_upload_policy(
+        bucket_name=BUCKET_NAME,
+        object_prefix=bob_prefix
+    )
+    bob_file = os.path.join(os.path.dirname(__file__), "data", "sales.json")
+    perform_upload(
+        user_name="Bob",
+        policy_data=bob_policy,
+        target_key=f"{bob_prefix}sales.json",
+        file_path=bob_file,
+        expect_success=True
+    )
+
+    logging.info("\n--- IAM Policy Demo Finished ---")
+
 def run_cleanup(storage_backend):
-    """Delete the object and the bucket."""
+    """Delete all objects and the bucket."""
     logging.info("--- Running Cleanup ---")
     try:
-        logging.info(f"Deleting object '{OBJECT_NAME}' from bucket '{BUCKET_NAME}'...")
-        storage_backend.delete_file(BUCKET_NAME, OBJECT_NAME)
-        logging.info(f"Object '{OBJECT_NAME}' deleted.")
+        # 1. List all objects
+        logging.info(f"Listing all objects in bucket '{BUCKET_NAME}'...")
+        try:
+            objects = storage_backend.list_objects(BUCKET_NAME)
+        except Exception as e:
+            # If bucket doesn't exist, we can't list objects, so just return
+            if "NoSuchBucket" in str(e):
+                logging.warning(f"Bucket '{BUCKET_NAME}' does not exist. Cleanup skipped.")
+                return
+            raise e
 
+        # 2. Delete all objects
+        if objects:
+            logging.info(f"Found {len(objects)} objects to delete.")
+            for obj_name in objects:
+                logging.info(f"Deleting object '{obj_name}'...")
+                storage_backend.delete_file(BUCKET_NAME, obj_name)
+        else:
+            logging.info("Bucket is already empty.")
+
+        # 3. Delete the bucket
         logging.info(f"Deleting bucket '{BUCKET_NAME}'...")
         storage_backend.delete_bucket(BUCKET_NAME)
         logging.info(f"Bucket '{BUCKET_NAME}' deleted.")
+        
     except Exception as e:
         logging.error(f"An error occurred during cleanup: {e}", exc_info=True)
     
@@ -142,6 +246,7 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--setup", action="store_true", help="Run the setup process: create bucket and upload file.")
     group.add_argument("--download", action="store_true", help="Download the sample file and verify its content.")
+    group.add_argument("--iam-upload", action="store_true", help="Run IAM-optimized direct upload demo.")
     group.add_argument("--cleanup", action="store_true", help="Run the cleanup process: delete file and bucket.")
 
     args = parser.parse_args()
@@ -154,6 +259,8 @@ def main():
         run_setup(storage_backend)
     elif args.download:
         run_download(storage_backend)
+    elif args.iam_upload:
+        run_iam_upload(storage_backend)
     elif args.cleanup:
         run_cleanup(storage_backend)
 
