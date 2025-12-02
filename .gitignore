@@ -12,4 +12,8 @@ wheels/
 # Virtual environments
 .venv
 
+# Environment variables
+.env
+*.env
+
 local_docs/
