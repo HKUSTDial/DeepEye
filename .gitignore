@@ -13,3 +13,6 @@ wheels/
 .venv
 
 local_docs/
+
+# Local Workspace
+workspace/
