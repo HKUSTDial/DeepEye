@@ -147,18 +147,26 @@ def run_download(storage):
     logging.info("--- Download Finished ---")
 
 def run_cleanup(storage):
-    """Delete the file and bucket."""
+    """Delete all files in the bucket, then the bucket itself."""
     logging.info("--- Running Cleanup ---")
     try:
-        # 1. Delete file
-        logging.info(f"Deleting file '{OBJECT_NAME}'...")
-        storage.delete_file(BUCKET_NAME, OBJECT_NAME)
+        # 1. List all files in the bucket
+        logging.info(f"Listing all files in bucket '{BUCKET_NAME}' for deletion...")
+        files_to_delete = storage.list_objects(BUCKET_NAME)
         
-        # 2. Delete bucket
+        if not files_to_delete:
+            logging.info("Bucket is already empty or does not exist.")
+        else:
+            # 2. Delete each file
+            for object_name in files_to_delete:
+                logging.info(f"Deleting file '{object_name}'...")
+                storage.delete_file(BUCKET_NAME, object_name)
+        
+        # 3. Delete the now-empty bucket
         logging.info(f"Deleting bucket '{BUCKET_NAME}'...")
         storage.delete_bucket(BUCKET_NAME)
         
-        logging.info("Deleted demo file and bucket.")
+        logging.info("✅ Successfully deleted all files and the bucket.")
         
         # Optional: Check if workspace is empty
         if not os.listdir(storage.root):
