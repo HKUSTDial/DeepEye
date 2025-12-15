@@ -8,10 +8,69 @@ import { useGraphStore, toast } from '@/store'
 import { registry } from '@/nodes/registry'
 import { SimpleExecutor } from '@/nodes/execution/SimpleExecutor'
 import { Settings, Play, Clock, AlertCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NodeHistoryPanel } from './NodeHistoryPanel'
 import { cn } from '@/shared/utils'
 import { EmptyState } from '@/shared/components'
+import { databaseConnectionsAPI, llmModelsAPI } from '@/shared/api'
+
+function DatabaseSelectInput({ value, onChange, className }: { value: any, onChange: (val: any) => void, className: string }) {
+  const [options, setOptions] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    databaseConnectionsAPI.list()
+      .then(res => setOptions(res))
+      .catch(err => console.error('Failed to load databases:', err))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <select
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      className={className}
+      disabled={loading}
+    >
+      <option value="">{loading ? '加载中...' : '请选择数据库...'}</option>
+      {options.map((db: any) => (
+        <option key={db.id} value={db.id}>
+          {db.name} ({db.type})
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function ModelSelectInput({ value, onChange, className }: { value: any, onChange: (val: any) => void, className: string }) {
+  const [options, setOptions] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    llmModelsAPI.list()
+      .then(res => setOptions(res))
+      .catch(err => console.error('Failed to load models:', err))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <select
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      className={className}
+      disabled={loading}
+    >
+      <option value="">{loading ? '加载中...' : '请选择模型...'}</option>
+      {options.map((model: any) => (
+        <option key={model.id} value={model.id}>
+          {model.model_name || model.model_endpoint_name}
+        </option>
+      ))}
+    </select>
+  )
+}
 
 export function PropertiesPanel() {
   const nodes = useGraphStore(state => state.nodes)
@@ -180,6 +239,28 @@ export function PropertiesPanel() {
           value={value || '#000000'}
           onChange={(e) => handlePropertyChange(key, e.target.value)}
           className="w-full h-10 rounded border border-border cursor-pointer"
+        />
+      )
+    }
+
+    // 数据库选择
+    if (prop.type === 'database-select') {
+      return (
+        <DatabaseSelectInput
+          value={value}
+          onChange={(val) => handlePropertyChange(key, val)}
+          className={inputClassName}
+        />
+      )
+    }
+
+    // 模型选择
+    if (prop.type === 'model-select') {
+      return (
+        <ModelSelectInput
+          value={value}
+          onChange={(val) => handlePropertyChange(key, val)}
+          className={inputClassName}
         />
       )
     }

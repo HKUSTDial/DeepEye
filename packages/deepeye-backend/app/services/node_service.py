@@ -3,6 +3,7 @@
 import base64
 import time
 from typing import Any, Dict, List, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from deepeye.nodes import NodeInput, NodeOutput, get_registry
 from deepeye.exceptions import NodeError
@@ -13,6 +14,8 @@ from app.models.schemas.node import (
     NodeListResponse,
     NodeExecutionResult,
 )
+from app.services.connection_service import ConnectionService
+from app.services.llm_service import LLMService
 
 
 class NodeService:
@@ -93,6 +96,8 @@ class NodeService:
         node_type: str,
         inputs: Dict[str, Any],
         config: Optional[Dict[str, Any]] = None,
+        db: Optional[AsyncSession] = None,
+        user_id: Optional[str] = None,
     ) -> NodeExecutionResult:
         """Execute a single node."""
         if not self.registry.is_registered(node_type):
@@ -102,6 +107,57 @@ class NodeService:
                 execution_time=0.0,
                 error=f"Node type '{node_type}' not found",
             )
+
+        # Resolve database connection if needed
+        if node_type == "DatabaseDataSource" and config and "database_id" in config and db and user_id:
+            try:
+                connection_service = ConnectionService()
+                conn = await connection_service.get_connection_by_id(db, config["database_id"], user_id)
+                if conn:
+                    # Construct connection string
+                    connection_string = self._build_connection_string(conn)
+                    config["connection_string"] = connection_string
+                else:
+                    return NodeExecutionResult(
+                        status="failed",
+                        outputs={},
+                        execution_time=0.0,
+                        error=f"Database connection not found: {config['database_id']}",
+                    )
+            except Exception as e:
+                return NodeExecutionResult(
+                    status="failed",
+                    outputs={},
+                    execution_time=0.0,
+                    error=f"Failed to resolve database connection: {str(e)}",
+                )
+
+        # Resolve LLM model if needed
+        if node_type in ["NL2SQL", "DataCoder", "DataPlot"] and config and ("model_id" in config or "model" in config) and db and user_id:
+            model_key = "model_id" if "model_id" in config else "model"
+            try:
+                llm_service = LLMService()
+                llm = await llm_service.get_llm_model_by_id(db, config[model_key], user_id)
+                if llm:
+                    config["api_key"] = llm.api_key
+                    config["base_url"] = llm.base_url
+                    config["model"] = llm.model_name or llm.model_endpoint_name
+                else:
+                    return NodeExecutionResult(
+                        status="failed",
+                        outputs={},
+                        execution_time=0.0,
+                        error=f"LLM model not found: {config[model_key]}",
+                    )
+            except Exception as e:
+                # If model_key is a valid model name (not a UUID), we might want to let it pass
+                # But here we assume frontend always sends IDs from the selector
+                return NodeExecutionResult(
+                    status="failed",
+                    outputs={},
+                    execution_time=0.0,
+                    error=f"Failed to resolve LLM model: {str(e)}",
+                )
 
         start_time = time.time()
 
@@ -175,6 +231,21 @@ class NodeService:
                 error=str(e),
             )
 
+    def _build_connection_string(self, conn) -> str:
+        """Build database connection string from connection object."""
+        db_type = conn.type.lower()
+        
+        if db_type == "sqlite":
+             # SQLite path handling might need adjustment based on where files are stored
+             # Assuming conn.database is the path
+             return f"sqlite:///{conn.database}"
+        elif db_type == "mysql":
+             return f"mysql+pymysql://{conn.username}:{conn.password}@{conn.host}:{conn.port}/{conn.database}"
+        elif db_type in ["postgresql", "postgres"]:
+             return f"postgresql://{conn.username}:{conn.password}@{conn.host}:{conn.port}/{conn.database}"
+        
+        raise ValueError(f"Unsupported database type: {conn.type}")
+
     def _serialize_outputs(self, outputs: Dict[str, NodeOutput]) -> Dict[str, Any]:
         """Serialize node outputs for API response."""
         serialized = {}
@@ -213,5 +284,12 @@ class NodeService:
             return [self._serialize_value(item) for item in value]
 
         # Handle other types
+        # Check for numpy types
+        if hasattr(value, "item"):
+            try:
+                return value.item()
+            except Exception:
+                pass
+        
         return value
 

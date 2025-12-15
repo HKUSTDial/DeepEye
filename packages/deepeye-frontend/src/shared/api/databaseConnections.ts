@@ -36,6 +36,7 @@ export interface DatabaseConnectionUpdate {
 export const databaseConnectionsAPI = {
   list: (skip = 0, limit = 100) =>
     apiClient.get<DatabaseConnection[]>('/database-connections', { skip, limit }),
+  get: (id: string) => apiClient.get<DatabaseConnection>(`/database-connections/${id}`),
   create: (data: DatabaseConnectionCreate) =>
     apiClient.post<DatabaseConnection>('/database-connections', data),
   update: (id: string, data: DatabaseConnectionUpdate) =>

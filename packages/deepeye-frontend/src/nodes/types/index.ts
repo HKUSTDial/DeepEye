@@ -16,7 +16,7 @@ export type DataType = 'number' | 'string' | 'boolean' | 'object' | 'array' | 'a
 /**
  * 属性面板类型
  */
-export type PropertyType = 'text' | 'string' | 'number' | 'boolean' | 'select' | 'color' | 'textarea'
+export type PropertyType = 'text' | 'string' | 'number' | 'boolean' | 'select' | 'color' | 'textarea' | 'database-select' | 'model-select'
 
 // ============================================================================
 // 端口定义

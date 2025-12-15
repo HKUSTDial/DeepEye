@@ -22,6 +22,12 @@ import { nodesAPI } from '@/shared/api'
     }
   },
   properties: {
+    model_id: {
+      type: 'model-select',
+      label: '选择模型',
+      description: '选择用于生成 SQL 的 LLM 模型',
+      required: true
+    },
     max_rows: {
       type: 'number',
       label: '最大行数',
@@ -67,6 +73,7 @@ import { nodesAPI } from '@/shared/api'
 })
 export class NL2SQLNode {
   database: any = null
+  model_id: string = ''
   max_rows: number = 100000
   verbose: boolean = false
   sql: string = ''
@@ -112,7 +119,7 @@ export class NL2SQLNode {
           query: prompt
         },
         {
-          model: modelId,
+          model_id: modelId || this.model_id, // 优先使用传入的 modelId (chat模式)，否则使用属性配置的
           max_rows: this.max_rows,
           verbose: this.verbose
         }

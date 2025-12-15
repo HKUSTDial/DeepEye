@@ -30,7 +30,7 @@ import { nodesAPI } from '@/shared/api'
       multiline: true
     },
     model: {
-      type: 'string',
+      type: 'model-select',
       label: 'LLM 模型',
       description: 'LLM 模型名称',
       default: 'gpt-4'
@@ -75,6 +75,57 @@ export class DataPlotNode {
   verbose: boolean = false
   images: any[] = []
   code: string = ''
+
+  /**
+   * 处理 AI 请求
+   * @param prompt 用户输入的任务描述
+   * @param modelId 选中的模型 ID
+   */
+  async handleAIRequest(prompt: string, modelId: string) {
+    try {
+      // 检查必要的输入
+      if (!this.data) {
+        throw new Error('请先连接数据源（data 输入端口）')
+      }
+
+      // 包装数据为后端期望的格式
+      let dataInput: any
+      if (Array.isArray(this.data)) {
+        dataInput = { dataframe_list: this.data }
+      } else {
+        dataInput = { dataframe: this.data }
+      }
+
+      const result = await nodesAPI.execute(
+        'DataPlot',
+        {
+          data: dataInput,
+          task: { description: prompt }
+        },
+        {
+          model: modelId || this.model,
+          max_retries: this.max_retries,
+          verbose: this.verbose
+        }
+      )
+
+      if (result.status === 'success') {
+        this.images = result.outputs.images || []
+        this.code = result.outputs.code || ''
+        this.task = prompt
+        
+        return {
+            role: 'assistant' as const,
+            content: `✅ 可视化完成，已生成 ${this.images.length} 张图表`
+        }
+      } else {
+        throw new Error(result.error || '数据可视化失败')
+      }
+    } catch (error: any) {
+      console.error('DataPlot 执行失败:', error)
+      throw error
+    }
+  }
 
   async compute() {
     try {

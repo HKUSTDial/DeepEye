@@ -14,11 +14,11 @@ import { nodesAPI } from '@/shared/api'
   icon: Database,
   color: '#10B981',
   properties: {
-    connection_string: {
-      type: 'string',
-      label: '连接字符串',
-      description: '数据库连接字符串',
-      placeholder: 'sqlite:///data.db 或 postgresql://user:pass@host/db'
+    database_id: {
+      type: 'database-select',
+      label: '选择数据库',
+      description: '选择已配置的数据库连接',
+      required: true
     },
     query: {
       type: 'string',
@@ -44,7 +44,7 @@ import { nodesAPI } from '@/shared/api'
   }
 })
 export class DatabaseDataSourceNode {
-  connection_string: string = ''
+  database_id: string = ''
   query: string = ''
   max_rows: number = 100000
   data: any = null
@@ -61,7 +61,7 @@ export class DatabaseDataSourceNode {
         'DatabaseDataSource',
         inputs,
         {
-          connection_string: this.connection_string,
+          database_id: this.database_id,
           mode: mode,
           max_rows: this.max_rows
         }

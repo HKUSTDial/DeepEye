@@ -220,7 +220,7 @@ export const UnifiedNode = memo(({ id, type, data, selected }: UnifiedNodeProps)
       )}
 
       {/* 自定义视图区域 */}
-      <NodeView view={definition.view} nodeData={data} />
+      <NodeView view={definition.view} nodeData={{ ...data, attributes }} />
 
       {/* 端口区域 */}
       <NodePorts

@@ -1,7 +1,10 @@
 """Node API routes."""
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dependencies import get_db, get_current_user
+from app.models.database.user import User
 from app.models.schemas.node import (
     NodeInfo,
     NodeListResponse,
@@ -34,12 +37,19 @@ async def get_node_info(node_type: str):
 
 
 @router.post("/{node_type}/execute", response_model=NodeExecutionResult)
-async def execute_node(node_type: str, request: NodeExecutionRequest):
+async def execute_node(
+    node_type: str, 
+    request: NodeExecutionRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Execute a single node."""
     result = await node_service.execute_node(
         node_type=node_type,
         inputs=request.inputs,
         config=request.config,
+        db=db,
+        user_id=current_user.id
     )
     
     if result.status == "failed":

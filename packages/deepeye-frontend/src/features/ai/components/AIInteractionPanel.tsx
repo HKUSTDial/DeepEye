@@ -10,7 +10,6 @@
 import { useState, useRef } from 'react'
 import { Send, Sparkles } from 'lucide-react'
 import { ModelSelector } from '@/shared/components'
-import { getDefaultModel } from '@/shared/config/models'
 
 export interface AIInteractionPanelProps {
   /** 消息发送回调（发送到后端） */
@@ -29,7 +28,7 @@ export function AIInteractionPanel({
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [response, setResponse] = useState<string>('')
-  const [selectedModel, setSelectedModel] = useState(defaultModel || getDefaultModel().id)
+  const [selectedModel, setSelectedModel] = useState(defaultModel || '')
   const inputRef = useRef<HTMLInputElement>(null)
 
   // 处理发送

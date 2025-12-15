@@ -30,7 +30,7 @@ import { nodesAPI } from '@/shared/api'
       multiline: true
     },
     model: {
-      type: 'string',
+      type: 'model-select',
       label: 'LLM 模型',
       description: 'LLM 模型名称',
       default: 'gpt-4'
@@ -114,7 +114,7 @@ export class DataCoderNode {
           task: { description: prompt }
         },
         {
-          model: modelId,
+          model: modelId || this.model,
           max_retries: this.max_retries,
           verbose: this.verbose
         }
