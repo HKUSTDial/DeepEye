@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    image: postgres:15-alpine
+    env_file:
+      - .env
+    environment:
+      # Internal credentials
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      # This variable is read by our custom init script
+      - POSTGRES_MULTIPLE_DATABASES=deepeye,deepeye_state
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Mount init script to auto-create databases
+      - ./scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "${HOST_BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - postgres
+      - code-sandbox
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./packages/backend:/app/packages/backend
+      - ./packages/core:/app/packages/core
+      # Mount local SQLite database file
+      - ./pipeline.db:/app/pipeline.db
+
+  backend-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - postgres
+      - code-sandbox
+    environment:
+      - SANDBOX_URL=http://code-sandbox:8000
+    command: celery -A app.core.celery_app worker --loglevel=info
+    volumes:
+      - ./packages/backend:/app/packages/backend
+      - ./packages/core:/app/packages/core
+      # Mount local SQLite database file
+      - ./pipeline.db:/app/pipeline.db
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "${HOST_FRONTEND_PORT:-5173}:5173"
+    environment:
+      # Automatically derive VITE_API_URL from the host backend port
+      - VITE_API_URL=http://localhost:${HOST_BACKEND_PORT:-8000}/api
+    volumes:
+      - ./packages/frontend/src:/app/src
+      - /app/node_modules
+    depends_on:
+      - backend-api
+
+  code-sandbox:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.sandbox
+    volumes:
+      # Mount the sandbox server code for hot reloading/development
+      - ./packages/core/sandbox:/app/sandbox
+      # Keep workspace mount if we want to inspect files
+      - ./workspace:/workspace
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:

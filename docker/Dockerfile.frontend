@@ -1,0 +1,16 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY packages/frontend/package.json packages/frontend/package-lock.json ./
+# Use huaweicloud mirrors for npm
+RUN npm config set registry https://mirrors.huaweicloud.com/repository/npm/ && \
+    npm install
+
+# Copy source code
+COPY packages/frontend .
+
+# Start development server
+CMD ["npm", "run", "dev", "--", "--host"]
+

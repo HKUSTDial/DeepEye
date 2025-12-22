@@ -17,3 +17,13 @@ wheels/
 *.env
 
 local_docs/
+
+artifacts/
+
+workspace/
+
+examples/
+
+architecture_plan.md
+
+pipeline.db
