@@ -1,8 +1,8 @@
-from typing import Optional
 from langchain_core.language_models import BaseChatModel
-from deepeye.agents.base import ReActAgent
+from langgraph.checkpoint.base import BaseCheckpointSaver
+
+from deepeye.agents.react_agent import ReActAgent
 from deepeye.tools.sandbox import get_sandbox_tools
-import os
 
 CODE_AGENT_SYSTEM_PROMPT = """You are an Expert Data Analyst and Python Programmer.
 Your goal is to analyze data, perform calculations, and generate visualizations using Python code.
@@ -24,21 +24,20 @@ Guidelines:
 Format your Python code cleanly.
 """
 
+
 class CodeAgent(ReActAgent):
-    """
-    A specialized agent for general Data Analysis using Python in a Sandbox.
-    """
+    """A specialized agent for Data Analysis using Python in a Sandbox."""
 
     def __init__(
         self,
         model: BaseChatModel,
         sandbox_url: str | None = None,
-        checkpointer: Optional[any] = None,
-        system_prompt: str = CODE_AGENT_SYSTEM_PROMPT
+        checkpointer: BaseCheckpointSaver | None = None,
+        system_prompt: str = CODE_AGENT_SYSTEM_PROMPT,
     ):
         super().__init__(
             model=model,
             tools=get_sandbox_tools(sandbox_url),
+            system_prompt=system_prompt,
             checkpointer=checkpointer,
-            system_prompt=system_prompt
         )

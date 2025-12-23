@@ -1,21 +1,20 @@
-from typing import Annotated, Sequence, List
-from typing_extensions import TypedDict
+"""Agent state definitions for LangGraph"""
+
+from typing import Annotated, Sequence, TypeVar
+
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
 
-def update_plan(old_plan: List[str], new_plan: List[str]) -> List[str]:
-    """Reducer to update the plan. If new_plan is provided, it replaces the old one."""
-    if new_plan is None:
-        return old_plan
-    return new_plan
+T = TypeVar("T")
 
-def update_completed_steps(old_steps: List[int], new_steps: List[int]) -> List[int]:
-    """Reducer to update completed steps."""
-    if new_steps is None:
-        return old_steps
-    return new_steps
+
+def replace_if_set(old: T, new: T) -> T:
+    """Generic reducer: replace old value if new is provided."""
+    return old if new is None else new
+
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
-    plan: Annotated[List[str], update_plan]
-    completed_steps: Annotated[List[int], update_completed_steps]
+    plan: Annotated[list[str], replace_if_set]
+    completed_steps: Annotated[list[int], replace_if_set]

@@ -1,6 +1,5 @@
 from typing import List, Annotated
 from langchain_core.tools import tool, InjectedToolCallId
-from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from deepeye.graph.state import AgentState
