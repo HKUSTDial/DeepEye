@@ -1,27 +1,22 @@
 from celery import Celery
 from app.core.config import settings
 
-# Initialize Celery app
-celery_app = Celery(
-    "deepeye_tasks",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
-)
+# Debug: Print Redis URL on import
+print(f"[Celery] Using broker: {settings.REDIS_URL}")
 
-# Export REDIS_URL for other modules if needed (e.g. chat.py used to import it)
-# But ideally they should use settings.REDIS_URL directly.
-# Keeping it for compatibility if there are other imports I missed, 
-# but chat.py was updated.
-REDIS_URL = settings.REDIS_URL
+# Initialize Celery app with explicit broker_url
+celery_app = Celery("deepeye_tasks")
 
-# Configure Celery
 celery_app.conf.update(
+    broker_url=settings.REDIS_URL,
+    result_backend=settings.REDIS_URL,
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    # Auto-discover tasks in the tasks module
-    imports=["app.tasks.agent_tasks"] 
+    imports=["app.tasks.agent_tasks"],
 )
 
+# Export for compatibility
+REDIS_URL = settings.REDIS_URL

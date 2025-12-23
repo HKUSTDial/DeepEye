@@ -15,6 +15,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "langgraph-checkpoint-postgres>=1.0.0",
     "psycopg[binary,pool]>=3.1.8",
+    "psycopg2-binary>=2.9.9",
     "deepeye[openai]",
 ]
 

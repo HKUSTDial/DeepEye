@@ -1,46 +1,42 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
+"""DataSource API endpoints."""
+
 import uuid
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
 from app.db.session import get_db
-from app.models.datasource import DataSource
-from app.api.schemas import DataSourceCreate, DataSourceResponse, DataSourceUpdate
+from app.models import DataSource
+from app.repositories import DataSourceRepository
+from app.schemas import DataSourceCreate, DataSourceResponse
 
-router = APIRouter()
+router = APIRouter(prefix="/datasources", tags=["datasources"])
 
-@router.get("/datasources", response_model=List[DataSourceResponse])
+
+@router.get("", response_model=list[DataSourceResponse])
 def list_datasources(db: Session = Depends(get_db)):
-    return db.query(DataSource).all()
+    return DataSourceRepository(db).find_all()
 
-@router.post("/datasources", response_model=DataSourceResponse)
-def create_datasource(datasource: DataSourceCreate, db: Session = Depends(get_db)):
-    db_obj = DataSource(
-        name=datasource.name,
-        type=datasource.type,
-        connection_string=datasource.connection_string
-    )
-    db.add(db_obj)
-    db.commit()
-    db.refresh(db_obj)
-    # Convert UUID to str for Pydantic
-    db_obj.id = str(db_obj.id)
-    return db_obj
 
-@router.get("/datasources/{datasource_id}", response_model=DataSourceResponse)
-def get_datasource(datasource_id: str, db: Session = Depends(get_db)):
-    db_obj = db.query(DataSource).filter(DataSource.id == datasource_id).first()
-    if not db_obj:
+@router.post("", response_model=DataSourceResponse)
+def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db)):
+    entity = DataSource(name=data.name, type=data.type, connection_string=data.connection_string)
+    return DataSourceRepository(db).save(entity)
+
+
+@router.get("/{datasource_id}", response_model=DataSourceResponse)
+def get_datasource(datasource_id: uuid.UUID, db: Session = Depends(get_db)):
+    entity = DataSourceRepository(db).get(datasource_id)
+    if not entity:
         raise HTTPException(status_code=404, detail="DataSource not found")
-    db_obj.id = str(db_obj.id)
-    return db_obj
+    return entity
 
-@router.delete("/datasources/{datasource_id}")
-def delete_datasource(datasource_id: str, db: Session = Depends(get_db)):
-    db_obj = db.query(DataSource).filter(DataSource.id == datasource_id).first()
-    if not db_obj:
+
+@router.delete("/{datasource_id}")
+def delete_datasource(datasource_id: uuid.UUID, db: Session = Depends(get_db)):
+    repo = DataSourceRepository(db)
+    if not repo.get(datasource_id):
         raise HTTPException(status_code=404, detail="DataSource not found")
-    db.delete(db_obj)
-    db.commit()
+    repo.delete(datasource_id)
     return {"status": "ok"}
 

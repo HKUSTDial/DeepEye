@@ -1,63 +1,80 @@
-from typing import Any, Dict, List, Optional
-from uuid import UUID
-from langchain_core.callbacks import BaseCallbackHandler
-from langchain_core.outputs import LLMResult
-from app.api.schemas import AgentEvent, AgentEventType
-import redis.asyncio as redis
-import asyncio
+"""Event-sourced callback for Agent events."""
 
-class RedisStreamingCallback(BaseCallbackHandler):
+from typing import Any
+
+from langchain_core.callbacks import AsyncCallbackHandler
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.config import settings
+from app.infra import EventBus
+from app.repositories import EventRepository
+from app.schemas import AgentEvent, AgentEventType
+
+
+def _get_session() -> Session:
+    """Create a new session per-call to avoid fork issues in Celery workers.
+
+    Celery prefork workers fork after module import, so module-level engines
+    would share connections across processes, causing "SSL SYSCALL error" or
+    connection pool exhaustion. Creating engine per-call is safe and the
+    overhead is negligible for event persistence.
     """
-    Callback handler that publishes LangChain events to Redis Pub/Sub.
-    Used for Sub-Agents running inside Tools to stream their internal steps.
-    """
-    def __init__(self, redis_client: redis.Redis, channel: str, source: str, ignore_tags: List[str] = None):
-        self.redis_client = redis_client
-        self.channel = channel
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+    return sessionmaker(bind=engine)()
+
+
+class AgentCallback(AsyncCallbackHandler):
+    """Async callback: publishes events to EventBus and persists to database."""
+
+    def __init__(
+        self,
+        event_bus: EventBus,
+        session_id: str,
+        source: str,
+        ignore_tags: list[str] | None = None,
+    ):
+        self.event_bus = event_bus
+        self.session_id = session_id
+        self.channel = f"session:{session_id}"
         self.source = source
         self.ignore_tags = set(ignore_tags or [])
-        # Loop capture is risky if cross-thread, better to rely on async execution context
 
-    def _should_ignore(self, kwargs: Dict[str, Any]) -> bool:
-        tags = kwargs.get("tags") or []
-        return any(tag in self.ignore_tags for tag in tags)
+    def _should_ignore(self, kwargs: dict[str, Any]) -> bool:
+        return any(t in self.ignore_tags for t in (kwargs.get("tags") or []))
 
-    async def _publish(self, event: AgentEvent):
-        """Helper to publish async"""
-        await self.redis_client.publish(self.channel, event.model_dump_json())
+    def _persist(self, event: AgentEvent) -> None:
+        try:
+            db = _get_session()
+            try:
+                EventRepository(db).append(self.session_id, event.type, event.source, event.content, event.data)
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[AgentCallback] Failed to persist event {event.type}: {e}")
 
-    async def on_chat_model_start(self, serialized: Dict[str, Any], messages: List[List[Any]], **kwargs: Any) -> Any:
-        pass # Optional: indicate thinking start
+    def emit(self, event: AgentEvent) -> None:
+        """Publish to EventBus (real-time) and persist to DB (history)."""
+        event.source = self.source
+        self.event_bus.publish(self.channel, event.model_dump_json())
+        self._persist(event)
 
-    async def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:
-        """Stream tokens"""
-        if self._should_ignore(kwargs): return
-        
-        if token:
-            event = AgentEvent(
-                type=AgentEventType.TOKEN,
-                source=self.source,
-                content=token
-            )
-            await self._publish(event)
+    async def on_chat_model_start(self, serialized: dict, messages: list, **kwargs: Any) -> None:
+        pass
 
-    async def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs: Any) -> Any:
-        if self._should_ignore(kwargs): return
-        
-        event = AgentEvent(
-            type=AgentEventType.TOOL_START,
-            source=self.source, # e.g. "sql_agent"
-            data={"name": serialized.get("name"), "input": input_str}
-        )
-        await self._publish(event)
+    async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        if self._should_ignore(kwargs) or not token:
+            return
+        self.emit(AgentEvent(type=AgentEventType.TOKEN, content=token))
 
-    async def on_tool_end(self, output: str, **kwargs: Any) -> Any:
-        if self._should_ignore(kwargs): return
+    async def on_tool_start(self, serialized: dict, input_str: str, **kwargs: Any) -> None:
+        if self._should_ignore(kwargs):
+            return
+        self.emit(AgentEvent(type=AgentEventType.TOOL_START, data={"name": serialized.get("name"), "input": input_str}))
 
-        event = AgentEvent(
-            type=AgentEventType.TOOL_END,
-            source=self.source,
-            data={"output": output}
-        )
-        await self._publish(event)
+    async def on_tool_end(self, output: Any, **kwargs: Any) -> None:
+        if self._should_ignore(kwargs):
+            return
+        out_str = output.content if hasattr(output, 'content') else str(output)
+        self.emit(AgentEvent(type=AgentEventType.TOOL_END, data={"output": out_str}))
 
