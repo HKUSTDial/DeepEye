@@ -1,130 +1,185 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { DataSourceService } from '../api/datasource';
-import type { DataSource } from '../types/datasource';
+import { ref, onMounted } from 'vue'
+import { datasourceApi } from '../api'
+import type { DataSource } from '../types'
 
-const emit = defineEmits(['select']);
+const emit = defineEmits<{ select: [id: string | null] }>()
 
-const dataSources = ref<DataSource[]>([]);
-const selectedId = ref<string>('');
-const isCreating = ref(false);
-const newDataSource = ref({
-  name: '',
-  type: 'postgres',
-  connection_string: ''
-});
-const error = ref<string | null>(null);
+const dataSources = ref<DataSource[]>([])
+const selectedId = ref('')
+const isCreating = ref(false)
+const newDs = ref({ name: '', type: 'postgres', connection_string: '' })
+const error = ref<string | null>(null)
 
 async function loadDataSources() {
   try {
-    dataSources.value = await DataSourceService.list();
-    // Default select first one if available and none selected
-    if (dataSources.value.length > 0 && !selectedId.value) {
-        selectedId.value = dataSources.value[0].id;
-        emit('select', selectedId.value);
+    dataSources.value = await datasourceApi.list()
+    if (dataSources.value.length && !selectedId.value) {
+      selectedId.value = dataSources.value[0].id
+      emit('select', selectedId.value)
     }
-  } catch (e: any) {
-    error.value = e.message;
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Failed to load'
   }
 }
 
 async function createDataSource() {
-  if (!newDataSource.value.name || !newDataSource.value.connection_string) return;
+  if (!newDs.value.name || !newDs.value.connection_string) return
   try {
-    const created = await DataSourceService.create(newDataSource.value);
-    dataSources.value.push(created);
-    isCreating.value = false;
-    newDataSource.value = { name: '', type: 'postgres', connection_string: '' };
-    // Auto select new one
-    selectedId.value = created.id;
-    emit('select', created.id);
-  } catch (e: any) {
-    error.value = e.message;
+    const created = await datasourceApi.create(newDs.value)
+    dataSources.value.push(created)
+    isCreating.value = false
+    newDs.value = { name: '', type: 'postgres', connection_string: '' }
+    selectedId.value = created.id
+    emit('select', created.id)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Failed to create'
   }
 }
 
-async function deleteDataSource(id: string) {
-    if(!confirm('Are you sure?')) return;
-    try {
-        await DataSourceService.delete(id);
-        dataSources.value = dataSources.value.filter(ds => ds.id !== id);
-        if (selectedId.value === id) {
-            selectedId.value = '';
-            emit('select', null);
-        }
-    } catch (e: any) {
-        error.value = e.message;
+async function deleteDataSource(id: string, event: Event) {
+  event.stopPropagation()
+  if (!confirm('Delete this data source?')) return
+  try {
+    await datasourceApi.delete(id)
+    dataSources.value = dataSources.value.filter(ds => ds.id !== id)
+    if (selectedId.value === id) {
+      selectedId.value = ''
+      emit('select', null)
     }
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Failed to delete'
+  }
 }
 
-function onSelectChange() {
-    emit('select', selectedId.value);
+function selectSource(id: string) {
+  selectedId.value = id
+  emit('select', id)
 }
 
-onMounted(() => {
-  loadDataSources();
-});
+onMounted(loadDataSources)
 </script>
 
 <template>
-  <div class="p-4 flex flex-col h-full text-white bg-gray-800">
-    <h2 class="text-sm font-bold mb-2 uppercase text-gray-400 tracking-wider">Data Sources</h2>
-    
-    <!-- List -->
-    <div class="flex-1 overflow-y-auto mb-2 custom-scrollbar">
-        <div v-if="error" class="text-red-400 text-xs mb-2">{{ error }}</div>
-        
-        <div v-if="dataSources.length === 0" class="text-gray-500 text-xs">
-            No data sources.
-        </div>
-
-        <div v-for="ds in dataSources" :key="ds.id" 
-             class="flex justify-between items-center p-2 mb-1 rounded cursor-pointer hover:bg-gray-700 transition-colors"
-             :class="{ 'bg-blue-900 border-blue-700 border': selectedId === ds.id, 'border border-transparent': selectedId !== ds.id }"
-             @click="selectedId = ds.id; onSelectChange()">
-            <div class="truncate flex-1 min-w-0">
-                <div class="font-medium text-sm truncate">{{ ds.name }}</div>
-                <div class="text-xs text-gray-400 truncate">{{ ds.type }}</div>
-            </div>
-            <button @click.stop="deleteDataSource(ds.id)" class="text-gray-500 hover:text-red-400 text-lg ml-2 leading-none">&times;</button>
-        </div>
+  <div class="border-t border-[var(--sidebar-border)] p-2">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-2 py-1.5 mb-1">
+      <span class="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">Data Sources</span>
+      <button
+        @click="isCreating = !isCreating"
+        class="btn p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)]"
+        :title="isCreating ? 'Cancel' : 'Add Data Source'"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-45': isCreating }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
     </div>
 
-    <!-- Create Form -->
-    <button v-if="!isCreating" @click="isCreating = true" class="w-full py-1.5 bg-gray-700 text-gray-200 rounded hover:bg-gray-600 text-sm border border-gray-600">
-        + Add Source
-    </button>
+    <!-- Error -->
+    <Transition name="fade">
+      <div v-if="error" class="text-red-400 text-xs px-2 mb-2">{{ error }}</div>
+    </Transition>
 
-    <div v-else class="border-t border-gray-700 pt-2">
-        <input v-model="newDataSource.name" placeholder="Name" class="w-full mb-2 p-1 bg-gray-900 border border-gray-600 rounded text-sm text-white placeholder-gray-500">
-        <select v-model="newDataSource.type" class="w-full mb-2 p-1 bg-gray-900 border border-gray-600 rounded text-sm text-white">
+    <!-- Create Form -->
+    <Transition name="expand">
+      <div v-if="isCreating" class="form-panel">
+        <div class="space-y-2 p-2.5 bg-[var(--sidebar-hover)] rounded-xl mb-2">
+          <input
+            v-model="newDs.name"
+            placeholder="Name"
+            class="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
+          />
+          <select
+            v-model="newDs.type"
+            class="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
+          >
             <option value="postgres">PostgreSQL</option>
             <option value="mysql">MySQL</option>
             <option value="sqlite">SQLite</option>
-        </select>
-        <input v-model="newDataSource.connection_string" placeholder="URI" class="w-full mb-2 p-1 bg-gray-900 border border-gray-600 rounded text-sm text-white placeholder-gray-500">
-        
-        <div class="flex gap-2">
-            <button @click="createDataSource" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-1 rounded text-xs">Save</button>
-            <button @click="isCreating = false" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-1 rounded text-xs">Cancel</button>
+          </select>
+          <input
+            v-model="newDs.connection_string"
+            placeholder="Connection URI"
+            class="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
+          />
+          <button
+            @click="createDataSource"
+            class="btn w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium"
+          >
+            Connect
+          </button>
         </div>
+      </div>
+    </Transition>
+
+    <!-- List -->
+    <div class="space-y-1 max-h-36 overflow-y-auto">
+      <Transition name="fade">
+        <div v-if="dataSources.length === 0 && !isCreating" class="text-[var(--sidebar-text-muted)] text-xs text-center py-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mx-auto mb-1.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+          </svg>
+          No data sources
+        </div>
+      </Transition>
+
+      <TransitionGroup name="msg" tag="div" class="space-y-1">
+        <div
+          v-for="ds in dataSources"
+          :key="ds.id"
+          @click="selectSource(ds.id)"
+          class="group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer text-sm ds-item"
+          :class="selectedId === ds.id ? 'bg-[var(--accent)] text-white' : 'hover:bg-[var(--sidebar-hover)]'"
+        >
+          <!-- DB Icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          </svg>
+          <!-- Name -->
+          <span class="flex-1 truncate">{{ ds.name }}</span>
+          <!-- Delete -->
+          <button
+            @click="deleteDataSource(ds.id, $event)"
+            class="btn opacity-0 group-hover:opacity-100 p-1 rounded-lg"
+            :class="selectedId === ds.id ? 'hover:bg-white/20' : 'hover:bg-red-500/20 text-[var(--sidebar-text-muted)] hover:text-red-400'"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+.form-panel {
+  overflow: hidden;
 }
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent; 
+
+.ds-item {
+  transition: background 0.15s ease, transform 0.15s var(--ease-out-back);
 }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #4b5563; 
-  border-radius: 2px;
+.ds-item:active {
+  transform: scale(0.98);
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #6b7280; 
+
+/* Expand transition for form */
+.expand-enter-active,
+.expand-leave-active {
+  transition: all 0.25s var(--ease-out-expo);
+  overflow: hidden;
+}
+.expand-enter-from,
+.expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+.expand-enter-to,
+.expand-leave-from {
+  opacity: 1;
+  max-height: 200px;
 }
 </style>
-
