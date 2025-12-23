@@ -1,15 +1,20 @@
 import uuid
-from sqlalchemy import Column, String, DateTime
-from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
 
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db.session import Base
+
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    title = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    title: Mapped[str | None] = mapped_column(String(255), default=None)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
