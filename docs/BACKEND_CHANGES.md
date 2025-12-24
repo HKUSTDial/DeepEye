@@ -29,7 +29,7 @@
 │   ┌─────────────┐         ┌─────────────────────────────────────────┐    │
 │   │ FastAPI API │         │          Celery Worker                  │    │
 │   │             │         │   ┌──────────────────────────────────┐  │    │
-│   │ POST /chat  │────────►│   │ EventSourcedCallback             │  │    │
+│   │ POST /chat  │────────►│   │ AgentCallback                    │  │    │
 │   │             │         │   │   ├─ _emit() → Redis (real-time) │  │    │
 │   │             │         │   │   └─ _persist() → PostgreSQL     │  │    │
 │   └─────────────┘         │   └──────────────────────────────────┘  │    │
@@ -72,18 +72,21 @@ class AgentEventRecord(Base):
     created_at: datetime
 ```
 
-#### 重写 `EventSourcedCallback` (`callbacks.py`)
+#### 重写 `AgentCallback` (`callbacks.py`)
 
 ```python
-class EventSourcedCallback(BaseCallbackHandler):
+class AgentCallback(AsyncCallbackHandler):
     """事件既推送到 Redis 也持久化到数据库"""
 
-    async def _emit(self, event: AgentEvent) -> None:
+    async def emit(self, event: AgentEvent) -> None:
         # 1. 推送到 Redis (实时)
-        await self.redis_client.publish(self.channel, event.model_dump_json())
+        await self.event_bus.publish(self.channel, event.model_dump_json())
         # 2. 持久化到 PostgreSQL (历史)
-        self._persist_event(event)
+        self._persist(event)
 ```
+
+> 说明：Celery + LangGraph 场景下回调可能运行在不同 event loop。
+> `AgentCallback` 在内部将 publish 调度回创建 EventBus 的 loop，避免跨 loop 异常。
 
 #### 更新历史 API (`sessions.py`)
 
@@ -128,7 +131,7 @@ async def start_chat(request: ChatRequest, db: Session = Depends(get_db)):
 
 ```
 实时流:
-  User → POST /chat → Celery Task → EventSourcedCallback
+  User → POST /chat → Celery Task → AgentCallback
                                           │
                                           ├─→ Redis Pub/Sub → SSE → Frontend
                                           │
@@ -150,4 +153,3 @@ async def start_chat(request: ChatRequest, db: Session = Depends(get_db)):
 | `REDIS_URL` | Celery Broker + Pub/Sub |
 | `SQLALCHEMY_DATABASE_URL` | 业务数据库 (sessions, datasources, agent_events) |
 | `POSTGRES_STATE_URL` | LangGraph Checkpoint 存储 |
-
