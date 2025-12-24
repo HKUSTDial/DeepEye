@@ -17,11 +17,15 @@ def create_sandbox_tool(sandbox_url: str) -> Callable:
         Returns text output (stdout) combined with any error messages.
         """
         try:
+            start_time = time.time()
+            print(f"[sandbox] POST {sandbox_url}/execute start")
             response = requests.post(
                 f"{sandbox_url}/execute",
                 json={"code": code},
                 timeout=30 # 30 seconds timeout
             )
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            print(f"[sandbox] POST /execute status={response.status_code} elapsed_ms={elapsed_ms} bytes={len(response.content)}")
             
             if response.status_code != 200:
                 return f"Sandbox System Error ({response.status_code}): {response.text}"

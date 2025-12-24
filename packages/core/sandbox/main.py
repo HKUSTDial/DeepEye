@@ -5,6 +5,7 @@ import io
 import contextlib
 import traceback
 import os
+import time
 
 app = FastAPI()
 
@@ -17,6 +18,8 @@ class CodeExecutionResponse(BaseModel):
 
 @app.post("/execute", response_model=CodeExecutionResponse)
 async def execute_code(request: CodeExecutionRequest):
+    start_time = time.time()
+    os.environ.setdefault("MPLBACKEND", "Agg")
     code = request.code
     output_buffer = io.StringIO()
     error_message = None
@@ -34,6 +37,8 @@ async def execute_code(request: CodeExecutionRequest):
     except Exception:
         error_message = traceback.format_exc()
     
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    print(f"[sandbox] execute done elapsed_ms={elapsed_ms} output_bytes={len(output_buffer.getvalue())} error={error_message is not None}")
     return CodeExecutionResponse(
         output=output_buffer.getvalue(),
         error=error_message,
