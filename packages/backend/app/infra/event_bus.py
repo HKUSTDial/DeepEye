@@ -2,37 +2,28 @@
 
 from abc import ABC, abstractmethod
 
-import redis
+import redis.asyncio as aioredis
 
 
 class EventBus(ABC):
-    """Abstract event bus for publishing events."""
+    """Abstract async event bus for publishing events."""
 
     @abstractmethod
-    def publish(self, channel: str, data: str) -> None: ...
+    async def publish(self, channel: str, data: str) -> None: ...
 
     @abstractmethod
-    def close(self) -> None: ...
+    async def close(self) -> None: ...
 
 
 class RedisEventBus(EventBus):
-    """Redis Pub/Sub implementation using sync client (avoids event loop issues in Celery)."""
+    """Redis Pub/Sub implementation using async client."""
 
     def __init__(self, redis_url: str):
-        self.redis_url = redis_url
-        self._client: redis.Redis | None = None
+        self._client = aioredis.from_url(redis_url)
 
-    @property
-    def client(self) -> redis.Redis:
-        if self._client is None:
-            self._client = redis.from_url(self.redis_url)
-        return self._client
+    async def publish(self, channel: str, data: str) -> None:
+        await self._client.publish(channel, data)
 
-    def publish(self, channel: str, data: str) -> None:
-        self.client.publish(channel, data)
-
-    def close(self) -> None:
-        if self._client:
-            self._client.close()
-            self._client = None
+    async def close(self) -> None:
+        await self._client.aclose()
 
