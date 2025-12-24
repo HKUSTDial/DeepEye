@@ -149,7 +149,7 @@ class UserRepository(SQLAlchemyRepository[User, UUID]):
 
 **位置**: `app/infra/event_bus.py`
 
-事件发布的抽象接口，解耦事件生产者和传输实现。使用**同步**接口以避免 Celery 事件循环冲突。
+事件发布的抽象接口，解耦事件生产者和传输实现。使用**异步**接口，所有调用点都在 async 上下文中。
 
 ### 接口定义
 
@@ -157,38 +157,31 @@ class UserRepository(SQLAlchemyRepository[User, UUID]):
 from abc import ABC, abstractmethod
 
 class EventBus(ABC):
-    """Abstract event bus for publishing events."""
+    """Abstract async event bus for publishing events."""
 
     @abstractmethod
-    def publish(self, channel: str, data: str) -> None: ...
+    async def publish(self, channel: str, data: str) -> None: ...
 
     @abstractmethod
-    def close(self) -> None: ...
+    async def close(self) -> None: ...
 ```
 
 ### Redis 实现
 
 ```python
+import redis.asyncio as aioredis
+
 class RedisEventBus(EventBus):
-    """Redis Pub/Sub implementation using sync client."""
+    """Redis Pub/Sub implementation using async client."""
 
     def __init__(self, redis_url: str):
-        self.redis_url = redis_url
-        self._client: redis.Redis | None = None
+        self._client = aioredis.from_url(redis_url)
 
-    @property
-    def client(self) -> redis.Redis:
-        if self._client is None:
-            self._client = redis.from_url(self.redis_url)
-        return self._client
+    async def publish(self, channel: str, data: str) -> None:
+        await self._client.publish(channel, data)
 
-    def publish(self, channel: str, data: str) -> None:
-        self.client.publish(channel, data)
-
-    def close(self) -> None:
-        if self._client:
-            self._client.close()
-            self._client = None
+    async def close(self) -> None:
+        await self._client.aclose()
 ```
 
 ### 扩展示例
@@ -196,13 +189,13 @@ class RedisEventBus(EventBus):
 ```python
 class KafkaEventBus(EventBus):
     def __init__(self, bootstrap_servers: str):
-        self.producer = KafkaProducer(bootstrap_servers=bootstrap_servers)
+        self.producer = AIOKafkaProducer(bootstrap_servers=bootstrap_servers)
 
-    def publish(self, channel: str, data: str) -> None:
-        self.producer.send(channel, data.encode())
+    async def publish(self, channel: str, data: str) -> None:
+        await self.producer.send(channel, data.encode())
 
-    def close(self) -> None:
-        self.producer.close()
+    async def close(self) -> None:
+        await self.producer.stop()
 
 
 class InMemoryEventBus(EventBus):
@@ -210,10 +203,10 @@ class InMemoryEventBus(EventBus):
     def __init__(self):
         self.messages: list[tuple[str, str]] = []
 
-    def publish(self, channel: str, data: str) -> None:
+    async def publish(self, channel: str, data: str) -> None:
         self.messages.append((channel, data))
 
-    def close(self) -> None:
+    async def close(self) -> None:
         pass
 ```
 

@@ -126,15 +126,15 @@ class SQLAlchemyRepository(BaseRepository[ModelT, ID]):
 
 ```python
 class EventBus(ABC):
-    def publish(self, channel: str, data: str) -> None: ...
-    def close(self) -> None: ...
+    async def publish(self, channel: str, data: str) -> None: ...
+    async def close(self) -> None: ...
 ```
 
 **为什么**：
 - 解耦事件发布和具体实现
 - 当前用 Redis，未来可换 Kafka
 - 便于本地测试（内存实现）
-- 使用**同步**接口避免 Celery 事件循环冲突
+- 使用**异步**接口，所有调用点都在 async 上下文中
 
 ### 3.3 引入 AgentFactory
 
@@ -184,11 +184,11 @@ class XxxRepository(SQLAlchemyRepository[XxxModel, uuid.UUID]):
 ```python
 # infra/kafka_event_bus.py
 class KafkaEventBus(EventBus):
-    def publish(self, channel: str, data: str) -> None:
-        self.producer.send(channel, data.encode())
+    async def publish(self, channel: str, data: str) -> None:
+        await self.producer.send(channel, data.encode())
 
-    def close(self) -> None:
-        self.producer.close()
+    async def close(self) -> None:
+        await self.producer.stop()
 ```
 
 ---
