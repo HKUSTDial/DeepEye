@@ -66,19 +66,19 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         supervisor = factory.create_supervisor(tools)
 
         try:
-            cb_supervisor.emit(AgentEvent(type=AgentEventType.AGENT_START))
+            await cb_supervisor.emit(AgentEvent(type=AgentEventType.AGENT_START))
             await supervisor.ainvoke(
                 agent_input.user_input,
                 thread_id=session_id,
                 config={"callbacks": [cb_supervisor]},
             )
-            cb_supervisor.emit(AgentEvent(type=AgentEventType.AGENT_END))
+            await cb_supervisor.emit(AgentEvent(type=AgentEventType.AGENT_END))
         except Exception as e:
             tb = traceback.format_exc()
             print(f"Agent Error: {tb}")
-            cb_supervisor.emit(AgentEvent(type=AgentEventType.ERROR, content=str(e), data={"traceback": tb}))
+            await cb_supervisor.emit(AgentEvent(type=AgentEventType.ERROR, content=str(e), data={"traceback": tb}))
         finally:
-            event_bus.close()
+            await event_bus.close()
 
 
 @celery_app.task(bind=True)
