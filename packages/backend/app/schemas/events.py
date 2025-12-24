@@ -1,21 +1,56 @@
-"""Agent Event schemas for streaming."""
+"""Agent Event schemas for streaming and message persistence."""
 
 import json
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class AgentEventType(str, Enum):
+    """Event types for real-time streaming."""
+
     TOKEN = "token"
     TOOL_START = "tool_start"
     TOOL_END = "tool_end"
     TOOL_ERROR = "tool_error"
     AGENT_START = "agent_start"
     AGENT_END = "agent_end"
-    AGENT_THOUGHT = "agent_thought"
     ERROR = "error"
+
+
+# --- Message Models (for persistence, matches frontend ToolStep structure) ---
+
+
+class ToolStep(BaseModel):
+    """A tool call or thought step, can be nested."""
+
+    type: Literal["tool", "thought"] = "tool"
+    name: str = ""
+    source: str = ""
+    input: str = ""
+    output: str = ""
+    thought: str = ""
+    status: Literal["running", "completed", "error"] = "completed"
+    subSteps: list["ToolStep"] = Field(default_factory=list)
+
+
+class UserMessage(BaseModel):
+    """User message in the conversation."""
+
+    role: Literal["user"] = "user"
+    content: str
+
+
+class AssistantMessage(BaseModel):
+    """Assistant message with content and nested tool steps."""
+
+    role: Literal["assistant"] = "assistant"
+    content: str = ""  # supervisor's final response
+    steps: list[ToolStep] = Field(default_factory=list)
+
+
+Message = UserMessage | AssistantMessage
 
 
 class AgentEvent(BaseModel):

@@ -12,17 +12,14 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.infra import RedisEventBus
 from app.repositories import DataSourceRepository
-from app.schemas import AgentEvent, AgentEventType, AgentInput
-from app.tasks.callbacks import AgentCallback
+from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage
+from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
 from deepeye.agents import AgentFactory
 from deepeye.tools.agent_tools import create_code_agent_tool, create_sql_agent_tool
 
 
 def _get_datasource_url(datasource_id: str | None) -> str | None:
-    """Fetch datasource connection string, creating fresh DB session per-call.
-
-    Avoids module-level engine to prevent fork issues in Celery prefork workers.
-    """
+    """Fetch datasource connection string, creating fresh DB session per-call."""
     if not datasource_id:
         return None
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
@@ -47,10 +44,16 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     model = _create_model()
     event_bus = RedisEventBus(settings.REDIS_URL)
 
-    # Callbacks for different sources
-    cb_supervisor = AgentCallback(event_bus, session_id, "supervisor", ignore_tags=["sub_agent"])
-    cb_sql = AgentCallback(event_bus, session_id, "sql_agent")
-    cb_code = AgentCallback(event_bus, session_id, "code_agent")
+    # Persist user message first
+    persist_message(session_id, UserMessage(content=agent_input.user_input))
+
+    # Shared collector for all callbacks
+    collector = MessageCollector()
+
+    # Callbacks for different sources - all share the same collector
+    cb_supervisor = AgentCallback(event_bus, session_id, "supervisor", collector, ignore_tags=["sub_agent"])
+    cb_sql = AgentCallback(event_bus, session_id, "sql_agent", collector)
+    cb_code = AgentCallback(event_bus, session_id, "code_agent", collector)
 
     # Build tools based on available datasource
     tools = []
@@ -66,17 +69,20 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         supervisor = factory.create_supervisor(tools)
 
         try:
-            await cb_supervisor.emit(AgentEvent(type=AgentEventType.AGENT_START))
+            await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_START))
             await supervisor.ainvoke(
                 agent_input.user_input,
                 thread_id=session_id,
                 config={"callbacks": [cb_supervisor]},
             )
-            await cb_supervisor.emit(AgentEvent(type=AgentEventType.AGENT_END))
+            # Build and persist the complete assistant message
+            assistant_message = collector.build()
+            persist_message(session_id, assistant_message)
+            await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_END))
         except Exception as e:
             tb = traceback.format_exc()
             print(f"Agent Error: {tb}")
-            await cb_supervisor.emit(AgentEvent(type=AgentEventType.ERROR, content=str(e), data={"traceback": tb}))
+            await cb_supervisor._publish(AgentEvent(type=AgentEventType.ERROR, content=str(e), data={"traceback": tb}))
         finally:
             await event_bus.close()
 

@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.repositories import EventRepository
 from app.schemas import ChatRequest, SSEMessage
 from app.services import get_or_create_session, start_agent_workflow
 
@@ -21,9 +20,7 @@ router = APIRouter(tags=["chat"])
 async def start_chat(request: ChatRequest, db: Session = Depends(get_db)):
     """Start or continue a chat session."""
     _, session_id = get_or_create_session(db, request.session_id, request.message)
-
-    EventRepository(db).append(session_id, "user_message", "user", request.message)
-
+    # user_message is persisted in agent_tasks.py before agent runs
     task_id = start_agent_workflow(session_id, request.message, request.datasource_id)
     return {"session_id": session_id, "task_id": task_id, "message": "Agent started"}
 

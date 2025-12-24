@@ -1,25 +1,36 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Message, ToolStep, Session } from '../types'
-import { sessionApi, type AgentEvent } from '../api'
+import { sessionApi, type AgentEvent, type StoredMessage } from '../api'
 
 /**
- * Event-Sourced Chat Store
+ * Chat Store
  *
- * Core principle: `reduceEvents()` is a PURE FUNCTION that converts
- * an event stream into messages. Both streaming and history use it.
+ * - Streaming: uses reduceStreamEvents() to build messages from real-time events
+ * - History: loads pre-built messages directly from backend
  */
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
-  const events = ref<AgentEvent[]>([])  // Raw event stream
+  const streamEvents = ref<AgentEvent[]>([])  // Events for current streaming session only
   const sessionId = ref<string | null>(null)
   const isStreaming = ref(false)
   const sessions = ref<Session[]>([])
   const isLoadingSessions = ref(false)
 
-  // ============ Pure Function: Event → Message ============
+  // ============ Convert stored messages to UI Message format ============
 
-  function reduceEvents(eventList: AgentEvent[]): Message[] {
+  function convertStoredMessages(stored: StoredMessage[]): Message[] {
+    // Backend now stores in the same structure as frontend Message
+    return stored.map((m) => ({
+      role: m.role,
+      content: m.content,
+      steps: m.steps,
+    }))
+  }
+
+  // ============ Streaming: Event → Message (real-time only) ============
+
+  function reduceStreamEvents(eventList: AgentEvent[]): Message[] {
     const result: Message[] = []
     let current: Message | null = null
     let stepStack: ToolStep[] = []
@@ -27,13 +38,7 @@ export const useChatStore = defineStore('chat', () => {
     for (const e of eventList) {
       const { type, source, content = '', data = {} } = e
 
-      if (type === 'user_message') {
-        if (current) result.push(current)
-        result.push({ role: 'user', content })
-        current = null
-        stepStack = []
-      }
-      else if (type === 'agent_start') {
+      if (type === 'agent_start') {
         if (current) result.push(current)
         current = { role: 'assistant', content: '', steps: [] }
         stepStack = []
@@ -41,8 +46,8 @@ export const useChatStore = defineStore('chat', () => {
       else if (type === 'token' && current) {
         if (source === 'supervisor') {
           current.content += content
-        } else if (stepStack.length) {
-          const step = stepStack[stepStack.length - 1]
+        } else if (stepStack.length > 0) {
+          const step = stepStack[stepStack.length - 1]!
           const subs = step.subSteps ??= []
           const last = subs[subs.length - 1]
           if (last?.type === 'thought') {
@@ -57,8 +62,8 @@ export const useChatStore = defineStore('chat', () => {
         if (source === 'supervisor') {
           current.steps!.push(step)
           stepStack = [step]
-        } else if (stepStack.length) {
-          stepStack[stepStack.length - 1].subSteps!.push(step)
+        } else if (stepStack.length > 0) {
+          stepStack[stepStack.length - 1]!.subSteps!.push(step)
           stepStack.push(step)
         } else {
           current.steps!.push(step)
@@ -66,16 +71,16 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
       else if (type === 'tool_end' && current) {
-        // output may be string or object with .content
         const rawOutput = data.output as unknown
         const output = typeof rawOutput === 'object' && rawOutput && 'content' in rawOutput ? String((rawOutput as { content: unknown }).content) : String(rawOutput || '')
-        if (source === 'supervisor' && stepStack.length) {
-          stepStack[stepStack.length - 1].output = output
+        if (source === 'supervisor' && stepStack.length > 0) {
+          stepStack[stepStack.length - 1]!.output = output
           if (stepStack.length > 1) stepStack.pop()
-        } else if (stepStack.length) {
+        } else if (stepStack.length > 0) {
           for (let i = stepStack.length - 1; i >= 0; i--) {
-            if (stepStack[i].source === source) {
-              stepStack[i].output = output
+            const s = stepStack[i]!
+            if (s.source === source) {
+              s.output = output
               stepStack = stepStack.slice(0, i)
               break
             }
@@ -95,23 +100,21 @@ export const useChatStore = defineStore('chat', () => {
 
   // ============ State Management ============
 
-  function rebuildMessages() {
-    messages.value = reduceEvents(events.value)
-    // Mark last assistant message as streaming if active
-    if (isStreaming.value) {
-      const last = messages.value[messages.value.length - 1]
-      if (last?.role === 'assistant') last.isStreaming = true
+  function rebuildStreamingMessages() {
+    // Keep existing messages, append streaming assistant message
+    const streamingMsgs = reduceStreamEvents(streamEvents.value)
+    const lastStreaming = streamingMsgs[streamingMsgs.length - 1]
+    if (lastStreaming) {
+      lastStreaming.isStreaming = true
+      // Remove any previous streaming message and append new one
+      const baseMessages = messages.value.filter((m) => !m.isStreaming)
+      messages.value = [...baseMessages, lastStreaming]
     }
   }
 
   function pushEvent(event: AgentEvent) {
-    events.value.push(event)
-    rebuildMessages()
-  }
-
-  function setEvents(eventList: AgentEvent[]) {
-    events.value = eventList
-    rebuildMessages()
+    streamEvents.value.push(event)
+    rebuildStreamingMessages()
   }
 
   // ============ Session Management ============
@@ -129,14 +132,14 @@ export const useChatStore = defineStore('chat', () => {
 
   function createSession() {
     sessionId.value = null
-    events.value = []
+    streamEvents.value = []
     messages.value = []
   }
 
   async function deleteSession(id: string) {
     try {
       await sessionApi.delete(id)
-      sessions.value = sessions.value.filter(s => s.id !== id)
+      sessions.value = sessions.value.filter((s) => s.id !== id)
       if (sessionId.value === id) createSession()
     } catch (e) {
       console.error('Failed to delete session', e)
@@ -147,12 +150,12 @@ export const useChatStore = defineStore('chat', () => {
     if (sessionId.value === id) return
     sessionId.value = id
     isStreaming.value = false
+    streamEvents.value = []
     try {
-      const { events: historyEvents } = await sessionApi.getHistory(id)
-      setEvents(historyEvents)
+      const { messages: storedMessages } = await sessionApi.getMessages(id)
+      messages.value = convertStoredMessages(storedMessages)
     } catch (e) {
-      console.error('Failed to load history', e)
-      events.value = []
+      console.error('Failed to load messages', e)
       messages.value = []
     }
   }
@@ -161,15 +164,19 @@ export const useChatStore = defineStore('chat', () => {
 
   function startStreaming() {
     isStreaming.value = true
+    streamEvents.value = []
   }
 
   function stopStreaming() {
     isStreaming.value = false
-    rebuildMessages()
+    // Mark last message as not streaming
+    const last = messages.value[messages.value.length - 1]
+    if (last?.isStreaming) last.isStreaming = false
+    streamEvents.value = []
   }
 
   function addUserMessage(content: string) {
-    pushEvent({ type: 'user_message', source: 'user', content })
+    messages.value.push({ role: 'user', content })
   }
 
   return {
