@@ -1,0 +1,505 @@
+{
+  "meta": {
+    "title": "Tech Companies: Revenue and Workforce Overview",
+    "fps": 30,
+    "width": 1280,
+    "height": 720
+  },
+  "scenes": [
+    {
+      "id": "scene_opening",
+      "type": "opening",
+      "content": {
+        "title": "Tech Industry Insights",
+        "subtitle": "Revenue and Workforce Comparison"
+      },
+      "narration": [
+        {
+          "text": "Explore the revenue and workforce statistics of leading tech companies."
+        }
+      ]
+    },
+    {
+      "id": "scene_chart_1",
+      "type": "chart",
+      "content": {
+        "chart_type": "bar_chart",
+        "title": "Revenue Comparison Among Major Tech Companies",
+        "data": [
+          {
+            "company": "Apple",
+            "revenue": 394.3,
+            "employees": 164000
+          },
+          {
+            "company": "Microsoft",
+            "revenue": 211.9,
+            "employees": 221000
+          },
+          {
+            "company": "Google",
+            "revenue": 307.4,
+            "employees": 190234
+          },
+          {
+            "company": "Amazon",
+            "revenue": 514.0,
+            "employees": 1541000
+          },
+          {
+            "company": "Meta",
+            "revenue": 134.9,
+            "employees": 86482
+          }
+        ],
+        "data_binding": {
+          "x_axis": {
+            "field": "company",
+            "label": "Company"
+          },
+          "y_axis": {
+            "field": "revenue",
+            "label": "Revenue (Billion USD)"
+          }
+        },
+        "style": {
+          "bar_color": "#5b8ff9",
+          "highlight_color": "#ff6b6b",
+          "background_color": "#0f1419",
+          "text_color": "#e8eaed",
+          "grid_color": "#555555",
+          "axis_color": "#888888"
+        },
+        "layout": {
+          "margin": {
+            "top": 80,
+            "right": 60,
+            "bottom": 100,
+            "left": 100
+          },
+          "chart_area": {
+            "width": 1120,
+            "height": 540
+          }
+        }
+      },
+      "narration": [
+        {
+          "text": "Let's examine the revenue of major tech companies."
+        },
+        {
+          "text": "Amazon leads with an impressive 514 billion dollars, far surpassing others."
+        },
+        {
+          "text": "Apple follows in second place with 394.3 billion dollars."
+        }
+      ],
+      "animations": [
+        {
+          "id": "entrance_anim",
+          "type": "entrance",
+          "effect": "grow_bars",
+          "trigger_narration": 0,
+          "description": "Chart entrance animation synced with overview"
+        },
+        {
+          "id": "emphasis_amazon",
+          "type": "emphasis",
+          "effect": "pulse",
+          "trigger_narration": 1,
+          "target_data": {
+            "data_filter": {
+              "company": "Amazon"
+            }
+          },
+          "style": {
+            "intensity": 0.1
+          },
+          "description": "Highlight Amazon when mentioned"
+        },
+        {
+          "id": "emphasis_apple",
+          "type": "emphasis",
+          "effect": "pulse",
+          "trigger_narration": 2,
+          "target_data": {
+            "data_filter": {
+              "company": "Apple"
+            }
+          },
+          "style": {
+            "intensity": 0.1
+          },
+          "description": "Highlight Apple when mentioned"
+        }
+      ]
+    },
+    {
+      "id": "scene_chart_2",
+      "type": "chart",
+      "content": {
+        "chart_type": "bar_chart",
+        "title": "Workforce Size Across Tech Companies",
+        "data": [
+          {
+            "company": "Apple",
+            "revenue": 394.3,
+            "employees": 164000
+          },
+          {
+            "company": "Microsoft",
+            "revenue": 211.9,
+            "employees": 221000
+          },
+          {
+            "company": "Google",
+            "revenue": 307.4,
+            "employees": 190234
+          },
+          {
+            "company": "Amazon",
+            "revenue": 514.0,
+            "employees": 1541000
+          },
+          {
+            "company": "Meta",
+            "revenue": 134.9,
+            "employees": 86482
+          }
+        ],
+        "data_binding": {
+          "x_axis": {
+            "field": "company",
+            "label": "Company"
+          },
+          "y_axis": {
+            "field": "employees",
+            "label": "Number of Employees"
+          }
+        },
+        "style": {
+          "bar_color": "#5b8ff9",
+          "highlight_color": "#ff6b6b",
+          "background_color": "#0f1419",
+          "text_color": "#e8eaed",
+          "grid_color": "#555555",
+          "axis_color": "#888888"
+        },
+        "layout": {
+          "margin": {
+            "top": 80,
+            "right": 60,
+            "bottom": 100,
+            "left": 100
+          },
+          "chart_area": {
+            "width": 1120,
+            "height": 540
+          }
+        }
+      },
+      "narration": [
+        {
+          "text": "Now, let's look at the workforce size of these companies."
+        },
+        {
+          "text": "Amazon employs 1,541,000 people, more than double the next highest, Microsoft, at 221,000 employees."
+        },
+        {
+          "text": "Meta has the smallest workforce with just 86,482 employees."
+        }
+      ],
+      "animations": [
+        {
+          "id": "entrance_anim",
+          "type": "entrance",
+          "effect": "grow_bars",
+          "trigger_narration": 0,
+          "description": "Chart entrance animation synced with overview"
+        },
+        {
+          "id": "emphasis_amazon",
+          "type": "emphasis",
+          "effect": "pulse",
+          "trigger_narration": 1,
+          "target_data": {
+            "data_filter": {
+              "company": "Amazon"
+            }
+          },
+          "style": {
+            "intensity": 0.1
+          },
+          "description": "Highlight Amazon when mentioned"
+        },
+        {
+          "id": "emphasis_microsoft",
+          "type": "emphasis",
+          "effect": "pulse",
+          "trigger_narration": 1,
+          "target_data": {
+            "data_filter": {
+              "company": "Microsoft"
+            }
+          },
+          "style": {
+            "intensity": 0.1
+          },
+          "description": "Highlight Microsoft when mentioned"
+        },
+        {
+          "id": "emphasis_meta",
+          "type": "emphasis",
+          "effect": "pulse",
+          "trigger_narration": 2,
+          "target_data": {
+            "data_filter": {
+              "company": "Meta"
+            }
+          },
+          "style": {
+            "intensity": 0.1
+          },
+          "description": "Highlight Meta when mentioned"
+        }
+      ]
+    },
+    {
+      "id": "scene_chart_3",
+      "type": "chart",
+      "content": {
+        "chart_type": "scatter_chart",
+        "title": "Correlation Between Revenue and Workforce Size",
+        "data": [
+          {
+            "company": "Apple",
+            "revenue": 394.3,
+            "employees": 164000
+          },
+          {
+            "company": "Microsoft",
+            "revenue": 211.9,
+            "employees": 221000
+          },
+          {
+            "company": "Google",
+            "revenue": 307.4,
+            "employees": 190234
+          },
+          {
+            "company": "Amazon",
+            "revenue": 514.0,
+            "employees": 1541000
+          },
+          {
+            "company": "Meta",
+            "revenue": 134.9,
+            "employees": 86482
+          }
+        ],
+        "data_binding": {
+          "x_axis": {
+            "field": "employees",
+            "label": "Number of Employees"
+          },
+          "y_axis": {
+            "field": "revenue",
+            "label": "Revenue (Billion USD)"
+          }
+        },
+        "style": {
+          "bar_color": "#5b8ff9",
+          "highlight_color": "#ff6b6b",
+          "background_color": "#0f1419",
+          "text_color": "#e8eaed",
+          "grid_color": "#555555",
+          "axis_color": "#888888"
+        },
+        "layout": {
+          "margin": {
+            "top": 80,
+            "right": 60,
+            "bottom": 100,
+            "left": 100
+          },
+          "chart_area": {
+            "width": 1120,
+            "height": 540
+          }
+        }
+      },
+      "narration": [
+        {
+          "text": "There is a clear correlation between revenue and workforce size."
+        },
+        {
+          "text": "Amazon, with the largest workforce, also generates the highest revenue."
+        },
+        {
+          "text": "Conversely, Meta has both the smallest workforce and the lowest revenue."
+        }
+      ],
+      "animations": [
+        {
+          "id": "entrance_anim",
+          "type": "entrance",
+          "effect": "fade_in",
+          "trigger_narration": 0,
+          "description": "Scatter chart entrance animation synced with overview"
+        },
+        {
+          "id": "emphasis_amazon",
+          "type": "emphasis",
+          "effect": "pulse",
+          "trigger_narration": 1,
+          "target_data": {
+            "data_filter": {
+              "company": "Amazon"
+            }
+          },
+          "style": {
+            "intensity": 0.1
+          },
+          "description": "Highlight Amazon when mentioned"
+        },
+        {
+          "id": "emphasis_meta",
+          "type": "emphasis",
+          "effect": "pulse",
+          "trigger_narration": 2,
+          "target_data": {
+            "data_filter": {
+              "company": "Meta"
+            }
+          },
+          "style": {
+            "intensity": 0.1
+          },
+          "description": "Highlight Meta when mentioned"
+        }
+      ]
+    },
+    {
+      "id": "scene_stats",
+      "type": "stat_cards",
+      "content": {
+        "cards": [
+          {
+            "number": "$514.0B",
+            "label": "Amazon Revenue",
+            "color": "#5b8ff9"
+          },
+          {
+            "number": "1,541,000",
+            "label": "Amazon Employees",
+            "color": "#51cf66"
+          },
+          {
+            "number": "$134.9B",
+            "label": "Meta Revenue",
+            "color": "#ff6b6b"
+          },
+          {
+            "number": "86,482",
+            "label": "Meta Employees",
+            "color": "#ff6b6b"
+          }
+        ]
+      },
+      "narration": [
+        {
+          "text": "Amazon dominates with a revenue of 514 billion dollars and a workforce of 1.5 million."
+        },
+        {
+          "text": "Meta, on the other hand, records the lowest revenue and workforce among these companies."
+        }
+      ],
+      "animations": [
+        {
+          "id": "cards_entrance",
+          "type": "entrance",
+          "effect": "fade_in",
+          "target": "cards",
+          "trigger_narration": 0,
+          "style": {
+            "direction": "from_bottom",
+            "stagger_delay": 0.15
+          },
+          "description": "Cards fade in from bottom with stagger"
+        },
+        {
+          "id": "emphasis_amazon_revenue",
+          "type": "emphasis",
+          "effect": "pulse",
+          "target": "card",
+          "trigger_narration": 0,
+          "target_data": {
+            "card_index": 0
+          },
+          "style": {
+            "intensity": 0.7
+          },
+          "description": "Highlight Amazon Revenue card"
+        },
+        {
+          "id": "emphasis_amazon_employees",
+          "type": "emphasis",
+          "effect": "pulse",
+          "target": "card",
+          "trigger_narration": 0,
+          "target_data": {
+            "card_index": 1
+          },
+          "style": {
+            "intensity": 0.7
+          },
+          "description": "Highlight Amazon Employees card"
+        },
+        {
+          "id": "emphasis_meta_revenue",
+          "type": "emphasis",
+          "effect": "pulse",
+          "target": "card",
+          "trigger_narration": 1,
+          "target_data": {
+            "card_index": 2
+          },
+          "style": {
+            "intensity": 0.7
+          },
+          "description": "Highlight Meta Revenue card"
+        },
+        {
+          "id": "emphasis_meta_employees",
+          "type": "emphasis",
+          "effect": "pulse",
+          "target": "card",
+          "trigger_narration": 1,
+          "target_data": {
+            "card_index": 3
+          },
+          "style": {
+            "intensity": 0.7
+          },
+          "description": "Highlight Meta Employees card"
+        }
+      ]
+    },
+    {
+      "id": "scene_closing",
+      "type": "closing",
+      "content": {
+        "title": "Thank You for Watching",
+        "subtitle": "Tech Industry Overview"
+      },
+      "narration": [
+        {
+          "text": "Thank you for exploring the revenue and workforce data of leading tech companies with us."
+        },
+        {
+          "text": "Stay tuned for more industry insights."
+        }
+      ]
+    }
+  ]
+}

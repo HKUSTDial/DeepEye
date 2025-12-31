@@ -1,0 +1,50 @@
+You are an expert data‐visualization engineer and front‐end developer.
+
+Your task is to take a chart image and generate a HTML file that, when loaded in a browser, reproduces the chart exactly. The chart must be centered in the viewport.
+
+## Constraints:
+- No Explanations: Do not include comments, reasoning, or explanatory text. Output only valid HTML with JavaScript code.
+
+## Technical Requirements
+- **Charting library**: Use D3.js to implement the chart. Write the code to be clean, modular, and easy to understand and modify.
+- **Single file output**: Provide one standalone HTML file that includes everything needed to render the chart.
+- **Chart fidelity**: Replicate all visual elements—shapes, colors, axes, labels, legends, fonts, line weights, markers—exactly as in the original image.
+- **No animations**: The chart must render immediately in its final state.
+- **Aspect ratio & sizing**: The chart’s content area (including margins, paddings, and plot area) must match the original image’s proportions precisely.
+- **Image**: Recreate any icon/image content using SVG <g> and shapes. Do not use <image>, base64 images, or links.
+- **Text**: Place all text in <text> leaf nodes. Do not use <tspan> or nested text structures.
+
+## Grouping Requirements
+You should use following `class` names for SVG groups with specific semantics:
+- title: The title area (may contain title, subtitle, and shapes)
+- image: Each individual icon/image/pictogram (no annotation text, no grouped images)
+- legend: Legend area
+- axis: Axis area
+
+## Data
+The tabular data used in this figure is provided below, which can be used in your recreation:
+```json
+{{TABLE}}
+```
+
+## Output Format
+Return only the following standalone HTML file:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Recreated Chart</title>
+        <!-- <style> -->
+    </head>
+    <body>
+        <div id="chart-container"></div>
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script>
+            <!-- Your D3 code here -->
+        </script>
+    </body>
+</html>
+```
+Only output this file. No comments or explanation. Keep it minimal and strictly within the token limits.

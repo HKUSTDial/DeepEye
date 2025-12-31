@@ -1,0 +1,716 @@
+"""
+使用 Claude API 生成其他场景的 TSX 组件（Opening, Closing, Stat Cards）
+
+支持并行生成，专门处理非图表场景：
+- opening: 开场场景（标题 + 副标题 + 渐变背景）
+- closing: 结尾场景（感谢语 + 渐变背景）
+- stat_cards: 数据卡片（2-4个关键指标）
+
+使用方法：
+  python "infographic_generation/generate_other_scenes.py" --config xxx.json --workers 5
+"""
+
+import json
+import os
+import sys
+import argparse
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Tuple
+
+# 导入项目现有的 LLM 客户端
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'config_generation'))
+from generator import LLMClient
+
+
+def extract_dataset_name(video_meta):
+    """
+    从视频元数据中提取数据集名字（用于组件命名）
+    去掉空格，保持简洁
+    """
+    title = video_meta.get('title', 'DataAnalysis')
+    # 去掉空格和特殊字符，只保留字母数字
+    dataset_name = ''.join(c for c in title if c.isalnum())
+    # 如果太长，截取前20个字符
+    if len(dataset_name) > 20:
+        dataset_name = dataset_name[:20]
+    return dataset_name
+
+
+def create_opening_scene_prompt(scene_data, video_meta, component_name, scene_index=1, total_scenes=1):
+    """创建 Opening 场景的 Prompt"""
+    content = scene_data.get('content', {})
+    title = content.get('title', 'Welcome')
+    subtitle = content.get('subtitle', '')
+    narration = scene_data.get('narration', [])
+    narration_text = narration[0].get('text', '') if narration else ''
+    
+    # 背景色配置 - 统一使用纯色（与图表场景保持一致）
+    # 优先从图表场景获取统一的背景色，如果没有则从当前场景读取
+    background = content.get('background', {})
+    if background.get('type') == 'gradient':
+        bg_color = background.get('colors', ['#0f1419'])[0]
+    elif background.get('type') == 'solid':
+        bg_color = background.get('color', '#0f1419')
+    else:
+        # 如果没有 background 配置，尝试从 style 获取（向后兼容）
+        style = content.get('style', {})
+        bg_color = style.get('background_color', '#0f1419')
+    
+    # 文字颜色配置
+    style = content.get('style', {})
+    text_color = style.get('text_color', '#ffffff')
+    subtitle_color = style.get('subtitle_color', '#e0e0e0')
+    
+    # 场景时间范围
+    time_range = scene_data.get('time_range', [0, 3])
+    duration = time_range[1] - time_range[0]
+    
+    prompt = f"""
+You are creating an OPENING SCENE for a data video.
+
+**VIDEO CONTEXT:**
+- Video Title: "{video_meta.get('title', 'Data Insights')}"
+- Scene {scene_index} of {total_scenes}
+- Duration: {duration} seconds
+
+**SCENE CONTENT:**
+- Main Title: "{title}"
+- Subtitle: "{subtitle}"
+- Narration: "{narration_text}"
+
+**DESIGN REQUIREMENTS:**
+
+1. **Background**: 
+   - Use solid background color (to match chart scenes)
+   - Color: {bg_color}
+   
+2. **Layout**:
+   - Centered title and subtitle
+   - Title: Large, bold, eye-catching (font-size: 56-72px)
+   - Subtitle: Smaller, secondary text (font-size: 24-32px)
+   - Spacing: 20-30px between title and subtitle
+
+3. **Colors**:
+   - Title color: {text_color}
+   - Subtitle color: {subtitle_color}
+   
+4. **Typography**:
+   - Use modern sans-serif font (e.g., 'Inter', 'Helvetica', 'Arial')
+   - Title: font-weight 700-900
+   - Subtitle: font-weight 400-500
+
+5. **NO ANIMATIONS** in this static version
+   - Animations will be added later by a separate script
+   - All elements should be at full opacity
+   - All elements at final positions
+
+6. **Subtitle/Narration Space**:
+   - Reserve BOTTOM 80px for narration subtitles (will be added in animation phase)
+   - Adjust content positioning to avoid overlap with subtitle area
+   - Keep main content in upper area
+
+**OUTPUT REQUIREMENTS:**
+
+Generate a complete TSX component (React + TypeScript + Remotion):
+
+```tsx
+import React from 'react';
+import {{ AbsoluteFill }} from 'remotion';
+
+interface SceneProps {{
+  sceneStartOffset?: number; // Will be used later for animation timing
+  narrations?: Array<{{text: string; time_start: number; time_end: number}}>; // Narration subtitles (will be used in animation version)
+}}
+
+export const [ComponentName]: React.FC<SceneProps> = ({{ sceneStartOffset = 0 }}) => {{
+  return (
+    <AbsoluteFill
+      style={{{{
+        background: '{bg_color}',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontFamily: "'Inter', 'Helvetica', 'Arial', sans-serif",
+        padding: '0 80px',
+      }}}}
+    >
+      {{/* Main Title */}}
+      <div
+        style={{{{
+          fontSize: 64,
+          fontWeight: 800,
+          color: '{text_color}',
+          textAlign: 'center',
+          marginBottom: 24,
+          maxWidth: '80%',
+          lineHeight: 1.2,
+        }}}}
+      >
+        {title}
+      </div>
+
+      {{/* Subtitle */}}
+      <div
+        style={{{{
+          fontSize: 28,
+          fontWeight: 400,
+          color: '{subtitle_color}',
+          textAlign: 'center',
+          maxWidth: '70%',
+          lineHeight: 1.5,
+        }}}}
+      >
+        {subtitle}
+      </div>
+    </AbsoluteFill>
+  );
+}};
+```
+
+**CRITICAL**:
+- Replace [ComponentName] with the actual component name
+- Keep the structure clean and simple
+- Ensure all styles are inline for easy animation later
+- DO NOT add any animation logic (opacity transitions, transforms, etc.)
+- All elements should be visible and at final positions
+
+Return ONLY the complete TSX code, no explanation.
+"""
+    
+    return prompt
+
+
+def create_closing_scene_prompt(scene_data, video_meta, component_name, scene_index=1, total_scenes=1):
+    """创建 Closing 场景的 Prompt"""
+    content = scene_data.get('content', {})
+    title = content.get('title', 'Thank You')
+    narration = scene_data.get('narration', [])
+    narration_text = ' '.join([n.get('text', '') for n in narration])
+    
+    # 背景色配置 - 统一使用纯色（与图表场景保持一致）
+    style = content.get('style', {})
+    background = style.get('background', {})
+    if background.get('type') == 'gradient':
+        bg_color = background.get('colors', ['#0f1419'])[0]
+    elif background.get('type') == 'solid':
+        bg_color = background.get('color', '#0f1419')
+    else:
+        # 如果没有 background 配置，尝试从 style 获取（向后兼容）
+        bg_color = style.get('background_color', '#0f1419')
+    
+    # 文字颜色配置
+    text_color = style.get('text_color', '#ffffff')
+    subtitle_color = style.get('subtitle_color', '#e0e0e0')
+    
+    # 场景时间范围
+    time_range = scene_data.get('time_range', [0, 3])
+    duration = time_range[1] - time_range[0]
+    
+    prompt = f"""
+You are creating a CLOSING SCENE for a data video.
+
+**VIDEO CONTEXT:**
+- Video Title: "{video_meta.get('title', 'Data Insights')}"
+- Scene {scene_index} of {total_scenes}
+- Duration: {duration} seconds
+
+**SCENE CONTENT:**
+- Main Title: "{title}"
+- Narration: "{narration_text}"
+
+**DESIGN REQUIREMENTS:**
+
+1. **Background**: 
+   - Use gradient background (often reversed from opening)
+   - Colors: {bg_color}
+   
+2. **Layout**:
+   - Centered title
+   - Title: Large, bold (font-size: 56-72px)
+   - Optional: Small tagline or summary text below title (font-size: 20-24px)
+
+3. **Colors**:
+   - Title color: {text_color}
+   - Secondary text color: {subtitle_color}
+   
+4. **Typography**:
+   - Use modern sans-serif font (e.g., 'Inter', 'Helvetica', 'Arial')
+   - Title: font-weight 700-900
+   - Secondary text: font-weight 400-500
+
+5. **NO ANIMATIONS** in this static version
+   - Animations will be added later by a separate script
+   - All elements should be at full opacity
+   - All elements at final positions
+
+6. **Subtitle/Narration Space**:
+   - Reserve BOTTOM 80px for narration subtitles (will be added in animation phase)
+   - Adjust content positioning to avoid overlap with subtitle area
+   - Keep main content in upper area
+
+**OUTPUT REQUIREMENTS:**
+
+Generate a complete TSX component (React + TypeScript + Remotion):
+
+```tsx
+import React from 'react';
+import {{ AbsoluteFill }} from 'remotion';
+
+interface SceneProps {{
+  sceneStartOffset?: number; // Will be used later for animation timing
+  narrations?: Array<{{text: string; time_start: number; time_end: number}}>; // Narration subtitles (will be used in animation version)
+}}
+
+export const [ComponentName]: React.FC<SceneProps> = ({{ sceneStartOffset = 0 }}) => {{
+  return (
+    <AbsoluteFill
+      style={{{{
+        background: '{bg_color}',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontFamily: "'Inter', 'Helvetica', 'Arial', sans-serif",
+        padding: '0 80px 80px 80px', // 底部80px padding for subtitles
+      }}}}
+    >
+      {{/* Main Title */}}
+      <div
+        style={{{{
+          fontSize: 64,
+          fontWeight: 800,
+          color: '{text_color}',
+          textAlign: 'center',
+          marginBottom: 20,
+          maxWidth: '80%',
+          lineHeight: 1.2,
+        }}}}
+      >
+        {title}
+      </div>
+
+      {{/* Optional summary text */}}
+      <div
+        style={{{{
+          fontSize: 22,
+          fontWeight: 400,
+          color: '{subtitle_color}',
+          textAlign: 'center',
+          maxWidth: '70%',
+          lineHeight: 1.6,
+          opacity: 0.9,
+        }}}}
+      >
+        Data-driven insights for better decisions
+      </div>
+    </AbsoluteFill>
+  );
+}};
+```
+
+**CRITICAL**:
+- Replace [ComponentName] with the actual component name
+- Keep the structure clean and simple
+- Ensure all styles are inline for easy animation later
+- DO NOT add any animation logic
+- All elements should be visible and at final positions
+
+Return ONLY the complete TSX code, no explanation.
+"""
+    
+    return prompt
+
+
+def create_stat_cards_scene_prompt(scene_data, video_meta, component_name, scene_index=1, total_scenes=1):
+    """创建 Stat Cards 场景的 Prompt"""
+    content = scene_data.get('content', {})
+    cards = content.get('cards', [])
+    narration = scene_data.get('narration', [])
+    narration_text = ' '.join([n.get('text', '') for n in narration])
+    
+    # 背景色配置 - 统一使用纯色（与图表场景保持一致）
+    style = content.get('style', {})
+    background = style.get('background', {})
+    bg_color = background.get('colors', ['#0f1419'])[0] if background.get('type') == 'gradient' else '#0f1419'
+    
+    # 场景时间范围
+    time_range = scene_data.get('time_range', [0, 4])
+    duration = time_range[1] - time_range[0]
+    
+    # 构建卡片信息
+    cards_info = []
+    for i, card in enumerate(cards, 1):
+        cards_info.append(f"Card {i}: {card.get('number', 'N/A')} - {card.get('label', 'Label')} (color: {card.get('color', '#5b8ff9')})")
+    cards_str = '\n'.join(cards_info)
+    
+    # 生成卡片数据的JSON字符串
+    cards_json = json.dumps(cards, indent=2, ensure_ascii=False)
+    
+    prompt = f"""
+You are creating a STAT CARDS SCENE for a data video.
+
+**VIDEO CONTEXT:**
+- Video Title: "{video_meta.get('title', 'Data Insights')}"
+- Scene {scene_index} of {total_scenes}
+- Duration: {duration} seconds
+
+**SCENE CONTENT:**
+- Number of Cards: {len(cards)}
+- Cards Data:
+{cards_str}
+- Narration: "{narration_text}"
+
+**DESIGN REQUIREMENTS:**
+
+1. **Background**: 
+   - Use gradient background
+   - Colors: {bg_color}
+   
+2. **Layout**:
+   - Cards arranged horizontally (flexbox row)
+   - Equal spacing between cards
+   - Centered on screen
+   - Responsive card width (based on number of cards)
+
+3. **Card Design**:
+   - Clean, modern card style
+   - Border: 2px solid with card color
+   - Background: Semi-transparent dark (#1a202c with 80% opacity)
+   - Padding: 32px
+   - Border radius: 12px
+   - Each card contains:
+     * Large number (font-size: 48-56px, font-weight: 800)
+     * Label below number (font-size: 16-18px, font-weight: 500)
+
+4. **Colors**:
+   - Number: Use card's color prop
+   - Label: Light gray (#e0e0e0)
+   - Border: Use card's color prop
+
+5. **Typography**:
+   - Use modern sans-serif font (e.g., 'Inter', 'Helvetica', 'Arial')
+   - Number: font-weight 800
+   - Label: font-weight 500
+
+6. **NO ANIMATIONS** in this static version
+   - Animations will be added later by a separate script
+   - All cards should be at full opacity
+   - All cards at final positions
+
+7. **Subtitle Space**:
+   - Reserve BOTTOM 130px for subtitles
+   - Cards should be positioned in upper 590px area
+
+**CARDS DATA:**
+```json
+{cards_json}
+```
+
+**OUTPUT REQUIREMENTS:**
+
+Generate a complete TSX component (React + TypeScript + Remotion):
+
+```tsx
+import React from 'react';
+import {{ AbsoluteFill }} from 'remotion';
+
+interface StatCard {{
+  number: string;
+  label: string;
+  color: string;
+}}
+
+interface SceneProps {{
+  sceneStartOffset?: number; // Will be used later for animation timing
+  narrations?: Array<{{text: string; time_start: number; time_end: number}}>; // Narration subtitles (will be used in animation version)
+}}
+
+export const [ComponentName]: React.FC<SceneProps> = ({{ sceneStartOffset = 0 }}) => {{
+  const cards: StatCard[] = {cards_json};
+
+  return (
+    <AbsoluteFill
+      style={{{{
+        background: '{bg_color}',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontFamily: "'Inter', 'Helvetica', 'Arial', sans-serif",
+        padding: '0 60px 130px 60px', // Bottom padding for subtitles
+      }}}}
+    >
+      <div
+        style={{{{
+          display: 'flex',
+          flexDirection: 'row',
+          gap: 40,
+          justifyContent: 'center',
+          alignItems: 'center',
+          maxWidth: '1100px',
+        }}}}
+      >
+        {{cards.map((card, index) => (
+          <div
+            key={{index}}
+            style={{{{
+              background: 'rgba(26, 32, 44, 0.8)',
+              border: `2px solid ${{card.color}}`,
+              borderRadius: 12,
+              padding: '36px 32px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 200,
+              flex: 1,
+            }}}}
+          >
+            {{/* Number */}}
+            <div
+              style={{{{
+                fontSize: 52,
+                fontWeight: 800,
+                color: card.color,
+                marginBottom: 12,
+                lineHeight: 1,
+              }}}}
+            >
+              {{card.number}}
+            </div>
+
+            {{/* Label */}}
+            <div
+              style={{{{
+                fontSize: 17,
+                fontWeight: 500,
+                color: '#e0e0e0',
+                textAlign: 'center',
+                lineHeight: 1.4,
+              }}}}
+            >
+              {{card.label}}
+            </div>
+          </div>
+        ))}}
+      </div>
+    </AbsoluteFill>
+  );
+}};
+```
+
+**CRITICAL**:
+- Replace [ComponentName] with the actual component name
+- Keep the structure clean and simple
+- Ensure all styles are inline for easy animation later
+- DO NOT add any animation logic
+- All cards should be visible and at full opacity
+- Reserve bottom 130px for subtitles
+
+Return ONLY the complete TSX code, no explanation.
+"""
+    
+    return prompt
+
+
+def get_prompt_for_scene_type(scene_data, video_meta, component_name, scene_index, total_scenes):
+    """根据场景类型选择对应的 Prompt 生成器"""
+    scene_type = scene_data.get('type', '')
+    
+    if scene_type == 'opening':
+        return create_opening_scene_prompt(scene_data, video_meta, component_name, scene_index, total_scenes)
+    elif scene_type == 'closing':
+        return create_closing_scene_prompt(scene_data, video_meta, component_name, scene_index, total_scenes)
+    elif scene_type == 'stat_cards':
+        return create_stat_cards_scene_prompt(scene_data, video_meta, component_name, scene_index, total_scenes)
+    else:
+        raise ValueError(f"不支持的场景类型: {scene_type}")
+
+
+def generate_tsx_component(scene_data, video_meta, llm_client, output_file, verbose=False, scene_index=1, total_scenes=1):
+    """生成单个 TSX 组件"""
+    scene_id = scene_data.get('id', f'scene_{scene_index}')
+    scene_type = scene_data.get('type', 'unknown')
+    content = scene_data.get('content', {})
+    title = content.get('title', 'Scene')
+    
+    # 生成组件名称（包含数据集名字）
+    dataset_name = extract_dataset_name(video_meta)
+    component_name = f"{dataset_name}_{''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())}Component"
+    
+    if verbose:
+        print(f"🎬 场景 {scene_index}/{total_scenes}: {scene_id} (type: {scene_type})")
+        print(f"   标题: {title}")
+    
+    try:
+        # 生成 prompt
+        prompt = get_prompt_for_scene_type(scene_data, video_meta, component_name, scene_index, total_scenes)
+        
+        # 调用 LLM
+        if verbose:
+            print(f"   📡 调用 Claude API...")
+        
+        response = llm_client.call(prompt, temperature=0.7, max_tokens=4000)
+        
+        # 提取代码
+        tsx_code = response.strip()
+        if '```tsx' in tsx_code:
+            tsx_code = tsx_code.split('```tsx')[1].split('```')[0].strip()
+        elif '```typescript' in tsx_code:
+            tsx_code = tsx_code.split('```typescript')[1].split('```')[0].strip()
+        elif '```' in tsx_code:
+            tsx_code = tsx_code.split('```')[1].split('```')[0].strip()
+        
+        # 强制替换组件名称（处理LLM可能不按指示的情况）
+        # 查找 export const XXX: React.FC 并替换为正确的组件名
+        import re
+        tsx_code = re.sub(r'export const \w+:', f'export const {component_name}:', tsx_code)
+        
+        # 保存文件
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(tsx_code)
+        
+        if verbose:
+            print(f"   ✅ 成功生成: {output_file}")
+        
+        return True
+    
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"\n❌ 生成失败 ({scene_id}):")
+        print(f"   场景类型: {scene_type}")
+        print(f"   错误: {str(e)}")
+        print(f"   详细堆栈:\n{error_detail}")
+        return False
+
+
+def generate_single_scene_wrapper(scene, idx, total_scenes, video_meta, llm_client, output_dir):
+    """包装函数用于并行执行"""
+    scene_id = scene.get('id', f'scene_{idx}')
+    scene_type = scene.get('type', 'unknown')
+    content = scene.get('content', {})
+    title = content.get('title', 'Scene')
+    
+    # 生成组件名称和文件名（包含数据集名字）
+    dataset_name = extract_dataset_name(video_meta)
+    component_name = f"{dataset_name}_{''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())}Component"
+    output_file = os.path.join(output_dir, f"{component_name}.tsx")
+    
+    try:
+        success = generate_tsx_component(
+            scene, 
+            video_meta, 
+            llm_client, 
+            output_file, 
+            verbose=False,
+            scene_index=idx,
+            total_scenes=total_scenes
+        )
+        
+        if success:
+            return (idx, scene_id, True, f"✅ {scene_type}: {title}")
+        else:
+            return (idx, scene_id, False, f"❌ {scene_type}: {title} - 生成失败")
+    
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"\n❌ 详细错误 ({scene_id}):\n{error_detail}")
+        return (idx, scene_id, False, f"❌ {scene_type}: {title} - {str(e)}")
+
+
+def main():
+    # 命令行参数解析
+    parser = argparse.ArgumentParser(description='生成其他场景的 TSX 组件（Opening/Closing/Stat Cards）')
+    parser.add_argument('-w', '--workers', type=int, default=5, help='并行线程数（默认5）')
+    parser.add_argument('--config', type=str, 
+                       default='infographic_generation/generated_20251216_045823_aligned_flight.json',
+                       help='配置文件路径')
+    parser.add_argument('--output', type=str,
+                       default='infographic_generation/output/claude_tsx_components',
+                       help='输出目录')
+    args = parser.parse_args()
+    
+    start_time = time.time()
+    
+    # 读取配置文件
+    with open(args.config, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    
+    video_meta = config.get('meta', {})
+    all_scenes = config.get('scenes', [])
+    
+    # 初始化 LLM 客户端
+    print(f"🚀 初始化 LLM 客户端 (Claude Sonnet 4，并行模式，{args.workers} 线程)...")
+    
+    llm_client = LLMClient(
+        api_base="https://newapi.deepwisdom.ai",
+        api_key="sk-Rq3hmLp1zTqnvUMow4sninyeuGk8rlE2xnIihASNWkeEfiPv",
+        model="claude-sonnet-4-20250514"
+    )
+    
+    # 过滤其他场景（opening, closing, stat_cards）
+    other_scenes = [s for s in all_scenes if s['type'] in ['opening', 'closing', 'stat_cards']]
+    
+    # 创建输出目录
+    os.makedirs(args.output, exist_ok=True)
+    
+    print(f"\n📊 视频标题: {video_meta.get('title', 'N/A')}")
+    print(f"📊 共找到 {len(other_scenes)} 个其他场景")
+    print(f"   - Opening: {len([s for s in other_scenes if s['type'] == 'opening'])}")
+    print(f"   - Closing: {len([s for s in other_scenes if s['type'] == 'closing'])}")
+    print(f"   - Stat Cards: {len([s for s in other_scenes if s['type'] == 'stat_cards'])}")
+    print("="*70)
+    
+    if len(other_scenes) == 0:
+        print("⚠️  未找到任何其他场景（opening/closing/stat_cards），退出。")
+        return
+    
+    success_count = 0
+    
+    # 并行模式
+    print(f"⚡ 使用并行模式生成（{args.workers} 个线程）...\n")
+    results = []
+    
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        # 提交所有任务
+        future_to_scene = {
+            executor.submit(
+                generate_single_scene_wrapper,
+                scene,
+                idx,
+                len(other_scenes),
+                video_meta,
+                llm_client,
+                args.output
+            ): idx
+            for idx, scene in enumerate(other_scenes, 1)
+        }
+        
+        # 收集结果（按完成顺序）
+        for future in as_completed(future_to_scene):
+            idx, scene_id, success, message = future.result()
+            results.append((idx, scene_id, success, message))
+            print(f"[{idx}/{len(other_scenes)}] {message}")
+            if success:
+                success_count += 1
+    
+    # 按原始顺序排序
+    results.sort(key=lambda x: x[0])
+    
+    elapsed = time.time() - start_time
+    
+    print("\n" + "="*70)
+    print("🎉 生成完成！")
+    print(f"✅ 成功: {success_count}/{len(other_scenes)}")
+    print(f"⏱️  总耗时: {elapsed:.1f}秒")
+    print(f"📂 输出目录: {args.output}")
+    print("="*70)
+
+
+if __name__ == '__main__':
+    main()
+

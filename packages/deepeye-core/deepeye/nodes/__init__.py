@@ -39,7 +39,7 @@ from deepeye.nodes.database.datasource import DatabaseDataSourceNode
 from deepeye.nodes.datacoder.datacoder import DataCoderNode
 from deepeye.nodes.dataplot.dataplot import DataPlotNode
 from deepeye.nodes.nl2sql.nl2sql import NL2SQLNode
-from deepeye.nodes.nl2dv.nl2dv import NL2DVNode
+from deepeye.nodes.nl2dv import NL2DVNode
 
 __all__ = [
     # Base

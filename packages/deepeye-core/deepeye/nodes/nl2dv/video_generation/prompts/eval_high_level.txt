@@ -1,0 +1,63 @@
+You are an expert evaluator of visualizations. The first image (reference) is an infographic chart rendered from ground truth HTML code, while the second image is an infographic chart rendered from AI-generated HTML code. Your task is to assess how well the AI-generated chart replicates the reference chart.
+
+### Scoring Criteria (Total: 100 points):
+
+1. Data Element (20 points):
+- Does the AI-generated chart accurately replicate all visual elements that encode data (e.g., bars, points, lines)?
+- The presence of extra or missing data elements that do not match the reference chart will negatively impact the score.
+- Are the positions and lengths/sizes of data elements consistent with the reference, such that the encoded values they represent appear similar?
+
+2. Layout (20 points):
+- Does the layout of title, chart area, and images/icons in the AI-generated chart replicate the spatial arrangement of the reference chart?
+- Is alignment of the elements in the generated chart (e.g., left-aligned, right-aligned) consistent with that of the original chart?
+- Were element positions preserved, or did significant misalignments occur?
+- The white space inside the generated chart should be similar to the original, and the aspect ratio of the whole infographic chart should be preserved.
+
+3. Text (15 points):
+- Does the AI-generated chart replicate all relevant text content accurately? This includes titles, axis labels, and annotations.
+
+4. Image (15 points):
+- Does the AI-generated chart reproduce image elements from the reference infographic chart (e.g., thematic images, embedded icons)?
+- How visually similar are those image elements?
+
+5. Color (10 points):
+- Does the AI-generated chart match the original one in terms of colors (background color, line colors, fill colors, text colors, etc.)? Minor differences due to rendering or anti-aliasing can be tolerated if the overall color scheme is preserved.
+
+6. Validity (20 points):
+- Is the AI-generated chart clear, readable, and free of overlapping or occluded elements?
+- Are fundamental charting conventions followed? For example: Are axis ticks aligned with data, are icons placed near corresponding data, are colors in legends consistent with the data elements, and is axis-data correspondence preserved?
+
+### Evaluation Output Format (in JSON):
+Please provide your evaluation in the following format (in valid JSON):
+
+```json
+{
+  "data_element": {
+    "score": <integer>,
+    "comment": "<your comment>"
+  },
+  "layout": {
+    "score": <integer>,
+    "comment": "<your comment>"
+  },
+  "text": {
+    "score": <integer>,
+    "comment": "<your comment>"
+  },
+  "image": {
+    "score": <integer>,
+    "comment": "<your comment>"
+  },
+  "color": {
+    "score": <integer>,
+    "comment": "<your comment>"
+  },
+  "validity": {
+    "score": <integer>,
+    "comment": "<your comment>"
+  },
+  "total_score": <sum of all scores above>
+}
+```
+
+Be precise and detailed in your comments, and ensure the `total_score` equals the sum of all individual scores.

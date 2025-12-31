@@ -19,7 +19,7 @@ from deepeye.nodes.io import (
     NodeStatus,
 )
 from deepeye.llm import LLMClient
-from deepeye.nodes.nl2dv.generator import SimpleConfigGenerator
+from .generator import SimpleConfigGenerator
 
 
 class NL2DVConfig(NodeConfig):
