@@ -1,0 +1,21 @@
+FROM docker.m.daocloud.io/library/node:20-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY packages/frontend-react/package*.json ./
+
+# Install dependencies with specific registry
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install && \
+    npm cache clean --force
+
+# Copy the rest of the source code
+COPY packages/frontend-react/ .
+
+# Expose port
+EXPOSE 5173
+
+# Start development server with host binding
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+

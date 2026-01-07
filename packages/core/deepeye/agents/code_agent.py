@@ -2,42 +2,78 @@ from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from deepeye.agents.react_agent import ReActAgent
-from deepeye.tools.sandbox import get_sandbox_tools
+from deepeye.sandbox import SandboxProtocol
 
 CODE_AGENT_SYSTEM_PROMPT = """You are an Expert Data Analyst and Python Programmer.
-Your goal is to analyze data, perform calculations, and generate visualizations using Python code.
+Your goal is to analyze data, perform calculations, and generate visualizations using bash commands.
 
 Environment:
-- You are running in a secure Docker Sandbox (Linux).
-- Pre-installed libraries: pandas, numpy, matplotlib, seaborn, scipy, sklearn, yfinance, tabulate, openpyxl.
-- Files provided to you are located in `/mnt/data/`.
+- Linux sandbox with bash shell
+- Pre-installed: Python 3.11, pandas, numpy, matplotlib, seaborn, scipy, sklearn, yfinance, tabulate, openpyxl
+- Working directory: /workspace
+- All files are in /workspace
+
+**CRITICAL - Reuse First Principle**:
+1. BEFORE creating any file or data, check if it already exists: `ls -la /workspace`
+2. REUSE data from previous steps - you have memory of what you created earlier
+3. If a file was created in a previous step, READ it instead of regenerating
+4. Only create NEW files when explicitly requested or when nothing exists
+5. Reference your previous work - you remember what commands you ran
 
 Guidelines:
-1. **SELF-CONTAINED CODE**: Every code block you write MUST be a complete, standalone script.
-   - ALWAYS include all necessary imports (e.g., `import pandas as pd`, `import matplotlib.pyplot as plt`).
-   - Do NOT assume variables from previous turns are preserved. Redefine them if needed.
-2. **File Paths**: Use the absolute paths provided in the prompt (e.g., `/mnt/data/query_result.csv`).
-3. **Visualizations**: Save plots to `/mnt/data/output.png` (or a descriptive name) unless asked otherwise. Do not use `plt.show()`.
-4. **Error Handling**: If an error occurs, analyze it and rewrite the COMPLETE code to fix it.
-5. **Output**: Print key results to stdout so I can see them.
+1. Use bash commands to accomplish tasks
+2. Write Python code to files then execute: `echo 'code' > script.py && python script.py`
+3. For multi-line scripts, use heredoc syntax:
+   ```bash
+   cat > script.py << 'EOF'
+   import pandas as pd
+   print('hello')
+   EOF
+   python script.py
+   ```
+4. Save plots to /workspace/output.png
+5. Use pipes and Unix tools for data processing
 
-Format your Python code cleanly.
+Examples:
+- Check existing files first: `ls -la /workspace`
+- Read existing data: `cat /workspace/data.txt` or `head -10 /workspace/data.csv`
+- Run Python: `python -c 'import pandas; print(pandas.__version__)'`
+- List files: `ls -la /workspace`
 """
 
 
 class CodeAgent(ReActAgent):
-    """A specialized agent for Data Analysis using Python in a Sandbox."""
+    """Data analysis agent with dedicated sandbox"""
 
     def __init__(
         self,
         model: BaseChatModel,
-        sandbox_url: str | None = None,
+        tools: list,
         checkpointer: BaseCheckpointSaver | None = None,
         system_prompt: str = CODE_AGENT_SYSTEM_PROMPT,
+        max_steps: int = 50,
     ):
+        """
+        Initialize CodeAgent with sandbox tools.
+        
+        Args:
+            model: LLM model
+            tools: Sandbox tools (from backend's get_sandbox_tools)
+            checkpointer: LangGraph checkpointer
+            system_prompt: System prompt
+            max_steps: Maximum execution steps
+            
+        Example:
+            from app.sandbox import sandbox_manager, get_sandbox_tools
+            
+            sandbox = await sandbox_manager.create_for_session(session_id)
+            tools = get_sandbox_tools(sandbox)
+            agent = CodeAgent(model=model, tools=tools)
+        """
         super().__init__(
             model=model,
-            tools=get_sandbox_tools(sandbox_url),
+            tools=tools,
             system_prompt=system_prompt,
             checkpointer=checkpointer,
+            max_steps=max_steps,
         )

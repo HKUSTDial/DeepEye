@@ -6,6 +6,8 @@ from deepeye.agents.factory import AgentFactory
 from deepeye.agents.react_agent import ReActAgent
 from deepeye.agents.sql_agent import SQLAgent
 from deepeye.agents.supervisor import SupervisorAgent
+from deepeye.agents.workflow_agent import WorkflowAgent
+from deepeye.agents.knowledge_base_agent import KnowledgeBaseAgent
 
 __all__ = [
     "BaseAgent",
@@ -14,5 +16,6 @@ __all__ = [
     "CodeAgent",
     "SupervisorAgent",
     "AgentFactory",
+    "WorkflowAgent",
+    "KnowledgeBaseAgent",
 ]
-

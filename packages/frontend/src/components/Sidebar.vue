@@ -1,17 +1,74 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useChatStore } from '../stores/chat'
 
 const store = useChatStore()
 
+// Typewriter animation state
+const animatingTitles = ref<Map<string, string>>(new Map())
+
 onMounted(() => store.fetchSessions())
 
-function handleNewChat() {
-  store.createSession()
+// Watch for title changes and animate
+watch(
+  () => store.sessions.map(s => ({ id: s.id, title: s.title })),
+  (newSessions, oldSessions) => {
+    if (!oldSessions) return
+    
+    for (const newSession of newSessions) {
+      const oldSession = oldSessions.find(s => s.id === newSession.id)
+      // Detect title change from "New conversation" to user input
+      if (oldSession && 
+          oldSession.title === 'New conversation' && 
+          newSession.title !== 'New conversation') {
+        animateTitle(newSession.id, newSession.title)
+      }
+    }
+  },
+  { deep: true }
+)
+
+function animateTitle(sessionId: string, fullTitle: string) {
+  animatingTitles.value.set(sessionId, '')
+  
+  let index = 0
+  const interval = setInterval(() => {
+    if (index < fullTitle.length) {
+      animatingTitles.value.set(sessionId, fullTitle.slice(0, index + 1))
+      index++
+    } else {
+      clearInterval(interval)
+      // Remove from animating map after animation completes
+      setTimeout(() => {
+        animatingTitles.value.delete(sessionId)
+      }, 100)
+    }
+  }, 100) // 30ms per character
 }
 
-function handleSelectSession(id: string) {
-  store.selectSession(id)
+function getDisplayTitle(session: { id: string; title: string }) {
+  // If animating, show animated title
+  if (animatingTitles.value.has(session.id)) {
+    return animatingTitles.value.get(session.id) || ''
+  }
+  return session.title || 'New conversation'
+}
+
+function isAnimating(sessionId: string) {
+  return animatingTitles.value.has(sessionId)
+}
+
+async function handleNewChat() {
+  // If current session has no messages (empty "New conversation"), don't create new one
+  if (store.currentSession && store.messages.length === 0) {
+    // Already have an empty session, just keep it
+    return
+  }
+  await store.createSession()
+}
+
+async function handleSelectSession(id: string) {
+  await store.selectSession(id)
 }
 
 function handleDeleteSession(id: string, event: Event) {
@@ -57,7 +114,7 @@ function handleDeleteSession(id: string, event: Event) {
             </svg>
             <!-- Title -->
             <span class="flex-1 truncate">
-              {{ session.title || 'New conversation' }}
+              {{ getDisplayTitle(session) }}<span v-if="isAnimating(session.id)" class="typing-cursor">|</span>
             </span>
             <!-- Delete -->
             <button
@@ -89,5 +146,16 @@ function handleDeleteSession(id: string, event: Event) {
 }
 .session-item:active {
   transform: scale(0.98);
+}
+
+.typing-cursor {
+  animation: blink 0.7s infinite;
+  color: var(--accent);
+  font-weight: 300;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
 </style>

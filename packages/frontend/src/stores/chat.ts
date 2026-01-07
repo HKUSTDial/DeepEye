@@ -1,26 +1,37 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { Message, ToolStep, Session } from '../types'
+import { ref, computed } from 'vue'
+import type { Session } from '../types'
 import { sessionApi, type AgentEvent, type StoredMessage } from '../api'
+import { SessionChat } from '../models/SessionChat'
 
 /**
  * Chat Store
  *
- * - Streaming: uses reduceStreamEvents() to build messages from real-time events
- * - History: loads pre-built messages directly from backend
+ * Uses SessionChat class to manage individual chat sessions.
+ * Each session has its own state encapsulated in SessionChat instance.
  */
 export const useChatStore = defineStore('chat', () => {
-  const messages = ref<Message[]>([])
-  const streamEvents = ref<AgentEvent[]>([])  // Events for current streaming session only
-  const sessionId = ref<string | null>(null)
-  const isStreaming = ref(false)
+  // Active session instance
+  const currentSession = ref<SessionChat | null>(null)
+  
+  // Session list from backend
   const sessions = ref<Session[]>([])
   const isLoadingSessions = ref(false)
+  
+  // File refresh trigger - increments when sandbox files change
+  const filesChangedTrigger = ref(0)
+  
+  // Sandbox started trigger - increments when sandbox starts
+  const sandboxStartedTrigger = ref(0)
+  
+  // Computed properties for backwards compatibility
+  const sessionId = computed(() => currentSession.value?.id || null)
+  const messages = computed(() => currentSession.value?.messages || [])
+  const isStreaming = computed(() => currentSession.value?.isStreaming || false)
 
-  // ============ Convert stored messages to UI Message format ============
+  // ============ Helper Functions ============
 
-  function convertStoredMessages(stored: StoredMessage[]): Message[] {
-    // Backend now stores in the same structure as frontend Message
+  function convertStoredMessages(stored: StoredMessage[]) {
     return stored.map((m) => ({
       role: m.role,
       content: m.content,
@@ -28,93 +39,10 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
-  // ============ Streaming: Event → Message (real-time only) ============
-
-  function reduceStreamEvents(eventList: AgentEvent[]): Message[] {
-    const result: Message[] = []
-    let current: Message | null = null
-    let stepStack: ToolStep[] = []
-
-    for (const e of eventList) {
-      const { type, source, content = '', data = {} } = e
-
-      if (type === 'agent_start') {
-        if (current) result.push(current)
-        current = { role: 'assistant', content: '', steps: [] }
-        stepStack = []
-      }
-      else if (type === 'token' && current) {
-        if (source === 'supervisor') {
-          current.content += content
-        } else if (stepStack.length > 0) {
-          const step = stepStack[stepStack.length - 1]!
-          const subs = step.subSteps ??= []
-          const last = subs[subs.length - 1]
-          if (last?.type === 'thought') {
-            last.thought = (last.thought || '') + content
-          } else {
-            subs.push({ type: 'thought', name: 'Thinking', source, thought: content, status: 'completed', subSteps: [] })
-          }
-        }
-      }
-      else if (type === 'tool_start' && current) {
-        const step: ToolStep = { type: 'tool', name: String(data.name || ''), source, input: String(data.input || ''), status: 'completed', subSteps: [] }
-        if (source === 'supervisor') {
-          current.steps!.push(step)
-          stepStack = [step]
-        } else if (stepStack.length > 0) {
-          stepStack[stepStack.length - 1]!.subSteps!.push(step)
-          stepStack.push(step)
-        } else {
-          current.steps!.push(step)
-          stepStack = [step]
-        }
-      }
-      else if (type === 'tool_end' && current) {
-        const rawOutput = data.output as unknown
-        const output = typeof rawOutput === 'object' && rawOutput && 'content' in rawOutput ? String((rawOutput as { content: unknown }).content) : String(rawOutput || '')
-        if (source === 'supervisor' && stepStack.length > 0) {
-          stepStack[stepStack.length - 1]!.output = output
-          if (stepStack.length > 1) stepStack.pop()
-        } else if (stepStack.length > 0) {
-          for (let i = stepStack.length - 1; i >= 0; i--) {
-            const s = stepStack[i]!
-            if (s.source === source) {
-              s.output = output
-              stepStack = stepStack.slice(0, i)
-              break
-            }
-          }
-        }
-      }
-      else if (type === 'agent_end' || type === 'error') {
-        if (current) result.push(current)
-        current = null
-        stepStack = []
-      }
-    }
-
-    if (current) result.push(current)
-    return result
-  }
-
-  // ============ State Management ============
-
-  function rebuildStreamingMessages() {
-    // Keep existing messages, append streaming assistant message
-    const streamingMsgs = reduceStreamEvents(streamEvents.value)
-    const lastStreaming = streamingMsgs[streamingMsgs.length - 1]
-    if (lastStreaming) {
-      lastStreaming.isStreaming = true
-      // Remove any previous streaming message and append new one
-      const baseMessages = messages.value.filter((m) => !m.isStreaming)
-      messages.value = [...baseMessages, lastStreaming]
-    }
-  }
-
   function pushEvent(event: AgentEvent) {
-    streamEvents.value.push(event)
-    rebuildStreamingMessages()
+    if (currentSession.value) {
+      currentSession.value.pushEvent(event)
+    }
   }
 
   // ============ Session Management ============
@@ -130,61 +58,115 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function createSession() {
-    sessionId.value = null
-    streamEvents.value = []
-    messages.value = []
+  /**
+   * Create a new session by calling backend API
+   */
+  async function createSession() {
+    try {
+      const newSession = await sessionApi.create()
+      currentSession.value = new SessionChat(newSession.id, newSession.title)
+      await fetchSessions() // Refresh session list
+    } catch (e) {
+      console.error('Failed to create session', e)
+    }
   }
 
+  /**
+   * Delete a session
+   */
   async function deleteSession(id: string) {
     try {
       await sessionApi.delete(id)
       sessions.value = sessions.value.filter((s) => s.id !== id)
-      if (sessionId.value === id) createSession()
+      if (currentSession.value?.id === id) {
+        await createSession()  // 等待新 session 创建完成
+      }
     } catch (e) {
       console.error('Failed to delete session', e)
     }
   }
 
-  async function selectSession(id: string) {
-    if (sessionId.value === id) return
-    sessionId.value = id
-    isStreaming.value = false
-    streamEvents.value = []
+  /**
+   * Update session title
+   */
+  async function updateSessionTitle(id: string, title: string) {
     try {
-      const { messages: storedMessages } = await sessionApi.getMessages(id)
-      messages.value = convertStoredMessages(storedMessages)
+      const updated = await sessionApi.update(id, title)
+      // Update in sessions list
+      const idx = sessions.value.findIndex((s) => s.id === id)
+      if (idx !== -1) {
+        sessions.value[idx] = updated
+      }
+      // Update current session if it's the same
+      if (currentSession.value?.id === id) {
+        currentSession.value.title = updated.title
+      }
     } catch (e) {
-      console.error('Failed to load messages', e)
-      messages.value = []
+      console.error('Failed to update session title', e)
+    }
+  }
+
+  /**
+   * Select an existing session and load its history
+   */
+  async function selectSession(id: string) {
+    if (currentSession.value?.id === id) return
+    
+    try {
+      // 1. Get session details from backend
+      const sessionInfo = await sessionApi.get(id)
+      const session = new SessionChat(sessionInfo.id, sessionInfo.title)
+      
+      // 2. Load messages
+      const { messages: storedMessages } = await sessionApi.getMessages(id)
+      session.loadMessages(convertStoredMessages(storedMessages))
+      
+      currentSession.value = session
+    } catch (e) {
+      console.error('Failed to load session', e)
     }
   }
 
   // ============ Streaming Control ============
 
   function startStreaming() {
-    isStreaming.value = true
-    streamEvents.value = []
+    if (currentSession.value) {
+      currentSession.value.startStreaming()
+    }
   }
 
   function stopStreaming() {
-    isStreaming.value = false
-    // Mark last message as not streaming
-    const last = messages.value[messages.value.length - 1]
-    if (last?.isStreaming) last.isStreaming = false
-    streamEvents.value = []
+    if (currentSession.value) {
+      currentSession.value.stopStreaming()
+    }
   }
 
   function addUserMessage(content: string) {
-    messages.value.push({ role: 'user', content })
+    if (currentSession.value) {
+      currentSession.value.addUserMessage(content)
+    }
+  }
+
+  function notifyFilesChanged() {
+    filesChangedTrigger.value++
+  }
+
+  function notifySandboxStarted() {
+    sandboxStartedTrigger.value++
   }
 
   return {
-    messages,
-    sessionId,
-    isStreaming,
+    // State
+    currentSession,
     sessions,
     isLoadingSessions,
+    filesChangedTrigger,
+    sandboxStartedTrigger,
+    // Computed (backwards compatible)
+    sessionId,
+    messages,
+    isStreaming,
+    // Methods
     pushEvent,
     addUserMessage,
     startStreaming,
@@ -193,5 +175,8 @@ export const useChatStore = defineStore('chat', () => {
     createSession,
     selectSession,
     deleteSession,
+    updateSessionTitle,
+    notifyFilesChanged,
+    notifySandboxStarted,
   }
 })

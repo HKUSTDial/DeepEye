@@ -1,6 +1,4 @@
-"""API Routers"""
+"""API package."""
 
-from app.api import chat, datasource, sessions
-
-__all__ = ["chat", "datasource", "sessions"]
-
+# Avoid eager imports that can trigger circular imports during app startup.
+__all__ = ["auth", "public", "v1"]

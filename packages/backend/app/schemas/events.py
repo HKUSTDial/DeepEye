@@ -1,4 +1,4 @@
-"""Agent Event schemas for streaming and message persistence."""
+"""Event schemas for streaming and message persistence."""
 
 import json
 from enum import Enum
@@ -7,8 +7,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-class AgentEventType(str, Enum):
-    """Event types for real-time streaming."""
+# ============ Event Type Hierarchy ============
+
+class EventTypeBase(str, Enum):
+    """Base class for all event types."""
+    pass
+
+
+class AgentEventType(EventTypeBase):
+    """Agent-related event types for real-time streaming."""
 
     TOKEN = "token"
     TOOL_START = "tool_start"
@@ -17,6 +24,16 @@ class AgentEventType(str, Enum):
     AGENT_START = "agent_start"
     AGENT_END = "agent_end"
     ERROR = "error"
+    WORKFLOW_EVENT = "workflow_event"
+
+
+class SandboxEventType(EventTypeBase):
+    """Sandbox-related event types."""
+
+    STARTED = "sandbox_started"  # Sandbox container started, open files panel
+    FILES_CHANGED = "sandbox_files_changed"  # Notify frontend to refresh file list
+    COMMAND_SUCCESS = "sandbox_command_success"
+    COMMAND_ERROR = "sandbox_command_error"
 
 
 # --- Message Models (for persistence, matches frontend ToolStep structure) ---
@@ -53,13 +70,25 @@ class AssistantMessage(BaseModel):
 Message = UserMessage | AssistantMessage
 
 
-class AgentEvent(BaseModel):
-    type: AgentEventType
+# ============ Event Models ============
+
+class EventBase(BaseModel):
+    """Base class for all events."""
     source: str = "system"
     content: str | None = None
     data: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"use_enum_values": True}
+
+
+class AgentEvent(EventBase):
+    """Agent-related event."""
+    type: AgentEventType
+
+
+class SandboxEvent(EventBase):
+    """Sandbox-related event."""
+    type: SandboxEventType
 
 
 class SSEMessage(BaseModel):
@@ -88,4 +117,3 @@ class SSEMessage(BaseModel):
 
         lines.append(f"data: {data_str}")
         return "\n".join(lines) + "\n\n"
-

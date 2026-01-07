@@ -12,12 +12,30 @@ from app.schemas.events import (
     AgentEvent,
     AgentEventType,
     AssistantMessage,
+    EventBase,
+    EventTypeBase,
     Message,
+    SandboxEvent,
+    SandboxEventType,
     SSEMessage,
     ToolStep,
     UserMessage,
 )
-from app.schemas.internal import AgentInput
+from app.schemas.input import AgentInput
+from app.schemas.knowledge_base import (
+    KnowledgeBaseCreate,
+    KnowledgeBaseFileResponse,
+    KnowledgeBaseResponse,
+    KnowledgeBaseSearchRequest,
+    KnowledgeBaseSearchResult,
+    KnowledgeBaseUpdate,
+)
+from app.schemas.workflow import WorkflowCreate, WorkflowResponse, WorkflowRunResponse, WorkflowUpdate
+from app.schemas.workflow import (
+    WorkflowTemplateParam,
+    WorkflowTemplateResponse,
+    WorkflowTemplateRunRequest,
+)
 
 __all__ = [
     # API
@@ -31,11 +49,27 @@ __all__ = [
     "AgentEvent",
     "AgentEventType",
     "AssistantMessage",
+    "EventBase",
+    "EventTypeBase",
     "Message",
+    "SandboxEvent",
+    "SandboxEventType",
     "SSEMessage",
     "ToolStep",
     "UserMessage",
     # Internal
     "AgentInput",
+    "WorkflowCreate",
+    "WorkflowResponse",
+    "WorkflowRunResponse",
+    "WorkflowUpdate",
+    "KnowledgeBaseCreate",
+    "KnowledgeBaseUpdate",
+    "KnowledgeBaseResponse",
+    "KnowledgeBaseFileResponse",
+    "KnowledgeBaseSearchRequest",
+    "KnowledgeBaseSearchResult",
+    "WorkflowTemplateParam",
+    "WorkflowTemplateResponse",
+    "WorkflowTemplateRunRequest",
 ]
-

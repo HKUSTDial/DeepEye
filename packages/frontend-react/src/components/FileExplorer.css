@@ -1,0 +1,90 @@
+.ide-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.ide-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ide-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(121, 121, 121, 0.4);
+  border-radius: 0;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.ide-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(121, 121, 121, 0.7);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Delete confirmation dialog */
+.delete-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.delete-dialog {
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 300px;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.delete-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.delete-message {
+  font-size: 13px;
+  color: #cccccc;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.delete-btn {
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.delete-btn-cancel {
+  background: transparent;
+  border: 1px solid #454545;
+  color: #cccccc;
+}
+
+.delete-btn-cancel:hover {
+  background: #3c3c3c;
+}
+
+.delete-btn-confirm {
+  background: #c53030;
+  border: none;
+  color: white;
+}
+
+.delete-btn-confirm:hover {
+  background: #e53e3e;
+}
+

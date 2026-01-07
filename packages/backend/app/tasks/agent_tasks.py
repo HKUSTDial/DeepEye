@@ -2,6 +2,7 @@
 
 import asyncio
 import traceback
+import uuid
 
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -11,22 +12,73 @@ from sqlalchemy.orm import sessionmaker
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.infra import RedisEventBus
-from app.repositories import DataSourceRepository
-from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage
+from app.repositories import DataSourceRepository, SessionRepository
+from app.sandbox.manager import SandboxManager
+from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
+from app.services.workflow_engine import build_registry
+from app.services.workflow_prompts import build_workflow_prompt
 from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
 from deepeye.agents import AgentFactory
-from deepeye.tools.agent_tools import create_code_agent_tool, create_sql_agent_tool
+from app.tools.workflow_tools import create_run_workflow_from_file_tool, create_design_workflow_tool
+from app.tools.kb_tools import create_knowledge_base_agent_tool
+from deepeye.utils.logger import logger
 
 
-def _get_datasource_url(datasource_id: str | None) -> str | None:
-    """Fetch datasource connection string, creating fresh DB session per-call."""
+def _get_datasource_info(datasource_id: str | None) -> dict[str, str] | None:
     if not datasource_id:
         return None
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
     Session = sessionmaker(bind=engine)
     with Session() as db:
         ds = DataSourceRepository(db).get(datasource_id)
-        return ds.connection_string if ds else None
+        if not ds:
+            return None
+        return {"id": str(ds.id), "name": ds.name, "type": ds.type}
+
+
+def _get_datasource_schema(datasource_id: str | None, max_tables: int = 20, max_columns: int = 20) -> list[dict[str, object]]:
+    if not datasource_id:
+        return []
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    with Session() as db:
+        ds = DataSourceRepository(db).get(datasource_id)
+        if not ds:
+            return []
+        connection_string = ds.connection_string
+
+    try:
+        from sqlalchemy import create_engine as sa_create_engine, inspect
+
+        data_engine = sa_create_engine(connection_string)
+        inspector = inspect(data_engine)
+        tables = inspector.get_table_names()[:max_tables]
+        views = inspector.get_view_names()[:max_tables]
+        items: list[dict[str, object]] = []
+
+        for name in tables:
+            columns = inspector.get_columns(name)[:max_columns]
+            items.append(
+                {
+                    "name": name,
+                    "kind": "table",
+                    "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
+                }
+            )
+
+        for name in views:
+            columns = inspector.get_columns(name)[:max_columns]
+            items.append(
+                {
+                    "name": name,
+                    "kind": "view",
+                    "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
+                }
+            )
+
+        return items
+    except Exception:
+        return []
 
 
 def _create_model() -> ChatOpenAI:
@@ -39,10 +91,23 @@ def _create_model() -> ChatOpenAI:
     )
 
 
+def _get_user_id(session_id: str) -> uuid.UUID | None:
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except (TypeError, ValueError):
+        return None
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    with Session() as db:
+        session = SessionRepository(db).get(session_uuid)
+        return session.user_id if session else None
+
+
 async def _run_agent_async(agent_input: AgentInput) -> None:
     session_id = agent_input.session_id
     model = _create_model()
     event_bus = RedisEventBus(settings.REDIS_URL)
+    sandbox_manager = SandboxManager()
 
     # Persist user message first
     persist_message(session_id, UserMessage(content=agent_input.user_input))
@@ -52,15 +117,44 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
 
     # Callbacks for different sources - all share the same collector
     cb_supervisor = AgentCallback(event_bus, session_id, "supervisor", collector, ignore_tags=["sub_agent"])
-    cb_sql = AgentCallback(event_bus, session_id, "sql_agent", collector)
-    cb_code = AgentCallback(event_bus, session_id, "code_agent", collector)
+    cb_workflow = AgentCallback(event_bus, session_id, "workflow_agent", collector)
+    cb_kb = AgentCallback(event_bus, session_id, "knowledge_base_agent", collector)
 
-    # Build tools based on available datasource
+    # Get existing sandbox or create new one (reuse within session)
+    channel = f"session:{session_id}"
+    sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
+    
+    # Notify frontend that sandbox is ready (to open files panel)
+    await event_bus.publish(
+        channel, 
+        SandboxEvent(type=SandboxEventType.STARTED, source="sandbox").model_dump_json()
+    )
+    
+    # Build tools - all agents share the same sandbox
     tools = []
-    db_url = _get_datasource_url(agent_input.datasource_id)
-    if db_url:
-        tools.append(create_sql_agent_tool(db_url, model, callbacks=[cb_sql]))
-    tools.append(create_code_agent_tool(settings.SANDBOX_URL, model, callbacks=[cb_code]))
+    datasource_info = _get_datasource_info(agent_input.datasource_id)
+    datasource_schema = _get_datasource_schema(agent_input.datasource_id)
+    workflow_prompt = build_workflow_prompt(
+        build_registry(),
+        datasource=datasource_info,
+        tables=datasource_schema,
+    )
+    tools.append(create_design_workflow_tool(model, session_id, workflow_prompt, callbacks=[cb_workflow]))
+    tools.append(create_run_workflow_from_file_tool(session_id))
+
+    user_id = _get_user_id(session_id)
+    user_input = agent_input.user_input
+
+    if user_id and agent_input.kb_ids:
+        tools.append(
+            create_knowledge_base_agent_tool(
+                model,
+                session_id,
+                str(user_id),
+                agent_input.kb_ids,
+                callbacks=[cb_kb],
+            )
+        )
 
     async with AsyncPostgresSaver.from_conn_string(settings.POSTGRES_STATE_URL) as checkpointer:
         await checkpointer.setup()
@@ -71,7 +165,7 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         try:
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_START))
             await supervisor.ainvoke(
-                agent_input.user_input,
+                user_input,
                 thread_id=session_id,
                 config={"callbacks": [cb_supervisor]},
             )
@@ -81,7 +175,7 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_END))
         except Exception as e:
             tb = traceback.format_exc()
-            print(f"Agent Error: {tb}")
+            logger.error(f"[AgentTask] Error: {tb}")
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.ERROR, content=str(e), data={"traceback": tb}))
         finally:
             await event_bus.close()

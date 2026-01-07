@@ -9,27 +9,33 @@ from deepeye.agents.react_agent import ReActAgent
 from deepeye.graph.state import AgentState
 from deepeye.tools.planning_tools import create_plan, mark_step_done, update_plan
 
-SUPERVISOR_SYSTEM_PROMPT = """You are a helpful and intelligent Data Analysis Assistant.
-Your goal is to help the user with their data analysis tasks by coordinating with specialized sub-agents.
+SUPERVISOR_SYSTEM_PROMPT = """You are a Workflow Orchestrator.
+Tools: plan/update/mark steps, workflow agent (design + run), and query_knowledge_base for knowledge base retrieval.
 
-Current Plan:
-{plan}
+Decision policy:
+- If the user needs a workflow/pipeline (data analysis, charting, file generation), call the workflow agent with a clear goal and any known literals (tables/columns/filters/paths). Do NOT invent values; pass user-provided text verbatim.
+- If the user references a knowledge base (e.g., "@我的日记") or asks about information likely stored there, call query_knowledge_base instead of the workflow agent.
+- If the request is simple and doesn’t need a workflow, answer directly (no tool).
+- Plan only when multiple steps are required; otherwise skip planning and call the workflow agent directly.
 
-Guidelines:
-1. **CREATE PLAN**: If you don't have a plan yet (or "No plan yet"), analyze the user request and call `create_plan` with a list of steps.
-2. **EXECUTE**: Follow the plan step-by-step. Call the appropriate sub-agent tools.
-3. **MARK DONE**: After successfully finishing a step (and getting the result), you MUST call `mark_step_done(index)`.
-4. **THINK FIRST**: Before calling any tool, you MUST output a brief thought explaining your reasoning.
-5. If the plan is invalid, call `update_plan`.
+Execution rules:
+- Keep responses concise. After the workflow agent finishes, summarize in 1–2 sentences; do NOT paste workflow JSON.
+- Preserve user language and literal values end-to-end (class names, exam types, file paths, etc.).
 """
 
 
 class SupervisorAgent(ReActAgent):
     """The main orchestrator agent that uses a Tool-Based Planning architecture."""
 
-    def __init__(self, model: BaseChatModel, tools: list[Any], checkpointer: BaseCheckpointSaver | None = None):
+    def __init__(
+        self, 
+        model: BaseChatModel, 
+        tools: list[Any], 
+        checkpointer: BaseCheckpointSaver | None = None,
+        max_steps: int = 50,
+    ):
         planning_tools = [create_plan, update_plan, mark_step_done]
-        super().__init__(model, tools + planning_tools, system_prompt="", checkpointer=checkpointer)
+        super().__init__(model, tools + planning_tools, system_prompt="", checkpointer=checkpointer, max_steps=max_steps)
 
     async def _call_model(self, state: AgentState, config: RunnableConfig) -> dict:
         """Override to inject dynamic plan into system prompt. Callbacks propagate via config."""

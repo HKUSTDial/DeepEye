@@ -3,6 +3,7 @@ services:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
+    restart: unless-stopped
 
   postgres:
     image: postgres:15-alpine
@@ -23,6 +24,44 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # 测试用学校数据库
+  school-db:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=school
+      - POSTGRES_PASSWORD=school123
+      - POSTGRES_DB=school_db
+    volumes:
+      - school_db_data:/var/lib/postgresql/data
+      - ./docker/test-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U school -d school_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   backend-api:
     build:
@@ -37,14 +76,19 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
-      code-sandbox:
-        condition: service_started
+      minio:
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
       # Mount local SQLite database file
       - ./pipeline.db:/app/pipeline.db
+      # Mount Docker socket to manage sandbox containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared workspace for sandbox containers
+      - sandbox_workspace:/workspace
+    restart: unless-stopped
 
   backend-worker:
     build:
@@ -57,43 +101,43 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
-      code-sandbox:
-        condition: service_started
-    environment:
-      - SANDBOX_URL=http://code-sandbox:8000
+      minio:
+        condition: service_healthy
     command: celery -A app.core.celery_app worker --loglevel=info
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
       # Mount local SQLite database file
       - ./pipeline.db:/app/pipeline.db
+      # Mount Docker socket to manage sandbox containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared workspace for sandbox containers
+      - sandbox_workspace:/workspace
+    restart: unless-stopped
 
   frontend:
     build:
       context: .
-      dockerfile: docker/Dockerfile.frontend
+      dockerfile: docker/Dockerfile.frontend-react
     ports:
       - "${HOST_FRONTEND_PORT:-5173}:5173"
     environment:
       # Automatically derive VITE_API_URL from the host backend port
-      - VITE_API_URL=http://localhost:${HOST_BACKEND_PORT:-8000}/api
+      - VITE_API_URL=http://localhost:${HOST_BACKEND_PORT:-8000}/api/v1
     volumes:
-      - ./packages/frontend/src:/app/src
+      - ./packages/frontend-react/src:/app/src
       - /app/node_modules
     depends_on:
       - backend-api
-
-  code-sandbox:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.sandbox
-    volumes:
-      # Mount the sandbox server code for hot reloading/development
-      - ./packages/core/sandbox:/app/sandbox
-      # Keep workspace mount if we want to inspect files
-      - ./workspace:/workspace
     restart: unless-stopped
 
 volumes:
   redis_data:
   postgres_data:
+  minio_data:
+  sandbox_workspace:
+  school_db_data:
+
+networks:
+  default:
+    name: deepeye-network

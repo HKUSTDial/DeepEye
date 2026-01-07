@@ -1,0 +1,18 @@
+.session-item {
+  transition: background 0.15s ease, transform 0.15s var(--ease-out-back);
+}
+.session-item:active {
+  transform: scale(0.98);
+}
+
+.typing-cursor {
+  animation: blink 0.7s infinite;
+  color: var(--accent);
+  font-weight: 300;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+

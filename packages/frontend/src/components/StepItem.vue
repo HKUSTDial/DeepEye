@@ -96,7 +96,23 @@ const isRunning = computed(() => props.step.status === 'running')
 
 .details-panel {
   max-height: 500px;
-  overflow: hidden;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar for details panel */
+.details-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.details-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.details-panel::-webkit-scrollbar-thumb {
+  background: var(--main-text-muted);
+  border-radius: 3px;
+  opacity: 0.3;
+}
+.details-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 /* Expand transition */

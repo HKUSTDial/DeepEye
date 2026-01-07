@@ -1,3 +1,5 @@
+from typing import Callable
+
 from langchain_community.utilities import SQLDatabase
 from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -16,7 +18,7 @@ Guidelines:
 3. Write standard SQL queries compatible with {dialect}.
 4. If a query fails, analyze the error message and try to correct the query.
 5. Do not make DML statements (INSERT, UPDATE, DELETE) unless explicitly asked.
-6. IMPORTANT: If the tool output contains a file path (e.g., 'Full result saved to: ...'), YOU MUST explicitly state this file path in your final answer so the user or other agents can use it.
+6. IMPORTANT: If the tool output contains a file path (e.g., 'Full result saved to: /workspace/...'), YOU MUST explicitly state this file path in your final answer so the user or other agents can use it.
 
 Answer the user's question concisely based on the data retrieved.
 """
@@ -29,11 +31,25 @@ class SQLAgent(ReActAgent):
         self,
         model: BaseChatModel,
         database: SQLDatabase | str,
+        write_to_workspace: Callable[[str, str], str] | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
         system_prompt: str = SQL_AGENT_SYSTEM_PROMPT,
+        max_steps: int = 50,
     ):
+        """
+        Initialize SQL Agent.
+        
+        Args:
+            model: LLM model
+            database: Database connection string or SQLDatabase instance
+            write_to_workspace: Callback to write files to sandbox workspace
+                               Signature: (filename, content) -> filepath
+            checkpointer: LangGraph checkpointer for state persistence
+            system_prompt: System prompt template
+            max_steps: Maximum execution steps
+        """
         self.db = SQLDatabase.from_uri(database) if isinstance(database, str) else database
-        db_tools = create_database_tools(self.db)
+        db_tools = create_database_tools(self.db, write_to_workspace)
         formatted_prompt = system_prompt.format(dialect=self.db.dialect)
 
         super().__init__(
@@ -41,5 +57,6 @@ class SQLAgent(ReActAgent):
             tools=db_tools,
             system_prompt=formatted_prompt,
             checkpointer=checkpointer,
+            max_steps=max_steps,
         )
 

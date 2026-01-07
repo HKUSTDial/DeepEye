@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
     datasource_id: str | None = None
+    kb_ids: list[str] | None = None
 
 
 class ChatSessionResponse(BaseModel):
@@ -45,4 +46,3 @@ class DataSourceResponse(DataSourceBase):
     created_at: datetime
 
     model_config = {"from_attributes": True}
-

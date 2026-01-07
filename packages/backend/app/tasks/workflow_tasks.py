@@ -1,0 +1,113 @@
+"""Workflow execution Celery tasks."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from datetime import datetime
+
+from app.core.celery_app import celery_app
+from app.core.config import settings
+from app.db.session import SessionLocal
+from app.models.workflow import Workflow
+from app.models.workflow_run import WorkflowRun
+from app.repositories import WorkflowRepository, WorkflowRunRepository
+from app.infra import RedisEventBus
+from app.services.workflow_service import run_workflow, update_workflow_run
+from app.sandbox import sandbox_manager
+from app.services.workflow_file_service import service_run_workflow_from_file
+
+
+async def _publish(channel: str, payload: dict) -> None:
+    event_bus = RedisEventBus(settings.REDIS_URL)
+    try:
+        await event_bus.publish(channel, json.dumps(payload))
+    finally:
+        await event_bus.close()
+
+
+def _publish_run(run: WorkflowRun) -> None:
+    channel = f"workflow_run:{run.id}"
+    payload = {
+        "type": "run",
+        "id": str(run.id),
+        "workflow_id": str(run.workflow_id),
+        "status": run.status,
+        "result": run.result,
+        "error": run.error,
+        "created_at": run.created_at.isoformat() if run.created_at else None,
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+    }
+    asyncio.run(_publish(channel, payload))
+
+
+def _publish_node(run: WorkflowRun, node_id: str, node_status: str, outputs: dict | None = None) -> None:
+    channel = f"workflow_run:{run.id}"
+    payload = {
+        "type": "node",
+        "run_id": str(run.id),
+        "node_id": node_id,
+        "status": node_status,
+        "outputs": outputs,
+    }
+    asyncio.run(_publish(channel, payload))
+
+
+@celery_app.task(bind=True)
+def run_workflow_task(self, run_id: str) -> dict:
+    db = SessionLocal()
+    try:
+        run_repo = WorkflowRunRepository(db)
+        workflow_repo = WorkflowRepository(db)
+
+        run = run_repo.get(run_id)
+        if not run:
+            return {"status": "error", "error": "run not found"}
+
+        workflow = workflow_repo.get(run.workflow_id)
+        if not workflow:
+            run.status = "failed"
+            run.error = "workflow not found"
+            run.finished_at = datetime.utcnow()
+            db.commit()
+            _publish_run(run)
+            return {"status": "error", "error": "workflow not found"}
+
+        _publish_run(run)
+        sandbox = asyncio.run(sandbox_manager.get_or_create_sandbox(str(run.id)))
+        result = run_workflow(
+            db,
+            workflow,
+            run.user_id,
+            sandbox=sandbox,
+            on_node_start=lambda node_id, node_run, _: _publish_node(run, node_id, node_run.status),
+            on_node_end=lambda node_id, node_run, _: _publish_node(
+                run, node_id, node_run.status, node_run.outputs
+            ),
+        )
+        update_workflow_run(db, run, result)
+        _publish_run(run)
+        return {"status": "finished", "run_id": str(run.id)}
+    except Exception as exc:
+        run = WorkflowRunRepository(db).get(run_id)
+        if run:
+            run.status = "failed"
+            run.error = str(exc)
+            run.finished_at = datetime.utcnow()
+            db.commit()
+            _publish_run(run)
+        return {"status": "error", "error": str(exc)}
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True)
+def run_workflow_file_task(self, user_id: str, session_id: str, path: str) -> dict:
+    db = SessionLocal()
+    try:
+        result = asyncio.run(service_run_workflow_from_file(db, user_id, session_id, path))
+        return {"status": "finished", "result": result}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+    finally:
+        db.close()

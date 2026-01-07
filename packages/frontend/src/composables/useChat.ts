@@ -17,6 +17,17 @@ export function useChat() {
     es.onmessage = (event) => {
       try {
         const agentEvent: AgentEvent = JSON.parse(event.data)
+        
+        // Handle sandbox events
+        if (agentEvent.type === 'sandbox_started') {
+          store.notifySandboxStarted()
+          return
+        }
+        if (agentEvent.type === 'sandbox_files_changed') {
+          store.notifyFilesChanged()
+          return
+        }
+        
         store.pushEvent(agentEvent)
 
         if (agentEvent.type === 'agent_end' || agentEvent.type === 'error') {
@@ -43,17 +54,39 @@ export function useChat() {
     if (!text.trim()) return
 
     error.value = null
+    
+    // Ensure we have a session (create if needed)
+    if (!store.currentSession) {
+      await store.createSession()
+    }
+    
+    // Now we must have a session_id
+    const session_id = store.sessionId
+    if (!session_id) {
+      error.value = 'Failed to create session'
+      return
+    }
+    
+    // Check if this is the first message (for title update)
+    const isFirstMessage = store.messages.length === 0
+    
     store.startStreaming()
     store.addUserMessage(text)
 
     try {
-      const { session_id } = await chatApi.start({
+      // Send message with session_id from backend
+      await chatApi.start({
         message: text,
-        session_id: store.sessionId,
+        session_id: session_id,
         datasource_id: datasourceId,
       })
 
-      store.sessionId = session_id
+      // Update session title with first message content
+      if (isFirstMessage) {
+        const title = text.length > 50 ? text.substring(0, 47) + '...' : text
+        await store.updateSessionTitle(session_id, title)
+      }
+
       store.fetchSessions()
       connectToSSE(session_id)
     } catch (e: unknown) {

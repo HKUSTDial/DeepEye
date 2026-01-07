@@ -11,6 +11,9 @@ from deepeye.agents.base import BaseAgent
 from deepeye.graph.state import AgentState
 
 
+DEFAULT_MAX_STEPS = 50
+
+
 class ReActAgent(BaseAgent):
     """ReAct-style agent using LangGraph. Callbacks propagate to all nodes."""
 
@@ -20,8 +23,10 @@ class ReActAgent(BaseAgent):
         tools: list[Any],
         system_prompt: str = "",
         checkpointer: BaseCheckpointSaver | None = None,
+        max_steps: int = DEFAULT_MAX_STEPS,
     ):
         self._bound_model = model.bind_tools(tools)
+        self.max_steps = max_steps
         super().__init__(model, tools, system_prompt, checkpointer)
 
     def _build_graph(self) -> Any:
@@ -46,13 +51,15 @@ class ReActAgent(BaseAgent):
         return "continue" if last_message.tool_calls else "end"
 
     async def ainvoke(self, input_message: str, thread_id: str | None = None, config: dict | None = None) -> dict:
-        run_config = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        run_config: dict = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        run_config["recursion_limit"] = self.max_steps
         if config:
             run_config.update(config)
         return await self.graph.ainvoke({"messages": [HumanMessage(content=input_message)]}, config=run_config)
 
     async def astream(self, input_message: str, thread_id: str | None = None, config: dict | None = None) -> AsyncIterator[Any]:
-        run_config = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        run_config: dict = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        run_config["recursion_limit"] = self.max_steps
         if config:
             run_config.update(config)
         async for event in self.graph.astream_events({"messages": [HumanMessage(content=input_message)]}, config=run_config, version="v2"):

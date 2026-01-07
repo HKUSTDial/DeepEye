@@ -5,30 +5,76 @@ Events from sub-agents are captured by the callback system and persisted
 alongside supervisor events, enabling unified history reconstruction.
 """
 
-import os
-import shutil
-import uuid
 from typing import Any, Callable
 
 from langchain_core.language_models import BaseChatModel
 
+from deepeye.sandbox import SandboxProtocol
 from deepeye.tools.base import tool
 
 
-def create_sql_agent_tool(db_uri: str, model: BaseChatModel, callbacks: list[Any] | None = None) -> Callable:
-    """Factory that creates a Tool wrapping a SQLAgent."""
+def create_sql_agent_tool(
+    db_uri: str, 
+    model: BaseChatModel, 
+    session_id: str,
+    sandbox: SandboxProtocol | None = None,
+    on_files_changed: Callable[[], None] | None = None,
+    callbacks: list[Any] | None = None
+) -> Callable:
+    """Factory that creates a Tool wrapping a SQLAgent.
+    
+    Args:
+        db_uri: Database connection string
+        model: LLM model
+        session_id: Session ID for maintaining conversation context
+        sandbox: Sandbox instance for writing query results
+        on_files_changed: Callback when files are written to sandbox
+        callbacks: Callbacks for event tracking
+    """
     from deepeye.agents.sql_agent import SQLAgent
+    import asyncio
+    
+    # Create write_to_workspace callback if sandbox provided
+    write_to_workspace = None
+    if sandbox:
+        def write_to_workspace(filename: str, content: str) -> str:
+            """Write file to sandbox /workspace directory (sync wrapper for async exec)."""
+            filepath = f"/workspace/{filename}"
+            command = f"cat > {filepath} << 'EOFCSV'\n{content}\nEOFCSV"
+            
+            # Execute command in sandbox (handle sync/async context)
+            try:
+                loop = asyncio.get_running_loop()
+                # We're in an async context, schedule and wait
+                future = asyncio.run_coroutine_threadsafe(
+                    sandbox.exec_command(command), loop
+                )
+                future.result(timeout=30)
+            except RuntimeError:
+                # No running loop, create new one
+                asyncio.run(sandbox.exec_command(command))
+            
+            # Notify frontend about file changes
+            if on_files_changed:
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.call_soon(on_files_changed)
+                except RuntimeError:
+                    on_files_changed()
+            
+            return filepath
 
-    sql_agent = SQLAgent(model=model, database=db_uri)
+    sql_agent = SQLAgent(model=model, database=db_uri, write_to_workspace=write_to_workspace)
+    # Use session-based thread_id to maintain context across calls
+    sub_thread_id = f"sql_agent_{session_id}"
 
     @tool
     async def ask_database(question: str) -> str:
         """
         Use this tool to answer questions about data in the database.
         Input should be a natural language question.
+        Query results will be saved to /workspace as CSV files.
         """
-        sub_thread_id = f"sub_sql_{uuid.uuid4()}"
-
         result = await sql_agent.ainvoke(
             question,
             thread_id=sub_thread_id,
@@ -41,48 +87,55 @@ def create_sql_agent_tool(db_uri: str, model: BaseChatModel, callbacks: list[Any
     return ask_database
 
 
-def create_code_agent_tool(sandbox_url: str, model: BaseChatModel, callbacks: list[Any] | None = None) -> Callable:
-    """Factory that creates a Tool wrapping a CodeAgent."""
+def create_code_agent_tool(
+    sandbox_tools: list, 
+    model: BaseChatModel, 
+    session_id: str,
+    callbacks: list[Any] | None = None
+) -> Callable:
+    """
+    Factory that creates a Tool wrapping a CodeAgent.
+    
+    Args:
+        sandbox_tools: Sandbox tools (from backend's get_sandbox_tools)
+        model: LLM model
+        session_id: Session ID for maintaining conversation context across calls
+        callbacks: Callbacks for event tracking
+        
+    Returns:
+        analyze_data tool function
+        
+    Example:
+        from app.sandbox import sandbox_manager, get_sandbox_tools
+        
+        sandbox = await sandbox_manager.create_for_session(session_id)
+        tools = get_sandbox_tools(sandbox)
+        analyze_data = create_code_agent_tool(tools, model, session_id)
+    """
     from deepeye.agents.code_agent import CodeAgent
 
-    code_agent = CodeAgent(model=model, sandbox_url=sandbox_url)
+    code_agent = CodeAgent(model=model, tools=sandbox_tools)
+    # Use session-based thread_id to maintain context across calls
+    sub_thread_id = f"code_agent_{session_id}"
 
     @tool
-    async def analyze_data(question: str, file_paths: list[str]) -> str:
+    async def analyze_data(question: str) -> str:
         """
-        Use this tool to perform advanced data analysis or visualization using Python.
+        Perform data analysis or visualization using Python in sandbox.
 
         Args:
-            question: The analysis task description (e.g. "Plot the sales trend").
-            file_paths: A list of local file paths (e.g. ["artifacts/data.csv"]) that contain the data to analyze.
-                        These files will be mounted into the secure sandbox environment.
+            question: Analysis task (e.g. "Plot the sales trend")
+        
+        Returns:
+            Analysis result or error message
+            
+        Note:
+            The code agent maintains context across calls within the same session.
+            It remembers previously created files and executed commands.
         """
-        sub_thread_id = f"sub_code_{uuid.uuid4()}"
-
-        # Prepare Files (mount to sandbox)
-        host_artifacts_dir = os.path.abspath("artifacts")
-        os.makedirs(host_artifacts_dir, exist_ok=True)
-
-        mounted_info = []
-        for host_path in file_paths:
-            if not os.path.exists(host_path):
-                return f"Error: File not found at {host_path}"
-
-            filename = os.path.basename(host_path)
-            abs_host_path = os.path.abspath(host_path)
-            if not abs_host_path.startswith(host_artifacts_dir):
-                dest_path = os.path.join(host_artifacts_dir, filename)
-                shutil.copy2(host_path, dest_path)
-
-            mounted_info.append(f"- {filename} is available at /mnt/data/{filename}")
-
-        # Augment prompt with file info
-        augmented_question = question
-        if mounted_info:
-            augmented_question += "\n[System: The following files have been mounted for your analysis:]\n" + "\n".join(mounted_info)
-
+        # Run code agent with persistent thread_id
         result = await code_agent.ainvoke(
-            augmented_question,
+            question,
             thread_id=sub_thread_id,
             config={"tags": ["sub_agent"], "callbacks": callbacks},
         )
@@ -91,3 +144,50 @@ def create_code_agent_tool(sandbox_url: str, model: BaseChatModel, callbacks: li
         return messages[-1].content if messages else ""
 
     return analyze_data
+
+
+def create_workflow_agent_tool(
+    model: BaseChatModel,
+    session_id: str,
+    callbacks: list[Any] | None = None,
+    system_prompt: str | None = None,
+) -> Callable:
+    """
+    Factory that creates a Tool wrapping a WorkflowAgent.
+
+    Args:
+        model: LLM model
+        session_id: Session ID for maintaining conversation context across calls
+        callbacks: Callbacks for event tracking
+
+    Returns:
+        design_workflow tool function
+    """
+    from deepeye.agents.workflow_agent import WorkflowAgent
+    from deepeye.tools.planning_tools import create_plan, mark_step_done, update_plan
+
+    workflow_agent = WorkflowAgent(
+        model=model,
+        system_prompt=system_prompt,
+        tools=[create_plan, update_plan, mark_step_done],
+    )
+    sub_thread_id = f"workflow_agent_{session_id}"
+
+    @tool
+    async def design_workflow(goal: str) -> str:
+        """
+        Design a workflow JSON for a data analysis goal.
+
+        Args:
+            goal: The analysis objective in natural language.
+        """
+        result = await workflow_agent.ainvoke(
+            goal,
+            thread_id=sub_thread_id,
+            config={"tags": ["sub_agent"], "callbacks": callbacks},
+        )
+
+        messages = result.get("messages", [])
+        return messages[-1].content if messages else ""
+
+    return design_workflow

@@ -1,0 +1,196 @@
+import type { Message, ToolStep } from '../types'
+import type { AgentEvent } from '../api'
+
+/**
+ * SessionChat - Represents a single chat window/session
+ * 
+ * Manages all state for one chat session including:
+ * - Unique session_id
+ * - Message history
+ * - Streaming state
+ * - Event accumulation
+ */
+export class SessionChat {
+  readonly id: string
+  title: string
+  messages: Message[]
+  streamEvents: AgentEvent[]
+  isStreaming: boolean
+  createdAt: Date
+  updatedAt: Date
+
+  constructor(id: string, title: string = 'New conversation') {
+    this.id = id
+    this.title = title
+    this.messages = []
+    this.streamEvents = []
+    this.isStreaming = false
+    this.createdAt = new Date()
+    this.updatedAt = new Date()
+  }
+
+  /**
+   * Add a user message
+   */
+  addUserMessage(content: string) {
+    this.messages.push({ role: 'user', content })
+    this.updatedAt = new Date()
+  }
+
+  /**
+   * Start streaming mode
+   */
+  startStreaming() {
+    this.isStreaming = true
+    this.streamEvents = []
+  }
+
+  /**
+   * Stop streaming and finalize
+   */
+  stopStreaming() {
+    this.isStreaming = false
+    const last = this.messages[this.messages.length - 1]
+    if (last?.isStreaming) {
+      last.isStreaming = false
+    }
+    this.streamEvents = []
+    this.updatedAt = new Date()
+  }
+
+  /**
+   * Add streaming event
+   */
+  pushEvent(event: AgentEvent) {
+    this.streamEvents.push(event)
+    this.rebuildStreamingMessage()
+  }
+
+  /**
+   * Load history messages (from backend)
+   */
+  loadMessages(messages: Message[]) {
+    this.messages = messages
+    this.updatedAt = new Date()
+  }
+
+  /**
+   * Clear all data
+   */
+  clear() {
+    this.messages = []
+    this.streamEvents = []
+    this.isStreaming = false
+  }
+
+  /**
+   * Rebuild streaming message from events
+   */
+  private rebuildStreamingMessage() {
+    const streamingMsgs = this.reduceStreamEvents(this.streamEvents)
+    const lastStreaming = streamingMsgs[streamingMsgs.length - 1]
+    
+    if (lastStreaming) {
+      lastStreaming.isStreaming = true
+      // Remove previous streaming message and append new one
+      const baseMessages = this.messages.filter(m => !m.isStreaming)
+      this.messages = [...baseMessages, lastStreaming]
+    }
+  }
+
+  /**
+   * Reduce stream events to messages (same logic as before)
+   */
+  private reduceStreamEvents(eventList: AgentEvent[]): Message[] {
+    const result: Message[] = []
+    let current: Message | null = null
+    let stepStack: ToolStep[] = []
+
+    for (const e of eventList) {
+      const { type, source, content = '', data = {} } = e
+
+      if (type === 'agent_start') {
+        if (current) result.push(current)
+        current = { role: 'assistant', content: '', steps: [] }
+        stepStack = []
+      }
+      else if (type === 'token' && current) {
+        if (source === 'supervisor') {
+          current.content += content
+        } else if (stepStack.length > 0) {
+          const step = stepStack[stepStack.length - 1]!
+          const subs = step.subSteps ??= []
+          const last = subs[subs.length - 1]
+          if (last?.type === 'thought') {
+            last.thought = (last.thought || '') + content
+          } else {
+            subs.push({ type: 'thought', name: 'Thinking', source, thought: content, status: 'completed', subSteps: [] })
+          }
+        }
+      }
+      else if (type === 'tool_start' && current) {
+        const step: ToolStep = { type: 'tool', name: String(data.name || ''), source, input: String(data.input || ''), status: 'completed', subSteps: [] }
+        if (source === 'supervisor') {
+          current.steps!.push(step)
+          stepStack = [step]
+        } else if (stepStack.length > 0) {
+          stepStack[stepStack.length - 1]!.subSteps!.push(step)
+          stepStack.push(step)
+        } else {
+          current.steps!.push(step)
+          stepStack = [step]
+        }
+      }
+      else if (type === 'tool_end' && current) {
+        const rawOutput = data.output as unknown
+        const output = typeof rawOutput === 'object' && rawOutput && 'content' in rawOutput ? String((rawOutput as { content: unknown }).content) : String(rawOutput || '')
+        if (source === 'supervisor' && stepStack.length > 0) {
+          stepStack[stepStack.length - 1]!.output = output
+          if (stepStack.length > 1) stepStack.pop()
+        } else if (stepStack.length > 0) {
+          for (let i = stepStack.length - 1; i >= 0; i--) {
+            const s = stepStack[i]!
+            if (s.source === source) {
+              s.output = output
+              stepStack = stepStack.slice(0, i)
+              break
+            }
+          }
+        }
+      }
+      else if (type === 'agent_end' || type === 'error') {
+        if (current) result.push(current)
+        current = null
+        stepStack = []
+      }
+    }
+
+    if (current) result.push(current)
+    return result
+  }
+
+  /**
+   * Serialize to plain object (for storage)
+   */
+  toJSON() {
+    return {
+      id: this.id,
+      title: this.title,
+      messages: this.messages,
+      createdAt: this.createdAt.toISOString(),
+      updatedAt: this.updatedAt.toISOString(),
+    }
+  }
+
+  /**
+   * Create from plain object
+   */
+  static fromJSON(data: any): SessionChat {
+    const session = new SessionChat(data.id, data.title)
+    session.messages = data.messages || []
+    session.createdAt = new Date(data.createdAt)
+    session.updatedAt = new Date(data.updatedAt)
+    return session
+  }
+}
+
