@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -6,11 +5,9 @@ import ReactFlow, {
   MiniMap,
   type Connection,
   type Edge,
-  type EdgeChange,
-  type EdgeOptions,
   type FitViewOptions,
   type Node,
-  type NodeChange,
+  type NodeTypes,
   type OnConnect,
   type OnEdgesChange,
   type OnNodesChange,
@@ -22,7 +19,7 @@ import ReactFlow, {
 type WorkflowGraphProps = {
   nodes: Node[]
   edges: Edge[]
-  nodeTypes: Record<string, unknown>
+  nodeTypes: NodeTypes
   className?: string
   onNodesChange?: OnNodesChange
   onEdgesChange?: OnEdgesChange
@@ -50,7 +47,7 @@ type WorkflowGraphProps = {
   selectionMode?: SelectionMode
   fitView?: boolean
   fitViewOptions?: FitViewOptions
-  defaultEdgeOptions?: EdgeOptions
+  defaultEdgeOptions?: Partial<Edge>
   showMiniMap?: boolean
   miniMapNodeColor?: (node: Node) => string
   showControls?: boolean
@@ -100,13 +97,11 @@ export function WorkflowGraph({
   backgroundSize = 1,
   backgroundColor = '#334155',
 }: WorkflowGraphProps) {
-  const stableNodeTypes = useMemo(() => nodeTypes, [])
-
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
-      nodeTypes={stableNodeTypes}
+      nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
@@ -135,25 +130,26 @@ export function WorkflowGraph({
       fitViewOptions={fitViewOptions}
       defaultEdgeOptions={defaultEdgeOptions}
       className={className}
+      style={{ width: '100%', height: '100%' }}
     >
       <Background
         variant={backgroundVariant}
         gap={backgroundGap}
         size={backgroundSize}
         color={backgroundColor}
-        className="bg-slate-950"
+        className="workflow-canvas-background"
       />
       {showControls && (
         <Controls
-          className="bg-slate-900 border border-slate-800 rounded-lg shadow-xl overflow-hidden"
+          className="workflow-canvas-controls"
           showInteractive={false}
         />
       )}
       {showMiniMap && (
         <MiniMap
-          className="bg-slate-900 border border-slate-800 rounded-lg shadow-xl"
+          className="workflow-canvas-minimap"
           nodeColor={miniMapNodeColor}
-          maskColor="rgba(15, 23, 42, 0.8)"
+          maskColor="rgba(0, 0, 0, 0.6)"
         />
       )}
     </ReactFlow>

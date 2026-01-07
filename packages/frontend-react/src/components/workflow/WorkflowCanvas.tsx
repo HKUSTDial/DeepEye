@@ -274,7 +274,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-1 relative bg-slate-950"
+      className="workflow-canvas-container"
       ref={canvasRef}
       onClick={closeContextMenu}
     >
@@ -347,15 +347,15 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
         selectionMode={SelectionMode.Partial}
         fitView
         fitViewOptions={{ padding: 0.2 }}
-        className="bg-slate-950"
+        className="workflow-canvas"
         defaultEdgeOptions={{
-          style: { stroke: '#6366f1', strokeWidth: 2 },
+          style: { stroke: 'var(--accent)', strokeWidth: 2 },
           animated: true,
         }}
         backgroundVariant={BackgroundVariant.Dots}
         backgroundGap={20}
         backgroundSize={1}
-        backgroundColor="#334155"
+        backgroundColor="var(--main-bg)"
         showMiniMap
         miniMapNodeColor={(node) => {
           switch (node.data.runStatus) {
@@ -374,19 +374,19 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
       />
       {contextMenu && (
         <div
-          className="absolute z-50 min-w-[180px] rounded-xl border border-slate-700 bg-slate-900/95 shadow-2xl backdrop-blur"
+          className="workflow-context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="px-3 py-2 text-xs text-slate-400 border-b border-slate-800">
+          <div className="workflow-context-menu-header">
             {contextMenu.type === 'node' && 'Node'}
             {contextMenu.type === 'edge' && 'Edge'}
             {contextMenu.type === 'selection' && `Selection (${contextMenu.nodeIds.length})`}
             {contextMenu.type === 'canvas' && 'Canvas'}
           </div>
-          <div className="p-1">
+          <div className="workflow-context-menu-body">
             <button
-              className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800"
+              className="workflow-context-menu-item"
               onClick={() => {
                 onSave()
                 closeContextMenu()
@@ -397,7 +397,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
             {contextMenu.type === 'node' && (
               <>
                 <button
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800"
+                  className="workflow-context-menu-item"
                   onClick={() => {
                     duplicateNodes([contextMenu.nodeId])
                     closeContextMenu()
@@ -406,7 +406,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                   Duplicate
                 </button>
                 <button
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-rose-300 hover:bg-rose-500/20"
+                  className="workflow-context-menu-item danger"
                   onClick={() => {
                     deleteNodes([contextMenu.nodeId])
                     closeContextMenu()
@@ -418,7 +418,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
             )}
             {contextMenu.type === 'edge' && (
               <button
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-rose-300 hover:bg-rose-500/20"
+                className="workflow-context-menu-item danger"
                 onClick={() => {
                   deleteEdges([contextMenu.edgeId])
                   closeContextMenu()
@@ -430,7 +430,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
             {contextMenu.type === 'selection' && (
               <>
                 <button
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800"
+                  className="workflow-context-menu-item"
                   onClick={() => {
                     duplicateNodes(contextMenu.nodeIds)
                     closeContextMenu()
@@ -439,7 +439,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                   Duplicate Selection
                 </button>
                 <button
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm text-rose-300 hover:bg-rose-500/20"
+                  className="workflow-context-menu-item danger"
                   onClick={() => {
                     deleteNodes(contextMenu.nodeIds)
                     closeContextMenu()
@@ -454,7 +454,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                 {Object.entries(nodeDefs).map(([type, def]) => (
                   <button
                     key={type}
-                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800"
+                    className="workflow-context-menu-item"
                     onClick={() => {
                       createNode(type, contextMenu.position)
                       closeContextMenu()

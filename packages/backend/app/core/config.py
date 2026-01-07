@@ -83,18 +83,11 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = False
     MINIO_SANDBOX_BUCKET: str = "deepeye-sandboxes"  # Auto-build image if not exists
     MINIO_KB_BUCKET: str = "deepeye-knowledge"
-
-    # E2B Configuration (optional)
-    E2B_API_KEY: str | None = None
-    
-    # Daytona Configuration (optional)
-    DAYTONA_WORKSPACE_URL: str | None = None
     
     @computed_field
     @property
     def SANDBOX_URL(self) -> str:
         return f"http://{self.SANDBOX_HOST}:{self.SANDBOX_PORT}"
-
     # --- User Configurable Settings ---
     
     # LLM Provider Configuration (Required)

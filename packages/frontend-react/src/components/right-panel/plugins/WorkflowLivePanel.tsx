@@ -281,6 +281,40 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
           }
           return
         }
+        if (phase === 'create_workflow' || phase === 'update_workflow') {
+          const workflow = payload?.workflow || payload?.definition
+          if (workflow && typeof workflow === 'object') {
+            const root = (workflow as Record<string, unknown>).root as Record<string, unknown> | undefined
+            const nodes = (root?.nodes as Record<string, unknown>) || {}
+            const edges = (root?.edges as Record<string, unknown>) || {}
+            const nodeList = Object.values(nodes)
+            const edgeList = Object.values(edges)
+            const stepDelayMs = 50
+
+            clearWorkflow(sessionId)
+            clearValidated(sessionId)
+            if (filePath) {
+              setActiveFilePath(sessionId, filePath)
+            }
+            setWorkflowDefinition(sessionId, workflow as Record<string, unknown>)
+            setViewState(sessionId, 'switching')
+            setWorkflowError(sessionId, null)
+
+            nodeList.forEach((node, index) => {
+              setTimeout(() => addWorkflowNode(sessionId, node as Record<string, unknown>), index * stepDelayMs)
+            })
+            const edgeStart = nodeList.length * stepDelayMs
+            edgeList.forEach((edge, index) => {
+              setTimeout(
+                () => addWorkflowEdge(sessionId, edge as Record<string, unknown>),
+                edgeStart + index * stepDelayMs,
+              )
+            })
+            const totalDelay = (nodeList.length + edgeList.length) * stepDelayMs
+            setTimeout(() => setViewState(sessionId, 'ready'), totalDelay)
+          }
+          return
+        }
         if (phase === 'run_end') {
           const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
           const error = typeof payload?.error === 'string' ? payload?.error : null
@@ -309,7 +343,22 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
       es.close()
       runEventSourceRef.current = null
     }
-  }, [sessionId, isStreaming, setNodeStatus, setRunStatus, setActiveRun, setRunOutput])
+  }, [
+    sessionId,
+    isStreaming,
+    setNodeStatus,
+    setRunStatus,
+    setActiveRun,
+    setRunOutput,
+    clearWorkflow,
+    clearValidated,
+    setActiveFilePath,
+    setWorkflowDefinition,
+    setViewState,
+    setWorkflowError,
+    addWorkflowNode,
+    addWorkflowEdge,
+  ])
 
   useEffect(() => {
     if (sessionId) {

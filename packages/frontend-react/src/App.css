@@ -3,8 +3,8 @@
 }
 
 .right-panel {
-  background: #1e1e1e;
-  border-left: 1px solid #3c3c3c;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
   overflow: hidden;
   transition: flex 0.25s ease;
 }
@@ -33,7 +33,7 @@
 
 .resize-handle-panel:hover,
 .resize-handle-panel.resize-active {
-  background: #007acc;
+  background: var(--panel-resize);
 }
 
 /* Explorer resize handle (right edge of file explorer) */
@@ -51,5 +51,5 @@
 
 .resize-handle-explorer:hover,
 .resize-handle-explorer.resize-active {
-  background: #007acc;
+  background: var(--panel-resize);
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { panelRegistry, getPanelPlugin, type PanelRenderContext } from './panelRegistry'
 import { useRightPanelStore } from '../../stores/rightPanel'
+import './RightPanel.css'
 
 interface RightPanelLayoutProps {
   sessionId: string | null
@@ -10,7 +11,6 @@ interface RightPanelLayoutProps {
 
 export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutProps) {
   const panes = useRightPanelStore((state) => state.panes)
-  const activePaneId = useRightPanelStore((state) => state.activePaneId)
   const maxPanes = useRightPanelStore((state) => state.maxPanes)
   const openTab = useRightPanelStore((state) => state.openTab)
   const closeTab = useRightPanelStore((state) => state.closeTab)
@@ -28,16 +28,22 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
 
   if (panes.length === 0) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#1e1e1e] text-slate-400">
-        <div className="text-center">
-          <div className="text-sm font-semibold text-slate-300">No panels open</div>
-          <div className="mt-3 flex flex-col gap-2">
+      <div className="right-panel-container">
+        <div className="right-panel-empty">
+          <div className="right-panel-empty-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div className="right-panel-empty-title">No panels open</div>
+          <div className="right-panel-empty-subtitle">Open a panel to get started</div>
+          <div className="right-panel-empty-actions">
             {panelRegistry.map((plugin) => (
               <button
                 key={plugin.id}
                 type="button"
                 onClick={() => openTab(plugin.id)}
-                className="flex items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                className="right-panel-empty-action"
               >
                 {plugin.icon}
                 Open {typeof plugin.title === 'string' ? plugin.title : plugin.title()}
@@ -50,53 +56,49 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
   }
 
   return (
-    <div className="flex h-full w-full bg-[#1e1e1e]">
+    <div className="right-panel-container">
       {panes.map((pane) => {
         const activeTab =
           pane.tabs.find((tab) => tab.id === pane.activeTabId) || pane.tabs[0] || null
         const plugin = activeTab ? getPanelPlugin(activeTab.pluginId) : undefined
         const title =
           plugin && typeof plugin.title === 'function' ? plugin.title(activeTab?.params) : plugin?.title
-        const isActivePane = pane.id === activePaneId
 
         return (
           <div
             key={pane.id}
-            className={`flex min-w-0 flex-1 flex-col border-l border-[#2a2a2a] ${
-              isActivePane ? 'bg-[#1f1f1f]' : 'bg-[#1e1e1e]'
-            }`}
+            className="right-panel-pane"
             onClick={() => setActivePane(pane.id)}
           >
-            <div className="flex items-center gap-2 border-b border-[#2a2a2a] bg-[#252526] px-2 py-1">
-              <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            <div className="right-panel-header">
+              <div className="right-panel-tabs">
                 {pane.tabs.map((tab) => {
                   const tabPlugin = getPanelPlugin(tab.pluginId)
-                  const tabTitle =
+                  const tabTitle: string =
                     tabPlugin && typeof tabPlugin.title === 'function'
                       ? tabPlugin.title(tab.params)
-                      : tabPlugin?.title || tab.pluginId
+                      : (tabPlugin?.title as string) || tab.pluginId
                   const isActiveTab = tab.id === activeTab?.id
 
                   return (
                     <div
                       key={tab.id}
-                      className={`group flex items-center gap-2 rounded-md px-2 py-1 text-xs ${
-                        isActiveTab
-                          ? 'bg-[#1e1e1e] text-slate-100'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`right-panel-tab ${isActiveTab ? 'active' : ''}`}
                     >
                       <button
                         type="button"
                         onClick={() => setActiveTab(pane.id, tab.id)}
-                        className="truncate text-left"
+                        className="right-panel-tab-button"
                       >
-                        {tabTitle}
+                        <span className="truncate">{tabTitle}</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => closeTab(pane.id, tab.id)}
-                        className="rounded p-0.5 text-slate-500 hover:text-slate-200"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          closeTab(pane.id, tab.id)
+                        }}
+                        className="right-panel-tab-close"
                         aria-label="Close tab"
                       >
                         <X className="h-3 w-3" />
@@ -105,7 +107,7 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
                   )
                 })}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="right-panel-actions">
                 <div className="relative">
                   <button
                     type="button"
@@ -113,13 +115,13 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
                       event.stopPropagation()
                       setMenuPaneId((current) => (current === pane.id ? null : pane.id))
                     }}
-                    className="rounded p-1 text-slate-400 hover:text-slate-200"
+                    className="right-panel-action-btn"
                     title="New tab"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
                   {menuPaneId === pane.id && (
-                    <div className="absolute right-0 mt-1 w-40 rounded-md border border-slate-700 bg-slate-900 p-1 text-xs shadow-xl">
+                    <div className="right-panel-menu">
                       {panelRegistry.map((plugin) => (
                         <button
                           key={plugin.id}
@@ -128,7 +130,7 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
                             openTab(plugin.id, undefined, pane.id)
                             setMenuPaneId(null)
                           }}
-                          className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-slate-200 hover:bg-slate-800"
+                          className="right-panel-menu-item"
                         >
                           {plugin.icon}
                           {typeof plugin.title === 'string' ? plugin.title : plugin.title()}
@@ -144,10 +146,10 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
                     splitPane()
                   }}
                   disabled={panes.length >= maxPanes}
-                  className="rounded px-2 py-1 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-40"
+                  className="right-panel-action-btn"
                   title="Split pane"
                 >
-                  Split
+                  <span className="text-xs">Split</span>
                 </button>
                 {panes.length > 1 && (
                   <button
@@ -156,7 +158,7 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
                       event.stopPropagation()
                       closePane(pane.id)
                     }}
-                    className="rounded p-1 text-slate-400 hover:text-slate-200"
+                    className="right-panel-action-btn"
                     title="Close pane"
                   >
                     <X className="h-4 w-4" />
@@ -164,12 +166,14 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
                 )}
               </div>
             </div>
-            <div className="min-h-0 flex-1 bg-[#1e1e1e]">
+            <div className="right-panel-content">
               {activeTab && plugin ? (
                 plugin.render(context, activeTab.params)
               ) : (
-                <div className="flex h-full items-center justify-center text-xs text-slate-500">
-                  {title ? `Loading ${title}...` : 'Select a tab'}
+                <div className="right-panel-empty">
+                  <div className="right-panel-empty-title">
+                    {title ? `Loading ${title}...` : 'Select a tab'}
+                  </div>
                 </div>
               )}
             </div>

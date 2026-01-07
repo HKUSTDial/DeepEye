@@ -97,14 +97,16 @@ export default function KnowledgeBaseDetail() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-screen bg-slate-950 text-white overflow-hidden"
+      className="flex h-screen overflow-hidden"
+      style={{ background: 'var(--main-bg)', color: 'var(--main-text)' }}
     >
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="border-b border-slate-800 px-6 py-4">
+        <div className="border-b px-6 py-4" style={{ borderColor: 'var(--border-color)' }}>
           <button
             onClick={() => navigate('/knowledge-bases')}
-            className="text-xs text-slate-400 hover:text-slate-200 mb-3 flex items-center gap-1"
+            className="text-xs mb-3 flex items-center gap-1 hover:opacity-80 transition-opacity"
+            style={{ color: 'var(--main-text-muted)' }}
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -113,18 +115,19 @@ export default function KnowledgeBaseDetail() {
           </button>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold">{kb?.name || 'Knowledge Base'}</h1>
-              <p className="text-sm text-slate-400 mt-1">{kb?.description || 'No description'}</p>
+              <h1 className="text-2xl font-semibold" style={{ color: 'var(--main-text)' }}>{kb?.name || 'Knowledge Base'}</h1>
+              <p className="text-sm mt-1" style={{ color: 'var(--main-text-muted)' }}>{kb?.description || 'No description'}</p>
             </div>
           </div>
         </div>
 
         {/* Toolbar */}
-        <div className="border-b border-slate-800 px-6 py-3 flex items-center justify-between gap-4">
+        <div className="border-b px-6 py-3 flex items-center justify-between gap-4" style={{ borderColor: 'var(--border-color)' }}>
           <div className="flex-1 max-w-md">
             <div className="relative">
               <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                style={{ color: 'var(--main-text-muted)' }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -141,26 +144,36 @@ export default function KnowledgeBaseDetail() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search documents..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-700 bg-slate-900/60 text-sm focus:outline-none focus:border-slate-600"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border text-sm focus:outline-none transition-all"
+                style={{
+                  borderColor: 'var(--input-border)',
+                  background: 'var(--input-bg)',
+                  color: 'var(--main-text)'
+                }}
               />
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-4 text-xs text-slate-400 px-4 py-2 rounded-lg border border-slate-800 bg-slate-900/40">
+            <div className="flex items-center gap-4 text-xs px-4 py-2 rounded-lg border" style={{ 
+              color: 'var(--main-text-muted)',
+              borderColor: 'var(--border-color)',
+              background: 'var(--card-bg)'
+            }}>
               <div className="flex items-center gap-2">
-                <span className="text-slate-500">Files:</span>
-                <span className="text-slate-200 font-medium">{files.length}</span>
+                <span style={{ color: 'var(--main-text-muted)' }}>Files:</span>
+                <span className="font-medium" style={{ color: 'var(--main-text)' }}>{files.length}</span>
               </div>
-              <div className="w-px h-4 bg-slate-700"></div>
+              <div className="w-px h-4" style={{ background: 'var(--border-color)' }}></div>
               <div className="flex items-center gap-2">
-                <span className="text-slate-500">Size:</span>
-                <span className="text-slate-200 font-medium">{(totalSize / 1024 / 1024).toFixed(2)} MB</span>
+                <span style={{ color: 'var(--main-text-muted)' }}>Size:</span>
+                <span className="font-medium" style={{ color: 'var(--main-text)' }}>{(totalSize / 1024 / 1024).toFixed(2)} MB</span>
               </div>
             </div>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+              style={{ background: 'var(--accent)' }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -180,16 +193,20 @@ export default function KnowledgeBaseDetail() {
         <div className="flex-1 overflow-auto p-6">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="text-sm text-slate-400">Loading documents...</div>
+              <div className="text-sm" style={{ color: 'var(--main-text-muted)' }}>Loading documents...</div>
             </div>
           ) : error ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-sm text-rose-400">{error}</div>
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
               {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 px-6 py-4 text-xs font-medium text-slate-400 border-b border-slate-800 bg-slate-900/60">
+              <div className="grid grid-cols-12 gap-4 px-6 py-4 text-xs font-medium border-b" style={{ 
+                color: 'var(--table-header-text)', 
+                borderColor: 'var(--table-border)',
+                background: 'var(--table-header-bg)'
+              }}>
                 <div className="col-span-5">Document Name</div>
                 <div className="col-span-2">Type</div>
                 <div className="col-span-1">Size</div>
@@ -200,7 +217,7 @@ export default function KnowledgeBaseDetail() {
               {/* Table Body */}
               {filteredFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 px-6">
-                  <svg className="w-16 h-16 text-slate-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-16 h-16 mb-4" style={{ color: 'var(--main-text-muted)', opacity: 0.4 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -208,10 +225,10 @@ export default function KnowledgeBaseDetail() {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <p className="text-sm text-slate-400 mb-1">
+                  <p className="text-sm mb-1" style={{ color: 'var(--main-text-muted)' }}>
                     {searchQuery.trim() ? 'No documents found' : 'No documents uploaded yet'}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs" style={{ color: 'var(--main-text-muted)', opacity: 0.7 }}>
                     {searchQuery.trim() ? 'Try a different search term' : 'Upload your first document to get started'}
                   </p>
                 </div>
@@ -219,25 +236,34 @@ export default function KnowledgeBaseDetail() {
                 filteredFiles.map((file, index) => (
                   <div
                     key={file.id}
-                    className={`grid grid-cols-12 gap-4 px-6 py-4 text-sm hover:bg-slate-900/60 transition-colors ${
-                      index < filteredFiles.length - 1 ? 'border-b border-slate-800/60' : ''
+                    className={`grid grid-cols-12 gap-4 px-6 py-4 text-sm transition-all ${
+                      index < filteredFiles.length - 1 ? 'border-b' : ''
                     }`}
+                    style={{
+                      borderColor: 'var(--table-border)',
+                      color: 'var(--main-text)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--table-row-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     <div className="col-span-5 flex items-center gap-3 min-w-0">
                       <span className="text-2xl flex-shrink-0">{getFileIcon(file.filename)}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium text-slate-200">{file.filename}</div>
+                        <div className="truncate font-medium" style={{ color: 'var(--main-text)' }}>{file.filename}</div>
                         {file.error && (
                           <div className="text-xs text-rose-400 mt-0.5 truncate">{file.error}</div>
                         )}
                       </div>
                     </div>
                     <div className="col-span-2 flex items-center">
-                      <span className="px-2 py-1 rounded text-xs font-medium bg-slate-800 text-slate-300">
+                      <span className="px-2 py-1 rounded text-xs font-medium" style={{ 
+                        background: 'var(--sidebar-hover)',
+                        color: 'var(--main-text-muted)'
+                      }}>
                         {getFileExtension(file.filename)}
                       </span>
                     </div>
-                    <div className="col-span-1 flex items-center text-slate-400">
+                    <div className="col-span-1 flex items-center" style={{ color: 'var(--main-text-muted)' }}>
                       {file.size_bytes >= 1024 * 1024
                         ? `${(file.size_bytes / 1024 / 1024).toFixed(1)} MB`
                         : `${(file.size_bytes / 1024).toFixed(1)} KB`}
@@ -258,12 +284,15 @@ export default function KnowledgeBaseDetail() {
                       </span>
                     </div>
                     <div className="col-span-2 flex items-center justify-end gap-2">
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs" style={{ color: 'var(--main-text-muted)' }}>
                         {new Date(file.updated_at).toLocaleDateString()}
                       </span>
                       <button
                         onClick={() => handleDeleteFile(file.id)}
-                        className="p-1.5 rounded hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-colors"
+                        className="p-1.5 rounded hover:bg-rose-500/10 transition-colors"
+                        style={{ color: 'var(--main-text-muted)' }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#f87171'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--main-text-muted)'}
                         title="Delete"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

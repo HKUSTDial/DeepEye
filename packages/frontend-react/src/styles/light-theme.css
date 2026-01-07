@@ -1,0 +1,385 @@
+/* Light Theme Override - Manus AI Style */
+
+/* Apply light theme globally */
+body.light-theme {
+  --sidebar-bg: #f8f9fa;
+  --sidebar-hover: #e9ecef;
+  --sidebar-active: #dee2e6;
+  --sidebar-border: #e9ecef;
+  --sidebar-text: #212529;
+  --sidebar-text-muted: #6c757d;
+
+  --main-bg: #ffffff;
+  --main-bg-alt: #f1f3f5;
+  --main-text: #212529;
+  --main-text-muted: #6c757d;
+
+  --accent: #0066ff;
+  --accent-hover: #0052cc;
+
+  --input-bg: #ffffff;
+  --input-border: #ced4da;
+  --input-focus: #0066ff;
+
+  --border-color: #dee2e6;
+  --border-hover: #ced4da;
+
+  --card-bg: #ffffff;
+  --card-bg-hover: #f8f9fa;
+  --card-border: #dee2e6;
+  --card-border-hover: #ced4da;
+
+  --table-header-bg: #f8f9fa;
+  --table-header-text: #495057;
+  --table-row-hover: #f1f3f5;
+  --table-border: #dee2e6;
+
+  --panel-bg: #ffffff;
+  --panel-border: #dee2e6;
+  --panel-resize: #0066ff;
+
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.1);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --error: #ef4444;
+  --error-bg: rgba(239, 68, 68, 0.1);
+  --info: #0066ff;
+  --info-bg: rgba(0, 102, 255, 0.1);
+
+  background: #ffffff;
+  color: #1f1f1f;
+}
+
+/* Button Styles */
+body.light-theme .btn {
+  font-weight: 500;
+}
+
+body.light-theme .btn-primary {
+  background: #0066ff;
+  color: #ffffff;
+  border: none;
+}
+
+body.light-theme .btn-primary:hover {
+  background: #0052cc;
+}
+
+body.light-theme .btn-secondary {
+  background: #ffffff;
+  color: #1f1f1f;
+  border: 1px solid #e5e5e6;
+}
+
+body.light-theme .btn-secondary:hover {
+  background: #f7f7f8;
+  border-color: #d4d4d5;
+}
+
+/* Card Styles */
+body.light-theme .card {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Input Styles */
+body.light-theme input,
+body.light-theme textarea,
+body.light-theme select {
+  background: #ffffff;
+  border: 1px solid #e5e5e6;
+  color: #1f1f1f;
+}
+
+body.light-theme input:focus,
+body.light-theme textarea:focus,
+body.light-theme select:focus {
+  border-color: #0066ff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+body.light-theme input::placeholder,
+body.light-theme textarea::placeholder {
+  color: #9e9ea7;
+}
+
+/* Sidebar Specific */
+body.light-theme .sidebar {
+  background: #f7f7f8;
+  border-right: 1px solid #e5e5e6;
+}
+
+/* Message Bubbles */
+body.light-theme .message-user {
+  background: #f7f7f8;
+  color: #1f1f1f;
+}
+
+body.light-theme .message-assistant {
+  background: #ffffff;
+  color: #1f1f1f;
+  border: 1px solid #e5e5e6;
+}
+
+/* Scrollbar */
+body.light-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body.light-theme ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.light-theme ::-webkit-scrollbar-thumb {
+  background: #d4d4d5;
+  border-radius: 4px;
+}
+
+body.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: #b4b4b5;
+}
+
+/* Code Blocks */
+body.light-theme pre {
+  background: #f7f7f8;
+  border: 1px solid #e5e5e6;
+}
+
+body.light-theme code {
+  background: #f7f7f8;
+  color: #1f1f1f;
+}
+
+/* Tables */
+body.light-theme table {
+  border-color: #e5e5e6;
+}
+
+body.light-theme th {
+  background: #f7f7f8;
+  color: #6e6e80;
+  font-weight: 500;
+}
+
+body.light-theme td {
+  border-color: #e5e5e6;
+}
+
+body.light-theme tr:hover {
+  background: #f9f9f9;
+}
+
+/* Modal/Dialog */
+body.light-theme .modal-overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+body.light-theme .modal-content {
+  background: #ffffff;
+  border: 1px solid #e5e5e6;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Dropdown */
+body.light-theme .dropdown {
+  background: #ffffff;
+  border: 1px solid #e5e5e6;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .dropdown-item:hover {
+  background: #f7f7f8;
+}
+
+/* Badge/Tag */
+body.light-theme .badge {
+  background: #f7f7f8;
+  color: #6e6e80;
+  border: 1px solid #e5e5e6;
+}
+
+body.light-theme .badge-primary {
+  background: rgba(0, 102, 255, 0.1);
+  color: #0066ff;
+  border-color: rgba(0, 102, 255, 0.2);
+}
+
+body.light-theme .badge-success {
+  background: rgba(52, 199, 89, 0.1);
+  color: #34c759;
+  border-color: rgba(52, 199, 89, 0.2);
+}
+
+body.light-theme .badge-error {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  border-color: rgba(255, 59, 48, 0.2);
+}
+
+body.light-theme .badge-warning {
+  background: rgba(255, 149, 0, 0.1);
+  color: #ff9500;
+  border-color: rgba(255, 149, 0, 0.2);
+}
+
+/* Loading Skeleton */
+body.light-theme .skeleton {
+  background: linear-gradient(
+    90deg,
+    #f7f7f8 25%,
+    #ececed 50%,
+    #f7f7f8 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Divider */
+body.light-theme .divider {
+  border-color: #e5e5e6;
+}
+
+/* Link */
+body.light-theme a {
+  color: #0066ff;
+}
+
+body.light-theme a:hover {
+  color: #0052cc;
+}
+
+/* Disabled State */
+body.light-theme .disabled,
+body.light-theme :disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Selection */
+body.light-theme ::selection {
+  background: rgba(0, 102, 255, 0.2);
+  color: #1f1f1f;
+}
+
+/* Workflow Styles */
+body.light-theme .workflow-canvas {
+  background: #f9f9f9;
+}
+
+body.light-theme .workflow-toolbar {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e5e6;
+}
+
+body.light-theme .workflow-sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e5e5e6;
+}
+
+body.light-theme .workflow-inspector {
+  background: #ffffff;
+  border-left: 1px solid #e5e5e6;
+}
+
+body.light-theme .workflow-node {
+  background: #ffffff;
+  border: 1px solid #ced4da;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .workflow-node:hover {
+  border-color: #adb5bd;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+body.light-theme .workflow-node.selected {
+  border-color: #0066ff;
+  box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.2), 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+body.light-theme .workflow-node-palette-item {
+  background: #ffffff;
+  border-color: #dee2e6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+body.light-theme .workflow-node-palette-item:hover {
+  border-color: #0066ff;
+  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.1);
+  background: #ffffff;
+}
+
+body.light-theme .workflow-edge {
+  stroke: #d4d4d5;
+}
+
+body.light-theme .workflow-edge.selected {
+  stroke: #0066ff;
+}
+
+body.light-theme .workflow-context-menu {
+  background: #ffffff;
+  border: 1px solid #e5e5e6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .workflow-context-menu-item:hover {
+  background: #f7f7f8;
+}
+
+/* Right Panel Styles */
+body.light-theme .right-panel {
+  background: #ffffff;
+  border-left: 1px solid #e5e5e6;
+}
+
+body.light-theme .right-panel-header {
+  background: #f7f7f8;
+  border-bottom: 1px solid #e5e5e6;
+}
+
+body.light-theme .right-panel-tab {
+  color: #6e6e80;
+  border-bottom: 2px solid transparent;
+}
+
+body.light-theme .right-panel-tab:hover {
+  color: #1f1f1f;
+  background: #ececed;
+}
+
+body.light-theme .right-panel-tab.active {
+  color: #0066ff;
+  border-bottom-color: #0066ff;
+  background: #ffffff;
+}
+
+body.light-theme .right-panel-content {
+  background: #ffffff;
+}
+
+body.light-theme .right-panel-divider {
+  background: #e5e5e6;
+}
+
+body.light-theme .right-panel-divider:hover {
+  background: #0066ff;
+}
+

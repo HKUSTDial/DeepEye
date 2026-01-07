@@ -73,7 +73,7 @@ export function FilesPanel({ sessionId }: FilesPanelProps) {
   )
 
   return (
-    <div ref={panelRef} className="flex h-full w-full overflow-hidden">
+    <div ref={panelRef} className="flex h-full w-full overflow-hidden bg-[var(--panel-bg)]">
       <div className="h-full relative min-w-0" style={explorerStyle}>
         <FileExplorer sessionId={sessionId} onSelectFile={handleFileSelect} />
         <div
@@ -81,7 +81,7 @@ export function FilesPanel({ sessionId }: FilesPanelProps) {
           onMouseDown={startExplorerDrag}
         ></div>
       </div>
-      <div className="flex-1 h-full min-w-0 border-l border-[#3c3c3c]">
+      <div className="flex-1 h-full min-w-0 border-l border-[var(--panel-border)]">
         <FileViewer sessionId={sessionId} filePath={selectedFile} onClose={closeFileViewer} />
       </div>
     </div>

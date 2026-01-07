@@ -125,20 +125,22 @@ export default function FileTreeItem({
       <div
         onClick={() => (file.type === 'directory' ? onToggle(file) : onSelect(file.path))}
         onContextMenu={handleContextMenu}
-        className={`group flex items-center h-[22px] cursor-pointer ${
-          isSelected ? 'bg-[#094771]' : 'hover:bg-[#2a2d2e]'
-        }`}
+        className={`file-tree-item ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft }}
       >
         {/* Arrow for Directory */}
-        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+        <div className="file-tree-item-icon" style={{ width: '16px' }}>
           {file.isLoading ? (
-            <Loader2 size={10} className="animate-spin text-[#808080]" />
+            <Loader2 size={12} className="animate-spin" style={{ color: 'var(--main-text-muted)' }} />
           ) : file.type === 'directory' ? (
             <svg
-              className={`w-3 h-3 text-[#c5c5c5] transition-transform duration-150 ${
-                file.isOpen ? 'rotate-90' : ''
-              }`}
+              className="transition-transform duration-150"
+              style={{ 
+                width: '12px', 
+                height: '12px',
+                color: 'var(--main-text)',
+                transform: file.isOpen ? 'rotate(90deg)' : 'rotate(0deg)'
+              }}
               fill="currentColor"
               viewBox="0 0 16 16"
             >
@@ -148,9 +150,9 @@ export default function FileTreeItem({
         </div>
 
         {/* Folder/File Icon */}
-        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 mr-1">
+        <div className="file-tree-item-icon">
           {file.type === 'directory' ? (
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <svg style={{ width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none">
               {file.isOpen ? (
                 <path
                   d="M20 19H4a2 2 0 01-2-2V7a2 2 0 012-2h5l2 2h9a2 2 0 012 2v8a2 2 0 01-2 2z"
@@ -164,14 +166,14 @@ export default function FileTreeItem({
               )}
             </svg>
           ) : (
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <svg style={{ width: '16px', height: '16px' }} viewBox="0 0 24 24" fill="none">
               <path
                 d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
-                fill="#3c3c3c"
-                stroke="#808080"
+                fill="var(--card-bg)"
+                stroke="var(--border-color)"
                 strokeWidth="1"
               />
-              <path d="M14 2v6h6" fill="#3c3c3c" stroke="#808080" strokeWidth="1" />
+              <path d="M14 2v6h6" fill="var(--card-bg)" stroke="var(--border-color)" strokeWidth="1" />
               <rect x="8" y="12" width="8" height="1.5" rx="0.5" fill={getIconColor(file.extension)} />
               <rect x="8" y="15" width="5" height="1.5" rx="0.5" fill={getIconColor(file.extension)} />
             </svg>
@@ -179,9 +181,7 @@ export default function FileTreeItem({
         </div>
 
         {/* Name */}
-        <span
-          className={`text-[13px] truncate leading-[22px] ${isSelected ? 'text-white' : 'text-[#cccccc]'}`}
-        >
+        <span className="file-tree-item-name">
           {file.name}
         </span>
       </div>

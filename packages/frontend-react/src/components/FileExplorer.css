@@ -1,5 +1,70 @@
+/* File Explorer - Unified Styles */
+
+/* File Explorer Container */
+.file-explorer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+  user-select: none;
+}
+
+/* Header */
+.file-explorer-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.file-explorer-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--main-text);
+  font-weight: 500;
+}
+
+.file-explorer-breadcrumb-separator {
+  color: var(--main-text-muted);
+}
+
+.file-explorer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-explorer-btn {
+  padding: 4px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--main-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-explorer-btn:hover {
+  background: var(--sidebar-hover);
+  color: var(--main-text);
+}
+
+.file-explorer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Scrollbar */
 .ide-scrollbar::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .ide-scrollbar::-webkit-scrollbar-track {
@@ -7,16 +72,12 @@
 }
 
 .ide-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(121, 121, 121, 0.4);
-  border-radius: 0;
-  border: 3px solid transparent;
-  background-clip: padding-box;
+  background: var(--border-color);
+  border-radius: 4px;
 }
 
 .ide-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(121, 121, 121, 0.7);
-  border: 3px solid transparent;
-  background-clip: padding-box;
+  background: var(--border-hover);
 }
 
 /* Delete confirmation dialog */
@@ -31,25 +92,25 @@
 }
 
 .delete-dialog {
-  background: #252526;
-  border: 1px solid #454545;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 20px;
-  min-width: 300px;
-  max-width: 400px;
+  min-width: 320px;
+  max-width: 420px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .delete-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--main-text);
   margin-bottom: 12px;
 }
 
 .delete-message {
   font-size: 13px;
-  color: #cccccc;
+  color: var(--main-text-muted);
   margin-bottom: 20px;
   line-height: 1.5;
 }
@@ -61,30 +122,56 @@
 }
 
 .delete-btn {
-  padding: 6px 16px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 6px;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
 
 .delete-btn-cancel {
   background: transparent;
-  border: 1px solid #454545;
-  color: #cccccc;
+  border: 1px solid var(--border-color);
+  color: var(--main-text);
 }
 
 .delete-btn-cancel:hover {
-  background: #3c3c3c;
+  background: var(--sidebar-hover);
+  border-color: var(--border-hover);
 }
 
 .delete-btn-confirm {
-  background: #c53030;
+  background: #ff3b30;
   border: none;
   color: white;
 }
 
 .delete-btn-confirm:hover {
   background: #e53e3e;
+}
+
+/* Empty State */
+.file-explorer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: var(--main-text-muted);
+}
+
+.file-explorer-empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  opacity: 0.3;
+}
+
+.file-explorer-empty-text {
+  font-size: 13px;
+  line-height: 1.5;
 }
 

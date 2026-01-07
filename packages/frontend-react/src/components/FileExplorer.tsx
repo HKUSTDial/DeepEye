@@ -276,25 +276,22 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
   }, [filesChangedTrigger, sessionId, sandboxReadySessionId])
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e] select-none">
+    <div className="file-explorer">
       {/* Header */}
-      <div className="h-9 flex items-center justify-between px-3 bg-[#252526] border-b border-[#3c3c3c]">
-        <div className="flex items-center gap-1.5 text-xs text-[#cccccc]">
-          <Home size={12} className="text-[#75beff]" />
-          <ChevronRight size={10} className="text-[#808080]" />
-          <span className="font-medium">workspace</span>
+      <div className="file-explorer-header">
+        <div className="file-explorer-breadcrumb">
+          <Home size={14} />
+          <ChevronRight size={12} className="file-explorer-breadcrumb-separator" />
+          <span>workspace</span>
         </div>
         {sessionId && (
           <button
             onClick={() => loadRootFiles(true)}
             disabled={isLoading}
-            className="p-1 hover:bg-[#3c3c3c] rounded transition-colors"
+            className="file-explorer-btn"
             title="Refresh"
           >
-            <RefreshCw
-              size={12}
-              className={`text-[#808080] hover:text-[#cccccc] ${isLoading ? 'animate-spin' : ''}`}
-            />
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
           </button>
         )}
       </div>
@@ -303,27 +300,30 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
       <div className="flex-1 overflow-y-auto ide-scrollbar">
         {/* Empty State */}
         {!sessionId && (
-          <div className="h-full flex flex-col items-center justify-center p-4 text-center">
-            <FolderOpen size={32} className="text-[#606060] mb-2" />
-            <p className="text-xs text-[#808080]">No active session</p>
-            <p className="text-[10px] text-[#606060] mt-1">Start a chat to see files</p>
+          <div className="file-explorer-empty">
+            <div className="file-explorer-empty-icon">
+              <FolderOpen size={48} />
+            </div>
+            <p className="file-explorer-empty-text">No active session<br />Start a chat to see files</p>
           </div>
         )}
 
         {/* Loading Root */}
         {sessionId && isLoading && rootFiles.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center p-4">
-            <div className="w-6 h-6 rounded-full border border-[#606060] border-t-[#75beff] animate-spin"></div>
-            <p className="text-[10px] text-[#808080] mt-2">Loading...</p>
+          <div className="file-explorer-empty">
+            <div className="w-6 h-6 rounded-full border-2 border-[var(--border-color)] border-t-[var(--accent)] animate-spin"></div>
+            <p className="file-explorer-empty-text mt-3">Loading...</p>
           </div>
         )}
 
         {/* Sandbox Not Created */}
         {sandboxNotCreated && (
-          <div className="h-full flex flex-col items-center justify-center p-4 text-center">
-            <FolderOpen size={32} className="text-[#ccaa00] mb-2" />
-            <p className="text-xs text-[#cccccc]">Workspace not ready</p>
-            <p className="text-[10px] text-[#808080] mt-1 max-w-[140px]">
+          <div className="file-explorer-empty">
+            <div className="file-explorer-empty-icon">
+              <FolderOpen size={48} />
+            </div>
+            <p className="file-explorer-empty-text">
+              Workspace not ready<br />
               Run code with AI agent, or click refresh
             </p>
           </div>
@@ -331,14 +331,14 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
 
         {/* Error */}
         {error && (
-          <div className="h-full flex flex-col items-center justify-center p-4 text-center">
-            <div className="w-8 h-8 rounded bg-[#5a1d1d] flex items-center justify-center mb-2">
-              <svg className="w-4 h-4 text-[#f48771]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="file-explorer-empty">
+            <div className="w-10 h-10 rounded-lg bg-[#ff3b30]/10 flex items-center justify-center mb-3">
+              <svg className="w-5 h-5 text-[#ff3b30]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="text-xs text-[#f48771]">Failed to load</p>
-            <p className="text-[10px] text-[#808080] mt-1">{error}</p>
+            <p className="text-sm font-medium text-[#ff3b30] mb-1">Failed to load</p>
+            <p className="file-explorer-empty-text">{error}</p>
           </div>
         )}
 

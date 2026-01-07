@@ -5,6 +5,7 @@ import { useChat } from '../hooks/useChat'
 import { useChatStore } from '../stores/chat'
 import { useKnowledgeBasesStore } from '../stores/knowledgeBases'
 import StepItem from './StepItem'
+import './ChatBox.css'
 
 interface ChatBoxProps {
   dataSourceId: string
@@ -93,14 +94,17 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="chat-container">
       {/* Messages Area */}
-      <div ref={chatContainerRef} className="flex-1 overflow-y-auto scroll-smooth">
+      <div ref={chatContainerRef} className="chat-messages">
         {/* Empty State */}
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center px-4 animate-fade-in">
-            <h2 className="text-2xl font-semibold mb-2">How can I help you today?</h2>
-            <p className="text-[var(--main-text-muted)] text-center max-w-md">
+          <div className="chat-empty">
+            <svg className="chat-empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <h2 className="chat-empty-title">How can I help you today?</h2>
+            <p className="chat-empty-subtitle">
               Ask me to analyze your data, write SQL queries, or create visualizations.
             </p>
           </div>
@@ -108,69 +112,51 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
 
         {/* Messages */}
         {messages.length > 0 && (
-          <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+          <div className="max-w-4xl mx-auto">
             {messages.map((msg, index) => (
-              <div
-                key={`msg-${index}`}
-                className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                style={{ animation: 'msgIn 0.4s var(--ease-out-expo) both' }}
-              >
-                {/* AI Avatar */}
-                {msg.role !== 'user' && (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[var(--accent)] text-white text-sm font-medium">
-                    D
+              <div key={`msg-${index}`} className={`message-bubble ${msg.role}`}>
+                {/* Message Header */}
+                <div className="message-header">
+                  <div className={`message-avatar ${msg.role}`}>
+                    {msg.role === 'user' ? 'U' : 'AI'}
+                  </div>
+                  <span className="message-role">{msg.role === 'user' ? 'You' : 'DeepEye'}</span>
+                  <span className="message-time">
+                    {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+
+                {/* Tool Steps */}
+                {msg.steps && msg.steps.length > 0 && msg.role !== 'user' && (
+                  <div className="space-y-2 mb-3 ml-9">
+                    {msg.steps.map((step, sIdx) => (
+                      <StepItem key={`step-${sIdx}`} step={step} />
+                    ))}
                   </div>
                 )}
 
                 {/* Message Content */}
-                <div className={`flex-1 max-w-[80%] space-y-2 ${msg.role === 'user' ? 'flex flex-col items-end' : ''}`}>
-                  {/* Tool Steps */}
-                  {msg.steps && msg.steps.length > 0 && msg.role !== 'user' && (
-                    <div className="space-y-2">
-                      {msg.steps.map((step, sIdx) => (
-                        <StepItem key={`step-${sIdx}`} step={step} />
-                      ))}
-                    </div>
-                  )}
+                {(msg.content || msg.isStreaming) && (
+                  <div className="message-content">
+                    {msg.role === 'user' ? (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    ) : (
+                      <>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content || ''}
+                        </ReactMarkdown>
+                        {msg.isStreaming && <span className="typing-cursor">|</span>}
+                      </>
+                    )}
+                  </div>
+                )}
 
-                  {/* Content Bubble */}
-                  {(msg.content || msg.isStreaming) && (
-                    <div
-                      className={`inline-block rounded-2xl px-4 py-3 text-left ${
-                        msg.role === 'user'
-                          ? 'bg-[var(--accent)] text-white'
-                          : 'bg-[var(--main-bg-alt)]'
-                      }`}
-                    >
-                      {msg.role === 'user' ? (
-                        <div className="whitespace-pre-wrap">{msg.content}</div>
-                      ) : (
-                        <>
-                          <div className="prose-chat">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {msg.content || ''}
-                            </ReactMarkdown>
-                          </div>
-                          {msg.isStreaming && <span className="typing-cursor"></span>}
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Thinking indicator */}
-                  {msg.role === 'assistant' && msg.isStreaming && !msg.content && (!msg.steps || msg.steps.length === 0) && (
-                    <div className="thinking-dots py-2">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
-                  )}
-                </div>
-
-                {/* User Avatar */}
-                {msg.role === 'user' && (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-purple-600 text-white text-sm font-medium">
-                    U
+                {/* Thinking indicator */}
+                {msg.role === 'assistant' && msg.isStreaming && !msg.content && (!msg.steps || msg.steps.length === 0) && (
+                  <div className="thinking-dots ml-9">
+                    <span></span>
+                    <span></span>
+                    <span></span>
                   </div>
                 )}
               </div>
@@ -187,9 +173,9 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-[var(--input-border)] bg-[var(--main-bg)]">
+      <div className="chat-input-container">
         <div className="max-w-3xl mx-auto px-4 py-4">
-          <div className="relative flex items-end bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] input-focus-ring">
+          <div className="chat-input-wrapper">
             <textarea
               ref={textareaRef}
               value={input}
@@ -208,21 +194,21 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
               }}
               onKeyDown={handleKeyDown}
               rows={1}
-              className="flex-1 bg-transparent px-4 py-3 resize-none focus:outline-none text-[var(--main-text)] placeholder-[var(--main-text-muted)]"
+              className="chat-input"
               style={{ maxHeight: '200px' }}
               placeholder="Message DeepEye..."
               disabled={isStreaming}
             />
             {showMentions && mentionMatches.length > 0 && (
-              <div className="absolute bottom-full left-3 mb-2 w-72 rounded-xl border border-slate-800 bg-slate-950 shadow-xl text-xs overflow-hidden z-50">
-                <div className="px-3 py-2 text-slate-400 border-b border-slate-800">Knowledge Bases</div>
-                <div className="max-h-48 overflow-y-auto">
+              <div className="mention-dropdown">
+                <div className="mention-header">Knowledge Bases</div>
+                <div className="mention-list">
                   {mentionMatches.map((kb) => (
                     <button
                       key={kb.id}
                       type="button"
                       onClick={() => handleMentionSelect(kb.name)}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-900 text-slate-200"
+                      className="mention-item"
                     >
                       @{kb.name}
                     </button>
@@ -233,11 +219,7 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
             <button
               onClick={handleSend}
               disabled={!input.trim() || isStreaming}
-              className={`btn m-2 p-2 rounded-xl ${
-                input.trim() && !isStreaming
-                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
-                  : 'bg-transparent text-[var(--main-text-muted)]'
-              }`}
+              className="chat-send-btn"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

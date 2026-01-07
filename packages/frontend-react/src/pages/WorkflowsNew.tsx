@@ -7,6 +7,7 @@ import { useWorkflowStore } from '../stores/workflow'
 import { useWorkflow } from '../hooks/useWorkflow'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useWorkflowNodesStore } from '../stores/workflowNodes'
+import '../components/workflow/Workflow.css'
 
 import { WorkflowToolbar } from '../components/workflow/WorkflowToolbar'
 import { WorkflowSidebar } from '../components/workflow/WorkflowSidebar'
@@ -67,7 +68,8 @@ export default function WorkflowsNew() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-screen bg-slate-950 text-white overflow-hidden"
+      className="flex h-screen overflow-hidden"
+      style={{ background: 'var(--main-bg)', color: 'var(--main-text)' }}
     >
       <WorkflowSidebar
         workflows={workflows}
@@ -90,4 +92,3 @@ export default function WorkflowsNew() {
     </motion.div>
   )
 }
-

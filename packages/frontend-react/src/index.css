@@ -5,31 +5,160 @@
 /* ===== Theme Variables ===== */
 :root {
   /* Sidebar */
-  --sidebar-bg: #202123;
-  --sidebar-hover: #2a2b32;
-  --sidebar-active: #343541;
-  --sidebar-border: #4d4d4f;
-  --sidebar-text: #ececf1;
-  --sidebar-text-muted: #8e8ea0;
+  --sidebar-bg: #f7f7f8;
+  --sidebar-hover: #ececed;
+  --sidebar-active: #e3e3e4;
+  --sidebar-border: #e5e5e6;
+  --sidebar-text: #1f1f1f;
+  --sidebar-text-muted: #6e6e80;
 
   /* Main */
-  --main-bg: #343541;
-  --main-bg-alt: #444654;
-  --main-text: #ececf1;
-  --main-text-muted: #c5c5d2;
+  --main-bg: #ffffff;
+  --main-bg-alt: #f9f9f9;
+  --main-text: #1f1f1f;
+  --main-text-muted: #6e6e80;
 
   /* Accent */
-  --accent: #10a37f;
-  --accent-hover: #1a7f64;
+  --accent: #0066ff;
+  --accent-hover: #0052cc;
 
   /* Input */
-  --input-bg: #40414f;
-  --input-border: #565869;
-  --input-focus: #8e8ea0;
+  --input-bg: #ffffff;
+  --input-border: #e5e5e6;
+  --input-focus: #0066ff;
+
+  /* Borders */
+  --border-color: #e5e5e6;
+  --border-hover: #d4d4d5;
+
+  /* Card */
+  --card-bg: #ffffff;
+  --card-bg-hover: #f9f9f9;
+  --card-border: #e5e5e6;
+  --card-border-hover: #d4d4d5;
+
+  /* Table */
+  --table-header-bg: #f7f7f8;
+  --table-header-text: #6e6e80;
+  --table-row-hover: #f9f9f9;
+  --table-border: #e5e5e6;
+
+  /* Panel */
+  --panel-bg: #ffffff;
+  --panel-border: #e5e5e6;
+  --panel-resize: #0066ff;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
   /* Animation */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--main-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--sidebar-hover);
+  border-color: var(--border-hover);
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* Thinking Dots Animation */
+.thinking-dots {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--main-text-muted);
+  animation: thinking 1.4s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes thinking {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Typing Cursor */
+.typing-cursor {
+  animation: blink 0.7s infinite;
+  color: var(--accent);
+  font-weight: 300;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Message In Animation */
+@keyframes msgIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ===== Base ===== */
@@ -46,11 +175,13 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Söhne', 'ui-sans-serif', system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
   background: var(--main-bg);
   color: var(--main-text);
-  line-height: 1.5;
+  line-height: 1.6;
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ===== Scrollbar ===== */

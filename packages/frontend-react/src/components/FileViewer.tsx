@@ -118,19 +118,19 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
   }, [sessionId, filePath])
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e]">
+    <div className="file-viewer">
       {/* Tab Bar */}
       {filePath && (
-        <div className="h-9 flex items-center bg-[#252526] border-b border-[#3c3c3c]">
-          <div className="h-full flex items-center gap-2 px-3 bg-[#1e1e1e] border-r border-[#3c3c3c] max-w-[200px]">
+        <div className="file-viewer-tab-bar">
+          <div className="file-viewer-tab">
             <FileCode size={14} style={{ color: iconColor }} />
-            <span className="text-[13px] text-[#cccccc] truncate">{fileName}</span>
+            <span className="file-viewer-tab-name">{fileName}</span>
             <button
               onClick={onClose}
-              className="ml-1 p-0.5 hover:bg-[#3c3c3c] rounded transition-colors opacity-60 hover:opacity-100"
+              className="file-viewer-tab-close"
               title="Close"
             >
-              <X size={14} className="text-[#cccccc]" />
+              <X size={14} />
             </button>
           </div>
         </div>
@@ -138,48 +138,48 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
       {/* Breadcrumb */}
       {filePath && (
-        <div className="h-6 flex items-center px-3 bg-[#1e1e1e] border-b border-[#3c3c3c]/50 text-[11px] text-[#808080]">
+        <div className="file-viewer-breadcrumb">
           <span className="truncate font-mono">{filePath}</span>
         </div>
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="file-viewer-content">
         {/* Loading */}
         {isLoading && (
-          <div className="h-full flex flex-col items-center justify-center">
-            <div className="w-8 h-8 rounded-full border border-[#606060] border-t-[#75beff] animate-spin"></div>
-            <p className="text-xs text-[#808080] mt-3">Loading...</p>
+          <div className="file-viewer-loading">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading...</p>
           </div>
         )}
 
         {/* Error */}
         {!isLoading && error && (
-          <div className="h-full flex flex-col items-center justify-center p-6">
-            <div className="w-10 h-10 rounded bg-[#5a1d1d] flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-[#f48771]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="file-viewer-error">
+            <div className="error-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="text-sm text-[#f48771]">Failed to load file</p>
-            <p className="text-xs text-[#808080] mt-2 text-center">{error}</p>
+            <p className="error-title">Failed to load file</p>
+            <p className="error-message">{error}</p>
           </div>
         )}
 
         {/* Image Viewer */}
         {!isLoading && !error && viewerType === 'image' && fileContent && (
-          <div className="h-full flex items-center justify-center p-6 bg-[#1e1e1e] overflow-auto">
+          <div className="image-viewer">
             <img
               src={`data:image/${fileExtension};base64,${fileContent.content}`}
               alt={fileName}
-              className="max-w-full max-h-full object-contain"
+              className="image-viewer-img"
             />
           </div>
         )}
 
         {/* Markdown Viewer */}
         {!isLoading && !error && viewerType === 'markdown' && fileContent && (
-          <div className="flex-1 overflow-auto p-6 bg-[#1e1e1e]">
+          <div className="markdown-viewer">
             <div className="markdown-body">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -193,33 +193,22 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
         {/* CSV Viewer */}
         {!isLoading && !error && viewerType === 'csv' && csvData && (
-          <div className="flex-1 overflow-auto bg-[#1e1e1e]">
-            <table className="w-full text-[13px] border-collapse">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-[#252526]">
-                  <th className="px-3 py-2 text-left font-semibold text-[#4fc1ff] border-b border-r border-[#3c3c3c] whitespace-nowrap">
-                    #
-                  </th>
+          <div className="csv-viewer">
+            <table className="csv-table">
+              <thead>
+                <tr>
+                  <th className="csv-row-number">#</th>
                   {csvData.headers.map((header, idx) => (
-                    <th
-                      key={idx}
-                      className="px-3 py-2 text-left font-semibold text-[#4fc1ff] border-b border-r border-[#3c3c3c] whitespace-nowrap"
-                    >
-                      {header}
-                    </th>
+                    <th key={idx}>{header}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {csvData.rows.map((row, rowIdx) => (
-                  <tr key={rowIdx} className="hover:bg-[#2a2d2e] transition-colors">
-                    <td className="px-3 py-1.5 text-[#858585] border-r border-[#3c3c3c]/50 font-mono text-right">
-                      {rowIdx + 1}
-                    </td>
+                  <tr key={rowIdx}>
+                    <td className="csv-row-number">{rowIdx + 1}</td>
                     {row.map((cell, cellIdx) => (
-                      <td key={cellIdx} className="px-3 py-1.5 text-[#cccccc] border-r border-[#3c3c3c]/50">
-                        {cell}
-                      </td>
+                      <td key={cellIdx}>{cell}</td>
                     ))}
                   </tr>
                 ))}
@@ -230,11 +219,11 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
         {/* Code Viewer with Line Numbers */}
         {!isLoading && !error && viewerType === 'code' && fileContent && (
-          <div className="flex-1 overflow-auto ide-code-viewer">
+          <div className="code-viewer">
             {isHighlighterLoading && !highlightedCode ? (
-              <div className="h-full flex flex-col items-center justify-center">
-                <div className="w-6 h-6 rounded-full border border-[#606060] border-t-[#75beff] animate-spin"></div>
-                <p className="text-xs text-[#808080] mt-2">Loading syntax highlighter...</p>
+              <div className="file-viewer-loading">
+                <div className="loading-spinner small"></div>
+                <p className="loading-text">Loading syntax highlighter...</p>
               </div>
             ) : highlightedCode ? (
               <div className="code-with-lines">
@@ -261,7 +250,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
         {/* Text Viewer with Line Numbers */}
         {!isLoading && !error && viewerType === 'text' && fileContent && (
-          <div className="flex-1 overflow-auto text-viewer">
+          <div className="text-viewer">
             <table className="text-viewer-table">
               <tbody>
                 {codeLines.map((line, idx) => (
@@ -279,10 +268,10 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
         {/* No File Selected */}
         {!isLoading && !error && !fileContent && (
-          <div className="h-full flex flex-col items-center justify-center p-6 bg-[#1e1e1e]">
-            <FileTextIcon size={48} className="text-[#404040] mb-4" />
-            <p className="text-sm text-[#808080]">Select a file to preview</p>
-            <p className="text-xs text-[#606060] mt-1">Click a file on the left</p>
+          <div className="file-viewer-empty">
+            <FileTextIcon className="file-viewer-empty-icon" />
+            <p className="file-viewer-empty-title">Select a file to preview</p>
+            <p className="file-viewer-empty-subtitle">Click a file on the left</p>
           </div>
         )}
       </div>

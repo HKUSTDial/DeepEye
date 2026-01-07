@@ -1,8 +1,93 @@
-.session-item {
-  transition: background 0.15s ease, transform 0.15s var(--ease-out-back);
+/* Sidebar - TaskHarbor Style */
+
+.sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
 }
+
+/* Navigation Items */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-text);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.nav-item.active {
+  background: var(--sidebar-active);
+  color: var(--accent);
+}
+
+.nav-item:active {
+  transform: scale(0.98);
+}
+
+/* Session Items */
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--sidebar-text);
+  font-size: 13px;
+}
+
+.session-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.session-item.active {
+  background: var(--sidebar-active);
+  font-weight: 500;
+}
+
 .session-item:active {
   transform: scale(0.98);
+}
+
+.session-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-delete-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: var(--sidebar-text-muted);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.session-item:hover .session-delete-btn {
+  opacity: 1;
+}
+
+.session-delete-btn:hover {
+  background: var(--sidebar-active);
+  color: var(--sidebar-text);
 }
 
 .typing-cursor {
@@ -16,3 +101,39 @@
   51%, 100% { opacity: 0; }
 }
 
+/* Scrollbar */
+.sidebar ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar ::-webkit-scrollbar-thumb {
+  background: var(--sidebar-border);
+  border-radius: 3px;
+}
+
+.sidebar ::-webkit-scrollbar-thumb:hover {
+  background: var(--sidebar-text-muted);
+}
+
+/* Loading Skeleton */
+.sidebar .skeleton {
+  height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--sidebar-hover) 25%,
+    var(--sidebar-active) 50%,
+    var(--sidebar-hover) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

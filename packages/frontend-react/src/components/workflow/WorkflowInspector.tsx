@@ -72,35 +72,35 @@ export function WorkflowInspector({
     <motion.aside
       initial={{ x: 20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col overflow-hidden"
+      className="workflow-inspector"
     >
-      <div className="p-4 border-b border-slate-800">
-        <div className="flex items-center gap-2 text-white">
-          <Settings className="w-5 h-5 text-purple-400" />
-          <h3 className="font-semibold text-lg">Inspector</h3>
+      <div className="workflow-inspector-header">
+        <div className="workflow-inspector-title-wrapper">
+          <Settings className="workflow-inspector-icon" />
+          <h3 className="workflow-inspector-title">Inspector</h3>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+      <div className="workflow-inspector-content">
         {resolvedSelectedNode ? (
           <>
             {/* Node Info */}
             <motion.div
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl"
+              className="workflow-inspector-node-info"
             >
-              <div className="font-semibold text-white mb-1">{resolvedSelectedNode.data.label}</div>
+              <div className="workflow-inspector-node-name">{resolvedSelectedNode.data.label}</div>
               {nodeDef?.description && (
-                <div className="mt-2 text-xs text-slate-300">{nodeDef.description}</div>
+                <div className="workflow-inspector-node-desc">{nodeDef.description}</div>
               )}
             </motion.div>
 
             {/* Parameters */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium text-slate-300 uppercase tracking-wider">Parameters</h4>
+            <div className="workflow-inspector-section">
+              <h4 className="workflow-inspector-section-title">Parameters</h4>
               {Object.keys(resolvedSelectedNode.data.params || {}).length === 0 ? (
-                <div className="text-sm text-slate-500 text-center py-4">No parameters</div>
+                <div className="workflow-inspector-empty">No parameters</div>
               ) : (
                 Object.keys(resolvedSelectedNode.data.params || {}).map((key) => {
                   const paramDef = nodeDef?.params?.[key]
@@ -108,16 +108,16 @@ export function WorkflowInspector({
                   const displayValue = editingParam === key ? localParams[key] : String(resolvedSelectedNode.data.params[key] || '')
 
                   return (
-                    <div key={`${resolvedSelectedNode.id}-${key}`} className="space-y-1.5">
-                      <label className="flex items-center justify-between text-xs text-slate-300">
-                        <span className="font-medium">{key}</span>
+                    <div key={`${resolvedSelectedNode.id}-${key}`} className="workflow-inspector-field">
+                      <label className="workflow-inspector-label">
+                        <span className="workflow-inspector-label-text">{key}</span>
                         {required ? (
-                          <span className="flex items-center gap-1 text-amber-400">
+                          <span className="workflow-inspector-label-required">
                             <AlertCircle className="w-3 h-3" />
                             required
                           </span>
                         ) : (
-                          <span className="text-slate-500">optional</span>
+                          <span className="workflow-inspector-label-optional">optional</span>
                         )}
                       </label>
                       <input
@@ -138,9 +138,7 @@ export function WorkflowInspector({
                             e.currentTarget.blur()
                           }
                         }}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg 
-                          text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 
-                          focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        className="workflow-inspector-input"
                       />
                     </div>
                   )
@@ -152,10 +150,10 @@ export function WorkflowInspector({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-12 text-center"
+            className="workflow-inspector-placeholder"
           >
-            <Settings className="w-12 h-12 text-slate-700 mb-3" />
-            <p className="text-sm text-slate-500">Select a node to edit parameters</p>
+            <Settings className="workflow-inspector-placeholder-icon" />
+            <p className="workflow-inspector-placeholder-text">Select a node to edit parameters</p>
           </motion.div>
         )}
 
@@ -164,41 +162,38 @@ export function WorkflowInspector({
           <motion.div
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="mt-4 space-y-3"
+            className="workflow-inspector-run-section"
           >
-            <h4 className="text-sm font-medium text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <h4 className="workflow-inspector-section-title workflow-inspector-section-title--icon">
               <PlayCircle className="w-4 h-4" />
               Run Status
             </h4>
 
-            <div className="p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-400">Status</span>
-                <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(resolvedActiveRun.status)}`}
-                >
+            <div className="workflow-inspector-run-info">
+              <div className="workflow-inspector-run-row">
+                <span className="workflow-inspector-run-label">Status</span>
+                <span className={`workflow-inspector-run-badge ${getStatusClass(resolvedActiveRun.status)}`}>
                   {resolvedActiveRun.status}
                 </span>
               </div>
 
               {resolvedActiveRun.created_at && (
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>Started</span>
-                  <span>{new Date(resolvedActiveRun.created_at).toLocaleTimeString()}</span>
+                <div className="workflow-inspector-run-row">
+                  <span className="workflow-inspector-run-label">Started</span>
+                  <span className="workflow-inspector-run-value">
+                    {new Date(resolvedActiveRun.created_at).toLocaleTimeString()}
+                  </span>
                 </div>
               )}
             </div>
 
             {resolvedRunOutput && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <CheckCircle2 className="w-3 h-3" />
+              <div className="workflow-inspector-output">
+                <div className="workflow-inspector-output-header">
+                  <CheckCircle2 className="w-3 h-12" />
                   Output
                 </div>
-                <pre
-                  className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs 
-                  text-slate-300 overflow-auto max-h-512 custom-scrollbar font-mono"
-                >
+                <pre className="workflow-inspector-output-content">
                   {resolvedRunOutput}
                 </pre>
               </div>
@@ -210,19 +205,19 @@ export function WorkflowInspector({
   )
 }
 
-function getStatusColor(status: string): string {
+function getStatusClass(status: string): string {
   switch (status) {
     case 'running':
-      return 'bg-green-500/20 text-green-400 border border-green-500/30'
+      return 'running'
     case 'success':
     case 'completed':
-      return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+      return 'success'
     case 'failed':
-      return 'bg-red-500/20 text-red-400 border border-red-500/30'
+      return 'failed'
     case 'pending':
-      return 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+      return 'pending'
     default:
-      return 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+      return ''
   }
 }
 
