@@ -31,3 +31,7 @@ pipeline.db
 bak/
 
 **/node_modules/**
+
+packages/deepeye-core
+packages/deepeye-backend
+packages/deepeye-frontend
