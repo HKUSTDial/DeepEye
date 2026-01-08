@@ -29,3 +29,5 @@ architecture_plan.md
 pipeline.db
 
 bak/
+
+**/node_modules/**
