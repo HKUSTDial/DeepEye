@@ -18,7 +18,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Mount init script to auto-create databases
-      - ./scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+      - ./docker/scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -124,6 +124,8 @@ services:
     environment:
       # Automatically derive VITE_API_URL from the host backend port
       - VITE_API_URL=http://localhost:${HOST_BACKEND_PORT:-8000}/api/v1
+      - VITE_AUTH_URL=http://localhost:${HOST_BACKEND_PORT:-8000}/api/auth
+      - VITE_API_TIMEOUT=30000
     volumes:
       - ./packages/frontend-react/src:/app/src
       - /app/node_modules

@@ -44,7 +44,12 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="DeepEye API", version="0.1.0", lifespan=lifespan)
 
-# CORS 中间件
+# ⭐ 全局鉴权中间件
+# 注意：在 FastAPI 中，后添加的中间件会包裹在先添加的中间件“外面”。
+# 我们希望 CORS 在最外层，所以先添加业务中间件，后添加 CORS 中间件。
+app.middleware("http")(auth_middleware)
+
+# CORS 中间件 (最外层)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -52,9 +57,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ⭐ 全局鉴权中间件（放在 CORS 之后）
-app.middleware("http")(auth_middleware)
 
 
 # 全局异常处理器 - 确保所有错误都返回 JSON 并包含 CORS headers

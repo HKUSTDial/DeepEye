@@ -11,8 +11,8 @@ export const mode = import.meta.env.MODE
 // API Configuration
 export const config = {
   api: {
-    baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8099/api/v1',  // ⭐ 添加 /v1 前缀
-    authBaseUrl: import.meta.env.VITE_AUTH_URL || 'http://localhost:8099/api/auth',  // 认证 API
+    baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',  // ⭐ 添加 /v1 前缀
+    authBaseUrl: import.meta.env.VITE_AUTH_URL || 'http://localhost:8000/api/auth',  // 认证 API
     timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 30000,
   },
 
