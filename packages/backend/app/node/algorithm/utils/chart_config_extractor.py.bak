@@ -1,0 +1,792 @@
+import json
+import re
+from typing import Dict, Any, List, Optional, Union, Tuple
+import pandas as pd
+import numpy as np
+import os
+import sys
+import yaml
+from dotenv import load_dotenv
+from storyteller.llm_call.openai_llm import call_openai
+from storyteller.llm_call.prompt_factory import get_prompt
+
+# 加载环境变量
+load_dotenv(override=True)
+
+# 添加项目根目录到Python路径
+# 获取当前文件的路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取项目根目录（假设当前文件在storyteller/algorithm/utils/下）
+project_root = os.path.abspath(os.path.join(current_dir, '../../..'))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+# 加载全局配置
+def load_config():
+    """加载config.yaml中的配置"""
+    config_path = os.path.join(current_dir, "../../config/config.yaml")
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        print(f"✅ 成功加载配置文件: {config_path}")
+        return config
+    except Exception as e:
+        print(f"⚠️ 加载配置文件失败: {str(e)}")
+        return {"llm_kwargs": {}}
+
+# 全局配置
+GLOBAL_CONFIG = load_config()
+
+class ChartConfigExtractor:
+    """
+    使用LLM解析Python可视化代码，提取图表配置信息，
+    以便转换为AntV G2配置。
+    
+    主要功能：
+    1. 使用GPT-4分析Python可视化代码
+    2. 提取关键配置信息（图表类型、字段、聚合方法等）
+    3. 处理数据并生成G2格式的配置
+    """
+    
+    def __init__(self):
+        """初始化提取器"""
+        self.default_config = {
+            "chart_type": "bar",
+            "title": None,
+            "x_field": None,
+            "y_field": None,
+            "data_columns": [],
+            "hue_column": None,
+            "is_stacked": False,
+            "agg_method": None
+        }
+
+    def extract_from_code(self, code: str) -> Dict[str, Any]:
+        """
+        从代码中提取图表配置
+        
+        参数:
+            code: 可视化代码字符串
+            
+        返回:
+            包含图表配置的字典
+        """
+        try:
+            # 准备参数
+            prompt_args = {
+                "CODE": code
+            }
+            
+            # 获取模板
+            prompt = get_prompt("chart_config_analysis", prompt_args)
+            
+            # 从全局配置中获取LLM参数
+            llm_kwargs = GLOBAL_CONFIG.get("llm_kwargs", {})
+            if not llm_kwargs:
+                print("⚠️ 未找到全局LLM配置，使用默认值")
+                llm_kwargs = {
+                    "model": "gpt-4-32k",
+                    "temperature": 0.0,
+                    "max_tokens": 4096
+                }
+            else:
+                # 确保关键参数存在，同时覆盖temperature为0
+                llm_kwargs = llm_kwargs.copy()  # 创建副本避免修改全局配置
+                llm_kwargs["temperature"] = 0.0  # 对于配置提取，始终使用低temperature
+                llm_kwargs["max_tokens"] = llm_kwargs.get("max_tokens", 4096)
+            
+            print(f"🔍 使用LLM配置: model={llm_kwargs.get('model')}, base_url={llm_kwargs.get('base_url', '默认')}")
+            
+            # 实现重试机制
+            max_retries = 3
+            for retry in range(max_retries):
+                try:
+                    # 调用LLM，使用全局配置
+                    responses = call_openai(
+                        prompt=prompt,
+                        **llm_kwargs
+                    )
+                    
+                    if responses and len(responses) > 0:
+                        response_text = responses[0].strip()
+                        print(f"✅ 成功获取LLM响应 (尝试 {retry+1}/{max_retries})")
+                        
+                        # 解析JSON响应
+                        config = self._parse_json_response(response_text)
+                        
+                        # 如果获取到了配置
+                        if config:
+                            # 填充默认值
+                            return self._fill_config_defaults(config)
+                    
+                    # 如果没有获取到有效响应，重试
+                    print(f"⚠️ LLM调用没有返回有效配置 (尝试 {retry+1}/{max_retries})")
+                    if retry < max_retries - 1:
+                        print("将在1秒后重试...")
+                        import time
+                        time.sleep(1)
+                    
+                except Exception as e:
+                    print(f"⚠️ LLM API调用出错: {str(e)} (尝试 {retry+1}/{max_retries})")
+                    import traceback
+                    traceback.print_exc()
+                    if retry < max_retries - 1:
+                        print("将在1秒后重试...")
+                        import time
+                        time.sleep(1)
+            
+            # 所有重试都失败，返回默认配置
+            print("⚠️ 达到最大重试次数，返回默认图表配置")
+            
+            # 检查是否是特定图表类型
+            if "hist" in code.lower():
+                default_config = self.default_config.copy()
+                default_config["chart_type"] = "histogram"
+                print("检测到可能是histogram图表，设置默认chart_type为histogram")
+                return default_config
+                
+            return self.default_config.copy()
+        
+        except Exception as e:
+            print(f"提取图表配置时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # 返回默认配置
+            return self.default_config.copy()
+    
+    
+    def _parse_json_response(self, response_text: str) -> Dict[str, Any]:
+        """解析LLM返回的JSON响应"""
+        try:
+            # 直接尝试解析
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            # 尝试提取JSON部分
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group(0))
+                except:
+                    print("无法解析提取的JSON部分")
+            
+            # 最后一次尝试：修复常见的JSON格式错误
+            try:
+                # 替换单引号为双引号
+                fixed_text = response_text.replace("'", '"')
+                # 确保属性名有双引号
+                fixed_text = re.sub(r'(\w+):', r'"\1":', fixed_text)
+                return json.loads(fixed_text)
+            except:
+                print("所有JSON解析尝试都失败了")
+            
+        return None
+
+    def _fill_config_defaults(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """填充配置中缺失的默认值"""
+        # 复制默认配置
+        result = self.default_config.copy()
+        
+        # 确保不丢失派生列信息
+        if "derived_columns" in config:
+            result["derived_columns"] = config["derived_columns"]
+        
+        # 用提供的配置更新默认值
+        result.update(config)
+        
+        # 确保图表类型有效
+        if not result["chart_type"]:
+            result["chart_type"] = "bar"
+        
+        # 智能构建标题（如果缺失）
+        if not result["title"]:
+            x_field = result.get("x_field", "")
+            y_field = result.get("y_field", "")
+            agg_method = result.get("agg_method", "")
+            
+            if agg_method and y_field:
+                agg_display = {
+                    "count": "Count of",
+                    "sum": "Sum of",
+                    "mean": "Average",
+                    "min": "Minimum",
+                    "max": "Maximum"
+                }.get(agg_method, agg_method.capitalize())
+                
+                result["title"] = f"{agg_display} {y_field} by {x_field}"
+            elif x_field and y_field:
+                result["title"] = f"{y_field} by {x_field}"
+        
+        return result
+        
+    def _handle_special_chart_types(self, df_copy: pd.DataFrame, chart_type: str, x_field: str, y_field: str) -> Optional[Dict[str, Any]]:
+        """处理特殊图表类型（boxplot、violin、histogram、scatter）"""
+        try:
+            if not (x_field and y_field and y_field in df_copy.columns):
+                return None
+                
+            print(f"为{chart_type}类型准备数据，不使用聚合...")
+            
+            # 散点图特殊处理
+            if chart_type == "scatter":
+                return self._handle_scatter_plot(df_copy, x_field, y_field)
+            
+            # boxplot等其他分布图表处理
+            # 获取唯一的x值作为标签
+            unique_x = df_copy[x_field].unique()
+            labels = [str(x) for x in unique_x]
+            
+            # 为每个x值创建对应的y值数组
+            datasets = []
+            for x_val in unique_x:
+                y_values = df_copy[df_copy[x_field] == x_val][y_field].tolist()
+                datasets.append({
+                    "label": str(x_val),
+                    "data": y_values
+                })
+                
+                return {
+                "type": chart_type,  # 添加图表类型
+                "labels": labels,
+                "datasets": datasets
+            }
+            
+        except Exception as e:
+            print(f"处理{chart_type}数据时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        return None
+    
+    def _handle_scatter_plot(self, df: pd.DataFrame, x_field: str, y_field: str) -> Dict[str, Any]:
+        """处理散点图数据"""
+        df_copy = df.copy()
+        
+        # 确保x和y字段都是数值类型
+        for field, name in [(x_field, 'X轴'), (y_field, 'Y轴')]:
+            if not pd.api.types.is_numeric_dtype(df_copy[field]):
+                try:
+                    print(f"{name}字段不是数值类型，尝试转换...")
+                    df_copy[field] = pd.to_numeric(df_copy[field], errors='coerce')
+                except Exception as e:
+                    print(f"无法将{name}字段转换为数值类型: {str(e)}")
+        
+        # 去除缺失值
+        valid_data = df_copy.dropna(subset=[x_field, y_field])
+        if len(valid_data) < len(df_copy):
+            print(f"警告: 移除了{len(df_copy)-len(valid_data)}行含缺失值的数据")
+        
+        # 为散点图返回所有数据点
+        return {
+            "type": "scatter",
+            "datasets": [{
+                "label": y_field,
+                "data": [{"x": x, "y": y} for x, y in zip(valid_data[x_field].tolist(), valid_data[y_field].tolist())],
+                "backgroundColor": 'rgba(54, 162, 235, 0.7)',
+                "borderColor": 'rgba(54, 162, 235, 1.0)',
+                "borderWidth": 1,
+                "pointRadius": 4,
+                "pointHoverRadius": 6
+            }]
+        }
+        
+    def _handle_distribution_plot(self, df: pd.DataFrame, chart_type: str, x_field: str, y_field: str) -> Dict[str, Any]:
+        """处理分布图（boxplot、violin、histogram）数据"""
+        # 获取唯一的x值作为标签
+        unique_x = df[x_field].unique()
+        labels = [str(x) for x in unique_x]
+        
+        # 为每个x值创建对应的y值数组
+        datasets = []
+        for x_val in unique_x:
+            y_values = df[df[x_field] == x_val][y_field].tolist()
+            datasets.append({
+                "label": str(x_val),
+                "data": y_values
+            })
+        
+        return {
+            "type": chart_type,
+            "labels": labels,
+            "datasets": datasets
+        }
+        
+    def resolve_chart_data(self, df: pd.DataFrame, config: Dict[str, Any] = None):
+        """
+        根据配置从DataFrame中提取数据
+        
+        参数:
+            df: DataFrame对象
+            config: 图表配置
+            
+        返回:
+            图表数据对象
+        """
+        if config is None:
+            config = {}
+            
+        try:
+            # 提取配置
+            chart_type = config.get("chart_type", "bar")
+            x_field = config.get("x_field")
+            y_field = config.get("y_field")
+            hue_field = config.get("hue_column")
+            
+            # 修复: 安全处理agg_method，确保None值不会导致错误
+            agg_method_raw = config.get("agg_method")
+            if agg_method_raw is None:
+                # 根据图表类型设置默认聚合方法
+                if chart_type in ["boxplot", "violin", "histogram", "scatter"]:
+                    agg_method = "none"  # 这些类型不需要聚合
+                else:
+                    agg_method = "sum"   # 默认使用sum作为聚合方法
+            else:
+                agg_method = str(agg_method_raw).lower()
+            
+            is_stacked = config.get("is_stacked", False)
+            
+            # 复制数据以避免修改原始数据
+            df_copy = df.copy()
+            
+            # 处理特殊图表类型
+            if chart_type in ["boxplot", "violin", "histogram", "scatter"]:
+                result = self._handle_special_chart_types(df_copy, chart_type, x_field, y_field)
+                if result is not None:
+                    return result
+
+            # 处理派生列 - 如果配置中包含derived_columns
+            if "derived_columns" in config and isinstance(config["derived_columns"], list):
+                print("发现派生列定义，准备处理...")
+                for derived_col in config["derived_columns"]:
+                    col_name = derived_col.get("name")
+                    source_col = derived_col.get("source_column")
+                    derivation_type = derived_col.get("derivation_type", "").lower()
+                    parameters = derived_col.get("parameters", {})
+                    
+                    if not col_name or not source_col:
+                        print(f"警告: 派生列定义不完整，跳过: {derived_col}")
+                        continue
+                    
+                    # 验证源列存在
+                    if source_col not in df_copy.columns:
+                        print(f"警告: 源列 '{source_col}' 不存在，跳过派生列 '{col_name}'")
+                        continue
+                    
+                    try:
+                        # 根据不同的派生类型处理
+                        if derivation_type == "bin":
+                            # 处理分箱操作
+                            bins = parameters.get("bins")
+                            labels = parameters.get("labels")
+                            right = parameters.get("right", True)
+                            
+                            if isinstance(bins, list) and isinstance(labels, list):
+                                print(f"对列 '{source_col}' 进行分箱操作，创建派生列 '{col_name}'")
+                                df_copy[col_name] = pd.cut(df_copy[source_col], 
+                                                          bins=bins, 
+                                                          labels=labels, 
+                                                          right=right)
+                                print(f"✅ 成功创建分箱列: {col_name}")
+                            else:
+                                print(f"警告: 分箱操作缺少必要参数，跳过")
+                        
+                        elif derivation_type == "transform":
+                            # 处理变换操作
+                            transform_type = parameters.get("type", "").lower()
+                            
+                            if transform_type == "log":
+                                df_copy[col_name] = np.log(df_copy[source_col])
+                                print(f"✅ 成功创建对数变换列: {col_name}")
+                            elif transform_type == "sqrt":
+                                df_copy[col_name] = np.sqrt(df_copy[source_col])
+                                print(f"✅ 成功创建平方根变换列: {col_name}")
+                            elif transform_type == "zscore":
+                                df_copy[col_name] = (df_copy[source_col] - df_copy[source_col].mean()) / df_copy[source_col].std()
+                                print(f"✅ 成功创建Z分数标准化列: {col_name}")
+                            else:
+                                print(f"警告: 不支持的变换类型: {transform_type}")
+                        
+                        elif derivation_type == "calculate":
+                            # 处理计算派生列
+                            expression = parameters.get("expression")
+                            if expression:
+                                # 安全地评估表达式 (仅支持简单的数学运算)
+                                if "df[" in expression:
+                                    locals_dict = {"df": df_copy, "np": np}
+                                    df_copy[col_name] = eval(expression, {"__builtins__": {}}, locals_dict)
+                                    print(f"✅ 成功创建计算列: {col_name}")
+                            else:
+                                print(f"警告: 计算派生列缺少表达式参数")
+                        else:
+                            print(f"警告: 未知的派生类型: {derivation_type}")
+                    
+                    except Exception as e:
+                        print(f"创建派生列 '{col_name}' 时出错: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
+            
+            # 验证字段存在
+            try:
+                self._validate_fields(df_copy, config)
+            except ValueError as e:
+                print(f"警告: {str(e)}")
+            
+            # 根据图表类型处理数据
+            if chart_type == "pie":
+                return self._prepare_pie_data(df_copy, x_field, y_field, agg_method)
+            elif hue_field and hue_field in df_copy.columns:
+                return self._prepare_grouped_data(df_copy, x_field, y_field, hue_field, agg_method, is_stacked)
+            else:
+                return self._prepare_single_series_data(df_copy, x_field, y_field, agg_method)
+            
+        except Exception as e:
+            print(f"处理数据时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    def _validate_fields(self, df: pd.DataFrame, config: Dict[str, Any]):
+        """验证字段是否存在于DataFrame中"""
+        if not isinstance(df, pd.DataFrame):
+            print("⚠️ 输入数据不是DataFrame类型")
+            return False
+            
+        required_fields = []
+        if config.get("x_field"):
+            required_fields.append(config["x_field"])
+        if config.get("y_field"):
+            required_fields.append(config["y_field"])
+        if config.get("hue_column"):
+            required_fields.append(config["hue_column"])
+            
+        missing_fields = [field for field in required_fields if field not in df.columns]
+        if missing_fields:
+            print(f"⚠️ 以下字段在DataFrame中不存在: {missing_fields}")
+            return False
+            
+        return True
+    
+    def _prepare_pie_data(self, df: pd.DataFrame, x_field: str, y_field: str, agg_method: str):
+        """准备饼图数据（G2格式）"""
+        if not x_field or x_field not in df.columns:
+            raise ValueError("饼图需要有效的类别字段")
+        
+        try:
+            # 如果是聚合操作
+            if y_field and y_field in df.columns:
+                if agg_method == "count":
+                    data = df.groupby(x_field)[y_field].count()
+                elif agg_method == "mean":
+                    data = df.groupby(x_field)[y_field].mean()
+                elif agg_method in [None, "none"]:
+                    print("饼图通常需要聚合，使用sum作为默认聚合方法")
+                    data = df.groupby(x_field)[y_field].sum()
+                else:  # 默认使用sum
+                    data = df.groupby(x_field)[y_field].sum()
+            else:
+                # 如果只有x字段，使用计数
+                data = df[x_field].value_counts()
+            
+            # 直接返回G2格式数据
+            return [
+                {"category": str(category), "value": value}
+                for category, value in zip(data.index, data.values)
+            ]
+        except Exception as e:
+            print(f"准备饼图数据时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # 返回基本的错误数据结构
+            return [
+                {"category": "错误", "value": 0},
+                {"category": "请检查数据", "value": 0}
+            ]
+    
+    def _prepare_grouped_data(self, df: pd.DataFrame, x_field: str, y_field: str, hue_field: str, agg_method: str, is_stacked: bool):
+        """准备分组数据（G2格式）"""
+        if not x_field or x_field not in df.columns:
+            raise ValueError(f"X轴字段 '{x_field}' 不存在")
+        if not hue_field or hue_field not in df.columns:
+            raise ValueError(f"分组字段 '{hue_field}' 不存在")
+        
+        try:
+            # 克隆数据，避免修改原数据
+            df_copy = df.copy()
+            
+            # 确保数据类型正确
+            for col in [x_field, y_field, hue_field]:
+                if col and col in df.columns:
+                    if df[col].apply(lambda x: isinstance(x, (list, dict, tuple))).any():
+                        df_copy[col] = df_copy[col].astype(str)
+                    elif df[col].dtype == 'object' or not pd.api.types.is_categorical_dtype(df[col]):
+                        df_copy[col] = df_copy[col].astype(str)
+            
+            # 处理聚合
+            pivot_data = None
+            if y_field and y_field in df.columns:
+                try:
+                    if agg_method == "count":
+                        pivot_data = pd.crosstab(df_copy[x_field], df_copy[hue_field])
+                except Exception as e:
+                    print(f"数据透视表处理失败: {str(e)}")
+                    # 使用更安全的方法
+                    grouped = df_copy.groupby([x_field, hue_field])
+                    if agg_method == "count":
+                        grouped = grouped.size()
+                    else:
+                        grouped = grouped[y_field].agg(agg_method or 'sum')
+                    pivot_data = grouped.unstack(fill_value=0)
+            
+            if pivot_data is None:
+                pivot_data = pd.crosstab(df_copy[x_field], df_copy[hue_field])
+            
+            # 直接返回G2格式数据
+            processed_data = []
+            for x_val in pivot_data.index:
+                for hue_val in pivot_data.columns:
+                    processed_data.append({
+                        x_field: str(x_val),
+                        y_field: float(pivot_data.loc[x_val, hue_val]),
+                        hue_field: str(hue_val)
+                    })
+            
+            return processed_data
+        
+        except Exception as e:
+            print(f"准备分组数据时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # 返回基本的错误数据结构
+            return [
+                {x_field: "错误", y_field: 0, hue_field: "请检查数据"}
+            ]
+    
+    def _prepare_single_series_data(self, df: pd.DataFrame, x_field: str, y_field: str, agg_method: str):
+        """准备单系列数据（G2格式）"""
+        if x_field is None or x_field not in df.columns:
+            print(f"警告: X轴字段 '{x_field}' 不存在或为None，使用索引作为X轴")
+            temp_df = df.copy()
+            temp_df['index_as_x'] = range(len(df))
+            df = temp_df
+            x_field = 'index_as_x'
+        
+        try:
+            df_copy = df.copy()
+            
+            # 确保数据类型正确
+            for col in [x_field, y_field]:
+                if col and col in df.columns:
+                    if df[col].dtype == 'object':
+                        df_copy[col] = df_copy[col].astype(str)
+            
+            # 处理聚合
+            grouped = None
+            if y_field and y_field in df.columns:
+                if agg_method == "mean":
+                    grouped = df_copy.groupby(x_field)[y_field].mean()
+                elif agg_method == "count":
+                    grouped = df_copy.groupby(x_field)[y_field].count()
+                elif agg_method == "sum":
+                    grouped = df_copy.groupby(x_field)[y_field].sum()
+                elif agg_method in [None, "none"]:
+                    print("不使用聚合方法，直接使用原始数据")
+                    grouped = df_copy.groupby(x_field)[y_field].mean()
+            else:
+                    grouped = df_copy.groupby(x_field)[y_field].sum()
+            
+            if grouped is None:
+                print(f"警告: Y轴字段 '{y_field}' 不存在或为None，使用计数作为Y轴")
+                grouped = df_copy[x_field].value_counts().sort_index()
+            
+            # 直接返回G2格式数据
+            return [
+                {x_field: str(x), y_field: float(y)}
+                for x, y in zip(grouped.index, grouped.values)
+            ]
+        
+        except Exception as e:
+            print(f"准备单系列数据时出错: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # 返回基本的错误数据结构
+            return [
+                {x_field: "错误", y_field: 0},
+                {x_field: "请检查数据", y_field: 0}
+            ]
+    
+    def convert_to_antv_config(self, config: Dict[str, Any], chart_data=None) -> Dict[str, Any]:
+        """
+        将提取的配置转换为AntV G2配置
+        
+        参数:
+            config: 提取的图表配置
+            chart_data: G2格式的图表数据
+            
+        返回:
+            AntV G2配置对象
+        """
+        chart_type = config.get("chart_type", "bar")
+        title = config.get("title", "")
+        x_field = config.get("x_field", "")
+        y_field = config.get("y_field", "")
+        hue_field = config.get("hue_column")
+        is_stacked = config.get("is_stacked", False)
+        
+        # 颜色配置
+        colors = [
+            '#FF6384',  # 红色
+            '#36A2EB',  # 蓝色
+            '#FFCE56',  # 黄色
+            '#4BC0C0',  # 绿色
+            '#9966FF',  # 紫色
+            '#FF9F40',  # 橙色
+            '#C7C7C7'   # 灰色
+        ]
+        
+        # 映射图表类型到G2类型
+        type_map = {
+            "bar": "interval",
+            "line": "line",
+            "scatter": "point",
+            "pie": "pie",
+            "boxplot": "box",
+            "histogram": "histogram",
+            "heatmap": "heatmap"
+        }
+        g2_type = type_map.get(chart_type, "interval")
+        
+        # 构建基础G2配置
+        g2_config = {
+            "type": g2_type,
+            "data": chart_data or [],
+            "title": title,
+            "autoFit": True,
+            "animation": True
+        }
+        
+        # 根据图表类型添加特定配置
+        if chart_type == "pie":
+            g2_config.update({
+                "angleField": "value",
+                "colorField": "category",
+                "radius": 0.8,
+                "label": {
+                    "type": "outer",
+                    "content": "{name}: {percentage}"
+                },
+                "color": colors
+            })
+        elif chart_type == "scatter":
+            g2_config.update({
+                "xField": x_field,
+                "yField": y_field,
+                "shape": "circle",
+                "pointStyle": {
+                    "fillOpacity": 0.7,
+                    "stroke": "#ffffff",
+                    "lineWidth": 0.5
+                },
+                "tooltip": {
+                    "showMarkers": False
+                },
+                "state": {
+                    "active": {
+                        "style": {
+                            "shadowBlur": 4,
+                            "stroke": "#000",
+                            "fill": "red"
+                        }
+                    }
+                }
+            })
+        elif chart_type == "boxplot":
+            # 为箱线图添加特定配置
+            g2_config.update({
+                "xField": x_field,
+                "yField": y_field,
+                "groupField": hue_field if hue_field else x_field,  # 如果没有hue_field，使用x_field作为分组
+                "boxStyle": {
+                    "stroke": "#545454",
+                    "fill": colors[0],
+                    "fillOpacity": 0.3
+                },
+                "outliersStyle": {
+                    "fill": "#f5222d",
+                    "fillOpacity": 0.5
+                },
+                "tooltip": {
+                    "showMarkers": False,
+                    "showTitle": False,
+                    "formatter": "(datum) => { return { name: '统计值', value: [" +
+                                "'最小值: ' + datum.min, " +
+                                "'第一四分位数: ' + datum.q1, " +
+                                "'中位数: ' + datum.median, " +
+                                "'第三四分位数: ' + datum.q3, " +
+                                "'最大值: ' + datum.max" +
+                                "].join('<br/>') }; }"
+                }
+            })
+            
+            # 如果提供了分组字段，添加颜色映射
+            if hue_field:
+                g2_config["colorField"] = hue_field
+                g2_config["color"] = colors
+        else:
+            # 非饼图通用配置
+            g2_config.update({
+                "xField": x_field,
+                "yField": y_field
+            })
+            
+            # 添加分组字段
+            if hue_field:
+                g2_config["seriesField"] = hue_field
+                g2_config["color"] = colors
+            else:
+                g2_config["color"] = colors[0]
+            
+            # 堆叠配置
+            if is_stacked and chart_type == "bar":
+                g2_config["isStack"] = True
+            
+            # 图表样式配置
+            if chart_type == "bar" or chart_type == "column":
+                g2_config["columnStyle"] = {
+                    "fillOpacity": 0.7,
+                    "lineWidth": 1
+                }
+            
+            if chart_type == "line":
+                g2_config["lineStyle"] = {
+                    "lineWidth": 2
+                }
+                g2_config["point"] = {
+                    "size": 5,
+                    "shape": 'circle',
+                    "style": {
+                        "lineWidth": 1
+                    }
+                }
+        
+        # 添加图例配置
+        g2_config["legend"] = {
+            "position": "right"
+        }
+        
+        # 添加工具提示配置
+        if "tooltip" not in g2_config:  # 确保不覆盖特定图表类型的配置
+            g2_config["tooltip"] = {
+                "showMarkers": True,
+                "showCrosshairs": chart_type == "line",
+                "shared": True
+            }
+        
+        # 添加交互配置
+        g2_config["interactions"] = [
+            {"type": "element-active"},
+            {"type": "legend-active"},
+            {"type": "legend-filter"}
+        ]
+        
+        return g2_config

@@ -1,0 +1,822 @@
+import random
+import math
+import copy
+import os
+import json
+import sys
+import subprocess
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+from urllib.parse import quote
+import shutil
+
+from storyteller.algorithm.mcts_node import MCTSNode, Report, ReportGenerationState
+from storyteller.algorithm.mcts_action import (
+    DataStorytellingAction,
+    Query2Chapters,
+    Chapters2Tasks,
+    Tasks2Charts,
+    ReviseVis,
+    Charts2Captions,
+    Captions2Summaries,
+    ReviseNarrativeStrategy,
+    TransitionAction,
+    GenerateReportSummaryAction
+)
+NODE_TYPE_TO_VALID_ACTIONS = {
+    ReportGenerationState.EMPTY: [
+        Query2Chapters
+    ],
+    ReportGenerationState.a1: [
+        Chapters2Tasks,
+    ],
+    ReportGenerationState.a2: [
+        Tasks2Charts
+    ],
+    ReportGenerationState.a3: [
+        ReviseVis,
+        Charts2Captions
+    ],
+    ReportGenerationState.a4: [
+        Charts2Captions
+    ],
+    ReportGenerationState.a5: [
+        Captions2Summaries,
+    ],
+    ReportGenerationState.a6: [
+        ReviseNarrativeStrategy,
+        TransitionAction
+    ],
+    ReportGenerationState.REVISECHAPTERSORDERS: [
+        TransitionAction,
+        GenerateReportSummaryAction
+    ], 
+    ReportGenerationState.ADDEDTRANSITIONS: [
+        GenerateReportSummaryAction
+    ], 
+    ReportGenerationState.FINALIZED: [
+    ]}
+from storyteller.algorithm.reward import StorytellingRewardModel
+from .utils.html2image import convert_html_file_to_image
+
+class DataStorytellingMCTSSolver:
+    def __init__(self, 
+                 original_query: str,
+                 dataset_path: str,
+                 output_dir: str,
+                 max_iterations: int = 100,
+                 max_depth: int = 10,
+                 exploration_constant: float = 1.414,
+                 data_context: str = "",
+                 llm_kwargs: dict = None):
+        """
+        MCTS 解决器，用于数据故事自动生成。
+
+        参数:
+            original_query: 用户输入的问题
+            dataset_path: 数据集路径
+            output_dir: 输出目录
+            max_iterations: 最大搜索迭代次数
+            max_depth: 最大搜索深度
+            exploration_constant: UCB1 公式中的探索常数
+            data_context: 数据集的上下文信息
+            llm_kwargs: 传递给 LLM（大模型）的参数
+        """
+        self.original_query = original_query
+        self.dataset_path = dataset_path
+        self.output_dir = output_dir
+        self.max_iterations = max_iterations
+        self.max_depth = max_depth
+        self.exploration_constant = exploration_constant
+        self.data_context = json.load(open(data_context, 'r', encoding='utf-8'))
+        self.llm_kwargs = llm_kwargs or {}
+
+        # 创建奖励模型
+        self.reward_model = StorytellingRewardModel(llm_kwargs=self.llm_kwargs)
+
+        # 定义动作空间
+        self.action_space = [
+            Query2Chapters(),
+            Chapters2Tasks(),
+            Tasks2Charts(),
+            ReviseVis(),
+            Charts2Captions(),
+            Captions2Summaries()
+        ]
+
+        # 确保输出目录存在
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # 初始化根节点 - 使用原有的 MCTSNode 初始化方式
+        self.root = MCTSNode(
+            node_type=ReportGenerationState.EMPTY,
+            report=Report(
+                original_query=self.original_query, 
+                dataset_path=self.dataset_path, 
+                data_context=self.data_context
+            ),
+            original_query=self.original_query,
+            llm_kwargs=self.llm_kwargs
+        )
+
+        # 添加最佳节点追踪
+        self.best_node = self.root
+        self.best_score = float('-inf')
+
+
+    def select(self, node: MCTSNode) -> MCTSNode:
+        """
+        选择阶段：使用 UCB1 公式选择最有希望的 `Node` 进行扩展。
+
+        参数:
+            node: 当前 MCTS 节点
+
+        返回:
+            选中的 `Node`
+        """
+        while node.children:
+            if any(child.N == 0 for child in node.children):
+                return next(child for child in node.children if child.N == 0)
+
+            # 选择 UCB1 评分最高的子节点
+            node = max(node.children, key=lambda c: (c.Q / c.N) + self.exploration_constant * math.sqrt(math.log(node.N) / c.N))
+        return node
+    def expand(self, node: MCTSNode) -> None:
+        """展开叶子节点，添加所有可能的子节点"""
+        print("🔄 扩展节点...")
+        print(f"\n调试信息:")
+        
+        # 如果节点已经有子节点，先清空它们
+        if node.children:
+            print(f"⚠️ 节点 {node.node_type} 在扩展前已有 {len(node.children)} 个子节点，将清空这些子节点")
+            node.children = []
+        
+        # 获取当前节点状态
+        current_state = node.node_type
+        print(f"当前状态: {current_state}")
+        
+        # 获取当前状态可用的动作类型
+        valid_action_types = NODE_TYPE_TO_VALID_ACTIONS.get(current_state, [])
+        
+        if not valid_action_types:
+            print(f"⚠️ 状态 {current_state.name} 没有有效的动作类型")
+            return
+        
+        print(f"找到 {len(valid_action_types)} 个可用动作类型")
+        
+        # 遍历每个动作类型
+        for action_class in valid_action_types:
+            try:
+                # 实例化动作类
+                action_instance = action_class()
+                print(f"尝试执行动作: {action_class.__name__}")
+                
+                # 创建子节点
+                children = action_instance.create_children_nodes(node, self.llm_kwargs)
+                
+                if not children:
+                    print(f"⚠️ 动作 {action_class.__name__} 没有生成任何子节点，尝试创建一个默认子节点")
+                    # 创建一个默认子节点，确保每个动作都能生成至少一个子节点
+                    default_child = copy.deepcopy(node)
+                    default_child.parent_node = node
+                    default_child.parent_action = action_instance
+                    default_child.depth = node.depth + 1
+                    
+                    # 根据动作类型设置正确的状态
+                    if action_class == Query2Chapters:
+                        default_child.node_type = ReportGenerationState.a1
+                    elif action_class == Chapters2Tasks:
+                        default_child.node_type = ReportGenerationState.a2
+                    elif action_class == Tasks2Charts:
+                        default_child.node_type = ReportGenerationState.a3
+                    elif action_class == ReviseVis:
+                        default_child.node_type = ReportGenerationState.a4
+                    elif action_class == Charts2Captions:
+                        default_child.node_type = ReportGenerationState.a5
+                    elif action_class == Captions2Summaries:
+                        default_child.node_type = ReportGenerationState.FINALIZED
+                    
+                    children = [default_child]
+                    print(f"✅ 为动作 {action_class.__name__} 创建了一个默认子节点")
+                else:
+                    print(f"✅ 动作 {action_class.__name__} 生成了 {len(children)} 个子节点")
+                
+                # 添加子节点到当前节点
+                node.children.extend(children)
+                
+                # 确保所有新创建的子节点继承当前的迭代号
+                current_iteration = self.root.report.current_iteration
+                for child in children:
+                    child.report.current_iteration = current_iteration
+                
+            except Exception as e:
+                print(f"❌ 执行动作 {action_class.__name__} 时出错: {str(e)}")
+                import traceback
+                traceback.print_exc()
+        
+        # 检查是否生成了子节点
+        if not node.children:
+            print("⚠️ 扩展后没有生成任何子节点")
+        else:
+            print(f"✅ 共生成 {len(node.children)} 个子节点")
+        
+        # 随机打乱子节点顺序
+        random.shuffle(node.children)
+
+    def simulate(self, node: MCTSNode) -> tuple[MCTSNode, float]:
+        """模拟阶段：从当前节点开始随机执行动作，直到达到终止状态"""
+        print("🔄 模拟阶段...")
+        
+        # 创建副本并保持正确的迭代号
+        current = copy.deepcopy(node)
+        current.report.current_iteration = self.root.report.current_iteration
+        
+        # 初始化默认奖励值
+        reward = 5.0  # 默认奖励值
+        
+        # 循环直到达到终止状态
+        while not current.is_terminal() and current.depth < self.max_depth:
+            # 获取当前状态下的合法动作
+            self.expand(current)
+            
+            # 检查是否有子节点
+            if not current.children:
+                print("⚠️ 当前节点扩展后没有子节点，停止模拟")
+                break
+            
+            # 随机选择一个子节点
+            current = random.choice(current.children)
+            # 确保子节点也有正确的迭代号
+            current.report.current_iteration = self.root.report.current_iteration
+            print(f"➡️ 模拟进入状态: {current.node_type.name} (深度 {current.depth})")
+        
+        # 如果达到终止状态，进行质量评估
+        if current.is_terminal():
+            print("✅ 模拟生成了完整报告！")
+            
+            # 创建当前迭代的目录
+            iteration_dir = os.path.join(self.output_dir, "iterations", f"iteration_{current.report.current_iteration}")
+            os.makedirs(iteration_dir, exist_ok=True)
+            
+            # 使用_save_html_report生成所有报告 (已包含Markdown和HTML的生成)
+            # 同时返回原始HTML内容(用绝对路径)
+            html_path, original_contents = self._save_html_report(current, os.path.join(iteration_dir, "report.html"))
+            
+            # 获取所有生成的HTML文件
+            html_dir = os.path.dirname(html_path)
+            html_files = [f for f in os.listdir(html_dir) if f.endswith('.html')]
+            
+            png_path = None
+            if html_files:
+                # 随机选择一个HTML文件进行PNG转换
+                selected_html = random.choice(html_files)
+                selected_html_path = os.path.join(html_dir, selected_html)
+                print(f"\n🎲 随机选择 {selected_html} 转换为PNG...")
+                
+                # 使用原始内容(绝对路径)临时保存文件用于PNG转换
+                if selected_html in original_contents:
+                    with open(selected_html_path, 'w', encoding='utf-8') as f:
+                        f.write(original_contents[selected_html])
+                
+                # 转换为PNG
+                png_path = os.path.splitext(selected_html_path)[0] + ".png"
+                convert_html_file_to_image(selected_html_path, png_path)
+                print(f"✅ PNG文件已生成: {png_path}")
+                
+                # 恢复为相对路径版本
+                html_content = original_contents[selected_html]
+                user_home = os.path.expanduser("~")
+                project_base = os.path.join(user_home, "mcts")
+                if os.path.exists(project_base):
+                    html_content = html_content.replace(project_base, "")
+                else:
+                    import re
+                    pattern = r'(src=")(\/.*?\/mcts)(\/storyteller\/.*?\.png")'
+                    html_content = re.sub(pattern, r'\1\3', html_content)
+                
+                with open(selected_html_path, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+            
+            try:
+                # 仅当有PNG图表时才计算质量奖励
+                if png_path and os.path.exists(png_path):
+                    # 计算质量奖励
+                    quality_reward = self.reward_model._compute_quality_reward(current, html_path, png_path)
+                    print(f"✓ 质量奖励计算完成: {quality_reward:.2f}")
+                    
+                    # 使用质量奖励作为总奖励
+                    reward = quality_reward
+                else:
+                    print(f"⚠️ 未找到PNG图表，无法计算质量奖励，使用默认奖励值: {reward:.2f}")
+                    
+                print(f"✓ 最终奖励: {reward:.2f}")
+                
+            except Exception as e:
+                print(f"❌ 奖励计算出错: {str(e)}")
+                print(f"⚠️ 使用默认奖励值: {reward:.2f}")
+        else:
+            # 未达到终止状态，返回默认奖励
+            print(f"⚠️ 未达到终止状态，使用默认奖励值: {reward:.2f}")
+        
+        return current, reward
+
+    def backpropagate(self, node: MCTSNode, reward: float):
+        """
+        回溯阶段：更新路径上所有节点的统计信息
+        """
+        while node is not None:
+            node.N += 1
+            node.Q += reward  # 使用同样的奖励值更新整条路径
+            node = node.parent_node
+
+    def update_selected_path_iteration(self, node: MCTSNode) -> None:
+        """
+        更新选中路径上所有节点的迭代号，并复制之前迭代的图表到当前迭代
+        
+        参数:
+            node: 当前选中的节点
+        """
+        import os
+        import re
+        import shutil
+        
+        current_iteration = self.root.report.current_iteration
+        
+        # 向上更新路径上的所有节点
+        while node is not None:
+            old_iteration = node.report.current_iteration
+            
+            # 更新迭代号
+            node.report.current_iteration = current_iteration
+            
+            # 只有当旧迭代号与当前迭代号不同时，才需要复制图表和更新路径
+            if old_iteration != current_iteration:
+                # 确保当前迭代的图表目录存在
+                current_charts_dir = os.path.join(self.output_dir, "iterations", f"iteration_{current_iteration}", "charts")
+                os.makedirs(current_charts_dir, exist_ok=True)
+                
+                # 遍历所有章节和图表
+                for chapter in node.report.chapters:
+                    for chart in getattr(chapter, 'charts', []):
+                        if hasattr(chart, 'url') and chart.url:
+                            # 检查图表URL是否包含旧迭代的路径
+                            old_iteration_pattern = rf"iteration_{old_iteration}"
+                            if old_iteration_pattern in chart.url:
+                                try:
+                                    # 获取图表文件名
+                                    chart_filename = os.path.basename(chart.url)
+                                    
+                                    # 构建旧路径和新路径
+                                    old_chart_path = chart.url
+                                    new_chart_path = os.path.join(current_charts_dir, chart_filename)
+                                    
+                                    # 构建新的URL
+                                    new_chart_url = os.path.join(
+                                        self.output_dir, "iterations", 
+                                        f"iteration_{current_iteration}", "charts", chart_filename
+                                    )
+                                    
+                                    # 复制图表文件，如果存在的话
+                                    if os.path.exists(old_chart_path):
+                                        shutil.copy2(old_chart_path, new_chart_path)
+                                        print(f"✅ 已复制图表从 {old_chart_path} 到 {new_chart_path}")
+                                    else:
+                                        print(f"⚠️ 未找到源图表文件: {old_chart_path}")
+                                    
+                                    # 更新图表URL
+                                    chart.url = new_chart_url
+                                    print(f"✅ 已更新图表URL为: {new_chart_url}")
+                                    
+                                except Exception as e:
+                                    print(f"❌ 复制图表时出错: {str(e)}")
+            
+            # 继续向上遍历
+            node = node.parent_node
+
+    def solve(self) -> MCTSNode:
+        """执行 MCTS 搜索"""
+        # 设置日志文件路径
+        log_file = os.path.join("storyteller", "output", "log.txt")
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        
+        # 保存原始的标准输出
+        original_stdout = sys.stdout
+        
+        # 打开日志文件
+        log_f = open(log_file, 'w', encoding='utf-8')
+        
+        class TeeOutput:
+            def __init__(self, file):
+                self.file = file
+                self.stdout = original_stdout
+            
+            def write(self, message):
+                self.stdout.write(message)
+                self.file.write(message)
+                self.file.flush()
+            
+            def flush(self):
+                self.stdout.flush()
+                self.file.flush()
+        
+        # 设置输出重定向
+        sys.stdout = TeeOutput(log_f)
+        
+        try:
+            print("\n🔍 MCTS 搜索开始")
+            print("=" * 50)
+            print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # 创建历史记录目录
+            history_dir = os.path.join(self.output_dir, "iterations")
+            os.makedirs(history_dir, exist_ok=True)
+            
+            start_time = datetime.now()
+            best_node = None
+            best_score = float('-inf')
+            
+            for iteration in range(self.max_iterations):
+                # 设置当前迭代号
+                self.root.report.current_iteration = iteration + 1
+                print(f"Debug: 设置根节点迭代号为 {self.root.report.current_iteration}")
+                
+                # 创建当前迭代的目录
+                iteration_dir = os.path.join(history_dir, f"iteration_{iteration + 1}")
+                os.makedirs(iteration_dir, exist_ok=True)
+                os.makedirs(os.path.join(iteration_dir, "charts"), exist_ok=True)
+                
+                print(f"\n🌀 **MCTS 迭代 {iteration + 1}/{self.max_iterations}**")
+                
+                # 选择
+                leaf = self.select(self.root)
+                print(f"👉 选择 `Node` (深度 {leaf.depth}) | 状态: {leaf.node_type}")
+                
+                # 更新选中路径上所有节点的迭代号
+                self.update_selected_path_iteration(leaf)
+                print(f"Debug: 已更新选中节点迭代号为 {leaf.report.current_iteration}")
+                
+                # 扩展
+                self.expand(leaf)
+                
+                # 如果扩展成功并生成了子节点，从子节点中选择一个进行模拟
+                if leaf.children:
+                    # 随机选择一个子节点进行模拟
+                    child_for_simulation = random.choice(leaf.children)
+                    # 模拟
+                    final_node, simulated_reward = self.simulate(child_for_simulation)
+                else:
+                    # 如果没有子节点，可以直接对当前节点进行模拟
+                    final_node, simulated_reward = self.simulate(leaf)
+                
+                # 保存这次迭代的结果 - 使用模拟返回的最终节点
+                iteration_dir = os.path.join(history_dir, f"iteration_{iteration + 1}")
+                os.makedirs(iteration_dir, exist_ok=True)
+                
+                # 保存HTML报告 - 同时获取原始内容
+                html_path, original_contents = self._save_html_report(final_node, 
+                    output_path=os.path.join(iteration_dir, "report.html"))
+                
+                # 保存报告截图 - 使用原始内容(绝对路径)
+                # 随机选择一个HTML文件进行PNG转换
+                html_files = [f for f in os.listdir(iteration_dir) if f.endswith('.html')]
+                if html_files:
+                    selected_html = html_files[0]  # 使用第一个HTML文件
+                    selected_html_path = os.path.join(iteration_dir, selected_html)
+                    
+                    # 临时使用原始内容(绝对路径)
+                    if selected_html in original_contents:
+                        with open(selected_html_path, 'w', encoding='utf-8') as f:
+                            f.write(original_contents[selected_html])
+                    
+                    # 转换为PNG
+                    image_path = os.path.splitext(selected_html_path)[0] + ".png"
+                    convert_html_file_to_image(selected_html_path, image_path)
+                    
+                    # 恢复为相对路径版本
+                    html_content = original_contents[selected_html]
+                    user_home = os.path.expanduser("~")
+                    project_base = os.path.join(user_home, "mcts")
+                    if os.path.exists(project_base):
+                        html_content = html_content.replace(project_base, "")
+                    else:
+                        import re
+                        pattern = r'(src=")(\/.*?\/mcts)(\/storyteller\/.*?\.png")'
+                        html_content = re.sub(pattern, r'\1\3', html_content)
+                    
+                    with open(selected_html_path, 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+                else:
+                    # 如果没找到HTML文件，使用默认路径
+                    image_path = os.path.join(iteration_dir, "report.png")
+                
+                # 保存评分信息
+                score_info = {
+                    "iteration": iteration + 1,
+                    "score": float(simulated_reward),
+                    "score_breakdown": {
+                        "quality_reward": simulated_reward
+                    },
+                    "is_best": simulated_reward > best_score,
+                    "node_type": final_node.node_type.name,
+                    "depth": final_node.depth,
+                    "chapter_count": len(final_node.report.chapters),
+                    "chart_count": sum(len(chapter.charts) for chapter in final_node.report.chapters),
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "elapsed_time": str(datetime.now() - start_time)
+                }
+                
+                with open(os.path.join(iteration_dir, "score.json"), 'w', encoding='utf-8') as f:
+                    json.dump(score_info, f, indent=2, ensure_ascii=False)
+                
+                print(f"✅ 迭代 {iteration + 1} 报告已保存到: {iteration_dir}")
+                print(f"   得分: {simulated_reward:.2f}")
+                
+                # 如果找到更好的完整报告
+                if simulated_reward > best_score:
+                    best_score = simulated_reward
+                    best_node = copy.deepcopy(final_node)
+                    print(f"📈 找到更好的完整报告！得分: {best_score:.2f}")
+                
+                # 回溯
+                self.backpropagate(leaf, simulated_reward)
+                print(f"   📊 `Q` 值更新: {leaf.Q}, 访问次数: {leaf.N}")
+                print("-" * 50)
+            
+            # 保存搜索历史统计信息
+            history_summary = {
+                "total_iterations": self.max_iterations,
+                "completed_iterations": iteration + 1,
+                "best_score": float(best_score),
+                "best_iteration": max(range(1, iteration + 2), 
+                    key=lambda i: os.path.exists(os.path.join(history_dir, f"iteration_{i}", "score.json")) and 
+                        json.load(open(os.path.join(history_dir, f"iteration_{i}", "score.json")))["score"]),
+                "final_depth": best_node.depth if best_node else 0,
+                "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "completion_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "total_duration": str(datetime.now() - start_time)
+            }
+            
+            with open(os.path.join(history_dir, "search_summary.json"), 'w', encoding='utf-8') as f:
+                json.dump(history_summary, f, indent=2, ensure_ascii=False)
+
+            print("\n✅ MCTS 搜索完成！")
+            print("=" * 50)
+            
+            if best_node.node_type.name == "FINALIZED":
+                print(f"🎯 返回最佳完整报告 | 得分: {best_score:.2f}")
+                return best_node
+            else:
+                print("⚠️ 未找到完整报告，返回根节点")
+                return self.root
+            
+        finally:
+            # 恢复原始输出
+            sys.stdout = original_stdout
+            # 关闭日志文件
+            log_f.close()
+
+    def _save_html_report(self, node: MCTSNode, output_path: str = None) -> str:
+        """
+        生成并保存HTML报告
+        
+        参数:
+            node: 当前节点
+            output_path: 指定输出路径（可选）
+            
+        返回:
+            str: HTML文件路径
+        """
+        try:
+            # 确定输出目录
+            if output_path is None:
+                # 使用iterations目录而不是temp
+                default_dir = os.path.join(self.output_dir, "iterations", "default")
+                os.makedirs(default_dir, exist_ok=True)
+                output_path = os.path.join(default_dir, "report.html")
+            
+            output_dir = os.path.dirname(output_path)
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 1. 生成Markdown报告
+            markdown_content = self._generate_markdown_report(node)
+            
+            # 2. 保存Markdown文件
+            md_path = os.path.join(output_dir, "report.md")
+            with open(md_path, 'w', encoding='utf-8') as f:
+                f.write(markdown_content)
+            
+            # 3. 调用process_all_reports.py生成所有模板风格的报告
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            process_script = os.path.join(script_dir, "utils", "process_all_reports.py")
+            
+            print(f"正在为 {output_dir} 生成报告...")
+            process_result = subprocess.run([
+                'python', 
+                process_script,
+                '--dir', output_dir
+                # 不再使用--all参数
+            ], check=True, capture_output=True, text=True)
+            
+            # 将子进程输出写入日志
+            if process_result.stdout:
+                print("--- HTML生成过程输出 ---")
+                print(process_result.stdout)
+            if process_result.stderr:
+                print("--- HTML生成过程错误 ---")
+                print(process_result.stderr)
+            
+            # 如果指定的输出路径不存在，但目录中存在其他HTML文件，则使用其中一个
+            if not os.path.exists(output_path):
+                html_files = [f for f in os.listdir(output_dir) if f.endswith('.html')]
+                if html_files:
+                    output_path = os.path.join(output_dir, html_files[0])
+                    print(f"使用生成的HTML文件: {output_path}")
+            
+            # 4. 处理所有HTML文件，将绝对路径替换为相对路径
+            # 但在处理前先保存原始的HTML内容(用绝对路径)以便生成PNG
+            html_files = [f for f in os.listdir(output_dir) if f.endswith('.html')]
+            original_contents = {}
+            
+            # 先保存所有HTML原始内容（用于生成PNG）
+            for html_file in html_files:
+                html_file_path = os.path.join(output_dir, html_file)
+                try:
+                    with open(html_file_path, 'r', encoding='utf-8') as f:
+                        original_contents[html_file] = f.read()
+                except Exception as e:
+                    print(f"❌ 读取HTML文件 {html_file} 时出错: {str(e)}")
+            
+            # 处理HTML文件，修改为相对路径（用于用户查看）
+            for html_file in html_files:
+                html_file_path = os.path.join(output_dir, html_file)
+                try:
+                    html_content = original_contents[html_file]
+                    
+                    # 获取当前用户目录路径
+                    user_home = os.path.expanduser("~")
+                    project_base = os.path.join(user_home, "mcts")
+                    
+                    # 替换绝对路径为相对路径
+                    if os.path.exists(project_base):
+                        # 将绝对路径"/Users/username/mcts/storyteller/..."替换为"/storyteller/..."
+                        html_content = html_content.replace(project_base, "")
+                    else:
+                        # 如果找不到项目根目录，尝试通用替换
+                        import re
+                        # 匹配类似"/Users/xxx/mcts/storyteller/"的路径
+                        pattern = r'(src=")(\/.*?\/mcts)(\/storyteller\/.*?\.png")'
+                        html_content = re.sub(pattern, r'\1\3', html_content)
+                    
+                    # 保存修改后的HTML内容
+                    with open(html_file_path, 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+                    
+                    print(f"✅ 已修复HTML文件中的图片路径: {html_file}")
+                
+                except Exception as e:
+                    print(f"❌ 处理HTML文件 {html_file} 时出错: {str(e)}")
+            
+            return output_path, original_contents
+        
+        except Exception as e:
+            print(f"❌ 保存HTML报告时出错: {str(e)}")
+            raise e
+
+    def _generate_markdown_report(self, node: MCTSNode) -> str:
+        """生成 Markdown 报告"""
+        markdown = []
+        
+        # 1. 报告标题 - 使用原始查询作为标题
+        markdown.append(f"# {self.original_query}\n")
+        
+        # 2. 报告摘要
+        if hasattr(node.report, 'key_abstract') and node.report.key_abstract:
+            markdown.append("## Key Abstract\n")
+            markdown.append(node.report.key_abstract + "\n")
+        
+        # 3. 章节内容
+        for i, chapter in enumerate(node.report.chapters):
+            # 移除标题中的字典格式
+            chapter_title = chapter.title
+            if isinstance(chapter_title, str) and chapter_title.startswith("{'title': '") and chapter_title.endswith("'}"):
+                chapter_title = chapter_title[len("{'title': '"):-2]
+            
+            markdown.append(f"\n## {chapter_title}\n")
+            
+            # 添加过渡文本（如果存在）
+            if hasattr(chapter, 'transition') and chapter.transition:
+                markdown.append(f"{chapter.transition}\n\n")
+            
+            # 检查是否有包含chart_groups属性的图表
+            charts_by_group = {}
+            has_groups = False
+            
+            # 尝试查找是否有图表分组信息
+            if hasattr(chapter, 'chart_groups') and chapter.chart_groups:
+                # 存在chart_groups，表示使用了新的评估和分组方法
+                has_groups = True
+                
+                # 按组整理图表
+                for group in chapter.chart_groups:
+                    group_id = group.get('group_id', 0)
+                    chart_indices = group.get('chart_indices', [])
+                    group_theme = group.get('theme', '图表组')
+                    
+                    # 过滤无价值图表组
+                    if "no insight" in group_theme.lower() or "no value" in group_theme.lower():
+                        print(f"⚠️ 跳过无价值图表组: {group_theme}，不包含在最终报告中")
+                        continue
+                    
+                    group_captions = []
+                    group_charts = []
+                    
+                    # 收集该组的所有图表
+                    for idx in chart_indices:
+                        if 0 <= idx < len(chapter.charts):
+                            chart = chapter.charts[idx]
+                            if hasattr(chart, 'url') and chart.url:
+                                group_charts.append(chart)
+                                if hasattr(chart, 'caption') and chart.caption:
+                                    group_captions.append(chart.caption)
+                    
+                    # 如果组内有图表，则添加到字典
+                    if group_charts:
+                        # 创建组共享的caption（使用第一个caption或组合所有caption）
+                        group_caption = group_captions[0] if group_captions else f"图表组: {group_theme}"
+                        charts_by_group[group_id] = {
+                            'charts': group_charts,
+                            'caption': group_caption,
+                            'theme': group_theme
+                        }
+            
+            # 如果有分组信息，按组显示图表
+            if has_groups and charts_by_group:
+                for group_id, group_info in charts_by_group.items():
+                    group_charts = group_info['charts']
+                    group_caption = group_info['caption']
+                    group_theme = group_info['theme']
+                    
+                    # 增强过滤无价值图表组的逻辑
+                    if ("no insight" in group_theme.lower() or 
+                        "no value" in group_theme.lower() or 
+                        "lacks clear insight" in group_theme.lower() or
+                        "lacks insight value" in group_theme.lower() or
+                        "will not be included" in group_caption.lower() or
+                        "无价值" in group_theme.lower() or 
+                        "无洞察" in group_theme.lower()):
+                        print(f"⚠️ 跳过无价值图表组: {group_theme}，不包含在最终报告中")
+                        continue
+                    
+                    # 添加组标题（可选）
+                    markdown.append(f"\n### {group_theme}\n")
+                    
+                    # 先添加组caption
+                    markdown.append(f"\n> {group_caption}\n")
+                    
+                    # 不要使用div标签，改为使用HTML注释作为标记，供parse_markdown识别
+                    markdown.append("\n<!-- chart-group-start -->\n")
+                    
+                    # 添加组内所有图表，不使用{.chart-in-group}标记
+                    for chart in group_charts:
+                        try:
+                            # 获取图片文件名
+                            img_filename = os.path.basename(chart.url)
+                            
+                            # 使用相对路径，不添加额外标记
+                            markdown.append(f"![{group_theme}](charts/{img_filename})\n")
+                        except Exception as e:
+                            print(f"❌ 处理分组图片路径时出错: {str(e)}")
+                            continue
+                    
+                    # 使用HTML注释作为结束标记
+                    markdown.append("\n<!-- chart-group-end -->\n")
+            else:
+                # 没有分组信息，使用传统方式逐个添加图表和caption
+                for chart in getattr(chapter, 'charts', []):
+                    # 先添加图表说明
+                    if hasattr(chart, 'caption') and chart.caption:
+                        markdown.append(f"\n> {chart.caption}\n")
+                    
+                    # 处理图表URL
+                    if hasattr(chart, 'url') and chart.url:
+                        try:
+                            # 获取图片文件名
+                            img_filename = os.path.basename(chart.url)
+                            
+                            # 使用相对路径，确保路径正确
+                            markdown.append(f"\n![{chapter_title}](charts/{img_filename})\n")
+                        except Exception as e:
+                            print(f"❌ 处理图片路径时出错: {str(e)}")
+                            continue
+            
+            # 添加章节总结
+            if hasattr(chapter, 'summary') and chapter.summary:
+                markdown.append("\n### Chapter Summary\n")
+                markdown.append(chapter.summary + "\n")
+        
+        # # 4. 报告总结
+        # if hasattr(node.report, 'brief_conclusion') and node.report.brief_conclusion:
+        #     markdown.append("\n## brief_conclusion\n")
+        #     markdown.append(node.report.brief_conclusion + "\n")
+        
+        return "\n".join(markdown)
