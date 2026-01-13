@@ -1,0 +1,135 @@
+/* Tool Steps - Minimal Tree Style */
+
+.tool-tree-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111827;
+  overflow: hidden;
+}
+
+.tool-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.tool-header:hover {
+  background: #f7f7f8;
+}
+
+.tool-node {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #111827;
+  flex-shrink: 0;
+}
+
+.tool-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.tool-status.running {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.tool-status.done {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.tool-chevron {
+  width: 14px;
+  height: 14px;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.tool-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.tool-details {
+  padding: 10px 12px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: grid;
+  gap: 10px;
+}
+
+.tool-block {
+  display: grid;
+  gap: 6px;
+}
+
+.tool-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.tool-pre {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.tool-children {
+  border-left: 2px solid #e5e7eb;
+  padding-left: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.tool-thought {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 2px 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.tool-thought .tool-node {
+  margin-top: 6px;
+  background: #9ca3af;
+}
+
+.tool-thought-text {
+  font-style: italic;
+  line-height: 1.5;
+}
