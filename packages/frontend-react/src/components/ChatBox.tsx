@@ -115,20 +115,9 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
           <div className="max-w-4xl mx-auto">
             {messages.map((msg, index) => (
               <div key={`msg-${index}`} className={`message-bubble ${msg.role}`}>
-                {/* Message Header */}
-                <div className="message-header">
-                  <div className={`message-avatar ${msg.role}`}>
-                    {msg.role === 'user' ? 'U' : 'AI'}
-                  </div>
-                  <span className="message-role">{msg.role === 'user' ? 'You' : 'DeepEye'}</span>
-                  <span className="message-time">
-                    {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-
                 {/* Tool Steps */}
                 {msg.steps && msg.steps.length > 0 && msg.role !== 'user' && (
-                  <div className="space-y-2 mb-3 ml-9">
+                  <div className="space-y-2 mb-3">
                     {msg.steps.map((step, sIdx) => (
                       <StepItem key={`step-${sIdx}`} step={step} />
                     ))}
@@ -153,7 +142,7 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
 
                 {/* Thinking indicator */}
                 {msg.role === 'assistant' && msg.isStreaming && !msg.content && (!msg.steps || msg.steps.length === 0) && (
-                  <div className="thinking-dots ml-9">
+                  <div className="thinking-dots">
                     <span></span>
                     <span></span>
                     <span></span>
@@ -244,4 +233,3 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
     </div>
   )
 }
-
