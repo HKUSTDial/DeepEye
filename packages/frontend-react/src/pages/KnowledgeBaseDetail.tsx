@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { BookOpen, FileText, Folder } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { knowledgeBasesApi } from '../api'
 import type { KnowledgeBase, KnowledgeBaseFile } from '../types'
+import './KnowledgeBaseDetail.css'
 
 export default function KnowledgeBaseDetail() {
   const { kbId } = useParams()
@@ -12,6 +14,7 @@ export default function KnowledgeBaseDetail() {
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [files, setFiles] = useState<KnowledgeBaseFile[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +74,11 @@ export default function KnowledgeBaseDetail() {
     return files.filter((file) => file.filename.toLowerCase().includes(q))
   }, [files, searchQuery])
 
+  const visibleFiles = useMemo(() => {
+    if (statusFilter === 'all') return filteredFiles
+    return filteredFiles.filter((file) => file.status === statusFilter)
+  }, [filteredFiles, statusFilter])
+
   const getFileExtension = (filename: string) => {
     const parts = filename.split('.')
     return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE'
@@ -80,16 +88,16 @@ export default function KnowledgeBaseDetail() {
     const ext = filename.split('.').pop()?.toLowerCase()
     switch (ext) {
       case 'pdf':
-        return '📄'
+        return <FileText size={18} />
       case 'doc':
       case 'docx':
-        return '📝'
+        return <FileText size={18} />
       case 'txt':
-        return '📃'
+        return <FileText size={18} />
       case 'md':
-        return '📋'
+        return <FileText size={18} />
       default:
-        return '📄'
+        return <FileText size={18} />
     }
   }
 
@@ -97,100 +105,93 @@ export default function KnowledgeBaseDetail() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-screen overflow-hidden"
-      style={{ background: 'var(--main-bg)', color: 'var(--main-text)' }}
+      className="kb-detail-page"
     >
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="border-b px-6 py-4" style={{ borderColor: 'var(--border-color)' }}>
-          <button
-            onClick={() => navigate('/knowledge-bases')}
-            className="text-xs mb-3 flex items-center gap-1 hover:opacity-80 transition-opacity"
-            style={{ color: 'var(--main-text-muted)' }}
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Knowledge Bases
+      <aside className="kb-detail-sidebar">
+        <div className="kb-summary">
+          <div className="kb-summary-icon">
+            <BookOpen size={18} />
+          </div>
+          <div className="kb-summary-text">
+            <div className="kb-summary-name">{kb?.name || 'Knowledge Base'}</div>
+            <div className="kb-summary-desc">{kb?.description || 'No description'}</div>
+          </div>
+        </div>
+        <div className="kb-nav">
+          <button type="button" className="kb-nav-item active">
+            <Folder size={16} className="kb-nav-icon" />
+            Documents
           </button>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold" style={{ color: 'var(--main-text)' }}>{kb?.name || 'Knowledge Base'}</h1>
-              <p className="text-sm mt-1" style={{ color: 'var(--main-text-muted)' }}>{kb?.description || 'No description'}</p>
-            </div>
+        </div>
+      </aside>
+
+      <div className="kb-detail-main">
+        {/* Header */}
+        <div className="kb-detail-header">
+          <div>
+            <button onClick={() => navigate('/knowledge-bases')} className="kb-back-link">
+              <svg className="kb-back-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Knowledge Bases
+            </button>
+            <h1 className="kb-page-title">Documents</h1>
+            <p className="kb-page-subtitle">Manage files in this knowledge base for retrieval and chat.</p>
           </div>
         </div>
 
         {/* Toolbar */}
-        <div className="border-b px-6 py-3 flex items-center justify-between gap-4" style={{ borderColor: 'var(--border-color)' }}>
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                style={{ color: 'var(--main-text-muted)' }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+        <div className="kb-detail-toolbar">
+          <div className="kb-toolbar-left">
+            <div className="kb-filter">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="kb-select"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+                <option value="all">All</option>
+                <option value="ready">Ready</option>
+                <option value="processing">Processing</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            <div className="kb-search">
+              <svg className="kb-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search documents..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border text-sm focus:outline-none transition-all"
-                style={{
-                  borderColor: 'var(--input-border)',
-                  background: 'var(--input-bg)',
-                  color: 'var(--main-text)'
-                }}
+                className="kb-search-input"
               />
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-4 text-xs px-4 py-2 rounded-lg border" style={{ 
-              color: 'var(--main-text-muted)',
-              borderColor: 'var(--border-color)',
-              background: 'var(--card-bg)'
-            }}>
-              <div className="flex items-center gap-2">
-                <span style={{ color: 'var(--main-text-muted)' }}>Files:</span>
-                <span className="font-medium" style={{ color: 'var(--main-text)' }}>{files.length}</span>
+          <div className="kb-toolbar-right">
+            <div className="kb-stats">
+              <div className="kb-stat">
+                <span className="kb-stat-label">Files</span>
+                <span className="kb-stat-value">{files.length}</span>
               </div>
-              <div className="w-px h-4" style={{ background: 'var(--border-color)' }}></div>
-              <div className="flex items-center gap-2">
-                <span style={{ color: 'var(--main-text-muted)' }}>Size:</span>
-                <span className="font-medium" style={{ color: 'var(--main-text)' }}>{(totalSize / 1024 / 1024).toFixed(2)} MB</span>
+              <div className="kb-stat-divider"></div>
+              <div className="kb-stat">
+                <span className="kb-stat-label">Size</span>
+                <span className="kb-stat-value">{(totalSize / 1024 / 1024).toFixed(2)} MB</span>
               </div>
             </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-              style={{ background: 'var(--accent)' }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="kb-upload-btn">
+              <svg className="kb-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              {isUploading ? 'Uploading...' : 'Upload Document'}
+              {isUploading ? 'Uploading...' : 'Upload'}
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleUpload}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" onChange={handleUpload} className="hidden" />
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="kb-detail-content">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-sm" style={{ color: 'var(--main-text-muted)' }}>Loading documents...</div>
@@ -200,22 +201,20 @@ export default function KnowledgeBaseDetail() {
               <div className="text-sm text-rose-400">{error}</div>
             </div>
           ) : (
-            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
+            <div className="kb-table">
               {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 px-6 py-4 text-xs font-medium border-b" style={{ 
-                color: 'var(--table-header-text)', 
-                borderColor: 'var(--table-border)',
-                background: 'var(--table-header-bg)'
-              }}>
-                <div className="col-span-5">Document Name</div>
-                <div className="col-span-2">Type</div>
-                <div className="col-span-1">Size</div>
-                <div className="col-span-2">Status</div>
-                <div className="col-span-2 text-right">Actions</div>
+              <div className="kb-table-row kb-table-header">
+                <div>Document</div>
+                <div>Segment Mode</div>
+                <div>Words</div>
+                <div>Recalls</div>
+                <div>Uploaded</div>
+                <div>Status</div>
+                <div className="kb-table-actions">Actions</div>
               </div>
-              
+
               {/* Table Body */}
-              {filteredFiles.length === 0 ? (
+              {visibleFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 px-6">
                   <svg className="w-16 h-16 mb-4" style={{ color: 'var(--main-text-muted)', opacity: 0.4 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -233,80 +232,45 @@ export default function KnowledgeBaseDetail() {
                   </p>
                 </div>
               ) : (
-                filteredFiles.map((file, index) => (
+                visibleFiles.map((file, index) => {
+                  const statusClass = ['ready', 'processing', 'failed'].includes(file.status)
+                    ? file.status
+                    : 'default'
+                  return (
                   <div
                     key={file.id}
-                    className={`grid grid-cols-12 gap-4 px-6 py-4 text-sm transition-all ${
-                      index < filteredFiles.length - 1 ? 'border-b' : ''
-                    }`}
-                    style={{
-                      borderColor: 'var(--table-border)',
-                      color: 'var(--main-text)'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--table-row-hover)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    className={`kb-table-row ${index < visibleFiles.length - 1 ? 'kb-table-divider' : ''}`}
                   >
-                    <div className="col-span-5 flex items-center gap-3 min-w-0">
-                      <span className="text-2xl flex-shrink-0">{getFileIcon(file.filename)}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium" style={{ color: 'var(--main-text)' }}>{file.filename}</div>
-                        {file.error && (
-                          <div className="text-xs text-rose-400 mt-0.5 truncate">{file.error}</div>
-                        )}
+                    <div className="kb-doc-cell">
+                      <span className="kb-doc-icon" aria-hidden="true">
+                        {getFileIcon(file.filename)}
+                      </span>
+                      <div className="kb-doc-text">
+                        <div className="kb-doc-name">{file.filename}</div>
+                        {file.error && <div className="kb-doc-error">{file.error}</div>}
                       </div>
                     </div>
-                    <div className="col-span-2 flex items-center">
-                      <span className="px-2 py-1 rounded text-xs font-medium" style={{ 
-                        background: 'var(--sidebar-hover)',
-                        color: 'var(--main-text-muted)'
-                      }}>
-                        {getFileExtension(file.filename)}
-                      </span>
+                    <div>
+                      <span className="kb-pill">Auto</span>
                     </div>
-                    <div className="col-span-1 flex items-center" style={{ color: 'var(--main-text-muted)' }}>
-                      {file.size_bytes >= 1024 * 1024
-                        ? `${(file.size_bytes / 1024 / 1024).toFixed(1)} MB`
-                        : `${(file.size_bytes / 1024).toFixed(1)} KB`}
-                    </div>
-                    <div className="col-span-2 flex items-center">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          file.status === 'ready'
-                            ? 'bg-emerald-500/10 text-emerald-400'
-                            : file.status === 'processing'
-                            ? 'bg-amber-500/10 text-amber-400'
-                            : file.status === 'failed'
-                            ? 'bg-rose-500/10 text-rose-400'
-                            : 'bg-slate-500/10 text-slate-400'
-                        }`}
-                      >
+                    <div className="kb-muted">--</div>
+                    <div className="kb-muted">0</div>
+                    <div className="kb-muted">{new Date(file.updated_at).toLocaleString()}</div>
+                    <div>
+                      <span className={`kb-status ${statusClass}`}>
                         {file.status.charAt(0).toUpperCase() + file.status.slice(1)}
                       </span>
                     </div>
-                    <div className="col-span-2 flex items-center justify-end gap-2">
-                      <span className="text-xs" style={{ color: 'var(--main-text-muted)' }}>
-                        {new Date(file.updated_at).toLocaleDateString()}
-                      </span>
-                      <button
-                        onClick={() => handleDeleteFile(file.id)}
-                        className="p-1.5 rounded hover:bg-rose-500/10 transition-colors"
-                        style={{ color: 'var(--main-text-muted)' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#f87171'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--main-text-muted)'}
-                        title="Delete"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
+                    <div className="kb-table-actions">
+                      <button className="kb-action-btn" onClick={() => handleDeleteFile(file.id)} title="Delete">
+                        <svg className="kb-action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     </div>
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
           )}
