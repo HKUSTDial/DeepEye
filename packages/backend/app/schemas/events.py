@@ -95,12 +95,15 @@ class SSEMessage(BaseModel):
     """Server-Sent Event message"""
 
     event: str | None = None
-    data: Any
+    data: Any = None
     id: str | None = None
     retry: int | None = None
+    comment: str | None = None
 
     def to_sse_string(self) -> str:
         lines = []
+        if self.comment:
+            lines.append(f": {self.comment}")
         if self.id:
             lines.append(f"id: {self.id}")
         if self.event:
@@ -108,12 +111,13 @@ class SSEMessage(BaseModel):
         if self.retry:
             lines.append(f"retry: {self.retry}")
 
-        if isinstance(self.data, BaseModel):
-            data_str = self.data.model_dump_json()
-        elif isinstance(self.data, (dict, list, int, float, bool)) or self.data is None:
-            data_str = json.dumps(self.data)
-        else:
-            data_str = str(self.data)
+        if self.data is not None:
+            if isinstance(self.data, BaseModel):
+                data_str = self.data.model_dump_json()
+            elif isinstance(self.data, (dict, list, int, float, bool)):
+                data_str = json.dumps(self.data)
+            else:
+                data_str = str(self.data)
+            lines.append(f"data: {data_str}")
 
-        lines.append(f"data: {data_str}")
         return "\n".join(lines) + "\n\n"

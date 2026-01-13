@@ -1,5 +1,6 @@
 """Callback for Agent events: streaming + message persistence."""
 
+import ast
 import asyncio
 import json
 import json5
@@ -19,7 +20,7 @@ _WORKFLOW_DIR = "/workspace/workflow"
 
 
 def _to_single_object(payload: str | dict | Any) -> dict | None:
-    """Parse payload to dict. Handles dict, str (JSON/JSON5), or other types."""
+    """Parse payload to dict. Handles dict, str (JSON/JSON5/Python repr), or other types."""
     if isinstance(payload, dict):
         return payload
     if not isinstance(payload, str):
@@ -33,6 +34,8 @@ def _to_single_object(payload: str | dict | Any) -> dict | None:
             payload = str(payload)
         except Exception:
             return None
+    
+    # Try JSON/JSON5 first
     try:
         return json5.loads(payload)
     except Exception as e1:
@@ -40,7 +43,14 @@ def _to_single_object(payload: str | dict | Any) -> dict | None:
         try:
             return json.loads(payload)
         except Exception as e2:
-            logger.warning(f"[_to_single_object] json parse also failed: {str(e2)[:100]}, payload length: {len(payload) if isinstance(payload, str) else 'N/A'}, preview: {str(payload)[:300]}")
+            # Fallback for Python-style dict strings (single quotes)
+            try:
+                val = ast.literal_eval(payload)
+                if isinstance(val, dict):
+                    return val
+            except Exception:
+                pass
+            logger.warning(f"[_to_single_object] all parse methods failed for payload length: {len(payload)}, preview: {payload[:300]}")
             return None
 
 
@@ -55,12 +65,14 @@ def _sanitize_workflow_name(name: str) -> str:
 
 
 def _normalize_workflow_path(path: str) -> str:
+    """Normalize path to always be under WORKFLOW_DIR."""
+    import os
     if not isinstance(path, str):
         return path
     clean = path.strip()
-    if clean.startswith("/"):
-        return clean
-    return f"{_WORKFLOW_DIR}/{_sanitize_workflow_name(clean)}"
+    # Extract basename to ignore agent-provided subdirectories or wrong roots
+    filename = os.path.basename(clean)
+    return f"{_WORKFLOW_DIR}/{_sanitize_workflow_name(filename)}"
 
 
 def _get_db_session() -> Session:
@@ -132,8 +144,9 @@ class MessageCollector:
     def build(self) -> AssistantMessage:
         """Build the final AssistantMessage."""
         # Mark any remaining tools as completed
-        for tool in self._pending_tool.values():
-            tool.status = "completed"
+        for tool_list in self._pending_tool.values():
+            for tool in tool_list:
+                tool.status = "completed"
         return AssistantMessage(content=self._content, steps=self._steps)
 
     def reset(self) -> None:

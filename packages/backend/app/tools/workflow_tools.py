@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+import os
 
 from deepeye.tools.base import tool
 from deepeye.tools.planning_tools import create_plan, mark_step_done, update_plan
@@ -39,21 +40,13 @@ def _build_workflow_path(name: str) -> str:
     return f"{WORKFLOW_DIR}/{_sanitize_workflow_name(name)}"
 
 def _normalize_workflow_path(path: str) -> str:
+    """Normalize path to always be under WORKFLOW_DIR."""
+    if not isinstance(path, str):
+        return path
     clean = path.strip()
-    if clean.startswith("/"):
-        return clean
-    return _build_workflow_path(clean)
-
-def _extract_path_from_payload(payload: dict | None) -> str | None:
-    if not isinstance(payload, dict):
-        return None
-    raw = payload.get("file_path") or payload.get("path") or payload.get("name")
-    if not isinstance(raw, str) or not raw.strip():
-        return None
-    cleaned = raw.strip()
-    if cleaned.startswith("/"):
-        return cleaned
-    return _build_workflow_path(cleaned)
+    # Extract basename to ignore agent-provided subdirectories or wrong roots
+    filename = os.path.basename(clean)
+    return f"{WORKFLOW_DIR}/{_sanitize_workflow_name(filename)}"
 
 
 async def _read_workflow_file(session_id: str, path: str) -> dict:
@@ -84,95 +77,73 @@ async def _write_workflow_path(session_id: str, path: str, data: dict) -> None:
 
 def create_create_workflow_tool(session_id: str) -> callable:
     @tool
-    async def create_workflow(payload: dict) -> str:
+    async def create_workflow(file_path: str, workflow: dict) -> dict:
         """
         Create or replace a full workflow JSON file.
 
-        Payload (structured frame):
-        {
-          "file_path": "/workspace/workflow/xxx.json",
-          "workflow": { "root": { "nodes": {...}, "edges": {...} } }
-        }
+        Args:
+            file_path: Path to the workflow JSON file (e.g. student_count.json)
+            workflow: The full workflow definition object
         """
-        if not isinstance(payload, dict):
-            return "Invalid payload: expected JSON object."
-        path = _extract_path_from_payload(payload)
-        if not path:
-            return "Invalid payload: file_path is required."
-        workflow = payload.get("workflow") or payload.get("definition")
-        if not isinstance(workflow, dict):
-            return "Invalid payload: workflow must be a JSON object."
-        await _write_workflow_path(session_id, path, workflow)
-        return path
+        norm_path = _normalize_workflow_path(file_path)
+        await _write_workflow_path(session_id, norm_path, workflow)
+        return {"status": "success", "file_path": norm_path}
 
     return create_workflow
 
 
 def create_read_workflow_tool(session_id: str) -> callable:
     @tool
-    async def read_workflow(payload: dict) -> dict:
+    async def read_workflow(file_path: str) -> dict:
         """
         Read an existing workflow JSON file.
 
-        Payload: { "path": "/workspace/workflow/xxx.json" }
+        Args:
+            file_path: Path to the workflow JSON file
         """
-        path = _extract_path_from_payload(payload)
-        if not path:
-            return {"status": "error", "error": "Workflow path is required."}
-        path = _normalize_workflow_path(path)
+        norm_path = _normalize_workflow_path(file_path)
         try:
-            workflow = await _read_workflow_file(session_id, path)
-            return {"status": "success", "workflow": workflow, "path": path}
+            workflow = await _read_workflow_file(session_id, norm_path)
+            return {"status": "success", "workflow": workflow, "file_path": norm_path}
         except Exception as exc:
-            return {"status": "error", "error": str(exc), "path": path}
+            return {"status": "error", "error": str(exc), "file_path": norm_path}
 
     return read_workflow
 
 
 def create_update_workflow_tool(session_id: str) -> callable:
     @tool
-    async def update_workflow(payload: dict) -> str:
+    async def update_workflow(file_path: str, workflow: dict) -> dict:
         """
         Update (overwrite) an existing workflow JSON file.
 
-        Payload (structured frame):
-        {
-          "file_path": "/workspace/workflow/xxx.json",
-          "workflow": { "root": { "nodes": {...}, "edges": {...} } }
-        }
+        Args:
+            file_path: Path to the workflow JSON file
+            workflow: The full workflow definition object
         """
-        if not isinstance(payload, dict):
-            return "Invalid payload: expected JSON object."
-        path = _extract_path_from_payload(payload)
-        if not path:
-            return "Invalid payload: file_path is required."
-        workflow = payload.get("workflow") or payload.get("definition")
-        if not isinstance(workflow, dict):
-            return "Invalid payload: workflow must be a JSON object."
-        await _write_workflow_path(session_id, path, workflow)
-        return path
+        norm_path = _normalize_workflow_path(file_path)
+        await _write_workflow_path(session_id, norm_path, workflow)
+        return {"status": "success", "file_path": norm_path}
 
     return update_workflow
 
 
 def create_run_workflow_from_file_tool(session_id: str) -> callable:
     @tool
-    async def run_workflow_from_file(payload: dict) -> dict:
+    async def run_workflow_from_file(file_path: str) -> dict:
         """
         Run a workflow JSON from the sandbox file system.
 
-        Payload: { "path": "/workspace/workflow/xxx.json" }
+        Args:
+            file_path: Path to the workflow JSON file
         """
-        path = _extract_path_from_payload(payload)
-        if not path:
-            return {"status": "error", "error": "Workflow path is required."}
-        path = _normalize_workflow_path(path)
+        norm_path = _normalize_workflow_path(file_path)
         db = SessionLocal()
         try:
             session = _get_session(db, session_id)
             if not session:
                 return {"status": "error", "error": "Session not found."}
-            result = await service_run_workflow_from_file(db, session.user_id, session_id, path)
+            result = await service_run_workflow_from_file(db, session.user_id, session_id, norm_path)
             return result
         finally:
             db.close()
@@ -182,16 +153,17 @@ def create_run_workflow_from_file_tool(session_id: str) -> callable:
 
 def create_design_workflow_tool(model, session_id: str, system_prompt: str, callbacks: list | None = None) -> callable:
     @tool
-    async def design_workflow(goal: str) -> str:
+    async def workflow_agent(goal: str) -> str:
         """
-        Design a full workflow JSON, validate it, and summarize the outcome.
+        Workflow Designer Agent: design, iterate, and run data analysis workflows.
+        Pass a clear analysis goal and any relevant data context.
         """
         db = SessionLocal()
         try:
             session = _get_session(db, session_id)
             if not session:
                 return "Session not found."
-            workflow_agent = WorkflowAgent(
+            workflow_agent_inst = WorkflowAgent(
                 model=model,
                 system_prompt=system_prompt,
                 tools=[
@@ -204,7 +176,7 @@ def create_design_workflow_tool(model, session_id: str, system_prompt: str, call
                     create_run_workflow_from_file_tool(session_id),
                 ],
             )
-            result = await workflow_agent.ainvoke(
+            result = await workflow_agent_inst.ainvoke(
                 goal,
                 thread_id=f"workflow_agent_{session_id}",
                 config={"callbacks": callbacks},
@@ -214,4 +186,4 @@ def create_design_workflow_tool(model, session_id: str, system_prompt: str, call
         finally:
             db.close()
 
-    return design_workflow
+    return workflow_agent

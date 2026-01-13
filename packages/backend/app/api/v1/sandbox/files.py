@@ -66,6 +66,13 @@ async def list_files(session_id: str, path: str = "/workspace"):
                 detail=f"No sandbox found for session {session_id}"
             )
         
+        # Check if path exists and is a directory
+        check_cmd = f"[ -d '{path}' ] && echo 'exists'"
+        check_result = await sandbox.exec_command(check_cmd)
+        if not check_result.success or "exists" not in check_result.stdout:
+            logger.info(f"[SandboxFiles] Path {path} does not exist or is not a directory, returning empty list")
+            return FileListResponse(session_id=session_id, files=[])
+        
         # Use find command with tab-separated output (most reliable)
         # Format: filename \t type(f/d) \t size
         cmd = f"find '{path}' -maxdepth 1 ! -path '{path}' -printf '%f\\t%y\\t%s\\n' 2>/dev/null"

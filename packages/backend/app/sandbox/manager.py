@@ -142,9 +142,15 @@ class SandboxManager:
         async with self._lock:
             sandboxes = self._sandboxes.get(session_id, [])
             if index < len(sandboxes):
-                return sandboxes[index]
+                sandbox = sandboxes[index]
+                # CRITICAL FIX: Verify container still exists and is healthy
+                if await sandbox.health_check():
+                    return sandbox
+                else:
+                    logger.warning(f"[SandboxManager] Cached sandbox {sandbox.container_name} is no longer healthy, removing from cache")
+                    self._sandboxes[session_id].pop(index)
             
-            # Not in local cache - query Docker directly by label
+            # Not in local cache or cache was stale - query Docker directly by label
             containers = self._find_containers_by_session(session_id)
             if containers and index < len(containers):
                 container = containers[index]

@@ -7,7 +7,11 @@ export const chatApi = {
 
   createEventSource: (sessionId: string) => {
     const token = useAuthStore.getState().accessToken
-    const url = new URL(`${API_BASE}/chat/${sessionId}/stream`)
+    // Support relative paths (e.g. /api/v1) for VITE_API_URL
+    const url = new URL(
+      `${API_BASE}/chat/${sessionId}/stream`,
+      window.location.origin
+    )
     if (token) {
       url.searchParams.set('token', token)
     }

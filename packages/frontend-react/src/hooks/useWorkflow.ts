@@ -166,7 +166,11 @@ export function useWorkflow() {
     
     eventSourceRef.current?.close()
     const token = useAuthStore.getState().accessToken
-    const url = new URL(`${API_BASE}/workflows/runs/${run.id}/stream`)
+    // Support relative paths (e.g. /api/v1) for VITE_API_URL
+    const url = new URL(
+      `${API_BASE}/workflows/runs/${run.id}/stream`,
+      window.location.origin
+    )
     if (token) {
       url.searchParams.set('token', token)
     }

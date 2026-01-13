@@ -1,6 +1,7 @@
 """Chat API endpoints."""
 
 import json
+import asyncio
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends
@@ -31,7 +32,7 @@ async def start_chat(request: ChatRequest, db: Session = Depends(get_db)):
 
 
 async def _event_generator(session_id: str) -> AsyncGenerator[str, None]:
-    """Subscribe to Redis and yield SSE events."""
+    """Subscribe to Redis and yield SSE events with heartbeat."""
     redis_client = Redis.from_url(settings.REDIS_URL)
     pubsub = redis_client.pubsub()
     channel = f"session:{session_id}"
@@ -39,18 +40,34 @@ async def _event_generator(session_id: str) -> AsyncGenerator[str, None]:
     await pubsub.subscribe(channel)
 
     try:
-        async for message in pubsub.listen():
-            if message["type"] != "message":
-                continue
-
-            data_str = message["data"].decode("utf-8")
+        # Initial heartbeat
+        yield SSEMessage(comment="heartbeat").to_sse_string()
+        
+        while True:
             try:
-                payload = json.loads(data_str)
-                yield SSEMessage(data=payload).to_sse_string()
-                if payload.get("type") == "done":
-                    break
-            except json.JSONDecodeError:
-                yield SSEMessage(data=data_str).to_sse_string()
+                # Use wait_for to implement heartbeat/timeout
+                # If no message for 15 seconds, send a ping
+                message = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True), timeout=15.0)
+                
+                if message is None:
+                    await asyncio.sleep(0.1)
+                    continue
+
+                data_str = message["data"].decode("utf-8")
+                try:
+                    payload = json.loads(data_str)
+                    yield SSEMessage(data=payload).to_sse_string()
+                    # Also check for AgentEventType.AGENT_END or similar "done" markers
+                    # Depending on how the end of stream is signaled
+                    if payload.get("type") in ("done", "agent_end", "error"):
+                        break
+                except json.JSONDecodeError:
+                    yield SSEMessage(data=data_str).to_sse_string()
+            
+            except asyncio.TimeoutError:
+                # Send keep-alive heartbeat
+                yield SSEMessage(comment="heartbeat").to_sse_string()
+                continue
     finally:
         await pubsub.unsubscribe(channel)
         await redis_client.close()

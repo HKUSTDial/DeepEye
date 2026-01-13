@@ -103,7 +103,7 @@ Rules (strict, structured JSON only):
    - `create_workflow` payload: {{ "file_path": "...json", "workflow": {{ "root": {{ "nodes": {{...}}, "edges": {{...}} }} }} }}.
 8) Reuse ONE workflow file for the whole task. If you need to iterate, call `read_workflow` and then `update_workflow` with the same file_path instead of creating new files.
 9) You may run the workflow between updates to inspect outputs; keep edits minimal and only change what is required.
-10) After creation or update, call `run_workflow_from_file` with payload {{ "path": "...json" }} to execute. Do NOT output bash commands.
+10) After creation or update, call `run_workflow_from_file` with payload {{ "file_path": "...json" }} to execute. Do NOT output bash commands.
 11) Summarize the outputs concisely in the user's language.
 12) Do NOT guess categorical values. Only use values explicitly provided by the user or datasource context; if unknown, omit instead of inventing.
 

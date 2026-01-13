@@ -122,15 +122,18 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
 
     # Get existing sandbox or create new one (reuse within session)
     channel = f"session:{session_id}"
+    logger.info(f"[AgentTask] Getting or creating sandbox for session: {session_id}")
     sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
     
     # Notify frontend that sandbox is ready (to open files panel)
+    logger.info(f"[AgentTask] Sandbox ready, publishing STARTED event")
     await event_bus.publish(
         channel, 
         SandboxEvent(type=SandboxEventType.STARTED, source="sandbox").model_dump_json()
     )
     
     # Build tools - all agents share the same sandbox
+    logger.info(f"[AgentTask] Building tools...")
     tools = []
     datasource_info = _get_datasource_info(agent_input.datasource_id)
     datasource_schema = _get_datasource_schema(agent_input.datasource_id)
@@ -146,6 +149,7 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     user_input = agent_input.user_input
 
     if user_id and agent_input.kb_ids:
+        logger.info(f"[AgentTask] Adding knowledge base tool for user: {user_id}")
         tools.append(
             create_knowledge_base_agent_tool(
                 model,
@@ -156,19 +160,23 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
             )
         )
 
+    logger.info(f"[AgentTask] Setting up LangGraph checkpointer...")
     async with AsyncPostgresSaver.from_conn_string(settings.POSTGRES_STATE_URL) as checkpointer:
         await checkpointer.setup()
 
+        logger.info(f"[AgentTask] Creating supervisor agent...")
         factory = AgentFactory(model, checkpointer)
         supervisor = factory.create_supervisor(tools)
 
         try:
+            logger.info(f"[AgentTask] Starting agent execution...")
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_START))
             await supervisor.ainvoke(
                 user_input,
                 thread_id=session_id,
                 config={"callbacks": [cb_supervisor]},
             )
+            logger.info(f"[AgentTask] Agent execution finished successfully")
             # Build and persist the complete assistant message
             assistant_message = collector.build()
             persist_message(session_id, assistant_message)

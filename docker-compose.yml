@@ -28,9 +28,6 @@ services:
 
   minio:
     image: minio/minio:latest
-    ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
       - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
@@ -47,8 +44,6 @@ services:
   # 测试用学校数据库
   school-db:
     image: postgres:15-alpine
-    ports:
-      - "5433:5432"
     environment:
       - POSTGRES_USER=school
       - POSTGRES_PASSWORD=school123
@@ -67,8 +62,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
-    ports:
-      - "${HOST_BACKEND_PORT:-8000}:8000"
+    # Removed direct port mapping to host
     env_file:
       - .env
     depends_on:
@@ -82,12 +76,8 @@ services:
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
-      # Mount local SQLite database file
-      - ./pipeline.db:/app/pipeline.db
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
-      # Shared workspace for sandbox containers
-      - sandbox_workspace:/workspace
     restart: unless-stopped
 
   backend-worker:
@@ -107,24 +97,19 @@ services:
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
-      # Mount local SQLite database file
-      - ./pipeline.db:/app/pipeline.db
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
-      # Shared workspace for sandbox containers
-      - sandbox_workspace:/workspace
     restart: unless-stopped
 
   frontend:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend-react
-    ports:
-      - "${HOST_FRONTEND_PORT:-5173}:5173"
+    # Removed direct port mapping to host
     environment:
-      # Automatically derive VITE_API_URL from the host backend port
-      - VITE_API_URL=http://localhost:${HOST_BACKEND_PORT:-8000}/api/v1
-      - VITE_AUTH_URL=http://localhost:${HOST_BACKEND_PORT:-8000}/api/auth
+      # Automatically derive VITE_API_URL from the host gateway port
+      - VITE_API_URL=/api/v1
+      - VITE_AUTH_URL=/api/auth
       - VITE_API_TIMEOUT=30000
     volumes:
       - ./packages/frontend-react/src:/app/src
@@ -133,13 +118,22 @@ services:
       - backend-api
     restart: unless-stopped
 
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "${HOST_GATEWAY_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend-api
+    restart: unless-stopped
+
 volumes:
   redis_data:
   postgres_data:
   minio_data:
-  sandbox_workspace:
   school_db_data:
 
 networks:
   default:
-    name: deepeye-network
