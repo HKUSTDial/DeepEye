@@ -45,7 +45,7 @@
 
 /* Message Bubble */
 .message-bubble {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   animation: fadeIn 0.3s ease;
   display: flex;
   flex-direction: column;
@@ -71,10 +71,10 @@
 }
 
 .message-content {
-  padding: 16px;
-  border-radius: 12px;
+  padding: 10px 14px;
+  border-radius: 18px;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.5;
   max-width: min(100%, 720px);
 }
 
@@ -84,8 +84,9 @@
 }
 
 .message-bubble.assistant .message-content {
-  background: var(--card-bg, var(--main-bg-alt));
-  border: 1px solid var(--border-color);
+  background: transparent;
+  border: none;
+  padding: 0;
   color: var(--main-text);
 }
 
