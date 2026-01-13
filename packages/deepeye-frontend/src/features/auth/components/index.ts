@@ -1,2 +1,0 @@
-export { LoginPage } from './LoginPage'
-

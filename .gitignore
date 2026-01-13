@@ -17,3 +17,22 @@ wheels/
 *.env
 
 local_docs/
+
+artifacts/
+
+workspace/
+
+examples/
+
+architecture_plan.md
+
+pipeline.db
+
+bak/
+
+**/node_modules/**
+
+packages/deepeye-core
+packages/deepeye-backend
+packages/deepeye-frontend
+packages/frontend

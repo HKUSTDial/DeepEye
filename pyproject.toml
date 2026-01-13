@@ -1,0 +1,16 @@
+[project]
+name = "deepeye-monorepo"
+version = "0.1.0"
+description = "DeepEye Monorepo Workspace"
+requires-python = ">=3.11"
+dependencies = [
+    "deepeye",
+    "langchain-openai",
+    "python-dotenv",
+]
+
+[tool.uv.sources]
+deepeye = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/core", "packages/plugins/*", "apps/*"]

@@ -1,0 +1,78 @@
+/* File Tree Item - Unified Styles */
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: var(--main-text);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  user-select: none;
+}
+
+.file-tree-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.file-tree-item.selected {
+  background: var(--sidebar-active);
+}
+
+.file-tree-item-icon {
+  flex-shrink: 0;
+  margin-right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-tree-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Context Menu */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 180px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--main-text);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.context-menu-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.context-menu-item-danger {
+  color: #ff3b30;
+}
+
+.context-menu-item-danger:hover {
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
+}
+

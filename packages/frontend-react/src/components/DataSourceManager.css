@@ -1,0 +1,11 @@
+.form-panel {
+  overflow: hidden;
+}
+
+.ds-item {
+  transition: background 0.15s ease, transform 0.15s var(--ease-out-back);
+}
+.ds-item:active {
+  transform: scale(0.98);
+}
+
