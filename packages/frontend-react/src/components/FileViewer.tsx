@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import { sandboxApi, type FileContentResponse } from '../api/sandbox'
 import { useCodeHighlight } from '../hooks/useCodeHighlight'
+import { useTheme } from '../hooks/useTheme'
 import './FileViewer.css'
 
 interface FileViewerProps {
@@ -13,6 +14,24 @@ interface FileViewerProps {
   onClose: () => void
 }
 
+const CODE_EXTENSIONS = new Set([
+  'py',
+  'js',
+  'ts',
+  'jsx',
+  'tsx',
+  'json',
+  'html',
+  'css',
+  'xml',
+  'yaml',
+  'yml',
+  'vue',
+  'sh',
+  'bash',
+  'sql',
+])
+
 export default function FileViewer({ sessionId, filePath, onClose }: FileViewerProps) {
   const [fileContent, setFileContent] = useState<FileContentResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -20,6 +39,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
   const [highlightedCode, setHighlightedCode] = useState<string>('')
 
   const { highlight, isInitializing: isHighlighterLoading } = useCodeHighlight()
+  const { theme } = useTheme()
 
   const fileName = useMemo(() => {
     return filePath?.split('/').pop() || ''
@@ -95,7 +115,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
       // Highlight code if it's a code file
       if (content.content_type === 'text') {
         const ext = path.split('.').pop()?.toLowerCase() || ''
-        if (['py', 'js', 'ts', 'jsx', 'tsx', 'json', 'html', 'css', 'xml', 'yaml', 'yml', 'vue', 'sh', 'bash', 'sql'].includes(ext)) {
+        if (CODE_EXTENSIONS.has(ext)) {
           const code = await highlight(content.content, ext)
           setHighlightedCode(code)
         }
@@ -116,6 +136,21 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
       setHighlightedCode('')
     }
   }, [sessionId, filePath])
+
+  useEffect(() => {
+    if (!fileContent || viewerType !== 'code') return
+    const ext = fileExtension || ''
+    if (!CODE_EXTENSIONS.has(ext)) return
+
+    let active = true
+    highlight(fileContent.content, ext).then((code) => {
+      if (active) setHighlightedCode(code)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [theme, fileContent, viewerType, fileExtension, highlight])
 
   return (
     <div className="file-viewer">

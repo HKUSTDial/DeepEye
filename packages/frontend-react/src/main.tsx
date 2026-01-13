@@ -7,10 +7,9 @@ import './styles/dark-theme.css'
 import App from './App'
 import { Login, Register, WorkflowsNew, KnowledgeBases, KnowledgeBaseDetail } from './pages'
 import ProtectedRoute from './components/ProtectedRoute'
+import { initTheme } from './hooks/useTheme'
 
-// Apply theme from localStorage or default to light
-const savedTheme = localStorage.getItem('theme') || 'light'
-document.body.classList.add(savedTheme === 'light' ? 'light-theme' : 'dark-theme')
+initTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

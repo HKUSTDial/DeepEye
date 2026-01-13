@@ -91,11 +91,12 @@ export function useCodeHighlight() {
     }
 
     const lang = getLanguage(ext)
+    const theme = document.body.classList.contains('dark-theme') ? 'github-dark' : 'github-light'
     
     try {
       let html = highlighter.codeToHtml(code, {
         lang,
-        theme: 'github-dark',
+        theme,
       })
       // Remove whitespace/newlines between </span> and <span class="line">
       // This prevents double line spacing in <pre> tags
