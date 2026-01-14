@@ -46,8 +46,15 @@ export const sandboxApi = {
     )
 
     const disposition = res.headers.get('content-disposition') || res.headers.get('Content-Disposition')
-    const match = disposition?.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i)
-    const headerFilename = match?.[1] ? decodeURIComponent(match[1]) : undefined
+    // Prefer RFC 5987 filename* (UTF-8''...) to preserve non-ascii filenames (e.g. Chinese).
+    const matchStar = disposition?.match(/filename\*\s*=\s*UTF-8''([^;]+)/i)
+    const starFilename = matchStar?.[1] ? decodeURIComponent(matchStar[1].trim()) : undefined
+
+    // Fallback to plain filename="..."
+    const matchPlain = disposition?.match(/filename\s*=\s*"([^"]+)"/i) || disposition?.match(/filename\s*=\s*([^;]+)/i)
+    const plainFilename = matchPlain?.[1]?.trim()
+
+    const headerFilename = starFilename || plainFilename
     const fallbackFilename = path.replace(/\/+$/, '').split('/').pop() || 'download'
     const filename = headerFilename || fallbackFilename
 

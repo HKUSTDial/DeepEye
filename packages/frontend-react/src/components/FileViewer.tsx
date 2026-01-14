@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
-import { X, FileCode, FileText as FileTextIcon } from 'lucide-react'
+import { X, FileCode, FileText as FileTextIcon, Download } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import { sandboxApi, type FileContentResponse } from '../api/sandbox'
 import { useCodeHighlight } from '../hooks/useCodeHighlight'
 import { useTheme } from '../hooks/useTheme'
+import * as XLSX from 'xlsx'
 import './FileViewer.css'
 
 interface FileViewerProps {
@@ -37,6 +38,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightedCode, setHighlightedCode] = useState<string>('')
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const { highlight, isInitializing: isHighlighterLoading } = useCodeHighlight()
   const { theme } = useTheme()
@@ -56,6 +58,12 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
     if (fileContent.content_type === 'image') {
       return 'image'
     }
+
+    if (fileContent.content_type === 'binary') {
+      const ext = fileExtension
+      if (ext === 'xlsx' || ext === 'xls') return 'xlsx'
+      return 'binary'
+    }
     
     const ext = fileExtension
     
@@ -67,6 +75,55 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
     
     return 'text'
   }, [fileContent, fileExtension])
+
+  const xlsxData = useMemo(() => {
+    if (viewerType !== 'xlsx' || !fileContent) return null
+    if (fileContent.encoding !== 'base64') return null
+
+    try {
+      const b64 = fileContent.content
+      const binaryStr = atob(b64)
+      const bytes = new Uint8Array(binaryStr.length)
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i)
+      }
+
+      const workbook = XLSX.read(bytes, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      const sheet = sheetName ? workbook.Sheets[sheetName] : undefined
+      if (!sheetName || !sheet) return { sheetName: 'Sheet1', rows: [], truncated: false }
+
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true }) as unknown[][]
+      const maxRows = 200
+      const maxCols = 50
+      const limitedRows = rows.slice(0, maxRows).map((r) => (Array.isArray(r) ? r.slice(0, maxCols) : []))
+
+      const truncated = rows.length > maxRows || limitedRows.some((r) => r.length > maxCols)
+      return { sheetName, rows: limitedRows, truncated }
+    } catch (e) {
+      return { sheetName: 'Sheet1', rows: [], truncated: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }, [viewerType, fileContent])
+
+  const handleDownload = async () => {
+    if (!sessionId || !filePath) return
+    setIsDownloading(true)
+    try {
+      const { blob, filename } = await sandboxApi.download(sessionId, filePath)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error('Download failed:', e)
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   const csvData = useMemo(() => {
     if (viewerType !== 'csv' || !fileContent) return null
@@ -249,6 +306,61 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* XLSX Viewer */}
+        {!isLoading && !error && viewerType === 'xlsx' && fileContent && (
+          <div className="csv-viewer">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs text-[var(--main-text-muted)]">
+                Sheet: <span className="font-mono">{xlsxData?.sheetName || 'Sheet1'}</span>
+                {xlsxData?.truncated ? <span> (showing first 200 rows / 50 cols)</span> : null}
+                {xlsxData && 'error' in xlsxData && xlsxData.error ? (
+                  <span className="ml-2 text-[#ff3b30]">Parse failed: {xlsxData.error}</span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="file-explorer-btn"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                title="Download"
+              >
+                <Download size={14} className={isDownloading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+
+            <table className="csv-table">
+              <tbody>
+                {(xlsxData?.rows || []).map((row, rowIdx) => (
+                  <tr key={rowIdx}>
+                    <td className="csv-row-number">{rowIdx + 1}</td>
+                    {row.map((cell, cellIdx) => (
+                      <td key={cellIdx}>{cell == null ? '' : String(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Binary Viewer */}
+        {!isLoading && !error && viewerType === 'binary' && fileContent && (
+          <div className="file-viewer-empty">
+            <FileTextIcon className="file-viewer-empty-icon" />
+            <p className="file-viewer-empty-title">Binary file preview is not supported</p>
+            <p className="file-viewer-empty-subtitle">Please download to view this file</p>
+            <button
+              type="button"
+              className="file-explorer-btn mt-3"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              title="Download"
+            >
+              <Download size={14} className={isDownloading ? 'animate-spin' : ''} />
+            </button>
           </div>
         )}
 
