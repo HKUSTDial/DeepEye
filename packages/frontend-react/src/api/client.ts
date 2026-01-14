@@ -18,9 +18,14 @@ interface RequestOptions {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public response?: any) {
+  public status: number
+  public response?: any
+
+  constructor(status: number, message: string, response?: any) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
+    this.response = response
   }
 }
 
@@ -123,6 +128,95 @@ async function request<T>(
 }
 
 /**
+ * Raw request that returns the Response object (for blobs/streams).
+ * Uses the same auth + refresh logic as `request`.
+ */
+async function requestResponse(
+  method: HttpMethod,
+  path: string,
+  options: RequestOptions = {},
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), config.api.timeout)
+
+  try {
+    // 1. Prepare headers
+    const headers: Record<string, string> = { ...options.headers }
+
+    // Keep behavior consistent with `request`: default to JSON content-type when not FormData
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json'
+    }
+
+    // 2. Auto add Authorization header
+    if (!options.skipAuth) {
+      const token = useAuthStore.getState().accessToken
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+    }
+
+    // 3. Prepare body
+    const body =
+      options.body instanceof FormData
+        ? options.body
+        : (options.body ? JSON.stringify(options.body) : undefined)
+
+    // 4. Fetch
+    let res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body,
+      signal: controller.signal,
+    })
+
+    // 5. Handle 401 with refresh and retry
+    if (res.status === 401 && !options.skipAuth) {
+      console.log('[HTTP Client] Token expired, attempting refresh...')
+      try {
+        await useAuthStore.getState().refreshToken()
+        const newToken = useAuthStore.getState().accessToken
+        if (newToken) {
+          headers['Authorization'] = `Bearer ${newToken}`
+          res = await fetch(`${API_BASE}${path}`, {
+            method,
+            headers,
+            body,
+            signal: controller.signal,
+          })
+        }
+      } catch (refreshError) {
+        console.error('[HTTP Client] Token refresh failed:', refreshError)
+        useAuthStore.getState().logout()
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        throw new ApiError(401, 'Session expired, please login again')
+      }
+    }
+
+    // 6. Handle non-OK
+    if (!res.ok) {
+      let errorMessage = `Request failed: ${res.statusText}`
+      let errorData: any = undefined
+
+      try {
+        errorData = await res.json()
+        errorMessage = errorData.detail || errorData.message || errorMessage
+      } catch {
+        // ignore
+      }
+
+      throw new ApiError(res.status, errorMessage, errorData)
+    }
+
+    return res
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+/**
  * 认证相关请求（不自动添加 token）
  */
 async function authRequest<T>(
@@ -168,6 +262,7 @@ export const http = {
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body }),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),
   delete: <T>(path: string) => request<T>('DELETE', path),
+  getResponse: (path: string) => requestResponse('GET', path),
 }
 
 // 认证 API（不需要鉴权）

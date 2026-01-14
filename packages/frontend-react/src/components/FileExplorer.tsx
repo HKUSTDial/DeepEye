@@ -201,16 +201,22 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
     onSelectFile(path)
   }
 
-  const handleDownload = (path: string) => {
+  const handleDownload = async (path: string) => {
     if (!sessionId) return
-    
-    const url = sandboxApi.getDownloadUrl(sessionId, path)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = ''
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+
+    try {
+      const { blob, filename } = await sandboxApi.download(sessionId, path)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error('Download failed:', e)
+    }
   }
 
   const handleDeleteRequest = (path: string, name: string) => {

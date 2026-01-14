@@ -39,5 +39,20 @@ export const sandboxApi = {
   // Returns download URL for file/directory (uses full API base URL)
   getDownloadUrl: (sessionId: string, path: string) => 
     `${API_BASE}/sandbox/files/sessions/${sessionId}/download?path=${encodeURIComponent(path)}`,
+
+  download: async (sessionId: string, path: string) => {
+    const res = await http.getResponse(
+      `/sandbox/files/sessions/${sessionId}/download?path=${encodeURIComponent(path)}`,
+    )
+
+    const disposition = res.headers.get('content-disposition') || res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i)
+    const headerFilename = match?.[1] ? decodeURIComponent(match[1]) : undefined
+    const fallbackFilename = path.replace(/\/+$/, '').split('/').pop() || 'download'
+    const filename = headerFilename || fallbackFilename
+
+    const blob = await res.blob()
+    return { blob, filename }
+  },
 }
 
