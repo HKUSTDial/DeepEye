@@ -61,7 +61,7 @@ export default function DataSourceManager({ selectedIds, onToggle }: DataSourceM
     event.stopPropagation()
     if (!confirm('Delete this data source?')) return
     try {
-      await datasourceApi.delete(id)
+      await datasourceApi.delete(id, sessionId)
       setDataSources(dataSources.filter((ds) => ds.id !== id))
       if (selectedIds.includes(id)) {
         onToggle(id)

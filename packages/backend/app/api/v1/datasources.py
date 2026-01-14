@@ -99,15 +99,47 @@ def get_datasource(
 
 
 @router.delete("/{datasource_id}")
-def delete_datasource(
+async def delete_datasource(
     datasource_id: uuid.UUID,
-    user_id: CurrentUserId,  # ⭐ 自动鉴权并注入 user_id
+    user_id: CurrentUserId,
+    session_id: str | None = None,
     db: Session = Depends(get_db)
 ):
     """Delete a datasource (only if owned by current user)."""
     repo = DataSourceRepository(db)
-    if not repo.get_by_id_and_user(datasource_id, user_id):
+    ds = repo.get_by_id_and_user(datasource_id, user_id)
+    if not ds:
         raise HTTPException(status_code=404, detail="DataSource not found")
+
+    # If it's a file datasource, cleanup storage
+    if ds.category == "file" and ds.storage_path:
+        from app.services.minio_service import delete_object
+        from deepeye.utils.logger import logger
+        
+        # 1. Delete from MinIO
+        try:
+            delete_object(settings.MINIO_DATASOURCE_BUCKET, ds.storage_path)
+        except Exception as e:
+            logger.error(f"Failed to delete file from MinIO: {e}")
+
+        # 2. Delete from Sandbox if session_id is provided
+        if session_id:
+            from app.sandbox.manager import sandbox_manager
+            try:
+                sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
+                dest_path = f"/workspace/data/{ds.name}"
+                await sandbox.exec_command(f"rm {dest_path}")
+                
+                # Notify frontend about file change
+                event_bus = RedisEventBus(settings.REDIS_URL)
+                await event_bus.publish(
+                    f"session:{session_id}",
+                    SandboxEvent(type=SandboxEventType.FILES_CHANGED, source="sandbox").model_dump_json()
+                )
+                await event_bus.close()
+            except Exception as e:
+                logger.error(f"Failed to delete file from sandbox {session_id}: {e}")
+
     repo.delete(datasource_id)
     return {"status": "ok"}
 

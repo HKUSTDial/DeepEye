@@ -51,16 +51,24 @@ class ReActAgent(BaseAgent):
         return "continue" if last_message.tool_calls else "end"
 
     async def ainvoke(self, input_message: str, thread_id: str | None = None, config: dict | None = None) -> dict:
-        run_config: dict = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        run_config: dict = {"configurable": {"thread_id": thread_id}} if thread_id else {"configurable": {}}
         run_config["recursion_limit"] = self.max_steps
         if config:
+            # Deep merge configurable to preserve thread_id
+            if "configurable" in config:
+                run_config["configurable"].update(config["configurable"])
+                config = {k: v for k, v in config.items() if k != "configurable"}
             run_config.update(config)
         return await self.graph.ainvoke({"messages": [HumanMessage(content=input_message)]}, config=run_config)
 
     async def astream(self, input_message: str, thread_id: str | None = None, config: dict | None = None) -> AsyncIterator[Any]:
-        run_config: dict = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        run_config: dict = {"configurable": {"thread_id": thread_id}} if thread_id else {"configurable": {}}
         run_config["recursion_limit"] = self.max_steps
         if config:
+            # Deep merge configurable to preserve thread_id
+            if "configurable" in config:
+                run_config["configurable"].update(config["configurable"])
+                config = {k: v for k, v in config.items() if k != "configurable"}
             run_config.update(config)
         async for event in self.graph.astream_events({"messages": [HumanMessage(content=input_message)]}, config=run_config, version="v2"):
             yield event

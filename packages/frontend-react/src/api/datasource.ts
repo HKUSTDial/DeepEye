@@ -4,7 +4,10 @@ import { http } from './client'
 export const datasourceApi = {
   list: () => http.get<DataSource[]>('/datasources'),
   create: (data: DataSourceCreate) => http.post<DataSource>('/datasources', data),
-  delete: (id: string) => http.delete<void>(`/datasources/${id}`),
+  delete: (id: string, sessionId?: string | null) => {
+    const url = sessionId ? `/datasources/${id}?session_id=${sessionId}` : `/datasources/${id}`
+    return http.delete<void>(url)
+  },
   upload: (file: File, sessionId?: string | null) => {
     const formData = new FormData()
     formData.append('file', file)
