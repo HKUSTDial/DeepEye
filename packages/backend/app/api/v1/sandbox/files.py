@@ -383,6 +383,26 @@ async def download_file(session_id: str, path: str):
         File content or zip archive as streaming response
     """
     try:
+        import unicodedata
+        from urllib.parse import quote
+
+        # Build a Content-Disposition header value that is safe for Starlette (latin-1 headers)
+        # while still supporting unicode filenames via RFC 5987 (filename*=UTF-8'')
+        def _content_disposition_attachment(original_name: str) -> str:
+            # ASCII fallback (remove non-ascii)
+            ascii_name = (
+                unicodedata.normalize("NFKD", original_name)
+                .encode("ascii", "ignore")
+                .decode("ascii")
+            ).strip()
+            ascii_name = ascii_name.replace('"', "").replace("\\", "")
+            if not ascii_name:
+                ascii_name = "download"
+
+            # Percent-encode UTF-8 filename for filename*
+            encoded = quote(original_name, safe="")
+            return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
+
         sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
         if not sandbox:
             raise HTTPException(
@@ -444,7 +464,7 @@ async def download_file(session_id: str, path: str):
                 io.BytesIO(file_content),
                 media_type=media_type,
                 headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Disposition": _content_disposition_attachment(filename),
                     "Content-Length": str(len(file_content))
                 }
             )
@@ -491,7 +511,7 @@ async def download_file(session_id: str, path: str):
                 zip_buffer,
                 media_type="application/zip",
                 headers={
-                    "Content-Disposition": f'attachment; filename="{zip_filename}"'
+                    "Content-Disposition": _content_disposition_attachment(zip_filename)
                 }
             )
         
