@@ -8,5 +8,5 @@ class AgentInput(BaseModel):
 
     session_id: str
     user_input: str
-    datasource_id: str | None = None
+    datasource_ids: list[str] | None = None
     kb_ids: list[str] | None = None

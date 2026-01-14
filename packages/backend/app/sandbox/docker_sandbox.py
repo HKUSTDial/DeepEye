@@ -2,6 +2,7 @@
 
 import time
 import asyncio
+import os
 
 import docker
 from docker.errors import DockerException, NotFound
@@ -219,6 +220,31 @@ class DockerSandbox:
                 exit_code=-1,
                 execution_time_ms=execution_time_ms,
             )
+
+    async def write_file(self, path: str, data: bytes) -> None:
+        """Write bytes to a file in the sandbox"""
+        if not self._created or not self.container:
+            raise RuntimeError("Sandbox not created")
+
+        import tarfile
+        import io
+
+        # Create a tar archive in memory containing the file
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+            tarinfo = tarfile.TarInfo(name=os.path.basename(path))
+            tarinfo.size = len(data)
+            tar.addfile(tarinfo, io.BytesIO(data))
+        
+        tar_stream.seek(0)
+        
+        # Ensure directory exists
+        dir_path = os.path.dirname(path)
+        if dir_path and dir_path != "/":
+            await self.exec_command(f"mkdir -p {dir_path}")
+
+        # Put archive into container
+        self.container.put_archive(dir_path or "/", tar_stream)
 
     async def health_check(self) -> bool:
         """Check if container is running"""

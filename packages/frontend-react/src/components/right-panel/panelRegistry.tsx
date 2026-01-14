@@ -5,7 +5,7 @@ import { WorkflowLivePanel } from './plugins/WorkflowLivePanel'
 
 export type PanelRenderContext = {
   sessionId: string | null
-  dataSourceId: string | null
+  dataSourceIds: string[]
 }
 
 export type PanelPlugin = {
@@ -26,7 +26,12 @@ export const panelRegistry: PanelPlugin[] = [
     id: 'workflow',
     title: 'Workflow',
     icon: <WorkflowIcon className="h-4 w-4" />,
-    render: (context) => <WorkflowLivePanel sessionId={context.sessionId} />,
+    render: (context) => (
+      <WorkflowLivePanel 
+        sessionId={context.sessionId} 
+        dataSourceIds={context.dataSourceIds} 
+      />
+    ),
   },
 ]
 

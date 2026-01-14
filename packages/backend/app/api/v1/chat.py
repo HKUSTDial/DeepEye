@@ -27,7 +27,12 @@ async def start_chat(request: ChatRequest, db: Session = Depends(get_db)):
         logger.warning("[chat] Received session_id='current' in ChatRequest")
     _, session_id = get_or_create_session(db, request.session_id, request.message)
     # user_message is persisted in agent_tasks.py before agent runs
-    task_id = start_agent_workflow(session_id, request.message, request.datasource_id, request.kb_ids)
+    task_id = start_agent_workflow(
+        session_id, 
+        request.message, 
+        request.datasource_ids,
+        request.kb_ids
+    )
     return {"session_id": session_id, "task_id": task_id, "message": "Agent started"}
 
 

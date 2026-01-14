@@ -24,61 +24,76 @@ from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
 
 
-def _get_datasource_info(datasource_id: str | None) -> dict[str, str] | None:
-    if not datasource_id:
-        return None
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    with Session() as db:
-        ds = DataSourceRepository(db).get(datasource_id)
-        if not ds:
-            return None
-        return {"id": str(ds.id), "name": ds.name, "type": ds.type}
-
-
-def _get_datasource_schema(datasource_id: str | None, max_tables: int = 20, max_columns: int = 20) -> list[dict[str, object]]:
-    if not datasource_id:
+def _get_datasources_info(datasource_ids: list[str] | None) -> list[dict[str, str]]:
+    if not datasource_ids:
         return []
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
     Session = sessionmaker(bind=engine)
+    items = []
     with Session() as db:
-        ds = DataSourceRepository(db).get(datasource_id)
-        if not ds:
-            return []
-        connection_string = ds.connection_string
-
-    try:
-        from sqlalchemy import create_engine as sa_create_engine, inspect
-
-        data_engine = sa_create_engine(connection_string)
-        inspector = inspect(data_engine)
-        tables = inspector.get_table_names()[:max_tables]
-        views = inspector.get_view_names()[:max_tables]
-        items: list[dict[str, object]] = []
-
-        for name in tables:
-            columns = inspector.get_columns(name)[:max_columns]
-            items.append(
-                {
-                    "name": name,
-                    "kind": "table",
-                    "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
+        for ds_id in datasource_ids:
+            ds = DataSourceRepository(db).get(ds_id)
+            if ds:
+                info = {
+                    "id": str(ds.id),
+                    "name": ds.name,
+                    "type": ds.type,
+                    "category": getattr(ds, "category", "database"),
                 }
-            )
+                if info["category"] == "file":
+                    info["local_path"] = f"/workspace/data/{ds.name}"
+                items.append(info)
+    return items
 
-        for name in views:
-            columns = inspector.get_columns(name)[:max_columns]
-            items.append(
-                {
-                    "name": name,
-                    "kind": "view",
-                    "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
-                }
-            )
 
-        return items
-    except Exception:
+def _get_datasources_schema(datasource_ids: list[str] | None, max_tables: int = 20, max_columns: int = 20) -> list[dict[str, object]]:
+    if not datasource_ids:
         return []
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    all_schemas = []
+    
+    with Session() as db:
+        for ds_id in datasource_ids:
+            ds = DataSourceRepository(db).get(ds_id)
+            if not ds:
+                continue
+            
+            category = getattr(ds, "category", "database")
+            if category == "database":
+                connection_string = ds.connection_string
+                if not connection_string:
+                    continue
+                try:
+                    from sqlalchemy import create_engine as sa_create_engine, inspect
+                    data_engine = sa_create_engine(connection_string)
+                    inspector = inspect(data_engine)
+                    tables = inspector.get_table_names()[:max_tables]
+                    
+                    for name in tables:
+                        columns = inspector.get_columns(name)[:max_columns]
+                        all_schemas.append({
+                            "datasource_id": str(ds.id),
+                            "datasource_name": ds.name,
+                            "name": name,
+                            "kind": "table",
+                            "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
+                        })
+                except Exception as e:
+                    logger.warning(f"Failed to get schema for DB {ds.name}: {e}")
+            elif category == "file":
+                metadata = getattr(ds, "file_metadata", {})
+                if metadata and "columns" in metadata:
+                    all_schemas.append({
+                        "datasource_id": str(ds.id),
+                        "datasource_name": ds.name,
+                        "name": ds.name,
+                        "kind": "file",
+                        "local_path": f"/workspace/data/{ds.name}",
+                        "columns": metadata["columns"],
+                        "preview": metadata.get("preview", [])
+                    })
+    return all_schemas
 
 
 def _create_model() -> ChatOpenAI:
@@ -132,15 +147,43 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         SandboxEvent(type=SandboxEventType.STARTED, source="sandbox").model_dump_json()
     )
     
+    # Build tool - handle data sources
+    datasource_ids = agent_input.datasource_ids or []
+    
+    # Sync file datasources
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    file_datasources = []
+    with Session() as db:
+        for ds_id in datasource_ids:
+            ds = DataSourceRepository(db).get(ds_id)
+            if ds and getattr(ds, "category", "database") == "file":
+                file_datasources.append(ds)
+    
+    if file_datasources:
+        logger.info(f"[AgentTask] Syncing {len(file_datasources)} file datasources to sandbox")
+        await sandbox_manager.sync_datasource_files(session_id, file_datasources)
+
     # Build tools - all agents share the same sandbox
     logger.info(f"[AgentTask] Building tools...")
     tools = []
-    datasource_info = _get_datasource_info(agent_input.datasource_id)
-    datasource_schema = _get_datasource_schema(agent_input.datasource_id)
+    datasources_info = _get_datasources_info(datasource_ids)
+    datasources_schema = _get_datasources_schema(datasource_ids)
+    
+    # Prepare datasources context for Supervisor
+    ds_context_lines = []
+    for ds in datasources_info:
+        line = f"- {ds['name']} ({ds['category']})"
+        if ds['category'] == 'file':
+            line += f", path: {ds.get('local_path', '')}"
+        ds_context_lines.append(line)
+    
+    datasources_context = "Available Data Sources:\n" + "\n".join(ds_context_lines) if ds_context_lines else "No data sources selected."
+
     workflow_prompt = build_workflow_prompt(
         build_registry(),
-        datasource=datasource_info,
-        tables=datasource_schema,
+        datasource=datasources_info,  # Now a list
+        tables=datasources_schema,    # Now includes datasource_id/name
     )
     tools.append(create_design_workflow_tool(model, session_id, workflow_prompt, callbacks=[cb_workflow]))
     tools.append(create_run_workflow_from_file_tool(session_id))
@@ -174,7 +217,12 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
             await supervisor.ainvoke(
                 user_input,
                 thread_id=session_id,
-                config={"callbacks": [cb_supervisor]},
+                config={
+                    "callbacks": [cb_supervisor],
+                    "configurable": {
+                        "datasources_context": datasources_context
+                    }
+                },
             )
             logger.info(f"[AgentTask] Agent execution finished successfully")
             # Build and persist the complete assistant message

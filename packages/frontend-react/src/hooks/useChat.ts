@@ -247,7 +247,7 @@ export function useChat() {
     stopStreaming,
   ])
 
-  const sendMessage = useCallback(async (text: string, datasourceId?: string, kbIds?: string[]) => {
+  const sendMessage = useCallback(async (text: string, datasourceIds?: string[], kbIds?: string[]) => {
     if (!text.trim()) return
 
     setError(null)
@@ -274,7 +274,7 @@ export function useChat() {
       await chatApi.start({
         message: text,
         session_id: session_id,
-        datasource_id: datasourceId,
+        datasource_ids: datasourceIds,
         kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
       })
 

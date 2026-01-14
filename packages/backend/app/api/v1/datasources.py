@@ -2,14 +2,17 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.models import DataSource
 from app.repositories import DataSourceRepository
-from app.schemas import DataSourceCreate, DataSourceResponse
+from app.schemas import DataSourceCreate, DataSourceResponse, SandboxEvent, SandboxEventType
+from app.services.datasource_file_service import create_file_datasource
+from app.infra.event_bus import RedisEventBus
+from app.core.config import settings
 
 router = APIRouter(prefix="/datasources", tags=["datasources"])
 
@@ -37,6 +40,49 @@ def create_datasource(
         connection_string=data.connection_string
     )
     return DataSourceRepository(db).save(entity)
+
+
+@router.post("/upload", response_model=DataSourceResponse)
+async def upload_datasource_file(
+    user_id: CurrentUserId,
+    file: UploadFile = File(...),
+    session_id: str | None = None,
+    db: Session = Depends(get_db)
+):
+    """Upload a data file (csv, json, xlsx) as a datasource."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    
+    ds = create_file_datasource(
+        db=db,
+        user_id=user_id,
+        filename=file.filename,
+        data=data,
+        content_type=file.content_type
+    )
+
+    # Proactive Sync: Push to sandbox if session_id is provided
+    if session_id:
+        from app.sandbox.manager import sandbox_manager
+        try:
+            sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
+            dest_path = f"/workspace/data/{file.filename}"
+            await sandbox.write_file(dest_path, data)
+            
+            # Notify frontend about file change via event bus
+            event_bus = RedisEventBus(settings.REDIS_URL)
+            await event_bus.publish(
+                f"session:{session_id}",
+                SandboxEvent(type=SandboxEventType.FILES_CHANGED, source="sandbox").model_dump_json()
+            )
+            await event_bus.close()
+        except Exception as e:
+            # We don't fail the upload if sandbox sync fails, just log it
+            from deepeye.utils.logger import logger
+            logger.error(f"Proactive sync failed for session {session_id}: {e}")
+
+    return ds
 
 
 @router.get("/{datasource_id}", response_model=DataSourceResponse)

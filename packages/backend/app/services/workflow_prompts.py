@@ -47,24 +47,38 @@ def render_node_specs(specs: list[NodeSpec]) -> str:
     return "\n".join(lines).strip()
 
 
-def _render_datasource_context(datasource: dict[str, str] | None) -> str:
+def _render_datasource_context(datasource: dict[str, str] | list[dict[str, str]] | None) -> str:
     if not datasource:
         return ""
-    lines = [
-        "Current datasource selection:",
-        f"- id: {datasource.get('id', '')}",
-        f"- name: {datasource.get('name', '')}",
-        f"- type: {datasource.get('type', '')}",
-        "Use this datasource id in params.datasource_id when building datasource.read or sql.execute nodes.",
-    ]
+    
+    lines = ["Current datasource selections:"]
+    ds_list = datasource if isinstance(datasource, list) else [datasource]
+    
+    for ds in ds_list:
+        ds_id = ds.get('id', '')
+        name = ds.get('name', '')
+        dstype = ds.get('type', '')
+        category = ds.get('category', 'database')
+        
+        lines.append(f"- id: {ds_id}")
+        lines.append(f"  name: {name}")
+        lines.append(f"  type: {dstype}")
+        lines.append(f"  category: {category}")
+        if category == "file":
+            lines.append(f"  local_path: {ds.get('local_path', '')}")
+            lines.append(f"  note: This file is already in the sandbox. Use python.code to read it.")
+        else:
+            lines.append(f"  note: Use this id in params.datasource_id for datasource.read or sql.execute.")
+    
     return "\n".join(lines).strip()
 
 
 def _render_schema_context(tables: list[dict[str, object]] | None) -> str:
     if not tables:
         return ""
-    lines = ["Datasource schema overview:"]
+    lines = ["Datasource schema/metadata overview:"]
     for table in tables:
+        ds_name = table.get("datasource_name", "")
         name = table.get("name", "")
         kind = table.get("kind", "table")
         columns = table.get("columns", [])
@@ -75,13 +89,16 @@ def _render_schema_context(tables: list[dict[str, object]] | None) -> str:
                 if isinstance(col, dict)
             ]
         )
-        lines.append(f"- {name} ({kind}): {col_text}".strip())
+        source_prefix = f"[{ds_name}] " if ds_name else ""
+        lines.append(f"- {source_prefix}{name} ({kind}): {col_text}".strip())
+        if kind == "file" and "preview" in table:
+            lines.append(f"  preview: {table['preview']}")
     return "\n".join(lines).strip()
 
 
 def build_workflow_prompt(
     registry: NodeRegistry,
-    datasource: dict[str, str] | None = None,
+    datasource: dict[str, str] | list[dict[str, str]] | None = None,
     tables: list[dict[str, object]] | None = None,
 ) -> str:
     specs_text = render_node_specs(registry.all())

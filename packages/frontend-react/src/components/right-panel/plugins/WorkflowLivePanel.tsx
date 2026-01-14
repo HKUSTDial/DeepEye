@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { BackgroundVariant } from 'reactflow'
+import { Workflow as WorkflowIcon } from 'lucide-react'
 import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
@@ -11,6 +12,7 @@ import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { useChatStore } from '../../../stores/chat'
 import { useWorkflowNodesStore } from '../../../stores/workflowNodes'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
+import { useTheme } from '../../../hooks/useTheme'
 
 const NODE_TYPES = { workflowNode: WorkflowNode }
 const WORKFLOW_DIR = '/workspace/workflow'
@@ -117,9 +119,9 @@ function toDefinition(nodes: any[], edges: any[], nodeDefs: Record<string, any>)
       id: node.id,
       type: node.data.type,
       inputs: Object.fromEntries(
-        def.inputs.map((p) => [p.id, { schema: p.schema, required: !!p.required, multiple: p.multiple }]),
+        def.inputs.map((p: any) => [p.id, { schema: p.schema, required: !!p.required, multiple: p.multiple }]),
       ),
-      outputs: Object.fromEntries(def.outputs.map((p) => [p.id, { schema: p.schema }])),
+      outputs: Object.fromEntries(def.outputs.map((p: any) => [p.id, { schema: p.schema }])),
       params: node.data.params || {},
       metadata: { position: node.position },
     }
@@ -138,7 +140,13 @@ function toDefinition(nodes: any[], edges: any[], nodeDefs: Record<string, any>)
   return { root: { nodes: nodeMap, edges: edgeMap } }
 }
 
-export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
+export function WorkflowLivePanel({ 
+  sessionId, 
+  dataSourceIds = [] 
+}: { 
+  sessionId: string | null,
+  dataSourceIds?: string[]
+}) {
   const [displaySessionId, setDisplaySessionId] = useState<string | null>(sessionId)
   const [isViewSwitching, setIsViewSwitching] = useState(false)
   const sessionState = useWorkflowSessionsStore((state) =>
@@ -165,7 +173,6 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
   const setValidatedGraph = useWorkflowSessionsStore((state) => state.setValidatedGraph)
   const clearValidated = useWorkflowSessionsStore((state) => state.clearValidated)
 
-  const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
   const sandboxReadySessionId = useChatStore((state) => state.sandboxReadySessionId)
@@ -174,6 +181,9 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
 
   const nodeDefs = useWorkflowNodesStore((state) => state.nodeDefs)
   const loadNodeDefs = useWorkflowNodesStore((state) => state.loadNodeDefs)
+
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
   const [isLoadingFiles, setIsLoadingFiles] = useState(false)
   const [isLoadingFile, setIsLoadingFile] = useState(false)
@@ -198,9 +208,7 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
   const runStatus = sessionState?.runStatus ?? null
   const runError = sessionState?.runError ?? null
   const error = sessionState?.error ?? null
-  const viewState = sessionState?.viewState ?? 'idle'
   const displayFileError = sessionState?.fileError ?? null
-  const activeFilePath = sessionState?.activeFilePath ?? null
   const activeRun = sessionState?.activeRun ?? null
   const runOutput = sessionState?.runOutput ?? ''
 
@@ -642,27 +650,61 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
     Object.keys(validatedNodes).length === 0 &&
     Object.keys(validatedEdges).length === 0
   ) {
-    if (viewState === 'empty') {
-      return (
-        <div className="h-full w-full flex items-center justify-center text-xs text-slate-500">
-          No workflow files yet.
-        </div>
-      )
-    }
+    const hasDataSources = dataSourceIds.length > 0
     return (
-      <div className="h-full w-full flex items-center justify-center text-xs text-slate-500">
-        Waiting for workflow output...
+      <div className={`h-full w-full flex flex-col items-center justify-center p-8 text-center ${
+        isDark ? 'bg-slate-950' : 'bg-slate-50'
+      }`}>
+        <div className={`mb-6 rounded-2xl p-4 ring-1 ${
+          isDark ? 'bg-slate-900/50 ring-slate-800' : 'bg-white ring-slate-200'
+        }`}>
+          <WorkflowIcon className={`h-8 w-8 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+        </div>
+        <h3 className={`mb-2 text-lg font-medium ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
+          {hasDataSources ? 'Ready to Analyze' : 'Select Data Source'}
+        </h3>
+        <p className={`max-w-xs text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          {hasDataSources 
+            ? `You have ${dataSourceIds.length} data source(s) selected. Ask DeepEye to analyze them, and the workflow will appear here.`
+            : 'Please select a database or upload a file from the sidebar to start your data exploration.'}
+        </p>
+        
+        {hasDataSources && (
+          <div className="mt-8 flex flex-col gap-2 w-full max-w-xs">
+            <div className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${
+              isDark ? 'text-slate-500' : 'text-slate-400'
+            }`}>Suggested prompts</div>
+            {[
+              'Show me a summary of the data',
+              'Analyze trends over time',
+              'Visualize the distribution of key metrics'
+            ].map((suggestion) => (
+              <div 
+                key={suggestion}
+                className={`rounded-lg border px-3 py-2 text-xs text-left transition-colors cursor-default ${
+                  isDark 
+                    ? 'border-slate-800 bg-slate-900/30 text-slate-400 hover:bg-slate-800 hover:text-slate-200' 
+                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                "{suggestion}"
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
-      <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/60 px-3 py-2 text-xs">
-        <div className="flex items-center gap-2 text-slate-300">
+    <div className={`h-full w-full flex flex-col ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
+      <div className={`flex items-center justify-between border-b px-3 py-2 text-xs ${
+        isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'
+      }`}>
+        <div className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
           <span className="font-semibold">Workflow</span>
           {isViewSwitching && <span className="text-slate-500">· Switching session...</span>}
-          {runStatus && <span className="text-slate-400">· {runStatus}</span>}
+          {runStatus && <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>· {runStatus}</span>}
           {runError && <span className="text-rose-300">· {runError}</span>}
           {error && <span className="text-rose-300">· {error}</span>}
           {displayFileError && <span className="text-rose-300">· {displayFileError}</span>}
@@ -672,7 +714,11 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
             value={activeFilePathForControls || ''}
             disabled={!sessionId || isLoadingFiles || activeFiles.length === 0 || isStreaming}
             onChange={(event) => loadWorkflowFile(event.target.value)}
-            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+            className={`rounded-md border px-2 py-1 text-xs ${
+              isDark 
+                ? 'border-slate-700 bg-slate-950 text-slate-200' 
+                : 'border-slate-300 bg-white text-slate-700'
+            }`}
           >
             {activeFiles.length === 0 ? (
               <option value="">No workflow files</option>
@@ -709,7 +755,11 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
                 setIsSaving(false)
               }
             }}
-            className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+              isDark 
+                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
+                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+            } disabled:opacity-40`}
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
@@ -741,7 +791,11 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
                 setIsUploading(false)
               }
             }}
-            className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+              isDark 
+                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
+                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+            } disabled:opacity-40`}
           >
             {isUploading ? 'Uploading...' : 'Upload'}
           </button>
@@ -782,7 +836,11 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
                 setIsExporting(false)
               }
             }}
-            className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+              isDark 
+                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
+                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+            } disabled:opacity-40`}
           >
             {isExporting ? 'Exporting...' : 'Export'}
           </button>
@@ -851,7 +909,11 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
                 }
               }
             }}
-            className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+              isDark 
+                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
+                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+            } disabled:opacity-40`}
           >
             {isRunning ? 'Running...' : 'Run'}
           </button>
@@ -870,11 +932,11 @@ export function WorkflowLivePanel({ sessionId }: { sessionId: string | null }) {
             panOnScroll
             fitView
             fitViewOptions={{ padding: 0.2 }}
-            className="bg-slate-950"
+            className={isDark ? 'bg-slate-950' : 'bg-slate-50'}
             backgroundVariant={BackgroundVariant.Dots}
             backgroundGap={20}
             backgroundSize={1}
-            backgroundColor="#334155"
+            backgroundColor={isDark ? '#334155' : '#cbd5e1'}
             showControls
           />
         </div>
