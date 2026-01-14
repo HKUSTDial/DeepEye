@@ -157,6 +157,11 @@ async def get_file_content(session_id: str, path: str):
         File content (text or base64 encoded)
     """
     try:
+        # Shell-quote the path for safe usage in sandbox exec commands.
+        # This prevents failures for paths containing spaces and avoids injection issues.
+        def _sh_quote(value: str) -> str:
+            return "'" + value.replace("'", "'\"'\"'") + "'"
+
         sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
         if not sandbox:
             raise HTTPException(
@@ -165,7 +170,8 @@ async def get_file_content(session_id: str, path: str):
             )
         
         # Check if file exists
-        check_result = await sandbox.exec_command(f"test -f {path} && echo 'exists'")
+        qpath = _sh_quote(path)
+        check_result = await sandbox.exec_command(f"test -f {qpath} && echo 'exists'")
         if not check_result.success or 'exists' not in check_result.stdout:
             raise HTTPException(
                 status_code=404,
@@ -187,7 +193,7 @@ async def get_file_content(session_id: str, path: str):
         
         if extension in text_extensions:
             # Read as text
-            result = await sandbox.exec_command(f"cat {path}")
+            result = await sandbox.exec_command(f"cat {qpath}")
             if not result.success:
                 raise HTTPException(
                     status_code=500,
@@ -203,7 +209,7 @@ async def get_file_content(session_id: str, path: str):
             
         elif extension in image_extensions:
             # Read as base64
-            result = await sandbox.exec_command(f"base64 {path}")
+            result = await sandbox.exec_command(f"base64 {qpath}")
             if not result.success:
                 raise HTTPException(
                     status_code=500,
@@ -219,12 +225,12 @@ async def get_file_content(session_id: str, path: str):
             
         else:
             # Try to read as text, fallback to base64
-            result = await sandbox.exec_command(f"file -b --mime-type {path}")
+            result = await sandbox.exec_command(f"file -b --mime-type {qpath}")
             mime_type = result.stdout.strip() if result.success else ""
             
             if 'text' in mime_type or not mime_type:
                 # Try text
-                result = await sandbox.exec_command(f"cat {path}")
+                result = await sandbox.exec_command(f"cat {qpath}")
                 if result.success:
                     return FileContentResponse(
                         path=path,
@@ -234,7 +240,7 @@ async def get_file_content(session_id: str, path: str):
                     )
             
             # Fallback to base64
-            result = await sandbox.exec_command(f"base64 {path}")
+            result = await sandbox.exec_command(f"base64 {qpath}")
             if not result.success:
                 raise HTTPException(
                     status_code=500,
@@ -330,7 +336,8 @@ async def delete_file(session_id: str, path: str):
             )
         
         # Check if path exists
-        check_result = await sandbox.exec_command(f"test -e {path} && echo 'exists'")
+        qpath = "'" + path.replace("'", "'\"'\"'") + "'"
+        check_result = await sandbox.exec_command(f"test -e {qpath} && echo 'exists'")
         if not check_result.success or 'exists' not in check_result.stdout:
             raise HTTPException(
                 status_code=404,
@@ -338,7 +345,7 @@ async def delete_file(session_id: str, path: str):
             )
         
         # Delete file or directory
-        result = await sandbox.exec_command(f"rm -rf {path}")
+        result = await sandbox.exec_command(f"rm -rf {qpath}")
         
         if not result.success:
             raise HTTPException(
