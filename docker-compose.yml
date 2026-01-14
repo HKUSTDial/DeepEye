@@ -114,6 +114,7 @@ services:
     volumes:
       - ./packages/frontend-react/src:/app/src
       - /app/node_modules
+    command: sh -lc "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
     depends_on:
       - backend-api
     restart: unless-stopped
