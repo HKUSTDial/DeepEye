@@ -7,7 +7,7 @@ from app.tasks.agent_tasks import run_agent_workflow
 def start_agent_workflow(
     session_id: str,
     message: str,
-    datasource_id: str | None = None,
+    datasource_ids: list[str] | None = None,
     kb_ids: list[str] | None = None,
 ) -> str:
     """Start agent workflow and return task ID."""
@@ -15,7 +15,7 @@ def start_agent_workflow(
         AgentInput(
             session_id=session_id,
             user_input=message,
-            datasource_id=datasource_id,
+            datasource_ids=datasource_ids,
             kb_ids=kb_ids,
         ).model_dump()
     )

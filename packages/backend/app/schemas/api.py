@@ -9,7 +9,7 @@ from pydantic import BaseModel
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
-    datasource_id: str | None = None
+    datasource_ids: list[str] | None = None
     kb_ids: list[str] | None = None
 
 
@@ -27,18 +27,26 @@ class ChatSessionResponse(BaseModel):
 
 class DataSourceBase(BaseModel):
     name: str
-    type: str  # postgres, mysql, sqlite...
+    type: str  # postgres, mysql, sqlite, csv, json...
+    category: str = "database"  # database, file
+    connection_string: str | None = None
+    storage_path: str | None = None
+    file_metadata: dict | None = None
+
+
+class DataSourceCreate(BaseModel):
+    name: str
+    type: str
     connection_string: str
-
-
-class DataSourceCreate(DataSourceBase):
-    pass
 
 
 class DataSourceUpdate(BaseModel):
     name: str | None = None
     type: str | None = None
+    category: str | None = None
     connection_string: str | None = None
+    storage_path: str | None = None
+    file_metadata: dict | None = None
 
 
 class DataSourceResponse(DataSourceBase):

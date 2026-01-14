@@ -32,21 +32,24 @@ export interface DataSource {
   id: string
   name: string
   type: string
-  connection_string: string
+  category: 'database' | 'file'
+  connection_string?: string | null
+  storage_path?: string | null
+  file_metadata?: any
   created_at: string
 }
 
 export interface DataSourceCreate {
   name: string
   type: string
-  connection_string: string
+  connection_string?: string | null
 }
 
 // API types
 export interface ChatPayload {
   message: string
   session_id?: string | null
-  datasource_id?: string
+  datasource_ids?: string[]
   kb_ids?: string[]
 }
 
@@ -95,4 +98,3 @@ export interface KnowledgeBaseFile {
   created_at: string
   updated_at: string
 }
-

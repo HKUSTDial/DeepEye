@@ -13,6 +13,7 @@ from app.sandbox.docker_sandbox import DockerSandbox
 from app.sandbox.factory import create_sandbox
 from app.sandbox.activity import ActivityTracker
 from app.core.config import settings
+from app.services.minio_service import download_bytes
 
 
 class SandboxManager:
@@ -125,6 +126,30 @@ class SandboxManager:
             
             return sandbox
 
+    async def sync_datasource_files(self, session_id: str, file_datasources: list) -> None:
+        """
+        Sync file-based data sources from MinIO to the sandbox.
+        
+        Args:
+            session_id: Session ID
+            file_datasources: List of DataSource objects (category='file')
+        """
+        sandbox = await self.get_or_create_sandbox(session_id)
+        
+        for ds in file_datasources:
+            if ds.category != 'file' or not ds.storage_path:
+                continue
+            
+            logger.info(f"[SandboxManager] Syncing file datasource {ds.name} to sandbox {session_id}")
+            try:
+                data = download_bytes(settings.MINIO_DATA_BUCKET, ds.storage_path)
+                # Save to /workspace/data/{ds.name} or similar
+                dest_path = f"/workspace/data/{ds.name}"
+                await sandbox.write_file(dest_path, data)
+                logger.info(f"[SandboxManager] Synced {ds.name} to {dest_path}")
+            except Exception as e:
+                logger.error(f"[SandboxManager] Failed to sync file datasource {ds.name}: {e}")
+    
     async def get_sandbox(self, session_id: str, index: int = 0) -> DockerSandbox | None:
         """
         Get sandbox by session_id and index.

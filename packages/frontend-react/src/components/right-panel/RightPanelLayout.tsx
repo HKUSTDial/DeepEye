@@ -6,10 +6,10 @@ import './RightPanel.css'
 
 interface RightPanelLayoutProps {
   sessionId: string | null
-  dataSourceId: string | null
+  dataSourceIds: string[]
 }
 
-export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutProps) {
+export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutProps) {
   const panes = useRightPanelStore((state) => state.panes)
   const maxPanes = useRightPanelStore((state) => state.maxPanes)
   const openTab = useRightPanelStore((state) => state.openTab)
@@ -22,8 +22,8 @@ export function RightPanelLayout({ sessionId, dataSourceId }: RightPanelLayoutPr
   const [menuPaneId, setMenuPaneId] = useState<string | null>(null)
 
   const context = useMemo<PanelRenderContext>(
-    () => ({ sessionId, dataSourceId }),
-    [sessionId, dataSourceId],
+    () => ({ sessionId, dataSourceIds }),
+    [sessionId, dataSourceIds],
   )
 
   if (panes.length === 0) {

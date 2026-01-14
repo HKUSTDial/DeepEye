@@ -8,7 +8,7 @@ import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
 import './App.css'
 
 function App() {
-  const [currentDataSourceId, setCurrentDataSourceId] = useState<string | null>(null)
+  const [selectedDataSourceIds, setSelectedDataSourceIds] = useState<string[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   // Resizable panel ratios (percentage based)
@@ -26,8 +26,10 @@ function App() {
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
   const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
 
-  const handleDataSourceSelected = (id: string | null) => {
-    setCurrentDataSourceId(id)
+  const handleDataSourceToggle = (id: string) => {
+    setSelectedDataSourceIds((prev) => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
   }
 
   const toggleSidebar = () => {
@@ -100,7 +102,10 @@ function App() {
           }`}
         >
           <Sidebar />
-          <DataSourceManager onSelect={handleDataSourceSelected} />
+          <DataSourceManager 
+            selectedIds={selectedDataSourceIds} 
+            onToggle={handleDataSourceToggle} 
+          />
         </div>
       </aside>
 
@@ -153,17 +158,8 @@ function App() {
             )}
           </div>
 
-          {/* Welcome / Chat */}
-          {!currentDataSourceId ? (
-            <div className="flex-1 flex flex-col items-center justify-center px-4">
-              <h1 className="text-4xl font-semibold mb-3 tracking-tight">DeepEye</h1>
-              <p className="text-[var(--main-text-muted)] text-center max-w-md leading-relaxed">
-                Select or create a data source from the sidebar to start analyzing your data.
-              </p>
-            </div>
-          ) : (
-            <ChatBox dataSourceId={currentDataSourceId} />
-          )}
+          {/* ChatBox is now always shown */}
+          <ChatBox dataSourceIds={selectedDataSourceIds} />
         </div>
 
         {/* Right Panel */}
@@ -182,7 +178,10 @@ function App() {
               rightPanelCollapsed ? 'opacity-0 pointer-events-none' : ''
             }`}
           >
-            <RightPanelLayout sessionId={sessionId} dataSourceId={currentDataSourceId} />
+            <RightPanelLayout 
+              sessionId={sessionId} 
+              dataSourceIds={selectedDataSourceIds} 
+            />
           </div>
         </aside>
       </main>

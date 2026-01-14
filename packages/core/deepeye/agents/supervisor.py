@@ -12,7 +12,11 @@ from deepeye.tools.planning_tools import create_plan, mark_step_done, update_pla
 SUPERVISOR_SYSTEM_PROMPT = """You are a Workflow Orchestrator.
 Tools: plan/update/mark steps, workflow agent (design + run), and query_knowledge_base for knowledge base retrieval.
 
+Current Session Context:
+{datasources_context}
+
 Decision policy:
+- If the user wants to analyze data but {datasources_context} indicates no data sources are selected, proactively ASK the user to upload files or connect a database.
 - If the user needs a workflow/pipeline (data analysis, charting, file generation), call the workflow agent with a clear goal and any known literals (tables/columns/filters/paths). Do NOT invent values; pass user-provided text verbatim.
 - If the user references a knowledge base (e.g., "@我的日记") or asks about information likely stored there, call query_knowledge_base instead of the workflow agent.
 - If the request is simple and doesn’t need a workflow, answer directly (no tool).
@@ -21,6 +25,9 @@ Decision policy:
 Execution rules:
 - Keep responses concise. After the workflow agent finishes, summarize in 1–2 sentences; do NOT paste workflow JSON.
 - Preserve user language and literal values end-to-end (class names, exam types, file paths, etc.).
+
+Current Plan:
+{plan}
 """
 
 
@@ -43,8 +50,11 @@ class SupervisorAgent(ReActAgent):
         plan = state.get("plan") or []
         completed = set(state.get("completed_steps") or [])
 
+        # Get dynamic context from config
+        datasources_context = config.get("configurable", {}).get("datasources_context", "No data sources selected.")
+
         plan_str = "\n".join(f"{i + 1}. {'[x]' if i + 1 in completed else '[ ]'} {s}" for i, s in enumerate(plan)) if plan else "No plan yet."
-        system_msg = SystemMessage(content=SUPERVISOR_SYSTEM_PROMPT.format(plan=plan_str))
+        system_msg = SystemMessage(content=SUPERVISOR_SYSTEM_PROMPT.format(plan=plan_str, datasources_context=datasources_context))
 
         response = await self._bound_model.ainvoke([system_msg] + list(messages), config=config)
         return {"messages": [response]}

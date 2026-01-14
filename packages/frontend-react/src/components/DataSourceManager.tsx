@@ -1,27 +1,26 @@
 import { useState, useEffect } from 'react'
 import { datasourceApi } from '../api'
+import { useChatStore } from '../stores/chat'
 import type { DataSource } from '../types'
 import './DataSourceManager.css'
 
 interface DataSourceManagerProps {
-  onSelect: (id: string | null) => void
+  selectedIds: string[]
+  onToggle: (id: string) => void
 }
 
-export default function DataSourceManager({ onSelect }: DataSourceManagerProps) {
+export default function DataSourceManager({ selectedIds, onToggle }: DataSourceManagerProps) {
+  const sessionId = useChatStore((state) => state.sessionId)
   const [dataSources, setDataSources] = useState<DataSource[]>([])
-  const [selectedId, setSelectedId] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [newDs, setNewDs] = useState({ name: '', type: 'postgres', connection_string: '' })
+  const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadDataSources = async () => {
     try {
       const list = await datasourceApi.list()
       setDataSources(list)
-      if (list.length && !selectedId) {
-        setSelectedId(list[0].id)
-        onSelect(list[0].id)
-      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     }
@@ -34,10 +33,27 @@ export default function DataSourceManager({ onSelect }: DataSourceManagerProps) 
       setDataSources([...dataSources, created])
       setIsCreating(false)
       setNewDs({ name: '', type: 'postgres', connection_string: '' })
-      setSelectedId(created.id)
-      onSelect(created.id)
+      onToggle(created.id)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create')
+    }
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    setError(null)
+    try {
+      const created = await datasourceApi.upload(file, sessionId)
+      setDataSources((prev) => [...prev, created])
+      onToggle(created.id)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setIsUploading(false)
+      e.target.value = '' // Reset input
     }
   }
 
@@ -47,18 +63,12 @@ export default function DataSourceManager({ onSelect }: DataSourceManagerProps) 
     try {
       await datasourceApi.delete(id)
       setDataSources(dataSources.filter((ds) => ds.id !== id))
-      if (selectedId === id) {
-        setSelectedId('')
-        onSelect(null)
+      if (selectedIds.includes(id)) {
+        onToggle(id)
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to delete')
     }
-  }
-
-  const selectSource = (id: string) => {
-    setSelectedId(id)
-    onSelect(id)
   }
 
   useEffect(() => {
@@ -72,22 +82,42 @@ export default function DataSourceManager({ onSelect }: DataSourceManagerProps) 
         <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">
           Data Sources
         </span>
-        <button
-          onClick={() => setIsCreating(!isCreating)}
-          className="btn p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)]"
-          title={isCreating ? 'Cancel' : 'Add Data Source'}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className={`w-4 h-4 transition-transform duration-200 ${isCreating ? 'rotate-45' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
+        <div className="flex gap-1">
+          {/* File Upload Button */}
+          <label className="btn p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] cursor-pointer">
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+              accept=".csv,.json,.xlsx,.xls,.parquet"
+            />
+            {isUploading ? (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            )}
+          </label>
+          {/* Add DB Button */}
+          <button
+            onClick={() => setIsCreating(!isCreating)}
+            className="btn p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)]"
+            title={isCreating ? 'Cancel' : 'Add Database'}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className={`w-4 h-4 transition-transform duration-200 ${isCreating ? 'rotate-45' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Error */}
@@ -153,35 +183,41 @@ export default function DataSourceManager({ onSelect }: DataSourceManagerProps) 
         {dataSources.map((ds) => (
           <div
             key={ds.id}
-            onClick={() => selectSource(ds.id)}
+            onClick={() => onToggle(ds.id)}
             className={`group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer text-sm ds-item ${
-              selectedId === ds.id
+              selectedIds.includes(ds.id)
                 ? 'bg-[var(--accent)] text-white'
                 : 'hover:bg-[var(--sidebar-hover)]'
             }`}
           >
-            {/* DB Icon */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-              />
-            </svg>
+            {/* Icon */}
+            {ds.category === 'file' ? (
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                />
+              </svg>
+            )}
             {/* Name */}
             <span className="flex-1 truncate">{ds.name}</span>
             {/* Delete */}
             <button
               onClick={(e) => deleteDataSource(ds.id, e)}
               className={`btn opacity-0 group-hover:opacity-100 p-1 rounded-lg ${
-                selectedId === ds.id
+                selectedIds.includes(ds.id)
                   ? 'hover:bg-white/20'
                   : 'hover:bg-red-500/20 text-[var(--sidebar-text-muted)] hover:text-red-400'
               }`}

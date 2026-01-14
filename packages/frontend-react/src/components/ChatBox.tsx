@@ -8,10 +8,10 @@ import StepItem from './StepItem'
 import './ChatBox.css'
 
 interface ChatBoxProps {
-  dataSourceId: string
+  dataSourceIds: string[]
 }
 
-export default function ChatBox({ dataSourceId }: ChatBoxProps) {
+export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const { sendMessage, error } = useChat()
   // 每个属性单独订阅 - 最简单可靠的方式
   const messages = useChatStore((state) => state.messages)
@@ -42,7 +42,7 @@ export default function ChatBox({ dataSourceId }: ChatBoxProps) {
   const handleSend = () => {
     if (input.trim() && !isStreaming) {
       const kbIds = extractKbIds(input)
-      sendMessage(input.trim(), dataSourceId, kbIds)
+      sendMessage(input.trim(), dataSourceIds, kbIds)
       setInput('')
       setShowMentions(false)
       setMentionQuery('')

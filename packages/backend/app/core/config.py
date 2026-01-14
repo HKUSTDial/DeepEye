@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = False
     MINIO_SANDBOX_BUCKET: str = "deepeye-sandboxes"  # Auto-build image if not exists
     MINIO_KB_BUCKET: str = "deepeye-knowledge"
+    MINIO_DATA_BUCKET: str = "deepeye-data"
     
     @computed_field
     @property

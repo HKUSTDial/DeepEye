@@ -13,6 +13,7 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 interface RequestOptions {
   body?: unknown
+  headers?: Record<string, string>
   skipAuth?: boolean  // 是否跳过自动添加 token（用于登录/注册等）
 }
 
@@ -38,8 +39,11 @@ async function request<T>(
 
   try {
     // 1. 准备 headers
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+    const headers: Record<string, string> = { ...options.headers }
+    
+    // 如果 body 不是 FormData，默认设置为 JSON
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json'
     }
 
     // 2. 自动添加 Authorization header（如果有 token 且不跳过鉴权）
@@ -50,15 +54,20 @@ async function request<T>(
       }
     }
 
-    // 3. 发起请求
+    // 3. 准备 body
+    const body = options.body instanceof FormData 
+      ? options.body 
+      : (options.body ? JSON.stringify(options.body) : undefined)
+
+    // 4. 发起请求
     let res = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body,
       signal: controller.signal,
     })
 
-    // 4. 处理 401 - Token 过期，尝试刷新
+    // 5. 处理 401 - Token 过期，尝试刷新
     if (res.status === 401 && !options.skipAuth) {
       console.log('[HTTP Client] Token expired, attempting refresh...')
       
@@ -74,7 +83,7 @@ async function request<T>(
           res = await fetch(`${API_BASE}${path}`, {
             method,
             headers,
-            body: options.body ? JSON.stringify(options.body) : undefined,
+            body,
             signal: controller.signal,
           })
         }
@@ -92,7 +101,7 @@ async function request<T>(
       }
     }
 
-    // 5. 处理响应
+    // 6. 处理响应
     if (!res.ok) {
       let errorMessage = `Request failed: ${res.statusText}`
       let errorData: any = undefined
