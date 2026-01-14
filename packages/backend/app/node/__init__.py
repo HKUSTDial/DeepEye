@@ -12,21 +12,6 @@ from deepeye.workflows.engine import ExecutionEngine
 from deepeye.workflows.registry import NodeRegistry
 
 
-_DISABLED_NODE_TYPES = {
-    # Legacy data-analysis helpers are disabled to avoid bloating the prompt;
-    # keep workflows focused on python.code for now.
-    "data.aggregate",
-    "data.filter_rows",
-    "data.limit_rows",
-    "data.select_columns",
-    "data.sort_rows",
-    # "datasource.read",
-    # sql.execute is enabled to allow SQL+Python workflows
-    "stats.correlation",
-    "stats.summary",
-}
-
-
 def _iter_modules() -> Iterable[object]:
     for module_info in pkgutil.iter_modules(__path__, __name__ + "."):
         yield importlib.import_module(module_info.name)
@@ -37,10 +22,6 @@ def _iter_nodes() -> Iterable[type[BaseNode]]:
     for _ in _iter_modules():
         for node_cls in BaseNode.__subclasses__():
             if node_cls in seen:
-                continue
-            if node_cls.node_type.startswith("viz."):
-                continue
-            if node_cls.node_type in _DISABLED_NODE_TYPES:
                 continue
             seen.add(node_cls)
             yield node_cls
