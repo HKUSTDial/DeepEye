@@ -1,0 +1,433 @@
+{
+  "dataSource": {
+    "type": "csv",
+    "path": "D:/Project/Pycharm/DeepEye/packages/deepeye-core/deepeye/nodes/nl2dashboard/input/test_deepeye/deepeye_dataset.csv",
+    "schema": {
+      "deepeye_dataset": {
+        "source_name": "deepeye_dataset",
+        "description": "Transaction details, product information, and customer feedback data from the DeepEye system",
+        "fields": [
+          {
+            "name": "transaction_id",
+            "dataType": "categorical",
+            "description": "Unique identifier for each transaction"
+          },
+          {
+            "name": "product_id",
+            "dataType": "categorical",
+            "description": "Unique identifier for the product"
+          },
+          {
+            "name": "product_name",
+            "dataType": "categorical",
+            "description": "Name of the product sold"
+          },
+          {
+            "name": "category",
+            "dataType": "categorical",
+            "description": "Category of the product (e.g., Accessories, Furniture, Electronics)"
+          },
+          {
+            "name": "cost_price",
+            "dataType": "numeric",
+            "description": "Unit cost price of the product"
+          },
+          {
+            "name": "region",
+            "dataType": "categorical",
+            "description": "Geographic region where the sale occurred"
+          },
+          {
+            "name": "sale_date",
+            "dataType": "temporal",
+            "description": "The date when the transaction took place"
+          },
+          {
+            "name": "quantity",
+            "dataType": "numeric",
+            "description": "Number of units purchased in the transaction"
+          },
+          {
+            "name": "total_amount",
+            "dataType": "numeric",
+            "description": "Total revenue generated from the transaction"
+          },
+          {
+            "name": "profit",
+            "dataType": "numeric",
+            "description": "Net profit earned from the transaction"
+          },
+          {
+            "name": "customer_name",
+            "dataType": "categorical",
+            "description": "Name of the customer who made the purchase"
+          },
+          {
+            "name": "rating",
+            "dataType": "numeric",
+            "description": "Customer satisfaction rating (typically 1 to 5)"
+          },
+          {
+            "name": "comment",
+            "dataType": "categorical",
+            "description": "Text feedback provided by the customer"
+          },
+          {
+            "name": "sentiment_label",
+            "dataType": "categorical",
+            "description": "Sentiment analysis result of the customer comment (e.g., Positive, Neutral, Negative)"
+          }
+        ]
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "highlight_1",
+      "blockType": "highlight",
+      "blockContent": {
+        "title": "Total Revenue",
+        "type": "sum",
+        "expression": "total_amount",
+        "unit": "USD"
+      },
+      "position": {
+        "col": 1,
+        "row": 1,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "highlight_2",
+      "blockType": "highlight",
+      "blockContent": {
+        "title": "Total Profit",
+        "type": "sum",
+        "expression": "profit",
+        "unit": "USD"
+      },
+      "position": {
+        "col": 2,
+        "row": 1,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "highlight_3",
+      "blockType": "highlight",
+      "blockContent": {
+        "title": "Top Sales Region",
+        "type": "mode",
+        "expression": "region",
+        "unit": ""
+      },
+      "position": {
+        "col": 3,
+        "row": 1,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "highlight_4",
+      "blockType": "highlight",
+      "blockContent": {
+        "title": "Highest Profit Category",
+        "type": "mode",
+        "expression": "category",
+        "unit": ""
+      },
+      "position": {
+        "col": 1,
+        "row": 2,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "intent_2_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "What is the profit comparison between different product categories in 2025?",
+        "caption": "Quality score: 0.46 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_2_goal_0_chart0_layer1",
+            "chartType": "bar",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Bar\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # Filter data for the year 2025\n    data['sale_date'] = pd.to_datetime(data['sale_date'])\n    data_2025 = data[data['sale_date'].dt.year == 2025]\n    \n    # Aggregate profit by category\n    agg_data = data_2025.groupby('category')['profit'].sum().reset_index()\n    x_data = agg_data['category'].tolist()\n    y_data = agg_data['profit'].tolist()\n    \n    # Create a bar chart\n    chart = (\n        Bar()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Profit\", y_data)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Profit Comparison by Product Category in 2025\"),\n            xaxis_opts=opts.AxisOpts(name=\"Category\"),\n            yaxis_opts=opts.AxisOpts(name=\"Profit\"),\n        )\n    )\n    return chart",
+            "code_file": "D:\\Project\\Pycharm\\DeepEye\\packages\\deepeye-core\\deepeye\\nodes\\nl2dashboard\\output\\output_deepeye\\lida_charts_20260115_225827\\echart_code\\intent_2_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0.4604703485965729,
+          "M_value": 1,
+          "Q_value": 0.9985,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_2_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_2_goal_0_chart0_echarts.html"
+      },
+      "position": {
+        "col": 2,
+        "row": 2,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "intent_3_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "What is the average rating for products sold in each region in 2025?",
+        "caption": "Quality score: 0.46 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_3_goal_0_chart0_layer1",
+            "chartType": "bar",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Bar\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # Convert 'sale_date' to datetime to filter by year\n    data['sale_date'] = pd.to_datetime(data['sale_date'])\n    \n    # Filter data for the year 2025\n    data_2025 = data[data['sale_date'].dt.year == 2025]\n    \n    # Group by 'region' and calculate the average 'rating'\n    agg_data = data_2025.groupby('region')['rating'].mean().reset_index()\n    \n    # Prepare data for the chart\n    x_data = agg_data['region'].tolist()\n    y_data = agg_data['rating'].tolist()\n    \n    # Create a Bar chart\n    chart = (\n        Bar()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Average Rating\", y_data)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Average Product Rating by Region in 2025\"),\n            xaxis_opts=opts.AxisOpts(name=\"Region\"),\n            yaxis_opts=opts.AxisOpts(name=\"Average Rating\"),\n        )\n    )\n    return chart",
+            "code_file": "D:\\Project\\Pycharm\\DeepEye\\packages\\deepeye-core\\deepeye\\nodes\\nl2dashboard\\output\\output_deepeye\\lida_charts_20260115_225827\\echart_code\\intent_3_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0.4604703485965729,
+          "M_value": 1,
+          "Q_value": 0.998,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_3_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_3_goal_0_chart0_echarts.html"
+      },
+      "position": {
+        "col": 3,
+        "row": 2,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "intent_4_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "What is the distribution of sales quantity across different product categories in 2025?",
+        "caption": "Quality score: 0.46 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_4_goal_0_chart0_layer1",
+            "chartType": "bar",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Bar\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # Process data to get the distribution of sales quantity across different product categories\n    # Filter data for the year 2025\n    data['sale_date'] = pd.to_datetime(data['sale_date'])\n    data_2025 = data[data['sale_date'].dt.year == 2025]\n    \n    # Group by category and sum the quantities\n    agg_data = data_2025.groupby('category')['quantity'].sum().reset_index()\n    x_data = agg_data['category'].tolist()\n    y_data = agg_data['quantity'].tolist()\n    \n    # Create a Bar chart\n    chart = (\n        Bar()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Quantity\", y_data)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Distribution of Sales Quantity Across Product Categories in 2025\"),\n            xaxis_opts=opts.AxisOpts(name=\"Category\"),\n            yaxis_opts=opts.AxisOpts(name=\"Quantity\"),\n        )\n    )\n    return chart",
+            "code_file": "D:\\Project\\Pycharm\\DeepEye\\packages\\deepeye-core\\deepeye\\nodes\\nl2dashboard\\output\\output_deepeye\\lida_charts_20260115_225827\\echart_code\\intent_4_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0.4604703485965729,
+          "M_value": 1,
+          "Q_value": 0.9985,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_4_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_4_goal_0_chart0_echarts.html"
+      },
+      "position": {
+        "col": 1,
+        "row": 3,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "intent_0_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "What is the total revenue trend by month in 2025?",
+        "caption": "Quality score: 0.15 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_0_goal_0_chart0_layer1",
+            "chartType": "line",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Line\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # Ensure 'sale_date' is in datetime format\n    data['sale_date'] = pd.to_datetime(data['sale_date'])\n    \n    # Filter data for the year 2025\n    data_2025 = data[data['sale_date'].dt.year == 2025]\n    \n    # Extract month and calculate total revenue per month\n    data_2025['month'] = data_2025['sale_date'].dt.to_period('M')\n    monthly_revenue = data_2025.groupby('month')['total_amount'].sum().reset_index()\n    \n    # Convert month to string for x-axis\n    x_data = monthly_revenue['month'].astype(str).tolist()\n    y_data = monthly_revenue['total_amount'].tolist()\n    \n    # Create Line chart\n    chart = (\n        Line()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Total Revenue\", y_data, is_smooth=True)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Total Revenue Trend by Month in 2025\"),\n            xaxis_opts=opts.AxisOpts(name=\"Month\"),\n            yaxis_opts=opts.AxisOpts(name=\"Total Revenue\"),\n            tooltip_opts=opts.TooltipOpts(trigger=\"axis\", axis_pointer_type=\"cross\")\n        )\n    )\n    return chart",
+            "code_file": "D:\\Project\\Pycharm\\DeepEye\\packages\\deepeye-core\\deepeye\\nodes\\nl2dashboard\\output\\output_deepeye\\lida_charts_20260115_225827\\echart_code\\intent_0_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0.15437114238739014,
+          "M_value": 1,
+          "Q_value": 0.994,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_0_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_0_goal_0_chart0_echarts.html"
+      },
+      "position": {
+        "col": 2,
+        "row": 3,
+        "span": 1,
+        "rowSpan": 1
+      }
+    },
+    {
+      "id": "filter_category",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "select",
+        "field": "category",
+        "label": "Product Category",
+        "operator": "one_of",
+        "options": [
+          "All",
+          "Accessories",
+          "Furniture",
+          "Electronics"
+        ]
+      }
+    },
+    {
+      "id": "filter_region",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "select",
+        "field": "region",
+        "label": "Region",
+        "operator": "one_of",
+        "options": [
+          "All",
+          "Latin America",
+          "North America",
+          "Europe",
+          "Asia Pacific"
+        ]
+      }
+    },
+    {
+      "id": "filter_sale_date",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "date_range",
+        "field": "sale_date",
+        "label": "Sale Date",
+        "operator": "between",
+        "range": {
+          "min": 20250101,
+          "max": 20251231,
+          "step": 1
+        }
+      }
+    }
+  ],
+  "adjacentEdges": [],
+  "interactionEdges": [
+    {
+      "source": {
+        "block": "Profit Comparison by Category Chart",
+        "layer": "Product Category Layer",
+        "field": "category"
+      },
+      "target": {
+        "block": "Average Rating by Region Chart",
+        "layer": "Region Layer",
+        "field": "category"
+      },
+      "interaction": {
+        "type": "highlight",
+        "detail": {
+          "color": "#ffcc00",
+          "opacity": {
+            "active": 1,
+            "inactive": 0.3
+          }
+        }
+      }
+    },
+    {
+      "source": {
+        "block": "Sales Quantity Distribution Chart",
+        "layer": "Product Category Layer",
+        "field": "category"
+      },
+      "target": {
+        "block": "Total Revenue Trend Chart",
+        "layer": "Revenue Layer",
+        "field": "category"
+      },
+      "interaction": {
+        "type": "cross-filter",
+        "detail": {
+          "type": "showDetail"
+        }
+      }
+    },
+    {
+      "source": {
+        "block": "Average Rating by Region Chart",
+        "layer": "Region Layer",
+        "field": "region"
+      },
+      "target": {
+        "block": "Total Revenue Trend Chart",
+        "layer": "Month Layer",
+        "field": "region"
+      },
+      "interaction": {
+        "type": "highlight",
+        "detail": {
+          "color": "#00ccff",
+          "opacity": {
+            "active": 1,
+            "inactive": 0.3
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "question": "Analyze the 2025 global sales performance. I need a dashboard showing the monthly revenue trend, the distribution of sales across different regions, and a profit comparison between product categories.",
+    "output_path": "D:\\Project\\Pycharm\\DeepEye\\packages\\deepeye-core\\deepeye\\nodes\\nl2dashboard\\output\\output_deepeye",
+    "charts_directory": "lida_charts_20260115_225827",
+    "design_version": "2.0",
+    "timestamp": "20260115_230018",
+    "n_highlight_blocks": 4,
+    "n_view_blocks": 4,
+    "n_filter_blocks": 3,
+    "dashboard_name": "Global Sales Insights 2025",
+    "dashboard_description": "Uncover Trends, Regional Distribution, and Product Profitability"
+  },
+  "layout": {
+    "type": "grid",
+    "columns": 3,
+    "gap": 1.0,
+    "pageTemplate": "public/templates/page_customized.html"
+  }
+}

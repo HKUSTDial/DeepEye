@@ -1,0 +1,233 @@
+<div class="flex h-screen overflow-hidden font-sans bg-[#F9FAFB]">
+    
+    <aside class="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-10 shadow-lg hidden md:flex">
+        <div class="p-6 border-b border-gray-100 flex items-center gap-2">
+            <div class="w-8 h-8 bg-[#FF4D4F] rounded-lg flex items-center justify-center text-white font-bold shadow-[#FF4D4F]/30 shadow-lg">D</div>
+            <span class="font-bold text-xl tracking-tight text-gray-800">Global Sales Insights 2025</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-8">
+            <div id="filter-container" class="space-y-6"></div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+        <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-20">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Global Sales Insights 2025</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Uncover Trends, Regional Distribution, and Product Profitability</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 bg-[#52C41A]/10 px-3 py-1 rounded-full border border-[#52C41A]/30">
+                    <div class="h-2 w-2 bg-[#52C41A] rounded-full animate-pulse"></div>
+                    <span class="text-xs font-semibold text-gray-600">System Online</span>
+                </div>
+                <div class="h-10 w-10 bg-gray-100 rounded-full border border-gray-200 flex items-center justify-center text-gray-500">
+                    <i class="ph ph-user text-xl"></i>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-x-hidden overflow-y-auto p-8">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#FF4D4F]/50 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_1">Metric 1</p>
+                        <div class="p-2 bg-[#FF4D4F]/10 text-[#FF4D4F] rounded-lg group-hover:bg-[#FF4D4F] group-hover:text-white transition-colors">
+                            <i class="ph ph-chart-line-up"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-4">
+                        <h3 class="text-2xl font-bold text-gray-900" id="val-highlight_1">--</h3>
+                        <span class="text-xs font-medium text-gray-400" id="unit-highlight_1"></span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#FF9C12]/80 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_2">Metric 2</p>
+                        <div class="p-2 bg-[#FF9C12]/10 text-[#FF9C12] rounded-lg group-hover:bg-[#FF9C12] group-hover:text-white transition-colors">
+                            <i class="ph ph-users"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-4" id="val-highlight_2">--</h3>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#52C41A]/80 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_3">Metric 3</p>
+                        <div class="p-2 bg-[#52C41A]/10 text-[#52C41A] rounded-lg group-hover:bg-[#52C41A] group-hover:text-white transition-colors">
+                            <i class="ph ph-package"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-4" id="val-highlight_3">--</h3>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#1890FF]/80 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_4">Metric 4</p>
+                        <div class="p-2 bg-[#1890FF]/10 text-[#1890FF] rounded-lg group-hover:bg-[#1890FF] group-hover:text-white transition-colors">
+                            <i class="ph ph-currency-dollar"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-4" id="val-highlight_4">--</h3>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[320px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#FF4D4F] rounded-full"></span>
+                        What is the profit comparison between different product categories in 2025?</h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_2_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[320px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#52C41A] rounded-full"></span>
+                        What is the average rating for products sold in each region in 2025?</h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_3_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[320px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#FF9C12] rounded-full"></span>
+                        What is the distribution of sales quantity across different product categories in 2025?</h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_4_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[320px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#1890FF] rounded-full"></span>
+                        What is the total revenue trend by month in 2025?</h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_0_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+const themeName = 'template3_aesthetic_vibrant';
+const template3Palette = {
+    // 1. 调色盘：提升饱和度后的鲜艳色
+    color: [
+        '#FF4D4F', // Vibrant Red
+        '#FF9C12', // Vibrant Orange
+        '#52C41A', // Vibrant Green
+        '#1890FF', // Vibrant Blue
+        '#722ED1', // Purple
+        '#13C2C2'  // Cyan
+    ],
+    backgroundColor: 'rgba(0,0,0,0)',
+    textStyle: { fontFamily: 'Inter, -apple-system, system-ui, sans-serif' },
+
+    title: {
+        textStyle: { color: '#1F2937', fontWeight: '700', fontSize: 14 },
+        subtextStyle: { color: '#6B7280' }
+    },
+
+    grid: {
+        top: 40,
+        left: '2%',
+        right: '2%',
+        bottom: '5%',
+        containLabel: true
+    },
+
+    categoryAxis: {
+        axisLine: { show: true, lineStyle: { color: '#E5E7EB' } },
+        axisLabel: { color: '#4B5563', fontSize: 11 },
+        splitLine: { show: false }
+    },
+    valueAxis: {
+        axisLine: { show: false },
+        axisLabel: { color: '#9CA3AF', fontSize: 10 },
+        splitLine: { show: true, lineStyle: { color: '#F3F4F6', type: 'dashed' } }
+    },
+
+    // 1. 折线图：明亮的红色渐变
+    line: {
+        smooth: true,
+        width: 3,
+        symbolSize: 8,
+        itemStyle: { color: '#FF4D4F', borderWidth: 2, borderColor: '#fff' },
+        areaStyle: {
+            opacity: 0.15, 
+            color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                    { offset: 0, color: '#FF4D4F' },
+                    { offset: 1, color: 'rgba(255, 77, 79, 0)' }
+                ]
+            }
+        }
+    },
+
+    // 2. 柱状图：鲜艳的渐变色
+    bar: {
+        itemStyle: {
+            borderRadius: [4, 4, 0, 0],
+            color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                    { offset: 0, color: '#1890FF' },
+                    { offset: 1, color: '#69C0FF' }
+                ]
+            }
+        },
+        barMaxWidth: 30
+    },
+
+    // 3. 饼图
+    pie: {
+        itemStyle: { borderWidth: 2, borderColor: '#fff' },
+        label: { color: '#4B5563' }
+    },
+
+    // 4. VisualMap 鲜艳映射
+    visualMap: {
+        inRange: {
+            color: ['#BAE7FF', '#1890FF', '#FF9C12', '#FF4D4F']
+        }
+    },
+
+    tooltip: {
+        backgroundColor: '#fff',
+        borderColor: '#E5E7EB',
+        borderWidth: 1,
+        textStyle: { color: '#1F2937' },
+        extraCssText: 'box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-left: 4px solid #FF4D4F;'
+    }
+};
+
+// 注册主题
+(function() {
+    if (typeof window.echarts !== 'undefined') {
+        window.echarts.registerTheme(themeName, template3Palette);
+        window.currentPalette = template3Palette;
+        window.currentThemeName = themeName;
+    } else {
+        const checkECharts = setInterval(() => {
+            if (typeof window.echarts !== 'undefined') {
+                window.echarts.registerTheme(themeName, template3Palette);
+                window.currentPalette = template3Palette;
+                window.currentThemeName = themeName;
+                clearInterval(checkECharts);
+            }
+        }, 50);
+        setTimeout(() => clearInterval(checkECharts), 10000);
+    }
+})();
+</script>

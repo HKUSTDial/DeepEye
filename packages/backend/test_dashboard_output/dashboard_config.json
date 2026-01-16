@@ -1,0 +1,240 @@
+{
+  "dataSource": {
+    "type": "csv",
+    "path": "/app/packages/backend/app/node/temp_migration/input/test_1/spotify_history.csv",
+    "schema": null
+  },
+  "blocks": [
+    {
+      "id": "intent_0_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "What is the trend of total music playtime over time?",
+        "caption": "Quality score: 0.00 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_0_goal_0_chart0_layer1",
+            "chartType": "line",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Line\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # Convert 'ts' column to datetime\n    data['ts'] = pd.to_datetime(data['ts'])\n    \n    # Group by date and sum 'ms_played'\n    data['date'] = data['ts'].dt.date\n    agg_data = data.groupby('date')['ms_played'].sum().reset_index()\n    \n    # Prepare data for plotting\n    x_data = agg_data['date'].astype(str).tolist()\n    y_data = agg_data['ms_played'].tolist()\n    \n    # Create Line chart\n    chart = (\n        Line()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Total Playtime (ms)\", y_data, is_smooth=True)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Trend of Total Music Playtime Over Time\"),\n            xaxis_opts=opts.AxisOpts(type_=\"category\", name=\"Date\"),\n            yaxis_opts=opts.AxisOpts(name=\"Total Playtime (ms)\")\n        )\n    )\n    return chart",
+            "code_file": "/app/packages/backend/test_dashboard_output/lida_charts_20260114_090207/echart_code/intent_0_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0,
+          "M_value": 0,
+          "Q_value": 0.9818830908848258,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_0_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_0_goal_0_chart0_echarts.html"
+      }
+    },
+    {
+      "id": "intent_1_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "Which platforms are most frequently used for music playback?",
+        "caption": "Quality score: 0.00 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_1_goal_0_chart0_layer1",
+            "chartType": "bar",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Bar\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # 1. Prepare data\n    platform_counts = data['platform'].value_counts().reset_index()\n    platform_counts.columns = ['platform', 'count']\n    x_data = platform_counts['platform'].tolist()\n    y_data = platform_counts['count'].tolist()\n    \n    # 2. Create chart object\n    chart = (\n        Bar()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Usage Count\", y_data)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Most Frequently Used Platforms for Music Playback\"),\n            xaxis_opts=opts.AxisOpts(name=\"Platform\"),\n            yaxis_opts=opts.AxisOpts(name=\"Count\"),\n        )\n    )\n    return chart",
+            "code_file": "/app/packages/backend/test_dashboard_output/lida_charts_20260114_090207/echart_code/intent_1_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0,
+          "M_value": 1,
+          "Q_value": 0.9999599626317897,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_1_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_1_goal_0_chart0_echarts.html"
+      }
+    },
+    {
+      "id": "intent_2_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "What are the most common reasons for starting a track?",
+        "caption": "Quality score: 0.00 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_2_goal_0_chart0_layer1",
+            "chartType": "bar",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Bar\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # Process data to find the most common reasons for starting a track\n    reason_start_counts = data['reason_start'].value_counts().reset_index()\n    reason_start_counts.columns = ['reason_start', 'count']\n    \n    # Prepare data for the chart\n    x_data = reason_start_counts['reason_start'].tolist()\n    y_data = reason_start_counts['count'].tolist()\n    \n    # Create a Bar chart\n    chart = (\n        Bar()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Count\", y_data)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Most Common Reasons for Starting a Track\"),\n            xaxis_opts=opts.AxisOpts(name=\"Reason Start\"),\n            yaxis_opts=opts.AxisOpts(name=\"Count\")\n        )\n    )\n    return chart",
+            "code_file": "/app/packages/backend/test_dashboard_output/lida_charts_20260114_090207/echart_code/intent_2_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0,
+          "M_value": 1,
+          "Q_value": 0.9999132523688776,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_2_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_2_goal_0_chart0_echarts.html"
+      }
+    },
+    {
+      "id": "intent_3_goal_0_chart0",
+      "blockType": "view",
+      "blockContent": {
+        "title": "How does the use of shuffle mode affect the likelihood of skipping tracks?",
+        "caption": "Quality score: 0.00 (一般)",
+        "xDataField": null,
+        "layers": [
+          {
+            "id": "intent_3_goal_0_chart0_layer1",
+            "chartType": "bar",
+            "xField": null,
+            "yField": null,
+            "yAgg": "sum",
+            "color": "#5470c6",
+            "size": 1,
+            "style": {},
+            "echarts_code": "import pandas as pd\nfrom pyecharts.charts import Bar\nfrom pyecharts import options as opts\n\ndef plot(data: pd.DataFrame):\n    # Ensure the 'shuffle' and 'skipped' columns are of boolean type\n    data['shuffle'] = data['shuffle'].astype(bool)\n    data['skipped'] = data['skipped'].astype(bool)\n    \n    # Group by 'shuffle' and calculate the mean of 'skipped' to find the likelihood of skipping\n    agg_data = data.groupby('shuffle')['skipped'].mean().reset_index()\n    x_data = agg_data['shuffle'].map({True: 'Shuffle On', False: 'Shuffle Off'}).tolist()\n    y_data = (agg_data['skipped'] * 100).tolist()  # Convert to percentage\n    \n    # Create a Bar chart\n    chart = (\n        Bar()\n        .add_xaxis(x_data)\n        .add_yaxis(\"Skip Percentage\", y_data)\n        .set_global_opts(\n            title_opts=opts.TitleOpts(title=\"Effect of Shuffle Mode on Track Skipping\"),\n            yaxis_opts=opts.AxisOpts(name=\"Skip Percentage\", axislabel_opts=opts.LabelOpts(formatter=\"{value}%\")),\n            xaxis_opts=opts.AxisOpts(name=\"Shuffle Mode\")\n        )\n    )\n    return chart",
+            "code_file": "/app/packages/backend/test_dashboard_output/lida_charts_20260114_090207/echart_code/intent_3_goal_0_chart0_echarts.py"
+          }
+        ],
+        "dataProcessing": [],
+        "quality_metrics": {
+          "score": 0,
+          "M_value": 1,
+          "Q_value": 0.9999866542105965,
+          "quality_level": "一般"
+        },
+        "python_code_name": "intent_3_goal_0_chart0_echarts.py",
+        "html_code_name": "intent_3_goal_0_chart0_echarts.html"
+      }
+    },
+    {
+      "id": "filter_shuffle_mode",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "select",
+        "field": "shuffle_mode",
+        "label": "Shuffle Mode",
+        "operator": "equals"
+      }
+    },
+    {
+      "id": "filter_platform",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "select",
+        "field": "platform",
+        "label": "Platform",
+        "operator": "equals"
+      }
+    },
+    {
+      "id": "filter_start_reason",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "select",
+        "field": "start_reason",
+        "label": "Start Reason",
+        "operator": "equals"
+      }
+    }
+  ],
+  "adjacentEdges": [],
+  "interactionEdges": [
+    {
+      "source": {
+        "block": "intent_3_goal_0_chart0",
+        "layer": "shuffle_mode",
+        "field": "shuffle_mode"
+      },
+      "target": {
+        "block": "intent_3_goal_0_chart0",
+        "layer": "track_skipping",
+        "field": "track_skipping"
+      },
+      "interaction": {
+        "type": "highlight",
+        "detail": {
+          "color": "#5470c6",
+          "opacity": {
+            "active": 0.9,
+            "inactive": 0.3
+          }
+        }
+      }
+    },
+    {
+      "source": {
+        "block": "intent_1_goal_0_chart0",
+        "layer": "platform",
+        "field": "platform"
+      },
+      "target": {
+        "block": "intent_0_goal_0_chart0",
+        "layer": "music_playtime",
+        "field": "music_playtime"
+      },
+      "interaction": {
+        "type": "cross-filter",
+        "detail": {
+          "type": "showDetail"
+        }
+      }
+    },
+    {
+      "source": {
+        "block": "intent_2_goal_0_chart0",
+        "layer": "start_reason",
+        "field": "start_reason"
+      },
+      "target": {
+        "block": "intent_1_goal_0_chart0",
+        "layer": "platform",
+        "field": "platform"
+      },
+      "interaction": {
+        "type": "cross-filter",
+        "detail": {
+          "type": "showDetail"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "question": "帮我分析一下这份音乐播放历史数据的趋势，看看有哪些有趣的洞察",
+    "output_path": "/app/packages/backend/test_dashboard_output",
+    "charts_directory": "lida_charts_20260114_090207",
+    "design_version": "2.0",
+    "timestamp": "20260114_090308",
+    "n_highlight_blocks": 0,
+    "n_view_blocks": 4,
+    "n_filter_blocks": 3,
+    "dashboard_name": "Music Playback Trends",
+    "dashboard_description": "Discover Patterns and Insights in Listening Habits"
+  }
+}

@@ -1,0 +1,382 @@
+{
+  "name": "spotify_history.csv",
+  "file_name": "spotify_history.csv",
+  "dataset_description": "",
+  "fields": [
+    {
+      "column": "spotify_track_uri",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "2J3n32GeLmMjwuAzyhcSNe",
+          "1oHxIPqJyvAYHy0PVrDU98",
+          "487OPlneJNni3NWC8SYqhW",
+          "5IyblF777jLZj1vGHG2UD3",
+          "0GgAAB0ZMllFhbNc3mAodO"
+        ],
+        "num_unique_values": 16527,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "ts",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "2013-07-08 02:44:34",
+          "2013-07-08 02:45:37",
+          "2013-07-08 02:50:24",
+          "2013-07-08 02:52:40",
+          "2013-07-08 03:17:52"
+        ],
+        "num_unique_values": 140422,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "platform",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "web player",
+          "windows",
+          "android",
+          "iOS",
+          "cast to device"
+        ],
+        "num_unique_values": 6,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "ms_played",
+      "properties": {
+        "dtype": "int64",
+        "samples": [
+          3185,
+          61865,
+          285386,
+          134022,
+          0
+        ],
+        "num_unique_values": 43082,
+        "semantic_type": "",
+        "description": "",
+        "min": 0.0,
+        "max": 1561125.0,
+        "mean": 128316.63509275323
+      }
+    },
+    {
+      "column": "track_name",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "Say It, Just Say It",
+          "Drinking from the Bottle (feat. Tinie Tempah)",
+          "Born To Die",
+          "Off To The Races",
+          "Half Mast"
+        ],
+        "num_unique_values": 13839,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "artist_name",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "The Mowgli's",
+          "Calvin Harris",
+          "Lana Del Rey",
+          "Empire Of The Sun",
+          "James Arthur"
+        ],
+        "num_unique_values": 4113,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "album_name",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "Waiting For The Dawn",
+          "18 Months",
+          "Born To Die - The Paradise Edition",
+          "Walking On A Dream",
+          "Impossible"
+        ],
+        "num_unique_values": 7948,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "reason_start",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "autoplay",
+          "clickrow",
+          "trackdone",
+          "nextbtn",
+          "backbtn"
+        ],
+        "num_unique_values": 13,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "reason_end",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "clickrow",
+          "unknown",
+          "nextbtn",
+          "trackdone",
+          "backbtn"
+        ],
+        "num_unique_values": 15,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "shuffle",
+      "properties": {
+        "dtype": "bool",
+        "samples": [
+          false,
+          true
+        ],
+        "num_unique_values": 2,
+        "semantic_type": "",
+        "description": "",
+        "min": 0.0,
+        "max": 1.0,
+        "mean": 0.7445816095022021
+      }
+    },
+    {
+      "column": "skipped",
+      "properties": {
+        "dtype": "bool",
+        "samples": [
+          false,
+          true
+        ],
+        "num_unique_values": 2,
+        "semantic_type": "",
+        "description": "",
+        "min": 0.0,
+        "max": 1.0,
+        "mean": 0.05250900840784732
+      }
+    }
+  ],
+  "field_names": [
+    "spotify_track_uri",
+    "ts",
+    "platform",
+    "ms_played",
+    "track_name",
+    "artist_name",
+    "album_name",
+    "reason_start",
+    "reason_end",
+    "shuffle",
+    "skipped"
+  ],
+  "n_samples": 149860,
+  "n_columns": 11,
+  "columns": [
+    {
+      "column": "spotify_track_uri",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "2J3n32GeLmMjwuAzyhcSNe",
+          "1oHxIPqJyvAYHy0PVrDU98",
+          "487OPlneJNni3NWC8SYqhW",
+          "5IyblF777jLZj1vGHG2UD3",
+          "0GgAAB0ZMllFhbNc3mAodO"
+        ],
+        "num_unique_values": 16527,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "ts",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "2013-07-08 02:44:34",
+          "2013-07-08 02:45:37",
+          "2013-07-08 02:50:24",
+          "2013-07-08 02:52:40",
+          "2013-07-08 03:17:52"
+        ],
+        "num_unique_values": 140422,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "platform",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "web player",
+          "windows",
+          "android",
+          "iOS",
+          "cast to device"
+        ],
+        "num_unique_values": 6,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "ms_played",
+      "properties": {
+        "dtype": "int64",
+        "samples": [
+          3185,
+          61865,
+          285386,
+          134022,
+          0
+        ],
+        "num_unique_values": 43082,
+        "semantic_type": "",
+        "description": "",
+        "min": 0.0,
+        "max": 1561125.0,
+        "mean": 128316.63509275323
+      }
+    },
+    {
+      "column": "track_name",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "Say It, Just Say It",
+          "Drinking from the Bottle (feat. Tinie Tempah)",
+          "Born To Die",
+          "Off To The Races",
+          "Half Mast"
+        ],
+        "num_unique_values": 13839,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "artist_name",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "The Mowgli's",
+          "Calvin Harris",
+          "Lana Del Rey",
+          "Empire Of The Sun",
+          "James Arthur"
+        ],
+        "num_unique_values": 4113,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "album_name",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "Waiting For The Dawn",
+          "18 Months",
+          "Born To Die - The Paradise Edition",
+          "Walking On A Dream",
+          "Impossible"
+        ],
+        "num_unique_values": 7948,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "reason_start",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "autoplay",
+          "clickrow",
+          "trackdone",
+          "nextbtn",
+          "backbtn"
+        ],
+        "num_unique_values": 13,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "reason_end",
+      "properties": {
+        "dtype": "object",
+        "samples": [
+          "clickrow",
+          "unknown",
+          "nextbtn",
+          "trackdone",
+          "backbtn"
+        ],
+        "num_unique_values": 15,
+        "semantic_type": "",
+        "description": ""
+      }
+    },
+    {
+      "column": "shuffle",
+      "properties": {
+        "dtype": "bool",
+        "samples": [
+          false,
+          true
+        ],
+        "num_unique_values": 2,
+        "semantic_type": "",
+        "description": "",
+        "min": 0.0,
+        "max": 1.0,
+        "mean": 0.7445816095022021
+      }
+    },
+    {
+      "column": "skipped",
+      "properties": {
+        "dtype": "bool",
+        "samples": [
+          false,
+          true
+        ],
+        "num_unique_values": 2,
+        "semantic_type": "",
+        "description": "",
+        "min": 0.0,
+        "max": 1.0,
+        "mean": 0.05250900840784732
+      }
+    }
+  ]
+}

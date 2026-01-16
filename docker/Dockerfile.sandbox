@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
     openpyxl
 
 # Install FastAPI and Uvicorn
-RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple fastapi uvicorn python-multipart
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple fastapi uvicorn python-multipart pyecharts
 
 # Copy source code (will be overridden by volume mount in dev, but good for prod)
 COPY packages/core/sandbox /app/sandbox

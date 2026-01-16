@@ -1,0 +1,160 @@
+{
+  "template_library_path": "template_library",
+  "default_template": "template_base.html",
+  "rules": [
+    {
+      "name": "rule_1",
+      "description": "4个highlight块且图表数量 = 4",
+      "conditions": {
+        "highlight_count": {
+          "min": 4,
+          "max": 4
+        },
+        "view_count": {
+          "min": 4,
+          "max": 4
+        }
+      },
+      "template": "template_4highlights_4charts.html"
+    },
+    {
+      "name": "rule_2",
+      "description": "4个highlight块且图表数量 = 5",
+      "conditions": {
+        "highlight_count": {
+          "min": 4,
+          "max": 4
+        },
+        "view_count": {
+          "min": 5,
+          "max": 5
+        }
+      },
+      "template": "template_base.html"
+    },
+    {
+      "name": "rule_3",
+      "description": "4个highlight块且图表数量 = 6",
+      "conditions": {
+        "highlight_count": {
+          "min": 4,
+          "max": 4
+        },
+        "view_count": {
+          "min": 6,
+          "max": 6
+        }
+      },
+      "template": "template_4highlights_6charts.html"
+    },
+    {
+      "name": "rule_4",
+      "description": "5个highlight块且图表数量 = 5",
+      "conditions": {
+        "highlight_count": {
+          "min": 5,
+          "max": 5
+        },
+        "view_count": {
+          "min": 5,
+          "max": 5
+        }
+      },
+      "template": "template_with_table.html"
+    },
+    {
+      "name": "rule_5",
+      "description": "无highlight块且图表数量 = 4",
+      "conditions": {
+        "highlight_count": {
+          "min": 0,
+          "max": 0
+        },
+        "view_count": {
+          "min": 4,
+          "max": 4
+        }
+      },
+      "template": "template_0highlights_4charts.html"
+    },
+    {
+      "name": "rule_6",
+      "description": "无highlight块且图表数量 = 5",
+      "conditions": {
+        "highlight_count": {
+          "min": 0,
+          "max": 0
+        },
+        "view_count": {
+          "min": 5,
+          "max": 5
+        }
+      },
+      "template": "template_0highlights_5charts.html"
+    },
+    {
+      "name": "rule_7",
+      "description": "无highlight块且图表数量 = 6",
+      "conditions": {
+        "highlight_count": {
+          "min": 0,
+          "max": 0
+        },
+        "view_count": {
+          "min": 6,
+          "max": 6
+        }
+      },
+      "template": "template_0highlights_6charts.html"
+    },
+    {
+      "name": "rule_8",
+      "description": "通用模板：适用于任意数量的highlight和图表",
+      "conditions": {},
+      "template": "template_universal.html"
+    }
+  ],
+  "templates": {
+    "template_base.html": {
+      "display_name": "基础模板",
+      "description": "适用于少量图表和highlight的基础布局",
+      "source_path": "template_library/template_base.html"
+    },
+    "template_4highlights_4charts.html": {
+      "display_name": "4高亮4图表模板",
+      "description": "适用于4个highlight块和4个图表的2x2网格布局",
+      "source_path": "template_library/template_4highlights_4charts.html"
+    },
+    "template_4highlights_6charts.html": {
+      "display_name": "4高亮6图表模板",
+      "description": "适用于4个highlight块和6个图表的3x2网格布局",
+      "source_path": "template_library/template_4highlights_6charts.html"
+    },
+    "template_0highlights_4charts.html": {
+      "display_name": "无高亮4图表模板",
+      "description": "适用于无highlight块和4个图表的2x2网格布局",
+      "source_path": "template_library/template_0highlights_4charts.html"
+    },
+    "template_0highlights_5charts.html": {
+      "display_name": "无高亮5图表模板",
+      "description": "适用于无highlight块和5个图表的2+3布局",
+      "source_path": "template_library/template_0highlights_5charts.html"
+    },
+    "template_0highlights_6charts.html": {
+      "display_name": "无高亮6图表模板",
+      "description": "适用于无highlight块和6个图表的3x2网格布局",
+      "source_path": "template_library/template_0highlights_6charts.html"
+    },
+    "template_universal.html": {
+      "display_name": "通用模板",
+      "description": "自动适应任意数量的highlight块和图表块的动态布局",
+      "source_path": "template_library/template_universal.html"
+    },
+    "template_with_table.html": {
+      "display_name": "表格模板",
+      "description": "适用于多个highlight和大量图表的表格布局",
+      "source_path": "template_library/template_with_table.html"
+    }
+  }
+}
+

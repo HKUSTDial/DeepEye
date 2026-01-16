@@ -1,0 +1,52 @@
+[
+  {
+    "question": "What is the trend of total music playtime over time?",
+    "visualization": "line",
+    "rationale": "A line chart can effectively show changes in total playtime over time, helping to identify patterns or trends in music consumption."
+  },
+  {
+    "question": "Which platforms are most frequently used for music playback?",
+    "visualization": "bar",
+    "rationale": "A bar chart can display the frequency of music playback across different platforms, highlighting user preferences for specific platforms."
+  },
+  {
+    "question": "What are the most common reasons for starting a track?",
+    "visualization": "pie",
+    "rationale": "A pie chart can show the proportion of different reasons for starting a track, providing insight into user behavior and preferences."
+  },
+  {
+    "question": "How does the use of shuffle mode affect the likelihood of a track being skipped?",
+    "visualization": "stacked bar",
+    "rationale": "A stacked bar chart can compare the frequency of skipped tracks with and without shuffle mode, revealing any correlation between shuffle mode and track skipping."
+  },
+  {
+    "question": "What is the distribution of playtime for tracks?",
+    "visualization": "histogram",
+    "rationale": "A histogram can show the distribution of playtime durations, helping to identify common playtime lengths and outliers."
+  },
+  {
+    "question": "Which artists have the highest total playtime?",
+    "visualization": "bar",
+    "rationale": "A bar chart can rank artists by total playtime, highlighting the most popular artists in the dataset."
+  },
+  {
+    "question": "What is the trend of track skipping over time?",
+    "visualization": "line",
+    "rationale": "A line chart can illustrate changes in the frequency of track skipping over time, indicating shifts in user engagement or satisfaction."
+  },
+  {
+    "question": "How does playtime vary by platform?",
+    "visualization": "boxplot",
+    "rationale": "A boxplot can show the distribution of playtime across different platforms, revealing any significant differences in user engagement by platform."
+  },
+  {
+    "question": "What are the most common reasons for ending a track?",
+    "visualization": "pie",
+    "rationale": "A pie chart can display the proportion of different reasons for ending a track, providing insight into user behavior and track engagement."
+  },
+  {
+    "question": "Which tracks are most frequently played?",
+    "visualization": "bar",
+    "rationale": "A bar chart can rank tracks by play frequency, identifying the most popular tracks in the dataset."
+  }
+]

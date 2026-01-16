@@ -36,6 +36,7 @@ export function useChat() {
   const setActiveWorkflowFile = useWorkflowSessionsStore((state) => state.setActiveFilePath)
   const setActiveRun = useWorkflowSessionsStore((state) => state.setActiveRun)
   const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
+  const triggerDashboardRefresh = useWorkflowSessionsStore((state) => state.triggerDashboardRefresh)
   const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
   const isStreaming = useChatStore((state) => state.isStreaming)
   
@@ -170,7 +171,11 @@ export function useChat() {
             const status = typeof payload?.status === 'string' ? payload?.status : ''
             const outputs = typeof payload?.outputs === 'object' ? payload?.outputs : undefined
             if (nodeId && status) {
-              setNodeStatus(sessionId, nodeId, status, outputs as Record<string, unknown> | undefined)
+              const typedOutputs = outputs as Record<string, unknown> | undefined
+              setNodeStatus(sessionId, nodeId, status, typedOutputs)
+              if (typedOutputs?.dashboard_url) {
+                openOrFocusTab('dashboard')
+              }
             }
             return
           }
@@ -197,6 +202,11 @@ export function useChat() {
             setViewState(sessionId, 'error')
             return
           }
+          if (phase === 'refresh') {
+            console.log('🔄 Triggering dashboard refresh as requested by agent...')
+            triggerDashboardRefresh(sessionId)
+            return
+          }
         }
 
         if (agentEvent.type === 'tool_end') {
@@ -209,10 +219,10 @@ export function useChat() {
         pushEvent(agentEvent)
 
         if (agentEvent.type === 'agent_end' || agentEvent.type === 'error') {
-          es.close()
-          esRef.current = null
           stopStreaming()
           if (agentEvent.type === 'error') {
+            es.close()
+            esRef.current = null
             setError(agentEvent.content || 'Unknown error')
           }
         }
@@ -243,6 +253,7 @@ export function useChat() {
     setActiveRun,
     setRunOutput,
     setViewState,
+    triggerDashboardRefresh,
     pushEvent,
     stopStreaming,
   ])

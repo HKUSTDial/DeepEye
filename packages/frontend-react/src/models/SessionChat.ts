@@ -56,7 +56,8 @@ export class SessionChat {
     if (last?.isStreaming) {
       last.isStreaming = false
     }
-    this.streamEvents = []
+    // 不再这里清空 streamEvents，允许在 agent_end 之后到达的“延迟”Token 继续追加到当前消息
+    // this.streamEvents = []
     this.updatedAt = new Date()
   }
 
@@ -93,9 +94,22 @@ export class SessionChat {
     const lastStreaming = streamingMsgs[streamingMsgs.length - 1]
     
     if (lastStreaming) {
-      lastStreaming.isStreaming = true
-      // Remove previous streaming message and append new one
-      const baseMessages = this.messages.filter(m => !m.isStreaming)
+      if (this.isStreaming) {
+        lastStreaming.isStreaming = true
+      }
+      
+      // 过滤掉所有当前正在流式显示的临时消息
+      let baseMessages = this.messages.filter(m => !m.isStreaming)
+
+      // 处理“延迟”事件：如果当前已经停止流式传输，但又有新事件进来，
+      // 说明我们在更新最后一条已完成的助理消息。
+      if (!this.isStreaming && baseMessages.length > 0) {
+        const last = baseMessages[baseMessages.length - 1]
+        if (last.role === 'assistant') {
+          baseMessages = baseMessages.slice(0, -1)
+        }
+      }
+
       this.messages = [...baseMessages, lastStreaming]
     }
   }
@@ -117,16 +131,24 @@ export class SessionChat {
         current = { role: 'assistant', content: '', steps: [] }
         stepStack = []
       }
-      else if (type === 'token' && current) {
+      else if (type === 'token') {
         if (source === 'supervisor') {
-          current.content += content
+          if (current) {
+            current.content += content
+          } else {
+            // Late token after agent_end, append to last assistant message if exists
+            const last = result[result.length - 1]
+            if (last && last.role === 'assistant') {
+              last.content += content
+            }
+          }
         } else {
           const pending = pendingBySource[source]
           const step = pending ? pending[pending.length - 1] : null
           if (!step) {
             continue
           }
-          const subs = step.subSteps ??= []
+          const subs = (step.subSteps ??= [])
           const last = subs[subs.length - 1]
           if (last?.type === 'thought') {
             last.thought = (last.thought || '') + content

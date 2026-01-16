@@ -12,6 +12,7 @@ import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { useChatStore } from '../../../stores/chat'
 import { useWorkflowNodesStore } from '../../../stores/workflowNodes'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
+import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
 
 const NODE_TYPES = { workflowNode: WorkflowNode }
@@ -173,6 +174,7 @@ export function WorkflowLivePanel({
   const setValidatedGraph = useWorkflowSessionsStore((state) => state.setValidatedGraph)
   const clearValidated = useWorkflowSessionsStore((state) => state.clearValidated)
 
+  const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
   const sandboxReadySessionId = useChatStore((state) => state.sandboxReadySessionId)
@@ -285,7 +287,11 @@ export function WorkflowLivePanel({
           const status = typeof payload?.status === 'string' ? payload?.status : ''
           const outputs = typeof payload?.outputs === 'object' ? payload?.outputs : undefined
           if (nodeId && status) {
-            setNodeStatus(sessionId, nodeId, status, outputs as Record<string, unknown> | undefined)
+            const typedOutputs = outputs as Record<string, unknown> | undefined
+            setNodeStatus(sessionId, nodeId, status, typedOutputs)
+            if (typedOutputs?.dashboard_url) {
+              openOrFocusTab('dashboard')
+            }
           }
           return
         }

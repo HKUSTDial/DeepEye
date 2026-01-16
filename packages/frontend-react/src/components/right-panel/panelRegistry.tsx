@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { FolderOpen, Workflow as WorkflowIcon } from 'lucide-react'
+import { FolderOpen, Workflow as WorkflowIcon, LayoutDashboard } from 'lucide-react'
 import { FilesPanel } from './plugins/FilesPanel'
 import { WorkflowLivePanel } from './plugins/WorkflowLivePanel'
+import { DashboardPanel } from './plugins/DashboardPanel'
 
 export type PanelRenderContext = {
   sessionId: string | null
@@ -32,6 +33,12 @@ export const panelRegistry: PanelPlugin[] = [
         dataSourceIds={context.dataSourceIds} 
       />
     ),
+  },
+  {
+    id: 'dashboard',
+    title: 'Dashboard',
+    icon: <LayoutDashboard className="h-4 w-4" />,
+    render: (context) => <DashboardPanel sessionId={context.sessionId} />,
   },
 ]
 

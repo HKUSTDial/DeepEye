@@ -1,0 +1,52 @@
+[
+  {
+    "question": "What is the trend of total music playtime over time?",
+    "visualization": "line",
+    "rationale": "A line chart can effectively show changes in total playtime over time, helping to identify patterns or trends in music consumption."
+  },
+  {
+    "question": "Which platforms are most frequently used for music playback?",
+    "visualization": "bar",
+    "rationale": "A bar chart can display the frequency of music playback across different platforms, highlighting user preferences for specific platforms."
+  },
+  {
+    "question": "What are the most common reasons for starting a track?",
+    "visualization": "pie",
+    "rationale": "A pie chart can illustrate the distribution of reasons for starting a track, providing insight into user behavior and preferences."
+  },
+  {
+    "question": "How does the average playtime vary by platform?",
+    "visualization": "box",
+    "rationale": "A box plot can show the distribution of playtime across different platforms, revealing variations and potential outliers in user engagement."
+  },
+  {
+    "question": "What is the distribution of playtime for tracks that were skipped versus not skipped?",
+    "visualization": "histogram",
+    "rationale": "A histogram can compare the distribution of playtime for skipped and non-skipped tracks, offering insights into user engagement and track performance."
+  },
+  {
+    "question": "Which artists have the highest total playtime?",
+    "visualization": "bar",
+    "rationale": "A bar chart can rank artists by total playtime, highlighting the most popular artists in the dataset."
+  },
+  {
+    "question": "Is there a correlation between shuffle mode and track skipping?",
+    "visualization": "scatter",
+    "rationale": "A scatter plot can visualize the relationship between shuffle mode and track skipping, helping to identify any potential correlation."
+  },
+  {
+    "question": "What is the trend of track skipping over time?",
+    "visualization": "line",
+    "rationale": "A line chart can show changes in track skipping behavior over time, revealing patterns or shifts in user engagement."
+  },
+  {
+    "question": "How does playtime vary by the reason a track ended?",
+    "visualization": "box",
+    "rationale": "A box plot can display the distribution of playtime based on the reason a track ended, providing insights into user behavior and track performance."
+  },
+  {
+    "question": "What are the most frequently played tracks?",
+    "visualization": "bar",
+    "rationale": "A bar chart can list the most frequently played tracks, highlighting popular songs and potential user favorites."
+  }
+]

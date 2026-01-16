@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 临时文件和输出
+data/
+*.log
+detection_report.txt
+*.ltr
+*.score
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 环境
+venv/
+env/
+.venv
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
