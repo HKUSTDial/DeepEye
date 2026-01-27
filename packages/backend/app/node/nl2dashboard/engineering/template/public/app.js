@@ -176,9 +176,15 @@ const App = {
                         oldScript.parentNode.removeChild(oldScript);
                     });
                 } else {
-                    // Inline script - execute it directly
-                    try {
-                        console.log(`📜 Executing inline script ${i + 1}/${scripts.length}...`);
+                // Inline script - execute it directly
+                try {
+                    // Skip if it's not a JS script (e.g. application/json)
+                    if (oldScript.type && oldScript.type !== 'text/javascript' && oldScript.type !== 'module') {
+                        console.log(`⏩ Skipping non-JS script ${i + 1}/${scripts.length} (type: ${oldScript.type})`);
+                        continue;
+                    }
+
+                    console.log(`📜 Executing inline script ${i + 1}/${scripts.length}...`);
                         // Use Function constructor to execute in global scope
                         const scriptFunc = new Function(scriptContent);
                         scriptFunc();
@@ -520,15 +526,21 @@ const App = {
                   </div>
               `;
               
-              const rangeMin = rangeWrap.querySelector(`#range-min-${field}`);
-              const rangeMax = rangeWrap.querySelector(`#range-max-${field}`);
-              const numMin = rangeWrap.querySelector(`#num-min-${field}`);
-              const numMax = rangeWrap.querySelector(`#num-max-${field}`);
-              const track = rangeWrap.querySelector(`#track-${field}`);
-              const handleMin = rangeWrap.querySelector(`#handle-min-${field}`);
-              const handleMax = rangeWrap.querySelector(`#handle-max-${field}`);
-  
-              const updateUI = () => {
+            const rangeMin = rangeWrap.querySelector(`#range-min-${field}`);
+            const rangeMax = rangeWrap.querySelector(`#range-max-${field}`);
+            const numMin = rangeWrap.querySelector(`#num-min-${field}`);
+            const numMax = rangeWrap.querySelector(`#num-max-${field}`);
+            const track = rangeWrap.querySelector(`#track-${field}`);
+            const handleMin = rangeWrap.querySelector(`#handle-min-${field}`);
+            const handleMax = rangeWrap.querySelector(`#handle-max-${field}`);
+
+            if (!rangeMin || !rangeMax || !numMin || !numMax || !track) {
+                console.warn(`[renderFilters] Missing slider elements for field ${field}`);
+                wrap.appendChild(rangeWrap);
+                return;
+            }
+
+            const updateUI = () => {
                   let vMin = parseFloat(rangeMin.value);
                   let vMax = parseFloat(rangeMax.value);
   
@@ -645,10 +657,16 @@ const App = {
                   </div>
                   `;
                   
-                  const dMin = dateWrap.querySelector(`#date-min-${field}`);
-                  const dMax = dateWrap.querySelector(`#date-max-${field}`);
-                  
-                  if (minD) {
+                const dMin = dateWrap.querySelector(`#date-min-${field}`);
+                const dMax = dateWrap.querySelector(`#date-max-${field}`);
+                
+                if (!dMin || !dMax) {
+                    console.warn(`[renderFilters] Missing date elements for field ${field}`);
+                    wrap.appendChild(dateWrap);
+                    return;
+                }
+
+                if (minD) {
                       dMin.min = minD;
                       dMax.min = minD;
                       dMin.value = minD;

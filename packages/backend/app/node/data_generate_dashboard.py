@@ -6,6 +6,7 @@ import logging
 import traceback
 import io
 import tarfile
+import shutil
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -398,10 +399,10 @@ class NL2DashboardHandler:
 
             # --- 新增：自动部署到独立容器并提供访问链接 ---
             # # va_app 的源代码路径通常在 local_output_path/va_app
-            # va_source_path = os.path.join(local_output_path, "va_app")
+            va_source_path = os.path.join(local_output_path, "va_app")
             # 通过当前文件的绝对路径来定位模板目录，这样在容器内外都能准确找到
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            va_source_path = os.path.join(current_dir, "nl2dashboard", "temp", "va_app")
+            # current_dir = os.path.dirname(os.path.abspath(__file__))
+            # va_source_path = os.path.join(current_dir, "nl2dashboard", "temp", "va_app")
             
             
             # 预设 URL，必须与 DashboardDeployService 中的容器名规则完全一致
@@ -436,6 +437,13 @@ class NL2DashboardHandler:
                             self._emit_log(f"Dashboard deployment failed: {e}")
                         finally:
                             new_loop.close()
+                            # 部署完成后清理本地临时目录，释放服务器空间
+                            try:
+                                if os.path.exists(local_tmp_dir):
+                                    shutil.rmtree(local_tmp_dir)
+                                    print(f"[DEBUG] Cleaned up local temporary directory: {local_tmp_dir}")
+                            except Exception as ce:
+                                print(f"[WARN] Failed to cleanup local directory {local_tmp_dir}: {ce}")
 
                     threading.Thread(target=_do_deploy, daemon=True).start()
                     
