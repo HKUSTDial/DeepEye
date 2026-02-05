@@ -1,6 +1,6 @@
-"""Dashboard 工程实现的 Prompt 模板
+"""Prompt templates for Dashboard Engineering implementation
 
-该模块定义了 Dashboard 工程实现使用的所有 Prompt 模板。
+This module defines all prompt templates used in Dashboard Engineering implementation.
 """
 
 # ============================================================================
@@ -42,19 +42,19 @@ You are a dashboard layout expert. Your task is to add layout configuration and 
 ## Layout Design Strategy:
 
 ### 1. Chart Importance Levels:
-- **Primary Chart (主图)**: Most important visualization, largest size
+- **Primary Chart**: Most important visualization, largest size
   - Span: 2-4 columns (depending on total columns)
   - RowSpan: 2-3 rows
   - Position: Prominent location (top-left or center-left)
   - Characteristics: Key metrics, overview charts, main trend analysis
   
-- **Secondary Charts (次图)**: Supporting visualizations, medium size
+- **Secondary Charts**: Supporting visualizations, medium size
   - Span: 1-2 columns
   - RowSpan: 1-2 rows
   - Position: Surrounding the primary chart
   - Characteristics: Detailed breakdowns, supplementary insights
   
-- **Tertiary Charts (辅助图)**: Additional context, smaller size
+- **Tertiary Charts**: Additional context, smaller size
   - Span: 1 column
   - RowSpan: 1 row
   - Position: Fill remaining spaces
@@ -104,27 +104,27 @@ You are a dashboard layout expert. Your task is to add layout configuration and 
 └─────┴─────┴─────────────┘
 ```
 
-**Pattern D: Fill Remaining Space (填充剩余空间)**
+**Pattern D: Fill Remaining Space**
 ```
 ❌ BAD - Leaving empty columns:
 ┌─────┬─────┬─────┬─────┐
 │  1  │  2  │  3  │  4  │
 ├─────┼─────┼─────┼─────┤
-│  5  │  6  │  7  │ [空]│  ← 不要留空！
+│  5  │  6  │  7  │ [EMPTY]│  ← Do not leave empty!
 └─────┴─────┴─────┴─────┘
 
 ✅ GOOD - Expand last chart to fill:
 ┌─────┬─────┬─────┬─────┐
 │  1  │  2  │  3  │  4  │
 ├─────┼─────┴─────┴─────┤
-│  5  │       7         │  ← 扩展到填满！
+│  5  │       7         │  ← Expand to fill!
 └─────┴─────────────────┘
 
 ✅ GOOD - Distribute evenly:
 ┌─────┬─────┬─────┬─────┐
 │  1  │  2  │  3  │  4  │
 ├─────┴─────┼─────┴─────┤
-│     5     │     6     │  ← 每个占2列
+│     5     │     6     │  ← Each occupies 2 columns
 └───────────┴───────────┘
 ```
 
@@ -159,7 +159,7 @@ You are a dashboard layout expert. Your task is to add layout configuration and 
    - Ensure positions don't overlap
    - CRITICAL: Row/rowSpan ranges must not overlap; the occupied rectangles [row..row+rowSpan-1] × [col..col+span-1] of any two blocks must not intersect
 
-6. **Fill Remaining Space (重要 - 避免留空)**:
+6. **Fill Remaining Space (IMPORTANT - Avoid leaving empty spaces)**:
    - **Last chart should expand to fill remaining columns**: If there are empty columns at the end of the last row, increase the last chart's span to occupy all remaining space
    - **Examples**:
      * 4 columns layout with 7 charts → Last row: 1 chart with span=4 (fill all 4 columns)
@@ -168,7 +168,7 @@ You are a dashboard layout expert. Your task is to add layout configuration and 
    - **Calculation**: For the last row, calculate remaining_cols = total_columns - sum(previous_charts_span_in_same_row), then set last_chart_span = remaining_cols
    - **Avoid orphan cells**: No single empty cells should be left at the end of rows
    - **Maximize space utilization**: Prefer larger charts over leaving gaps
-   - **Priority rule**: Fill > Balance > Aesthetic (填满 > 平衡 > 美观)
+   - **Priority rule**: Fill > Balance > Aesthetic
 
 7. **Responsive Considerations**:
    - Don't exceed the total column count
@@ -183,9 +183,9 @@ You are a dashboard layout expert. Your task is to add layout configuration and 
 ## Task:
 1. **Analyze the chart dimensions** provided above to understand each chart's aspect ratio
 2. **Identify chart importance levels** based on descriptions and chart types:
-   - Assign 1-2 primary charts (主图)
-   - Assign 3-5 secondary charts (次图)
-   - Assign remaining as tertiary charts (辅助图)
+   - Assign 1-2 primary charts
+   - Assign 3-5 secondary charts
+   - Assign remaining as tertiary charts
 3. **Choose optimal column count** (2-6) based on total number of charts and their aspect ratios
 4. **Design layout pattern** (Pattern A/B/C or custom) that best fits the chart set
 5. **Add "layout" object** at root level with "type", "columns", "gap", "pageTemplate"

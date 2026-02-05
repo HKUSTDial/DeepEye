@@ -1,7 +1,9 @@
 """
-此文件定义了myGraph类：
-myGraph类表示一个图，其中存储了节点信息nodes，节点之间的距离信息dis等。该图主要用于线性融合排序算法(diversified_ranking)，
-通过偏序关系得到每个图表的分数后，利用相似度对分数进行一定的调整，再通过getTopK函数接口获得分数最高的K个图表
+This file defines the myGraph class.
+
+myGraph represents a graph with node info and pairwise distances. It is used by the diversified_ranking
+algorithm: after partial-order scores are computed, similarity is used to adjust scores, and getTopK
+returns the top-K charts.
 """
 
 from .view import Chart

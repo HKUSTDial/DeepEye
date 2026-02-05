@@ -1,8 +1,10 @@
 """
-该文件实现了Table类，是整份代码中最重要和最复杂的一个类：
-Table类实现了对原始数据分类整合以产生不同类型图表的重要功能，其顶层函数为dealWithTable，该函数先调用generateViews函数
-进行必要的预处理后调用getClassifyTable函数，由getClassifyTable函数根据数据类型进行不同的处理和操作，实现较复杂，代码
-量较大。经过处理后，原始数据表格分散为若干个小的数据表格，为后续产生不同的图表以及图标的排序做好准备工作。
+This file implements the Table class, the core and most complex class in the codebase.
+
+Table classifies and aggregates raw data to produce different chart types. The top-level entry is
+dealWithTable, which calls generateViews for preprocessing and getClassifyTable for type-based
+processing. After processing, the raw table is split into smaller tables used for chart generation
+and ranking.
 """
 
 import datetime
@@ -619,8 +621,8 @@ class Table(object):
 
         self.generateViews()
         # except Exception as e:
-        #     print(f"报错了{e}-------------")
-        #     traceback.print_exc()  # 打印详细的错误堆栈信息
+        #     print(f"Error: {e}")
+        #     traceback.print_exc()
         #     sys.exit()
 
         if self.transformed:

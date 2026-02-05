@@ -35,21 +35,21 @@ class NL2DashboardHandler:
     def __init__(self, db: Session, user_id: str, sandbox=None):
         self.db = db
         self.user_id = user_id
-        self.sandbox = sandbox # 这是 DockerSandbox 实例
+        self.sandbox = sandbox # DockerSandbox instance
 
     def _emit_log(self, text: str, sync: bool = False):
-        """将日志同步到前端 SSE 对话框"""
+        """Sync logs to frontend SSE dialog"""
         if not self.sandbox or not getattr(self.sandbox, "session_id", None):
             return
         
-        # 核心：使用独立线程立即执行，不等待主线程释放
+        # Core: Use independent thread to execute immediately
         import threading
         from app.infra import RedisEventBus
         from app.schemas import AgentEvent, AgentEventType
         from app.core.config import settings
 
         def _sync_publish():
-            # 在新线程中创建一个临时的事件循环来处理 Redis 发布
+            # Create a temporary event loop in new thread for Redis publishing
             try:
                 temp_loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(temp_loop)
@@ -61,7 +61,7 @@ class NL2DashboardHandler:
                         source="supervisor",
                         content=f"\n> **Dashboard Generation**: {text}\n"
                     )
-                    # 立即发布
+                    # Publish immediately
                     await bus.publish(f"session:{self.sandbox.session_id}", event.model_dump_json())
                     await bus.close()
                 
@@ -73,11 +73,11 @@ class NL2DashboardHandler:
         if sync:
             _sync_publish()
         else:
-            # 启动守护线程，确保不阻塞主流程，但也确保消息能发出去
+            # Start daemon thread to ensure non-blocking but message delivery
             threading.Thread(target=_sync_publish, daemon=True).start()
 
     def _emit_workflow_event(self, phase: str, payload: Dict[str, Any] = None, sync: bool = False):
-        """发送工作流事件到前端"""
+        """Send workflow events to frontend"""
         if not self.sandbox or not getattr(self.sandbox, "session_id", None):
             return
         
@@ -138,7 +138,7 @@ class NL2DashboardHandler:
             return []
 
     def _ensure_sandbox(self):
-        """确保 sandbox 引用是最新且可用的"""
+        """Ensure sandbox reference is up-to-date and available"""
         if not self.sandbox:
             return False
             
@@ -153,7 +153,7 @@ class NL2DashboardHandler:
         except Exception:
             pass
             
-        # 尝试刷新 (通过 session_id 重新发现容器)
+        # Try to refresh (rediscover container via session_id)
         if getattr(self.sandbox, 'session_id', None):
             try:
                 from app.sandbox.manager import sandbox_manager
@@ -161,7 +161,7 @@ class NL2DashboardHandler:
                 import threading
                 from concurrent.futures import Future
                 
-                # 始终在独立线程中运行异步获取逻辑，避免与当前可能的 loop 冲突
+                # Always run async logic in separate thread to avoid loop conflicts
                 def _get_sb_thread(f, sid):
                     try:
                         new_loop = asyncio.new_event_loop()
@@ -185,15 +185,15 @@ class NL2DashboardHandler:
         return False
 
     def _write_to_sandbox(self, path: str, content: str):
-        """将内容写入沙盒容器内部"""
+        """Write content to sandbox container"""
         if not self._ensure_sandbox():
             return
         
-        # 确保目录存在
+        # Ensure directory exists
         dir_name = os.path.dirname(path)
         self.sandbox.container.exec_run(f"mkdir -p {dir_name}")
         
-        # 使用 tar 流式写入，避免转义问题（参考 docker-py 最佳实践）
+        # Use tar stream for writing to avoid escaping issues
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode='w') as tar:
             content_bytes = content.encode('utf-8')
@@ -210,16 +210,16 @@ class NL2DashboardHandler:
         question = inputs.get("question") or params.get("question")
         datasource_id = inputs.get("datasource_id") or params.get("datasource_id")
         
-        # 1. 路径逻辑对齐 PythonCodeHandler
+        # 1. Path logic alignment with PythonCodeHandler
         safe_id = "".join(ch if str(ch).isalnum() or ch in ("-", "_") else "_" for ch in str(node.id)) or "dashboard"
         sandbox_base = "/workspace/.workflow_scripts"
         
-        # 2. 统一处理输入数据
+        # 2. Unified input data handling
         data_input = inputs.get("data") or params.get("data")
         dataset_path = None
         
-        # 临时本地路径（使用北京时间戳确保目录新鲜，解决工作区显示旧时间的问题）
-        # 服务器默认为 UTC，这里手动强制 +8 小时
+        # Temporary local path (using Beijing timestamp for fresh directory)
+        # Server defaults to UTC, force +8 hours
         import time
         bj_time = time.gmtime(time.time() + 8 * 3600)
         run_ts = time.strftime('%Y%m%d_%H%M%S', bj_time)
@@ -228,61 +228,89 @@ class NL2DashboardHandler:
 
         try:
             if data_input:
-                # 尝试解析可能被序列化为字符串的 dict/list (比如来自上游节点的输出)
+                # Try to parse dict/list potentially serialized as string
+                print(f"[DEBUG] Attempting to parse data input: {data_input}")
                 if isinstance(data_input, str) and data_input.strip().startswith(("{", "[")):
                     try:
                         import ast
-                        # 使用 ast.literal_eval 比 json.loads 更能处理 Python repr 格式 (单引号、None等)
+                        # Use ast.literal_eval over json.loads for Python repr format
                         parsed = ast.literal_eval(data_input.strip())
                         if isinstance(parsed, (dict, list)):
                             data_input = parsed
-                            print(f"[DEBUG] 成功将字符串输入解析为 {type(data_input)}")
+                            print(f"[DEBUG] Successfully parsed string input as {data_input}")
                     except Exception as e:
-                        # 如果解析失败，可能是正常的字符串路径，继续后续逻辑
+                        # If parsing fails, treat as normal string path
                         pass
 
                 if isinstance(data_input, list):
                     if not data_input:
                         print("[WARN] Received empty list for data_input")
-                    # 在本地存一份 CSV 供分析使用
+                    # Save a local CSV for analysis
                     local_csv = os.path.join(local_tmp_dir, f"{safe_id}_input.csv")
                     df = pd.DataFrame(data_input)
                     if df.empty and not df.columns.tolist():
-                        # 如果没有列，人为创建一个占位列防止 pandas read_csv 报错
+                        # Create placeholder column to prevent pandas read_csv error
                         df = pd.DataFrame(columns=["empty_data"])
                     df.to_csv(local_csv, index=False)
                     dataset_path = local_csv
                     
-                    # 同时同步到沙盒一份，让用户可见
+                    # Sync to sandbox for user visibility
                     if self.sandbox:
                         csv_content = df.to_csv(index=False)
                         self._write_to_sandbox(f"{sandbox_base}/{safe_id}_input.csv", csv_content)
-                        print(f"[DEBUG] 数据已同步到沙盒: {sandbox_base}/{safe_id}_input.csv")
+                        print(f"[DEBUG] Data synced to sandbox: {sandbox_base}/{safe_id}_input.csv")
                 
                 elif isinstance(data_input, dict):
-                    # 如果是字典（可能是 Counter 结果），转换为长格式 DataFrame
-                    print(f"[DEBUG] 检测到字典输入，尝试转换...")
+                    # Strategy: Convert nested dict to Long Format to avoid NaN issues in Wide Format
+                    print(f"[DEBUG] Dict input detected, converting to Long Format...")
+                    
                     rows = []
-                    # 尝试处理简单的 k-v 字典或嵌套字典
-                    for key, val in data_input.items():
-                        if isinstance(val, dict) or (hasattr(val, 'items') and not isinstance(val, str)):
-                            for sub_k, sub_v in val.items():
-                                rows.append({"category": key, "name": sub_k, "value": sub_v})
+                    for main_key, sub_content in data_input.items():
+                        if isinstance(sub_content, dict):
+                            # Handle nested dict: {"monthly_revenue": {"2025-08": 6580.0, ...}}
+                            for sub_key, sub_val in sub_content.items():
+                                rows.append({
+                                    "dimension": main_key,
+                                    "name": str(sub_key),
+                                    "value": sub_val
+                                })
+                        elif isinstance(sub_content, (list, tuple)) and not isinstance(sub_content, str):
+                            # Handle list: {"tags": ["a", "b"]}
+                            for item in sub_content:
+                                rows.append({
+                                    "dimension": main_key,
+                                    "name": str(item),
+                                    "value": 1 # Count mode
+                                })
                         else:
-                            rows.append({"name": key, "value": val})
+                            # Handle simple K-V: {"total": 100}
+                            rows.append({
+                                "dimension": "summary",
+                                "name": str(main_key),
+                                "value": sub_content
+                            })
+                    
+                    df = pd.DataFrame(rows)
+                    
+                    # Key fix: Keep original field names in CSV for LLM generated Filter matching
+                    # app.py handles logic: if field == dimension, filter name
+                    
+                    if df.empty:
+                        df = pd.DataFrame(columns=["dimension", "name", "value"])
                     
                     local_csv = os.path.join(local_tmp_dir, f"{safe_id}_input.csv")
-                    pd.DataFrame(rows).to_csv(local_csv, index=False)
+                    df.to_csv(local_csv, index=False)
                     dataset_path = local_csv
                     
                     if self.sandbox:
-                        csv_content = pd.DataFrame(rows).to_csv(index=False)
+                        csv_content = df.to_csv(index=False)
                         self._write_to_sandbox(f"{sandbox_base}/{safe_id}_input.csv", csv_content)
+                        print(f"[DEBUG] Long Format data synced to sandbox: {sandbox_base}/{safe_id}_input.csv")
 
                 elif isinstance(data_input, str):
-                    # 如果是沙盒路径（以 /workspace 开头），尝试从沙盒读取到本地
+                    # If sandbox path (starts with /workspace), try reading from sandbox to local
                     if data_input.startswith("/workspace"):
-                        print(f"[DEBUG] 正在从沙盒读取数据: {data_input}")
+                        print(f"[DEBUG] Reading data from sandbox: {data_input}")
                         res = self.sandbox.container.exec_run(f"cat {data_input}")
                         if res.exit_code == 0:
                             local_csv = os.path.join(local_tmp_dir, "input_from_sandbox.csv")
@@ -294,13 +322,13 @@ class NL2DashboardHandler:
                     else:
                         dataset_path = data_input
         except Exception as e:
-            print(f"[ERROR] 数据搬运失败: {e}")
+            print(f"[ERROR] Data transportation failed: {e}")
 
-        # 3. 确定本地输出路径
+        # 3. Determine local output path
         local_output_path = os.path.join(local_tmp_dir, "output")
         os.makedirs(local_output_path, exist_ok=True)
 
-        # 4. 运行核心逻辑 (在 backend 容器完成)
+        # 4. Run core logic (completed in backend container)
         try:
             msg = f"Analyzing data for question: {question}"
             print(f"[DEBUG] Analyzing data | Question: {question}")
@@ -313,7 +341,7 @@ class NL2DashboardHandler:
             api_key = settings.LLM_API_KEY
             base_url = settings.LLM_BASE_URL
             
-            # 这里的逻辑：优先使用节点参数，如果没有或为 "default"，则使用配置中的模型，如果配置也是 "default"，则强制 gpt-4o
+            # Priority: node params > config model > default gpt-4o
             model = params.get("model")
             if not model or model == "default":
                 model = settings.LLM_MODEL
@@ -322,7 +350,7 @@ class NL2DashboardHandler:
                 
             print(f"[DEBUG] Using model: {model}")
             
-            # 如果 question 为空，给一个默认值防止报错
+            # Default question if empty
             if not question:
                 question = "Analyze and present key information from the data"
                 print(f"[DEBUG] Question is empty, using default value: {question}")
@@ -336,7 +364,7 @@ class NL2DashboardHandler:
                 "data_schema": data_schema
             }
             
-            # --- 新增调试输出：验证输入数据和 schema ---
+            # --- Debug Output: Verify input data and schema ---
             print(f"\n{'='*20} NL2DASHBOARD INPUT DEBUG {'='*20}")
             print(f"Question: {question}")
             print(f"Dataset Path: {dataset_path}")
@@ -370,19 +398,18 @@ class NL2DashboardHandler:
                 info_doc=info_doc
             )
             
-            # 5. 关键一步：将生成的整个结果文件夹同步到沙盒
+            # 5. Sync entire results folder to sandbox
             if self.sandbox:
                 print(f"[*] Moving generation results to sandbox workspace...")
                 # self._emit_log("Synchronizing results to the sandbox workspace...")
-                # 压缩本地目录
+                # Compress local directory
                 tar_stream = io.BytesIO()
-                # 文件夹名包含时间戳，确保用户在沙盒中看到的是最新创建的
+                # Folder name includes timestamp for uniqueness
                 sandbox_folder_name = f"dashboard_{run_ts}"
                 with tarfile.open(fileobj=tar_stream, mode='w') as tar:
                     tar.add(local_output_path, arcname=sandbox_folder_name)
                 tar_stream.seek(0)
-                # 放入沙盒
-                # 确保基础目录存在并引用有效
+                # Put in sandbox
                 self._ensure_sandbox()
 
                 if self.sandbox and self.sandbox.container:
@@ -397,38 +424,32 @@ class NL2DashboardHandler:
             else:
                 final_sandbox_path = va_app_path
 
-            # --- 新增：自动部署到独立容器并提供访问链接 ---
-            # # va_app 的源代码路径通常在 local_output_path/va_app
+            # --- Auto-deploy to independent container and provide access link ---
             va_source_path = os.path.join(local_output_path, "va_app")
-            # 通过当前文件的绝对路径来定位模板目录，这样在容器内外都能准确找到
-            # current_dir = os.path.dirname(os.path.abspath(__file__))
-            # va_source_path = os.path.join(current_dir, "nl2dashboard", "temp", "va_app")
             
-            
-            # 预设 URL，必须与 DashboardDeployService 中的容器名规则完全一致
+            # URL preset, must match container naming rules in DashboardDeployService
             full_url = f"/dashboards/deepeye-nl2dashboard-{safe_id}/"
             deployment_info = {"url": full_url}
             
             if os.path.exists(va_source_path):
                 try:
-                    # 1. 局部导入，彻底切断启动时的循环引用
+                    # 1. Local import to cut cyclic dependency
                     from app.services.dashboard_deploy_service import dashboard_deployer
                     
                     print(f"[*] Starting independent dashboard service container (ID: {safe_id})...")
-                    # self._emit_log(f"Deploying the dashboard service in the background. It will be accessible via: {full_url}")
                     
-                    # 2. 彻底异步触发：使用线程在后台执行部署，不阻塞当前同步流程 and 流式响应
+                    # 2. Asynchronous trigger: use thread for background deployment
                     import threading
                     def _do_deploy():
-                        # 为新线程创建一个独立的事件循环
+                        # Create independent event loop for new thread
                         new_loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(new_loop)
                         try:
-                            # 局部导入并执行
+                            # Local import and execute
                             from app.services.dashboard_deploy_service import dashboard_deployer
                             new_loop.run_until_complete(dashboard_deployer.deploy(safe_id, va_source_path))
                             
-                            # 使用同步模式顺序发送，并增加间隔防止前端处理冲突
+                            # Sequential send in sync mode to prevent frontend conflicts
                             self._emit_log("Dashboard deployment complete!\n", sync=True)
                             print(f"Dashboard deployment complete! Access it here: {full_url}\n")
                             self._emit_workflow_event("refresh", sync=True)
@@ -437,7 +458,7 @@ class NL2DashboardHandler:
                             self._emit_log(f"Dashboard deployment failed: {e}")
                         finally:
                             new_loop.close()
-                            # 部署完成后清理本地临时目录，释放服务器空间
+                            # Cleanup local temporary directory after deployment
                             try:
                                 if os.path.exists(local_tmp_dir):
                                     shutil.rmtree(local_tmp_dir)
@@ -448,10 +469,10 @@ class NL2DashboardHandler:
                     threading.Thread(target=_do_deploy, daemon=True).start()
                     
                     print(f"\n" + "-"*20)
-                    print(f"[SUCCESS] Dashboard 部署任务已提交: {full_url}")
+                    print(f"[SUCCESS] Dashboard deployment task submitted: {full_url}")
                     print(f"-"*20 + "\n")
                 except Exception as de:
-                    print(f"[WARN] 提交部署任务失败: {de}")
+                    print(f"[WARN] Failed to submit deployment task: {de}")
                     traceback.print_exc()
 
             return {

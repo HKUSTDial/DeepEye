@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-可视化质量检测脚本 - 修复版
-修复了 ECharts [x,y] 数据格式导致的类型误判问题
+Visualization quality detection script (fixed version).
+Fixes type misjudgment caused by ECharts [x,y] data format.
 """
 
 import os
@@ -13,7 +13,7 @@ import numpy as np
 from pathlib import Path
 import traceback
 
-# 添加当前目录到路径，以便导入本地的deepeye_pack
+# Add current directory to path for local deepeye_pack import
 script_dir = Path(__file__).parent
 sys.path.insert(0, str(script_dir))
 
@@ -24,37 +24,34 @@ from deepeye_pack.table_l import Table
 
 
 class VisualizationDetector:
-    """可视化质量检测器"""
-    
+    """Visualization quality detector."""
+
     def __init__(self, csv_path, deepeye_model_path=None):
         self.csv_path = csv_path
         self.deepeye_model_path = deepeye_model_path
         self.dp = None
         self.data = None
         self.csv_columns = []
-        
+
     def load_data(self):
-        """加载CSV数据"""
-        # print(f"正在加载数据: {self.csv_path}")
+        """Load CSV data."""
         try:
             self.data = pd.read_csv(self.csv_path, encoding='utf-8-sig')
             self.data.columns = [str(col).strip().replace('\ufeff', '') for col in self.data.columns]
             self.csv_columns = list(self.data.columns)
-            # print(f"数据加载完成，共 {len(self.data)} 行，{len(self.data.columns)} 列")
         except Exception as e:
-            print(f"数据加载失败: {e}")
+            print(f"Failed to load data: {e}")
             try:
                 self.data = pd.read_csv(self.csv_path, encoding='utf-8')
                 self.csv_columns = list(self.data.columns)
-            except:
-                print("无法读取数据文件")
+            except Exception:
+                print("Unable to read data file.")
 
     def initialize_deepeye(self):
-        """初始化deepeye系统（轻量级版本）"""
-        # print("\n正在初始化deepeye系统...")
+        """Initialize deepeye system (lightweight version)."""
         self.dp = deepeye_pack.deepeye('detection')
-        
-        # 创建虚拟 Instance 对象防止 View 初始化报错
+
+        # Create virtual Instance to avoid View init errors
         from deepeye_pack.instance import Instance
         virtual_instance = Instance('Simulated_Table')
         if self.data is not None:
@@ -63,10 +60,10 @@ class VisualizationDetector:
             virtual_instance.tuple_num = 1000
         self.dp.instance = virtual_instance
         
-        # print("deepeye系统初始化完成（轻量级模式，使用手动数据注入）")
-        
+        # deepeye init done (lightweight mode, manual data injection)
+
     def parse_visualization_code(self, code_file_path):
-        """静态解析"""
+        """Static parsing."""
         with open(code_file_path, 'r', encoding='utf-8') as f:
             code = f.read()
         
@@ -91,7 +88,7 @@ class VisualizationDetector:
 
     def execute_visualization_code(self, code_file_path, viz_info):
         """
-        【核心修复】智能提取数据，支持 [x, y] 格式拆分
+        Core fix: smart data extraction with [x, y] format splitting.
         """
         result = {
             'x_data': [],
@@ -118,9 +115,8 @@ class VisualizationDetector:
             if 'plot' in local_scope:
                 chart_obj = local_scope['plot'](self.data.copy())
                 
-                # --- 智能数据提取 ---
-                # Pyecharts 数据可能在 options 字典中，也可能在私有属性中
-                # 我们优先解析 options['series']，因为那里包含了最完整的渲染数据
+                # Smart data extraction: pyecharts data may be in options dict or private attrs
+                # Prefer options['series'] for full render data
                 
                 extracted_x_from_series = []
                 extracted_y_all_series = []
@@ -134,50 +130,41 @@ class VisualizationDetector:
                         s_y = []
                         
                         for item in raw_data:
-                            # 1. 提取 Value 部分
+                            # 1. Extract value part
                             val = item
                             if isinstance(item, dict):
                                 val = item.get('value')
-                                # 饼图特殊处理：X通常在 name 中
+                                # Pie: X usually in name
                                 if viz_info['chart_type'] == 'pie':
                                     s_x.append(item.get('name'))
-                            
-                            # 2. 判断 Value 是否为 [x, y] 格式
+
+                            # 2. Check if value is [x, y] format
                             if isinstance(val, (list, tuple)) and len(val) >= 2:
-                                # 假设 [x, y] 格式，通常 index 0 是 x (时间/类别), index 1 是 y (数值)
-                                # 或者是散点图 [x, y]
+                                # [x, y]: index 0 = x (time/category), index 1 = y (value), or scatter [x,y]
                                 s_x.append(val[0])
                                 s_y.append(val[1])
                             else:
-                                # 纯数值格式
                                 s_y.append(val)
-                        
+
                         extracted_y_all_series.append(s_y)
-                        # 如果还没提取到 X 轴数据（且不是饼图），暂存这里的 X
                         if not extracted_x_from_series and s_x and viz_info['chart_type'] != 'pie':
                             extracted_x_from_series = s_x
-                        # 饼图需要收集所有 name
                         elif viz_info['chart_type'] == 'pie' and s_x:
                             extracted_x_from_series = s_x
 
-                # --- 确定最终 X 轴数据 ---
-                # 优先使用 xAxis.data (显式定义的轴)
+                # Final X: prefer xAxis.data (explicit axis)
                 final_x = []
                 if hasattr(chart_obj, 'options') and chart_obj.options.get('xAxis'):
                     xaxis = chart_obj.options['xAxis']
                     if isinstance(xaxis, list) and len(xaxis) > 0:
                         final_x = xaxis[0].get('data', [])
-                
-                # 如果 xAxis 为空，使用从 series 中提取的 X (通常用于 Time Series 或 Dataset)
+
                 if not final_x and extracted_x_from_series:
                     final_x = extracted_x_from_series
-                
-                # 备用：私有属性
                 if not final_x and hasattr(chart_obj, '_xaxis_data'):
-                     final_x = list(chart_obj._xaxis_data)
+                    final_x = list(chart_obj._xaxis_data)
 
-                # --- 确定最终 Y 轴数据 ---
-                # 如果是单系列，展平；多系列保持列表
+                # Final Y: flatten if single series, keep list if multi-series
                 if len(extracted_y_all_series) == 1:
                     final_y = extracted_y_all_series[0]
                     result['series_num'] = 1
@@ -191,11 +178,11 @@ class VisualizationDetector:
                 result['x_data'] = final_x
                 result['y_data'] = final_y
                 
-                print(f"  数据提取成功: X点数={len(final_x)}, 系列数={result['series_num']}")
-                
+                print(f"  Data extraction OK: X points={len(final_x)}, series={result['series_num']}")
+
             else:
                 result['status'] = 'error'
-                result['error'] = "找不到 plot 函数"
+                result['error'] = "plot function not found"
 
         except Exception as e:
             result['status'] = 'error'
@@ -204,15 +191,14 @@ class VisualizationDetector:
         return result
 
     def get_data_type(self, values):
-        """根据数据列表的实际内容判断类型"""
+        """Infer type from actual list content."""
         if not values or len(values) == 0:
             return Type.categorical
-        
-        # 增加采样
+
         sample = [v for v in values[:50] if v is not None]
-        if not sample: return Type.categorical
-        
-        # 宽松的数值判断：尝试转换 float
+        if not sample:
+            return Type.categorical
+
         numeric_count = 0
         for v in sample:
             try:
@@ -220,12 +206,11 @@ class VisualizationDetector:
                 numeric_count += 1
             except (ValueError, TypeError):
                 pass
-        
-        # 只要 >80% 是数字，就认为是 Numerical (Type 2)
+
         if numeric_count / len(sample) > 0.8:
             return Type.numerical
-            
-        # 判断时间 (Type 3)
+
+        # Check for time (Type 3)
         try:
             pd.to_datetime(sample[0])
             return Type.temporal
@@ -235,50 +220,50 @@ class VisualizationDetector:
         return Type.categorical
 
     def validate_rules(self, viz_info, x_data, y_data):
-        """基于提取后的真实数据验证规则"""
+        """Validate rules on extracted real data."""
         res = {'valid': True, 'msg': []}
-        
+
         if not x_data or not y_data:
-            return {'valid': False, 'msg': ['数据为空']}
-            
-        # 展平 Y 数据
+            return {'valid': False, 'msg': ['Data is empty']}
+
         y_flat = []
         if isinstance(y_data[0], list):
-             for s in y_data: y_flat.extend(s)
+            for s in y_data:
+                y_flat.extend(s)
         else:
-             y_flat = y_data
-             
+            y_flat = y_data
+
         y_type = self.get_data_type(y_flat)
-        
-        # 规则 1: Y 轴必须是数值
+
+        # Rule 1: Y must be numerical
         if viz_info['chart_type'] in ['bar', 'line', 'scatter']:
             if y_type != Type.numerical:
-                # 采样打印，方便调试
                 sample_str = str(y_flat[:5])
                 res['valid'] = False
-                res['msg'].append(f"Y轴数据类型错误: 期望数值，实际检测为 {y_type} (样本: {sample_str})")
-                
-        # 规则 2: 饼图不能有负数
+                res['msg'].append(f"Y-axis type error: expected numerical, got {y_type} (sample: {sample_str})")
+
+        # Rule 2: Pie must not have negative values
         if viz_info['chart_type'] == 'pie':
             try:
                 if any(float(v) < 0 for v in y_flat if v is not None):
                     res['valid'] = False
-                    res['msg'].append("饼图数据包含负数")
+                    res['msg'].append("Pie chart data contains negative values")
             except: pass
             
         return res
 
     def create_view_from_visualization(self, viz_info, viz_data):
-        """创建 View 对象"""
+        """Create View object from visualization data."""
         x_raw = viz_data['x_data']
         y_raw = viz_data['y_data']
         series_num = viz_data['series_num']
-        
-        if not x_raw: return None
-            
+
+        if not x_raw:
+            return None
+
         temp_table = Table(self.dp.instance, False, 'Simulated_Table', '')
-        
-        # X 特征
+
+        # X features
         x_type = self.get_data_type(x_raw)
         fx = Features(name="Extracted_X", type=x_type, origin=0)
         try:
@@ -289,9 +274,10 @@ class VisualizationDetector:
                 fx.min, fx.max = (min(nums), max(nums)) if nums else (0, 0)
             else:
                 fx.min, fx.max = 0, fx.distinct
-        except: pass
-            
-        # Y 特征
+        except Exception:
+            pass
+
+        # Y features
         fy = Features(name="Extracted_Y", type=Type.numerical, origin=1)
         y_flat = []
         if series_num > 1:
@@ -329,17 +315,16 @@ class VisualizationDetector:
         
         try:
             view = View(temp_table, 0, 1, -1, series_num, X_view, Y_view, target_chart)
-            # 打印调试信息
-            print(f"  特征确认 -> X类型: {x_type}, X唯一值: {fx.distinct}")
-            print(f"  特征确认 -> Y类型: 数值(2), Y范围: [{fy.min:.2f}, {fy.max:.2f}]")
-            print(f"  DeepEye评分结果 -> M: {view.M:.4f}, Q: {view.Q:.4f}")
+            print(f"  Features -> X type: {x_type}, X distinct: {fx.distinct}")
+            print(f"  Features -> Y type: numerical(2), Y range: [{fy.min:.2f}, {fy.max:.2f}]")
+            print(f"  DeepEye score -> M: {view.M:.4f}, Q: {view.Q:.4f}")
             return view
         except Exception as e:
-            print(f"创建View失败: {e}")
+            print(f"Failed to create View: {e}")
             return None
 
     def calculate_view_score(self, view):
-        """计算评分 (RankLib)"""
+        """Compute score (RankLib)."""
         if not view or not self.dp: return None
         try:
             import subprocess, tempfile
@@ -372,26 +357,26 @@ class VisualizationDetector:
         except: return None
 
     def detect_visualization(self, code_file_path):
-        """主检测流程"""
+        """Main detection flow."""
         print("\n" + "="*80)
-        print(f"开始检测: {os.path.basename(code_file_path)}")
-        
+        print(f"Starting detection: {os.path.basename(code_file_path)}")
+
         viz_info = self.parse_visualization_code(code_file_path)
         viz_data = self.execute_visualization_code(code_file_path, viz_info)
-        
-        result = {'file': viz_info['file'], 'chart_type': viz_info['chart_type'], 'status': 'fail', 'score': None, 'quality': '无法评分', 'issues': []}
-        
+
+        result = {'file': viz_info['file'], 'chart_type': viz_info['chart_type'], 'status': 'fail', 'score': None, 'quality': 'Not scored', 'issues': []}
+
         if viz_data['status'] == 'error':
-            result['issues'].append(f"代码执行错误: {viz_data['error']}")
+            result['issues'].append(f"Code execution error: {viz_data['error']}")
             return result
-            
+
         validation = self.validate_rules(viz_info, viz_data['x_data'], viz_data['y_data'])
         if not validation['valid']:
-            print(f"❌ 规则校验失败: {validation['msg']}")
+            print(f"❌ Rule validation failed: {validation['msg']}")
             result['issues'] = validation['msg']
-            result['quality'] = '违反生成规则'
+            result['quality'] = 'Rule violation'
             return result
-            
+
         view = self.create_view_from_visualization(viz_info, viz_data)
         if view:
             score = self.calculate_view_score(view)
@@ -399,23 +384,28 @@ class VisualizationDetector:
             result['score'] = score
             result['M_value'] = view.M
             result['Q_value'] = view.Q
-            print(f"✅ 检测完成, 评分: {score}")
+            print(f"✅ Detection done, score: {score}")
             if score is not None:
-                if score > 0.7: result['quality'] = '优秀'
-                elif score > 0.5: result['quality'] = '良好'
-                else: result['quality'] = '一般'
-        
+                if score > 0.7:
+                    result['quality'] = 'Excellent'
+                elif score > 0.5:
+                    result['quality'] = 'Good'
+                else:
+                    result['quality'] = 'Fair'
+
         return result
 
     def generate_report(self, results):
         print("\n" + "="*80)
-        print("检测报告")
+        print("Detection report")
         print("="*80)
         for res in results:
-            print(f"文件: {res['file']}")
-            print(f"质量: {res['quality']}")
-            if res['score'] is not None: print(f"评分: {res['score']:.4f}")
-            if res['issues']: print(f"问题: {', '.join(res['issues'])}")
+            print(f"File: {res['file']}")
+            print(f"Quality: {res['quality']}")
+            if res['score'] is not None:
+                print(f"Score: {res['score']:.4f}")
+            if res['issues']:
+                print(f"Issues: {', '.join(res['issues'])}")
             print("-" * 40)
 
 def main():

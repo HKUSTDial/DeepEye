@@ -5,7 +5,7 @@ __pycache__/
 *.so
 .Python
 
-# 临时文件和输出
+# Temporary files and output
 data/
 *.log
 detection_report.txt
@@ -18,12 +18,12 @@ detection_report.txt
 *.swp
 *.swo
 
-# 环境
+# Environment
 venv/
 env/
 .venv
 
-# 系统文件
+# System files
 .DS_Store
 Thumbs.db
 

@@ -1,6 +1,6 @@
-"""Dashboard 工程实现模块
+"""Dashboard Engineering Implementation Module
 
-提供 Dashboard 工程实现相关的类。
+Provides classes related to Dashboard engineering implementation.
 """
 
 from .dashboard_engineer import DashboardEngineer

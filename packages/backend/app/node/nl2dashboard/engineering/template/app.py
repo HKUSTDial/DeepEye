@@ -10,13 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-# --- 路径配置 ---
+# --- Path configuration ---
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(ROOT_DIR, "public")
 CHARTS_DIR = os.path.join(PUBLIC_DIR, "charts")
 CONFIGS_DIR = os.path.join(PUBLIC_DIR, "configs")
 
-# --- 辅助函数 ---
+# --- Helper functions ---
 def load_schema() -> Dict[str, Any]:
     schema_path = os.path.join(CONFIGS_DIR, "dashboard_config.json")
     if not os.path.exists(schema_path): return {}
@@ -32,13 +32,13 @@ def resolve_data_path(schema: Dict[str, Any]) -> str:
 def load_dataset(csv_path: str) -> pd.DataFrame:
     if not os.path.exists(csv_path): return pd.DataFrame()
     df = pd.read_csv(csv_path)
-    # 转换日期列
+    # Convert date columns
     date_cols = ["transaction_date", "enrollment_date", "birth_date", "created_at"]
     for col in date_cols:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
     
-    # 预计算一些常用的过滤字段
+    # Pre-compute some commonly used filter fields
     if "enrollment_date" in df.columns:
         df["enrollment_year"] = df["enrollment_date"].dt.year
     
@@ -53,7 +53,7 @@ def dynamic_import_plot(py_filename: str):
     return getattr(module, "plot")
 
 def convert_numpy_types(obj):
-    """递归转换 numpy 类型为 Python 原生类型，并处理 NaN/Inf"""
+    """Recursively convert numpy types to Python native types and handle NaN/Inf"""
     if isinstance(obj, (np.integer, np.int64, np.int32)):
         return int(obj)
     elif isinstance(obj, (np.floating, np.float64, np.float32)):
@@ -78,65 +78,93 @@ def chart_option_from_plot(plot_fn, df: pd.DataFrame) -> Dict[str, Any]:
     option_json = c.dump_options()
     option_dict = json.loads(option_json)
     
-    # 修复 PyECharts datasetIndex 导致的数据丢失问题
-    # PyECharts 2.0.7 在 dump_options() 时，如果配置了 datasetIndex 但没有 dataset，
-    # 会导致 series.data 被清空为 null。从 chart.options 中恢复正确的数据。
+    # Fix PyECharts datasetIndex data loss issue
+    # PyECharts 2.0.7: when dump_options() is called, if datasetIndex is configured but no dataset exists,
+    # series.data will be cleared to null. Restore correct data from chart.options.
     if hasattr(c, 'options') and isinstance(c.options, dict):
         chart_options = c.options
         if 'series' in chart_options and isinstance(chart_options['series'], list):
             chart_series = chart_options['series']
-            # 检查并修复每个 series
+            # Check and fix each series
             if 'series' in option_dict and isinstance(option_dict['series'], list):
                 for i, series in enumerate(option_dict['series']):
-                    # 如果存在 datasetIndex 但没有 dataset，且 data 全是 null
+                    # If datasetIndex exists but no dataset, and data is all null
                     if (series.get('datasetIndex') is not None and 
                         'dataset' not in option_dict and
                         i < len(chart_series)):
                         data = series.get('data', [])
-                        # 检查 data 是否全是 null
+                        # Check if data is all null
                         if isinstance(data, list) and len(data) > 0 and all(x is None for x in data):
-                            # 从 chart.options 中恢复正确的数据
+                            # Restore correct data from chart.options
                             original_series = chart_series[i]
                             original_data = original_series.get('data', [])
                             if original_data and not all(x is None for x in original_data):
                                 series['data'] = convert_numpy_types(original_data)
-                                # 移除 datasetIndex 和 seriesLayoutBy
+                                # Remove datasetIndex and seriesLayoutBy
                                 if 'datasetIndex' in series:
                                     del series['datasetIndex']
                                 if 'seriesLayoutBy' in series:
                                     del series['seriesLayoutBy']
     
-    # 最后统一做一次清理，处理所有可能的 NaN/Inf
+    # Final cleanup pass to handle all possible NaN/Inf
     return convert_numpy_types(option_dict)
 
 def apply_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
     if not filters or df.empty: return df
     filtered = df.copy()
     for field, cond in filters.items():
+        # Special handling: if field is not in columns but data is in long format (has dimension column)
+        # try to filter by dimension
+        if field not in filtered.columns and "dimension" in filtered.columns:
+            op, val = cond.get("operator"), cond.get("value")
+            if val is None or val == "All": continue
+            try:
+                # Logic: if field matches a dimension value, filter within that dimension
+                # e.g., field="date" corresponds to dimension="monthly_revenue"
+                # Here we make a simple heuristic: if the filter's field is in the unique values of the dimension column,
+                # or we directly filter by dimension
+                
+                # Special filtering logic for long format:
+                # 1. Find data under that dimension
+                # 2. Filter by name within that dimension
+                # 3. Keep data from other dimensions (or decide based on requirements)
+                
+                # Solution: if field is a value in dimension, filter name under that dimension
+                if field in filtered["dimension"].unique():
+                    mask = (filtered["dimension"] == field)
+                    if op == "equals" or not isinstance(val, (list, tuple)):
+                        filtered = filtered[~mask | ((filtered["dimension"] == field) & (filtered["name"] == str(val)))]
+                    elif op in ("in", "one_of") and isinstance(val, (list, tuple)):
+                        val_strs = [str(v) for v in val]
+                        filtered = filtered[~mask | ((filtered["dimension"] == field) & (filtered["name"].isin(val_strs)))]
+                    continue
+            except Exception as e:
+                print(f"[apply_filters] skip long-format filter on {field} due to error: {e}")
+
         if field not in filtered.columns: continue
         op, val = cond.get("operator"), cond.get("value")
         if val is None or val == "All": continue
         try:
-            # 标量等值过滤
+            # Scalar equality filter
             if op == "equals" or not isinstance(val, (list, tuple)):
                 filtered = filtered[filtered[field] == val]
-            # 多选：等价于 in
+            # Multi-select: equivalent to in
             elif op in ("in", "one_of") and isinstance(val, (list, tuple)):
                 filtered = filtered[filtered[field].isin(val)]
-            # 区间：between
+            # Range: between
             elif op == "between" and isinstance(val, (list, tuple)) and len(val) == 2:
                 v1, v2 = val[0], val[1]
-                # 如果是日期列，尝试转为 datetime 再比较
+                # If it's a date column, try to convert to datetime before comparison
                 if "date" in field or "time" in field:
                     v1 = pd.to_datetime(v1, errors="coerce")
                     v2 = pd.to_datetime(v2, errors="coerce")
                 filtered = filtered[(filtered[field] >= v1) & (filtered[field] <= v2)]
         except Exception as e:
-            # 出错就跳过这个过滤条件，避免整张表挂掉
+            # Skip this filter condition on error to avoid crashing the entire table
             print(f"[apply_filters] skip filter on {field} due to error: {e}")
     return filtered
 
-# --- 引擎 ---
+# --- Engine ---
 class DashboardEngine:
     def __init__(self):
         self.schema = load_schema()
@@ -147,17 +175,17 @@ class DashboardEngine:
         self.highlight_blocks: List[Dict[str, Any]] = [
             b for b in self.schema.get("blocks", []) if b.get("blockType") == "highlight"
         ]
-        # 处理 filter 的 range
+        # Process filter ranges
         self._process_filter_ranges()
-        # 处理 filter 的 options
+        # Process filter options
         self._process_filter_options()
 
     def get_layout_config(self):
-        # 返回配置中的模板路径
+        # Return template path from configuration
         return self.schema.get("layout", {})
     
     def _process_filter_options(self):
-        """处理 select/multiselect 类型 filter 的 options"""
+        """Process options for select/multiselect type filters"""
         if self.full_df.empty: return
         
         filter_blocks = [b for b in self.schema.get("blocks", []) if b.get("blockType") == "filter"]
@@ -165,15 +193,26 @@ class DashboardEngine:
             bc = block.get("blockContent", {})
             if bc.get("controlType") in ("select", "multiselect") and not bc.get("options"):
                 field = bc.get("field")
+                
+                # Special handling for long format: if field is not in columns but is a value in dimension column
+                if field not in self.full_df.columns and "dimension" in self.full_df.columns:
+                    if field in self.full_df["dimension"].unique():
+                        # Extract unique values from name column under that dimension
+                        unique_vals = self.full_df[self.full_df["dimension"] == field]["name"].unique().tolist()
+                        options = ["All"] + sorted([str(v) for v in unique_vals if pd.notna(v)])
+                        bc["options"] = options
+                        print(f"[_process_filter_options] Set options for dimension {field}: {len(options)} values")
+                        continue
+
                 if field in self.full_df.columns:
                     unique_vals = self.full_df[field].unique().tolist()
-                    # 排序并转为字符串
+                    # Sort and convert to strings
                     options = ["All"] + sorted([str(v) for v in unique_vals if pd.notna(v)])
                     bc["options"] = options
                     print(f"[_process_filter_options] Set options for {field}: {len(options)} values")
 
     def _process_filter_ranges(self):
-        """处理 slider 类型 filter 的 range，根据实际数据设置最小/最大值"""
+        """Process ranges for slider type filters, set min/max based on actual data"""
         print(f"[_process_filter_ranges] Starting to process filter ranges...")
         print(f"[_process_filter_ranges] DataFrame shape: {self.full_df.shape}")
         print(f"[_process_filter_ranges] DataFrame columns: {list(self.full_df.columns)}")
@@ -193,7 +232,7 @@ class DashboardEngine:
             
             print(f"[_process_filter_ranges] Processing block: {block_id}, type: {control_type}, field: {field}")
             
-            # 只处理 slider 或 range 类型的 filter
+            # Only process slider or range type filters
             if control_type not in ("slider", "range"):
                 print(f"[_process_filter_ranges] Skipping {block_id}: not a slider/range (type={control_type})")
                 continue
@@ -207,11 +246,11 @@ class DashboardEngine:
                 continue
             
             try:
-                # 判断是否为时间字段
+                # Determine if it's a time field
                 is_time_field = 'time' in field.lower() or 'hour' in field.lower()
                 
                 if is_time_field:
-                    # 时间字段：从时间字符串中提取小时数
+                    # Time field: extract hour from time string
                     def extract_hour(time_str):
                         if pd.isna(time_str):
                             return None
@@ -226,18 +265,18 @@ class DashboardEngine:
                     
                     values = self.full_df[field].apply(extract_hour).dropna()
                 else:
-                    # 数值字段：转换为数值
+                    # Numeric field: convert to numeric
                     values = pd.to_numeric(self.full_df[field], errors='coerce').dropna()
                 
                 if len(values) > 0:
                     min_val = float(values.min())
                     max_val = float(values.max())
                     
-                    # 计算合适的 step
+                    # Calculate appropriate step
                     if is_time_field:
-                        step = 1  # 时间字段步长为1小时
+                        step = 1  # Time field step is 1 hour
                     else:
-                        # 对于数值字段，根据范围自动计算step
+                        # For numeric fields, auto-calculate step based on range
                         range_size = max_val - min_val
                         if range_size <= 10:
                             step = 0.1
@@ -250,7 +289,7 @@ class DashboardEngine:
                         else:
                             step = max(1, int(range_size / 100))
                     
-                    # 更新或创建 range 配置
+                    # Update or create range configuration
                     block_content['range'] = {
                         'min': min_val,
                         'max': max_val,
@@ -274,9 +313,9 @@ class DashboardEngine:
             try:
                 print(f"[compute_charts] loading plot for block {bid} from {py_name}")
                 plot_fn = dynamic_import_plot(py_name)
-                # 后端只负责给数据，美化工作交给前端 Theme
+                # Backend only provides data, styling is handled by frontend Theme
                 option = chart_option_from_plot(plot_fn, df)
-                # 只打印一下关键信息，避免日志太大
+                # Only print key information to avoid log bloat
                 print(f"[compute_charts] block {bid} option keys = {list(option.keys())}")
                 results[bid] = {"option": option}
             except Exception as e:
@@ -287,42 +326,42 @@ class DashboardEngine:
     def compute_highlights(
         self, global_filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """计算高亮块数据
+        """Compute highlight block data
         
-        配置格式（仅支持新格式）：
+        Configuration format (only new format supported):
         {
-            "expression": "unit_price * transaction_qty",  // 字段名或算术表达式
-            "type": "sum",                                   // 聚合类型
+            "expression": "unit_price * transaction_qty",  // Field name or arithmetic expression
+            "type": "sum",                                   // Aggregation type
             "title": "Total Revenue",
             "unit": "currency"
         }
         
-        expression 可以是：
-        - 单个字段名：transaction_id
-        - 算术表达式：unit_price * transaction_qty, (revenue - cost) / revenue
+        expression can be:
+        - Single field name: transaction_id
+        - Arithmetic expression: unit_price * transaction_qty, (revenue - cost) / revenue
         """
-        print(f"\n🔍 [DEBUG] ========== 开始计算高亮数据 ==========")
-        print(f"🔍 [DEBUG] 高亮块数量: {len(self.highlight_blocks)}")
-        print(f"🔍 [DEBUG] 过滤器: {global_filters}")
+        print(f"\n🔍 [DEBUG] ========== Starting highlight data computation ==========")
+        print(f"🔍 [DEBUG] Highlight block count: {len(self.highlight_blocks)}")
+        print(f"🔍 [DEBUG] Filters: {global_filters}")
         
         df = apply_filters(self.full_df, global_filters or {})
-        print(f"🔍 [DEBUG] 过滤后数据行数: {len(df)}")
+        print(f"🔍 [DEBUG] Rows after filtering: {len(df)}")
         
         items: List[Dict[str, Any]] = []
         for i, block in enumerate(self.highlight_blocks):
-            print(f"\n🔍 [DEBUG] 处理高亮块 {i+1}/{len(self.highlight_blocks)}: {block.get('id')}")
+            print(f"\n🔍 [DEBUG] Processing highlight block {i+1}/{len(self.highlight_blocks)}: {block.get('id')}")
             
             bc = block.get("blockContent", {})
             
-            # 只支持新格式
+            # Only support new format
             expression = bc.get("expression")
             htype = bc.get("type")
             unit = bc.get("unit") or ""
             title = bc.get("title") or block.get("id")
             
-            # 验证必需字段
+            # Validate required fields
             if not expression or not htype:
-                print(f"❌ [DEBUG] 缺少必需字段 - expression: {expression}, type: {htype}")
+                print(f"❌ [DEBUG] Missing required fields - expression: {expression}, type: {htype}")
                 item = {
                     "id": block.get("id"),
                     "title": title,
@@ -332,27 +371,27 @@ class DashboardEngine:
                 items.append(item)
                 continue
             
-            print(f"🔍 [DEBUG] 表达式: {expression}, 类型: {htype}, 单位: {unit}")
+            print(f"🔍 [DEBUG] Expression: {expression}, Type: {htype}, Unit: {unit}")
             
             value = None
             try:
-                # 计算表达式的值
+                # Evaluate expression
                 series = self._evaluate_expression(df, expression)
                 
                 if series is not None:
-                    # 根据类型进行聚合
+                    # Aggregate by type
                     value = self._aggregate_series(series, htype, expression, df)
-                    print(f"🔍 [DEBUG] 计算结果: {value}")
+                    print(f"🔍 [DEBUG] Computed value: {value}")
                 else:
-                    print(f"❌ [DEBUG] 表达式求值失败")
+                    print(f"❌ [DEBUG] Expression evaluation failed")
                     
             except Exception as e:
-                print(f"❌ [DEBUG] 计算失败: {e}")
+                print(f"❌ [DEBUG] Computation failed: {e}")
                 import traceback
                 traceback.print_exc()
                 value = None
             
-            # 格式化数值
+            # Format value
             formatted_value = self._format_highlight_value(value, unit, htype)
             
             item = {
@@ -362,45 +401,45 @@ class DashboardEngine:
                 "value": formatted_value,
             }
             items.append(item)
-            print(f"🔍 [DEBUG] 高亮项: {item}")
+            print(f"🔍 [DEBUG] Highlight item: {item}")
         
-        print(f"\n🔍 [DEBUG] ========== 高亮数据计算完成 ==========")
+        print(f"\n🔍 [DEBUG] ========== Highlight data computation completed ==========")
         return items
     
     def _evaluate_expression(self, df: pd.DataFrame, expression: str) -> Optional[pd.Series]:
-        """求值表达式，返回一个 Series"""
+        """Evaluate expression and return a Series"""
         if not expression:
             return None
         
         expression = expression.strip()
         
-        # 如果是单个字段名
+        # If it's a single field name
         if expression in df.columns:
-            print(f"🔍 [DEBUG] 表达式是单个字段: {expression}")
+            print(f"🔍 [DEBUG] Expression is a single field: {expression}")
             return df[expression]
         
-        # 如果是算术表达式，使用 eval
+        # If it's an arithmetic expression, use eval
         try:
-            print(f"🔍 [DEBUG] 尝试求值表达式: {expression}")
-            # 使用 DataFrame.eval 求值
+            print(f"🔍 [DEBUG] Attempting to evaluate expression: {expression}")
+            # Use DataFrame.eval to evaluate
             result = df.eval(expression, engine='python')
             
-            # 如果结果是 Series，直接返回
+            # If result is Series, return directly
             if isinstance(result, pd.Series):
                 return result
-            # 如果结果是标量，创建一个常量 Series
+            # If result is scalar, create a constant Series
             elif isinstance(result, (int, float)):
                 return pd.Series([result] * len(df))
             else:
-                print(f"❌ [DEBUG] 表达式求值结果类型不支持: {type(result)}")
+                print(f"❌ [DEBUG] Expression evaluation result type not supported: {type(result)}")
                 return None
                 
         except Exception as e:
-            print(f"❌ [DEBUG] 表达式求值失败: {e}")
+            print(f"❌ [DEBUG] Expression evaluation failed: {e}")
             return None
     
     def _aggregate_series(self, series: pd.Series, agg_type: str, expression: str, df: pd.DataFrame) -> Any:
-        """对 Series 进行聚合"""
+        """Aggregate a Series"""
         if agg_type == "nunique":
             return int(series.nunique(dropna=True))
         
@@ -414,66 +453,66 @@ class DashboardEngine:
             return float(pd.to_numeric(series, errors="coerce").mean())
         
         elif agg_type == "max":
-            # 对于数值型，返回最大值
+            # For numeric types, return maximum value
             numeric_series = pd.to_numeric(series, errors="coerce")
             if numeric_series.notna().any():
                 return float(numeric_series.max())
-            # 对于非数值型，返回字符串最大值
+            # For non-numeric types, return string maximum
             return str(series.max())
         
         elif agg_type == "min":
-            # 对于数值型，返回最小值
+            # For numeric types, return minimum value
             numeric_series = pd.to_numeric(series, errors="coerce")
             if numeric_series.notna().any():
                 return float(numeric_series.min())
-            # 对于非数值型，返回字符串最小值
+            # For non-numeric types, return string minimum
             return str(series.min())
         
         elif agg_type == "mode":
-            # 返回众数（出现最多的值）
-            # 对于分类数据，找出现次数最多的类别
+            # Return mode (most frequent value)
+            # For categorical data, find the most frequent category
             value_counts = series.value_counts()
             if len(value_counts) > 0:
                 return str(value_counts.index[0])
             return None
         
         else:
-            print(f"❌ [DEBUG] 不支持的聚合类型: {agg_type}")
+            print(f"❌ [DEBUG] Unsupported aggregation type: {agg_type}")
             return None
     
     def _format_highlight_value(self, value: Any, unit: str, htype: str) -> str:
-        """格式化高亮值为显示字符串"""
+        """Format highlight value as display string"""
         if value is None:
             return "N/A"
         
-        # 日期/时间格式检测与处理
-        # 尝试检测是否为日期或时间戳类型
+        # Date/time format detection and processing
+        # Try to detect if it's a date or timestamp type
         if isinstance(value, (pd.Timestamp, pd.DatetimeIndex)):
-            # 检查是否只有日期部分（时间为 00:00:00）
+            # Check if it only has date part (time is 00:00:00)
             if value.hour == 0 and value.minute == 0 and value.second == 0:
-                # 只展示日期
+                # Only show date
                 return value.strftime('%Y-%m-%d')
             else:
-                # 展示日期和时间
+                # Show date and time
                 return value.strftime('%Y-%m-%d %H:%M:%S')
         
-        # 如果是字符串，尝试解析为日期
+        # If it's a string, try to parse as date
         if isinstance(value, str):
             try:
                 dt = pd.to_datetime(value, errors='coerce')
                 if pd.notna(dt):
-                    # 检查是否只有日期部分
+                    # Check if it only has date part
                     if dt.hour == 0 and dt.minute == 0 and dt.second == 0:
                         return dt.strftime('%Y-%m-%d')
                     else:
                         return dt.strftime('%Y-%m-%d %H:%M:%S')
             except:
-                pass  # 不是日期，继续其他格式处理
+                pass  # Not a date, continue with other format processing
         
-        # 货币格式
+        # Currency format
         if unit == "currency" or unit == "USD":
             if isinstance(value, (int, float)):
-                # 如果值很大，使用 K/M 格式
+                # If value is large, use K/M format
                 if abs(value) >= 1000000:
                     return f"{value/1000000:.2f}M"
                 elif abs(value) >= 1000:
@@ -481,34 +520,34 @@ class DashboardEngine:
                 return f"{value:,.2f}"
             return str(value)
         
-        # 百分比格式
+        # Percentage format
         elif unit == "%":
             if isinstance(value, (int, float)):
                 return f"{value:.1f}%"
             return str(value)
         
-        # 数值格式
+        # Numeric format
         elif isinstance(value, float):
-            # 如果是整数值，不显示小数
+            # If it's an integer value, don't show decimals
             if value == int(value):
-                # 如果值很大，使用 K/M 格式
+                # If value is large, use K/M format
                 if abs(value) >= 1000000:
                     return f"{value/1000000:.2f}M"
                 elif abs(value) >= 1000:
                     return f"{int(value)/1000:.2f}K"
                 return f"{int(value):,}"
-            # 否则保留2位小数
+            # Otherwise keep 2 decimal places
             return f"{value:,.2f}"
         
         elif isinstance(value, int):
-            # 如果值很大，使用 K/M 格式
+            # If value is large, use K/M format
             if abs(value) >= 1000000:
                 return f"{value/1000000:.2f}M"
             elif abs(value) >= 1000:
                 return f"{value/1000:.2f}K"
             return f"{value:,}"
         
-        # 其他类型直接转字符串
+        # Other types convert directly to string
         return str(value)
 
 # --- App ---
@@ -520,21 +559,26 @@ app.mount("/public", StaticFiles(directory=PUBLIC_DIR), name="public")
 @app.get("/")
 @app.head("/")
 def index():
-    # 返回 Shell 页面
+    # Return shell page
     return FileResponse(os.path.join(PUBLIC_DIR, "index.html"))
 
 @app.get("/init")
 def init_data():
-    # 刷新 Schema
+    # Refresh schema
     engine.schema = load_schema()
+    # Important: reprocess options and ranges, otherwise they will be overwritten by load_schema()
+    engine._process_filter_ranges()
+    engine._process_filter_options()
+    
     print("[/init] schema loaded, blocks =", len(engine.schema.get("blocks", [])))
     layout = engine.get_layout_config()
     charts = engine.compute_charts()
     highlights = engine.compute_highlights()
+    
     print("[/init] charts keys =", list(charts.keys()))
     print("[/init] highlights count =", len(highlights))
     return convert_numpy_types({
-        "layout": layout,  # 包含 templatePath
+        "layout": layout,  # Contains templatePath
         "blocks": engine.schema.get("blocks", []),
         "charts": charts,
         "highlights": highlights
@@ -542,11 +586,11 @@ def init_data():
 
 @app.get("/data")
 def get_raw_data():
-    """返回原始数据的 JSON 格式，供详情页表格使用"""
+    """Return raw data in JSON format for detail page table"""
     if engine.full_df.empty:
         return []
     
-    # 转换为 records 格式，并限制返回条数以防崩溃
+    # Convert to records format and limit returned rows to prevent crashes
     data = engine.full_df.head(500).to_dict(orient="records")
     return convert_numpy_types(data)
 
@@ -568,4 +612,4 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception: pass
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8007)

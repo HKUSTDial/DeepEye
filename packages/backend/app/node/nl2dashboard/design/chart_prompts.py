@@ -1,9 +1,9 @@
 """Chart Generation Prompts
 
-从 autoVASystem 迁移的图表生成相关 prompts
+Chart generation prompts migrated from autoVASystem.
 """
 
-# 高亮块生成
+# Highlight block generation
 HIGHLIGHT_DESIGN_PROMPT = """
 You are a Visualization Design Expert. Based on the following extracted analytical intents and the provided dataset schema, generate zero or more highlight design suggestions.
 
@@ -118,12 +118,15 @@ Requirements:
 Please generate the configuration, and output should use ````json``` to wrap the json object.
 """
 
-# Dashboard Design Prompts
+# Dashboard design prompts
 DASHBOARD_DESIGN_PROMPT = """
 You are a Dashboard Design Expert. Based on the following insights and chart designs, generate a comprehensive dashboard design focusing on filter components and view interactions.
 
 Your goal is to design an interactive dashboard that enhances data exploration through:
-1. Filter components that allow users to control data views, the filter will be applied to the whole dashboard
+1. Filter components that allow users to control data views, the filter will be applied to the whole dashboard.
+   IMPORTANT: If the data schema contains 'dimension', 'name', and 'value' columns, it means the data is in Long Format. 
+   In this case, to filter a specific metric (e.g., "monthly_revenue"), set the FILTER'S FIELD to the metric name (e.g., "monthly_revenue"). 
+   The system will automatically filter the 'name' column within that dimension.
 2. Inter-chart interactions that enable data discovery through highlighting and cross-filtering
 
 For each filter component design, include:
@@ -132,7 +135,7 @@ FILTER_ID: A unique identifier for the filter (e.g., filter_1)
 - FILTER_DESCRIPTION: A short natural language explanation of the filter design
 - LABEL: Display label for the filter
 - CONTROL_TYPE: The type of control (select, multiselect, slider, range, checkbox, radio)
-- FIELD: The data field this filter controls
+- FIELD: The data field this filter controls (Use the dimension name if data is in Long Format)
 - OPERATOR: How the filter operates (equals, not_equals, between, one_of, not_in)
 - RANGE_CONFIG: For slider/range controls, specify min/max/step values in one line
 
@@ -185,7 +188,7 @@ Please generate a dashboard configuration that follows this JSON schema, only fi
             "blockType": "filter",
             "blockContent": {{
                 "controlType": "<control_type>",  # select, multiselect, slider, range, checkbox, radio
-                "field": "<field_name>",
+                "field": "<field_name>", # If Long Format (dimension/name/value), use the specific dimension value as field name
                 "label": "<display_label>",
                 "operator": "<operator>",  # equals, not_equals, between, one_of, not_in
                 "range": {{  # Required for slider/range controls

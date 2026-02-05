@@ -1,11 +1,8 @@
 """
-此文件同样定义了Table类，但此Table类专门用于机器学习算法的处理，大部分代码与table.py文件相同，仅有少许变量处理方式不同。
+This file also defines a Table class, specialized for the learning-to-rank pipeline. Most logic
+matches table.py with minor differences in variable handling.
 
-附：table.py文件注释：
-该文件实现了Table类，是整份代码中最重要和最复杂的一个类：
-Table类实现了对原始数据分类整合以产生不同类型图表的重要功能，其顶层函数为dealWithTable，该函数先调用generateViews函数
-进行必要的预处理后调用getClassifyTable函数，由getClassifyTable函数根据数据类型进行不同的处理和操作，实现较复杂，代码
-量较大。经过处理后，原始数据表格分散为若干个小的数据表格，为后续产生不同的图表以及图标的排序做好准备工作。
+See table.py for the main Table implementation and its role in data classification and chart generation.
 """
 
 import datetime

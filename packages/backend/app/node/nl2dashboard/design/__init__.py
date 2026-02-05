@@ -1,6 +1,6 @@
-"""Dashboard 设计模块
+"""Dashboard design module.
 
-提供 Dashboard 设计相关的类。
+Provides dashboard design related classes.
 """
 
 from .dashboard_designer import DashboardDesigner

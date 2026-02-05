@@ -220,7 +220,7 @@
         </div>
     </div>
 
-<!-- Template 1 主题配置脚本 -->
+<!-- Template 1 theme configuration script -->
     <script>
 // --- 🎨 Template 1 (Cool Tone Aesthetics) ---
 const themeName = 'template1_aesthetic';
@@ -365,16 +365,16 @@ const templatePalette = {
             }
         };
 
-// 注册主题到全局，供 app.js 使用
+// Register theme globally for use in app.js
 (function() {
-    // 确保 echarts 已加载
+    // Ensure echarts is loaded
     if (typeof window.echarts !== 'undefined') {
         window.echarts.registerTheme(themeName, templatePalette);
-        // 将主题配置暴露到全局，供 app.js 中的 renderCharts 使用（使用通用变量名）
+        // Expose theme configuration globally for renderCharts in app.js (generic variable names)
         window.currentPalette = templatePalette;
         window.currentThemeName = themeName;
                 } else {
-        // 如果 echarts 还未加载，等待加载完成
+        // If echarts is not yet loaded, wait until it is ready
         const checkECharts = setInterval(() => {
             if (typeof window.echarts !== 'undefined') {
                 window.echarts.registerTheme(themeName, templatePalette);
@@ -384,7 +384,7 @@ const templatePalette = {
             }
         }, 50);
         
-        // 10秒后停止检查，避免无限等待
+        // Stop checking after 10 seconds to avoid infinite wait
         setTimeout(() => clearInterval(checkECharts), 10000);
     }
 })();
@@ -399,7 +399,7 @@ if (!window.switchPage) {
         const title = document.getElementById('page-title');
 
         if (!overview || !details || !navOverview || !navDetails || !title) {
-            console.warn('Page elements not found, waiting for DOM...');
+        console.warn('Page elements not found, waiting for DOM...');
             setTimeout(() => window.switchPage(pageId), 100);
                 return;
         }
@@ -429,13 +429,13 @@ if (!window.switchPage) {
             navOverview.classList.add('nav-inactive');
             navOverview.classList.remove('nav-active');
             if (title) title.textContent = 'Music Wrapped Insights';
-            // fetchRealData 等数据获取功能由 app.js 或其他模块处理
+            // Data fetching like fetchRealData is handled in app.js or other modules
         }
     };
 }
     </script>
 
-<!-- Template 1 样式（模板特定功能所需） -->
+<!-- Template 1 styles (required for template-specific features) -->
 <style>
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

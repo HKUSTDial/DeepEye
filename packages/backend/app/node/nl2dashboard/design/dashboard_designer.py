@@ -105,7 +105,7 @@ class DashboardDesigner:
         # LLM client is optional - only needed for highlight and interaction generation
         # Chart generation uses LIDA's own LLM
         if not self.llm_client:
-            print("⚠️  No LLM client configured. Highlight and Interaction generation will be skipped.")
+                print("⚠️ No LLM client configured. Highlight and interaction generation will be skipped.")
         
         self.info_doc = info_doc
         
@@ -265,7 +265,7 @@ class DashboardDesigner:
             tuple: (dashboard_name, dashboard_description)
         """
         try:
-            # 如果没有 LLM client，使用默认值
+            # If no LLM client, use default values
             if not self.llm_client:
                 print("Skipping dashboard name/description generation (no LLM client)")
                 return "Data Dashboard", "A comprehensive data visualization dashboard"
@@ -396,7 +396,7 @@ class DashboardDesigner:
             # print("="*60)
             
             # 1. Generate charts with LIDA
-            # Get API configuration from LLM client or environment
+            # Get API config from LLM client or environment
             api_key = None
             base_url = None
             
@@ -583,7 +583,7 @@ class DashboardDesigner:
             
             print(f"✓ Total generated: {len(all_charts)} charts")
             
-            # 2. Quality detection with DeepEye (if available)
+            # 2. Quality detection with DeepEye when available
             if has_detector and all_charts:
                 print(f"\n🔍 Starting quality detection...")
                 
@@ -618,7 +618,7 @@ class DashboardDesigner:
                             })
                     
                     # 3. Filter high-quality charts
-                    print(f"\n[INFO] Filtering high-quality charts...")
+                    print("\n[INFO] Filtering high-quality charts...")
                     high_quality_charts = []
                     
                     for result in detection_results:
@@ -631,7 +631,7 @@ class DashboardDesigner:
                         score = result.get('score')
                         chart_type = result.get('chart_type', '').lower()
                         
-                        # 过滤掉 Boxplot 类型的图表
+                        # Filter out Boxplot-type charts
                         if chart_type == 'boxplot' or 'boxplot' in chart_type:
                             print(f"  ✗ {chart_info['chart_id']}: Filtered (Boxplot type not supported)")
                             continue
@@ -672,8 +672,8 @@ class DashboardDesigner:
                     # Sort by score
                     high_quality_charts.sort(key=lambda x: x.get('score', 0), reverse=True)
                     
-                    # 3.5. Filter goals by score and data column diversity: calculate best score and collect fields for each goal
-                    print(f"\n[INFO] Filtering goals by score and data column diversity (keep top 5 with score >= 0)...")
+                    # 3.5. Filter goals by score and data column diversity
+                    print("\n[INFO] Filtering goals by score and data column diversity (keep top 5 with score >= 0)...")
                     goal_scores = {}  # goal_index -> best_score
                     goal_fields = {}  # goal_index -> set of fields used
                     
@@ -772,7 +772,7 @@ class DashboardDesigner:
                     high_quality_charts = filtered_charts
                     print(f"  ✓ Filtered to {len(high_quality_charts)} charts from {len(valid_goal_indices)} goals")
                     
-                    # 4. Generate report
+                    # 4. Write report
                     report_file = output_path / "chart_quality_report.json"
                     with open(report_file, 'w', encoding='utf-8') as f:
                         json.dump({
@@ -910,7 +910,7 @@ class DashboardDesigner:
             List[Dict]: List of highlight block configurations
         """
         try:
-            # 如果没有 LLM client，跳过 highlight 生成
+            # Skip highlight generation when no LLM client
             if not self.llm_client:
                 print("Skipping highlight generation (no LLM client)")
                 return []
@@ -918,20 +918,19 @@ class DashboardDesigner:
             # Load insight data
             insight_data = self._load_insight_data(insight_path)
             
-            # Convert data schema to string format
+            # Convert data schema to string
             data_source_schema_str = json.dumps(data_schema, ensure_ascii=False)
             
             print("Generating highlight blocks...")
             
-            # --- 新增调试：Highlight 生成前的输入 ---
-            print(f"Highlight Generation Context:")
+            # Debug: input before highlight generation
+            print("Highlight generation context:")
             print(f"  Question: {original_question}")
-            print(f"  Intents Count: {len(insight_data.get('intents', []))}")
+            print(f"  Intents count: {len(insight_data.get('intents', []))}")
             if insight_path:
-                print(f"  Insight Path: {insight_path}")
+                print(f"  Insight path: {insight_path}")
             else:
-                print("  ⚠️  No insight path provided, using default data (this often leads to empty highlights)")
-            # ------------------------------------
+                print("  ⚠️ No insight path provided, using default data (may lead to empty highlights)")
 
             # Step 1: Generate highlight designs
             prompt = HIGHLIGHT_DESIGN_PROMPT.format(
@@ -968,22 +967,21 @@ class DashboardDesigner:
             )
             highlight_configs = self._parse_chart_configs(response.content)
             
-            # 限制最多6个Highlight
+            # Cap at 6 highlight blocks
             if len(highlight_configs) > 6:
                 highlight_configs = highlight_configs[:4]
-                print(f"Limited to 4 highlight blocks (generated {len(highlight_configs)} total)")
+                print("Limited to 4 highlight blocks (more than 6 were generated)")
             
             print(f"Generated {len(highlight_configs)} highlight blocks")
             
-            # --- 新增调试输出：Highlight 块详情 ---
+            # Debug: highlight block details
             if highlight_configs:
-                print(f"Highlight Blocks Detail:")
+                print("Highlight block details:")
                 for i, hb in enumerate(highlight_configs):
                     content = hb.get("blockContent", {})
                     print(f"  {i+1}. Title: {content.get('title')}, Value: {content.get('value')}")
             else:
-                print("⚠️  Warning: No highlight blocks were successfully generated.")
-            # ------------------------------------
+                print("⚠️ Warning: No highlight blocks were successfully generated.")
             
             return highlight_configs
             
@@ -1011,7 +1009,7 @@ class DashboardDesigner:
             Dict: Dashboard interaction configuration with blocks and interactionEdges
         """
         try:
-            # 如果没有 LLM client，跳过 interaction 生成
+            # Skip interaction generation when no LLM client
             if not self.llm_client:
                 print("Skipping interaction generation (no LLM client)")
                 return {"blocks": [], "interactionEdges": []}
@@ -1024,11 +1022,10 @@ class DashboardDesigner:
             
             print("Generating dashboard interactions...")
             
-            # --- 新增调试：Filter 生成前的输入 ---
-            print(f"Interaction Generation Context:")
-            print(f"  Chart Configs Count: {len(chart_configs or [])}")
-            print(f"  Data Schema Fields: {list(data_schema.keys()) if isinstance(data_schema, dict) else 'Unknown'}")
-            # ------------------------------------
+            # Debug: input before filter generation
+            print("Interaction generation context:")
+            print(f"  Chart configs count: {len(chart_configs or [])}")
+            print(f"  Data schema fields: {list(data_schema.keys()) if isinstance(data_schema, dict) else 'Unknown'}")
 
             # Prepare chart designs summary
             chart_designs = []
@@ -1059,14 +1056,13 @@ class DashboardDesigner:
             print("  → Parsing dashboard design from LLM response...")
             dashboard_design = self._parse_dashboard_design(response.content)
             
-            # --- 新增调试：Filter 设计阶段输出 ---
+            # Debug: filter design phase output
             if dashboard_design:
-                print(f"  → Dashboard Design Parsed:")
+                print("  → Dashboard design parsed:")
                 print(f"    - Filters planned: {len(dashboard_design.get('filters', []))}")
                 print(f"    - Interactions planned: {len(dashboard_design.get('interactions', []))}")
             else:
-                print("  ⚠️  Failed to parse dashboard design from LLM response.")
-            # ------------------------------------
+                print("  ⚠️ Failed to parse dashboard design from LLM response.")
             
             # Step 2: Generate dashboard configuration
             print("  → Step 2/2: Generating dashboard configuration...")
@@ -1086,7 +1082,7 @@ class DashboardDesigner:
             print("  ✓ Step 2/2 completed")
             dashboard_interact_config = self._parse_dashboard_config(response.content)
             
-            # --- 新增调试输出：Filter 块详情 ---
+            # Debug: filter block details
             filter_blocks = [b for b in dashboard_interact_config.get('blocks', []) if b.get('blockType') == 'filter']
             print(f"Generated {len(filter_blocks)} filter blocks")
             if filter_blocks:
@@ -1094,10 +1090,9 @@ class DashboardDesigner:
                     content = fb.get("blockContent", {})
                     print(f"  Filter {i+1}: Field='{content.get('field')}', Type='{content.get('controlType')}', Label='{content.get('title')}'")
             else:
-                print("⚠️  Warning: No filter blocks generated.")
+                print("⚠️ Warning: No filter blocks generated.")
             
             print(f"Generated {len(dashboard_interact_config.get('interactionEdges', []))} interaction edges")
-            # ------------------------------------
 
             return dashboard_interact_config
             
@@ -1265,29 +1260,24 @@ class DashboardDesigner:
             "interactionEdges": []
         }
         
-        # Extract Filter Design (Robust Method: Divide and Conquer)
-        # print("     [DEBUG] Extracting filter designs (Robust Method)...")
-        
-        # 1. 预处理：统一换行符，便于处理
+        # Extract filter design (divide and conquer)
+        # 1. Preprocess: normalize line endings
         text = dashboard_design_rsp.replace('\r\n', '\n')
         
-        # 2. 第一步：切割块 - 通过查找 "FILTER_ID" 来定位每个过滤器的起始位置
-        # 使用 split 而不是复杂的正则，可以避免回溯死锁
-        # 支持多种格式：FILTER_ID: FILTER_ID: **FILTER_ID**: 1. **FILTER_ID**:
+        # 2. Step 1: split blocks by "FILTER_ID" to locate each filter
+        # Use split to avoid regex backtracking; support FILTER_ID:, **FILTER_ID**:, 1. **FILTER_ID**:
         raw_blocks = re.split(r'(?=(?:^|\n)\s*(?:\d+\.\s*)?(?:\*\*)?\s*FILTER_ID\s*(?:\*\*)?\s*[:：])', text, flags=re.MULTILINE | re.IGNORECASE)
         
         for block in raw_blocks:
             if not re.search(r'FILTER_ID\s*[:：]', block, re.IGNORECASE):
                 continue
             
-            # 3. 第二步：在每个块内独立提取字段
-            # 使用函数封装提取逻辑，如果某个字段没找到，默认为空字符串或 None
+            # 3. Step 2: extract fields inside each block independently
             def extract_field(pattern, content):
                 match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
                 return match.group(1).strip() if match else None
             
-            # 定义每个字段的简单正则 (不再依赖上下文顺序)
-            # 支持多种格式：**FIELD**: value, - **FIELD**: value, FIELD: value
+            # Simple regex per field (order-independent); support **FIELD**: value, - **FIELD**: value
             filter_item = {
                 "filter_id": extract_field(r"(?:\*\*)?\s*FILTER_ID\s*(?:\*\*)?\s*[:：\s*-]+(.*?)(?=\n|FILTER_|INTERACTION_|$)", block),
                 "purpose": extract_field(r"(?:\*\*)?\s*FILTER_PURPOSE\s*(?:\*\*)?\s*[:：\s*-]+(.*?)(?=\n|FILTER_|INTERACTION_|$)", block),
@@ -1299,14 +1289,14 @@ class DashboardDesigner:
                 "range_config": extract_field(r"(?:\*\*)?\s*RANGE_CONFIG\s*(?:\*\*)?\s*[:：\s*-]+(.*?)(?=\n|FILTER_|INTERACTION_|$)", block),
             }
             
-            # 只有当提取到了 ID 时才添加，避免空块
+            # Only add when ID was extracted to avoid empty blocks
             if filter_item["filter_id"]:
-                # 清理可能残留的 Markdown 符号和空白
+                # Strip leftover Markdown and whitespace
                 for k, v in filter_item.items():
                     if v:
                         filter_item[k] = v.strip('`"\'* ').strip()
                 
-                # 构建 filter_block 结构
+                # Build filter_block structure
                 filter_block = {
                     "id": filter_item["filter_id"],
                     "blockType": "filter",
@@ -1318,7 +1308,7 @@ class DashboardDesigner:
                     }
                 }
                 
-                # 只有 field 存在时才添加
+                # Only add when field is present
                 if filter_block["blockContent"]["field"]:
                     dashboard_design["blocks"].append(filter_block)
                     # print(f"     [DEBUG] Found Filter: {filter_item['filter_id']} (field={filter_block['blockContent']['field']})")

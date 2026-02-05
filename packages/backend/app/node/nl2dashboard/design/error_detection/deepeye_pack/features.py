@@ -1,8 +1,8 @@
 """
-此文件定义了两个类Type和Feature：
-Type类主要用于根据数据类型进行分类，最终分为categorical，numerical和temporal三类，在view.py, table.py, table_l.py
-文件中进行算法实现时，根据数据Type类型的不同，进行的操作也有所差异。
-Features类用于存储数据的一些特征信息，如名称(name)，类型(type)，数据来源(origin)，最小值(min)，最大值(max)等。
+This file defines Type and Features.
+
+Type: used to classify data into categorical, numerical, and temporal; view/table/table_l use it to
+branch logic. Features: stores column attributes such as name, type, origin, min, max, etc.
 """
 
 class Type(object):

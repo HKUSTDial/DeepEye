@@ -1,9 +1,9 @@
 """
-此文件定义了Chart和View两个类：
-Chart类是定义图表类型的辅助类，将bar, line, scatter, pie四种图表类型分别用0, 1, 2, 3来表示，并定义了chart列表。
-View类记录了图表的所有信息，包括图表标题，横纵坐标标题，图表类型，M,Q,W值，图表评分等，此外还实现了信息汇总函数output
-和output，该函数将图表所包含的所有信息包装在一个字符串中，该字符串可用于机器学习排序算法中，将此字符串写入.ltr文件供
-模型文件读入从而对图表进行排序
+This file defines Chart and View.
+
+Chart: helper class for chart types; bar, line, scatter, pie are encoded as 0,1,2,3 with a chart list.
+View: holds all chart info (title, axis titles, chart type, M/Q/W, score, etc.) and implements output
+and output_score, which pack the info into a string for learning-to-rank (written to .ltr for the model).
 """
 
 import math
@@ -75,7 +75,7 @@ class View(object):
         if self.fx.type == Type.categorical: # regard the corrcoef of categorical as 0
             return 0
         if self.fx.type == Type.temporal:
-            # 时间序列：长度应该等于该系列的实际数据点数
+            # Time series: length should match actual data points of the series
             data1 = [i for i in range(len(self.Y[series_id]))]
         else:
             data1 = self.X[series_id]
@@ -175,12 +175,12 @@ class View(object):
                            log(X) and log(Y), result is the max of the four correlation coefficient.
             
         """
-        # 确保data1和data2总是被定义
+        # Ensure data1 and data2 are always defined
         data1 = []
         data2 = []
-        
+
         if self.fx.type == Type.temporal:
-            # 时间序列：长度应该等于该系列的实际数据点数
+            # Time series: length should match actual data points of the series
             if series_id < len(self.Y):
                 data1 = [i for i in range(len(self.Y[series_id]))]
                 data2 = self.Y[series_id]
@@ -257,10 +257,8 @@ class View(object):
             None
             
         """
-        # self.tuple_num: x数目 * series系列数目
-        # self.series_num: 系列数目
-        # self.table.instance.tuple_num: 数据总行数
-        # self.Y[0]: 第一组数据的值
+        # self.tuple_num: x count * series count; self.series_num: number of series
+        # self.table.instance.tuple_num: total data rows; self.Y[0]: first series values
         if self.chart == Chart.pie:
             if self.tuple_num == 1:
                 self.M = 0
@@ -287,7 +285,6 @@ class View(object):
         else: #if self.chart == Chart.line
             if self.series_num == 1:
                 corr = self.getCorrelation(0)
-                # print(f"  [折线图M值计算] 单系列相关性={corr:.4f}, M={'1' if corr > 0.3 else '0'}")
                 if corr > 0.3:
                     self.M = 1
                 else:
@@ -298,13 +295,10 @@ class View(object):
                     try:
                         corr = self.getCorrelation(i)
                         correlations.append(corr)
-                        # print(f"  [折线图M值计算] 系列{i}相关性={corr:.4f}")
-                    except Exception as e:
-                        # print(f"  [折线图M值计算] 系列{i}计算失败: {str(e)}")
+                    except Exception:
                         correlations.append(0)
-                
+
                 max_corr = max(correlations) if correlations else 0
-                # print(f"  [折线图M值计算] 最大相关性={max_corr:.4f}, M={'1' if max_corr > 0.3 else '0'}")
                 if max_corr > 0.3:
                     self.M = 1
                 else:

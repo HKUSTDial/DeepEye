@@ -1,12 +1,12 @@
 """
-此文件进行数据集的初始化操作，主要实现了以下几个方面的功能：
-1.数据集的读入和初始化：主要在from_csv和csv_handle两个函数中实现，通过文件操作读入数据集后，对数据集每一列进行
-类型识别，对于date, datetime, year类型的数据，通过csv_handle_changedate函数进行处理，统一格式。
-2.视图排序顶层函数：包括learning_to_rank, partial_order, diversified_ranking三个函数，分别表示用机器学习
-方法，偏序关系方法，线性融合排序方法对产生的图表进行排序，而算法内部的具体实现位于instance.py文件中
-3.输出函数：包括to_list, to_print_out, to_single_json, to_multiple_jsons, to_single_html, to_multiple_htmls
-六个输出函数，分别表示输出为列表，标准输出，单个json文件，多个json文件，单个html文件，多个html文件。
-此外还有大量的代码用于异常检测与异常信息输出(所有以error_开头的函数)，增强代码的鲁棒性
+This file handles dataset initialization and provides:
+
+1. Dataset load and init: from_csv and csv_handle read the dataset and infer column types; date/datetime/year
+   are normalized via csv_handle_changedate.
+2. View ranking entry points: learning_to_rank, partial_order, diversified_ranking (ML, partial-order,
+   diversified ranking); implementation is in instance.py.
+3. Output helpers: to_list, to_print_out, to_single_json, to_multiple_jsons, to_single_html, to_multiple_htmls.
+4. Error handling and reporting (error_* functions) for robustness.
 """
 
 #coding:utf-8
@@ -39,7 +39,7 @@ except ImportError:
     try:
         from IPython.core.display import display, HTML
     except ImportError:
-        # 如果不在IPython环境中，定义空的display函数
+        # When not in IPython, define no-op display
         def display(*args, **kwargs):
             pass
         HTML = str
@@ -225,7 +225,7 @@ class deepeye(object):
             a = a[:-1]  # remove '\n'
             # x = a.replace('$', '').split(',')  # x stores the name of each column
 
-            # 分割列名，并替换其中的空格为下划线
+            # Split column names and replace spaces with dashes
             column_names = a.split(',')
             column_names = [name.replace(' ', '-').replace('_', '-') for name in column_names]
             x = column_names  # x stores the name of each column
@@ -238,37 +238,29 @@ class deepeye(object):
         fh.close()
 
         test = pd.DataFrame(pd.read_csv(self.csv_path, engine='c',names=column_names, skiprows=1)).dropna(axis=0, how='any')
-        # 先给type默认为0
+        # Default type to 0 initially
         types = [0 for i in range(len(test.dtypes))]
-
-        # 上面数据读取完毕-----------------------------------------------------------------------------------
 
         # type transformation
         for i in range(len(test.dtypes)):
             if test.dtypes[i].name[0:3] == 'int' or test.dtypes[i].name[0:5] == 'float':
-                if (x[i][0] == "'" or x[i][0] == '"'):  # 消除单引号和双引号
+                if (x[i][0] == "'" or x[i][0] == '"'):  # Strip quotes
                     x[i] = x[i].replace('\'', '').replace('"', '')
                 for j in test[x[i]]:
-                    # TODO 修改：0就是数字，不当时间来看。1949.0也是数字！
+                    # Treat 0 as number, not year; 1949.0 is numeric
                     # if not (j == 0 or (j > 1000 and j < 2100)):
                     if (not ((j > 1900 and j < 2100))) or isinstance(j, float):
                         types[i] = test.dtypes[i].name[0:5]
                         break
                     else:
                         types[i] = 'year'
-            # bool没有处理，交给这里处理
             elif test.dtypes[i].name[0:6] == 'object' or test.dtypes[i].name[0:6] == 'bool':
-                if (x[i][0] == "'" or x[i][0] == '"'):  # 消除单引号和双引号
+                if (x[i][0] == "'" or x[i][0] == '"'):
                     x[i] = x[i].replace('\'', '').replace('"', '')
                 for j in test[x[i]]:
-                    # 先判断一下是否为字符串形式的时间（月份或者星期）
-                    # if j in ['January']:
-                    #     types[i] = 'date'
-                    #     break
-                    # 包含2016-10-24 但是还含有字母的话就只能当varchar了
+                    # Check for date-like strings; if contains date but also letters -> varchar
                     my_re = re.compile(r'[A-Za-z]', re.S)
                     res = re.findall(my_re, str(j))
-                    # 不包含2016-10-24或者存在字符都不行,20-34也不是时间！
                     # if j != 0 and (not(re.search(r'\d+[/-]\d+[/-]\d+', j)) or len(res)!=0):
 
                     if not is_vaild_datetime(j) and (j != 0 or j == False) and (not (re.search(
@@ -284,9 +276,8 @@ class deepeye(object):
 
         raw_csv = pd.read_csv(self.csv_path, header=0, keep_default_na=False, engine='c')
         self.csv_dataframe = pd.DataFrame(raw_csv).dropna(axis=0, how='any')
-        # 使用 os.path 处理路径，兼容 Windows 和 Linux
-        name = os.path.basename(path)  # 获取文件名
-        name = os.path.splitext(name)[0]  # 去除扩展名
+        name = os.path.basename(path)
+        name = os.path.splitext(name)[0]
         for index in range(len(x)):
             x[index] = x[index].replace('$', '')
         self.table_info(name.replace('$', ''), x, types)
@@ -308,7 +299,7 @@ class deepeye(object):
         self.csv_path = path
 
         try:
-            fh = open(self.csv_path, "r", encoding='utf-8-sig')  # 使用utf-8-sig处理BOM
+            fh = open(self.csv_path, "r", encoding='utf-8-sig')  # utf-8-sig for BOM
         except IOError:
             print("Error: no such file or directory")  
 
@@ -317,9 +308,8 @@ class deepeye(object):
         types = [0 for i in range(len(test.dtypes))]
         a = fh.readline()
         a = a[:-1] # remove '\n'
-        x = a.split(',') # x stores the name of each column
-        # 清理BOM字符
-        x = [col.strip().replace('\ufeff', '') for col in x]
+        x = a.split(',')  # x stores the name of each column
+        x = [col.strip().replace('\ufeff', '') for col in x]  # Strip BOM
         fh.close()
 
         #type transformation
@@ -327,7 +317,6 @@ class deepeye(object):
             if test.dtypes.iloc[i].name[0:3] == 'int' or test.dtypes.iloc[i].name[0:5] == 'float':
                 if (x[i][0] == "'" or x[i][0] == '"'):
                     x[i] = x[i].replace('\'', '').replace('"', '')
-                # 初始化类型为数值类型
                 types[i] = test.dtypes.iloc[i].name[0:5] if test.dtypes.iloc[i].name[0:5] == 'float' else 'int'
                 for j in test[x[i]]:
                     if not (j == 0 or (j > 1000 and j < 2100)):
@@ -338,11 +327,9 @@ class deepeye(object):
             elif test.dtypes.iloc[i].name[0:6] == 'object':
                 if (x[i][0] == "'" or x[i][0] == '"'):
                     x[i] = x[i].replace('\'', '').replace('"', '')
-                
-                # 默认类型为 varchar（分类类型）
+
                 types[i] = 'varchar'
                 try:
-                    # 检查是否可能是日期类型
                     date_count = 0
                     non_empty_count = 0
                     for j in test[x[i]]:
@@ -350,33 +337,27 @@ class deepeye(object):
                             non_empty_count += 1
                             if re.search(r'\d+[/-]\d+[/-]\d+', str(j)):
                                 date_count += 1
-                    
-                    # 如果大部分非空值都是日期格式，则认为是日期类型
+
                     if non_empty_count > 0 and date_count / non_empty_count > 0.5:
                         types[i] = 'date'
                     else:
                         types[i] = 'varchar'
                 except Exception as e:
-                    print(f"警告: 列 '{x[i]}' 类型识别时出错: {e}")
-                    # 出错时默认使用 varchar
+                    print(f"Warning: column '{x[i]}' type detection error: {e}")
                     types[i] = 'varchar'
             else:
-                # 其他类型（如 bool, datetime64 等），默认使用 varchar
                 types[i] = 'varchar'
-        
-        # 确保所有列都有有效的类型（兜底逻辑）
+
         for i in range(len(types)):
             if types[i] == 0 or types[i] == '0' or str(types[i]).strip() == '0':
-                print(f"警告: 列 '{x[i]}' 类型识别失败，默认使用 'varchar'")
+                print(f"Warning: column '{x[i]}' type detection failed, defaulting to 'varchar'")
                 types[i] = 'varchar'
-        
-        # 清理列名和类型中的空格
+
         x = [col.strip() for col in x]
         types = [str(t).strip() for t in types]
-                    
-        # 使用 os.path 处理路径，兼容 Windows 和 Linux
-        name = os.path.basename(path)  # 获取文件名
-        name = os.path.splitext(name)[0]  # 去除扩展名
+
+        name = os.path.basename(path)
+        name = os.path.splitext(name)[0]
         self.table_info(name, x, types)
         self.import_method = methods_of_import[2] # = 'csv'
 
@@ -438,10 +419,9 @@ class deepeye(object):
             try:
                 table[col_name] = pd.to_datetime(table[col_name].apply(lambda x: str(x)+'/1/1')).dt.date
             except Exception as e:
-                print(f"报错了{e}-------------")
-                traceback.print_exc()  # 打印详细的错误堆栈信息
+                print(f"Error: {e}")
+                traceback.print_exc()
 
-    
     def show_csv_info(self):
         """
         print out csv info
@@ -900,7 +880,6 @@ class deepeye(object):
 
         filename = self.table_name + str(data['order']) + '.html'
         margin = str(data['title_top']) + '%'
-        # 设置图标基本属性
         if data['chart'] == 'bar':
             chart = (Bar().set_series_opts(label_opts=opts.LabelOpts(is_show=False))
                           .set_global_opts(title_opts=opts.TitleOpts(title=data['chartname'], subtitle=data['describe'], pos_left='center', pos_top=margin),
@@ -918,12 +897,12 @@ class deepeye(object):
                               .set_global_opts(title_opts=opts.TitleOpts(title=data['chartname'], subtitle=data['describe'], pos_left='center', pos_top=margin),
                                                xaxis_opts=opts.AxisOpts(type_='value', name=data['x_name'], splitline_opts=opts.SplitLineOpts(is_show=True)),
                                                yaxis_opts=opts.AxisOpts(type_='value', name=data['y_name'], splitline_opts=opts.SplitLineOpts(is_show=True))))
-        else :
-            print ("not valid chart")
-        
-        if not data["classify"]: # 在图片上只需展示一组数据
-            attr = data["x_data"][0] # 横坐标
-            val = data["y_data"][0] # 纵坐标
+        else:
+            print("not valid chart")
+
+        if not data["classify"]:  # Single series on chart
+            attr = data["x_data"][0]  # X axis
+            val = data["y_data"][0]    # Y axis
             if data['chart'] == 'bar':       
                 chart.add_xaxis(attr).add_yaxis("", val, label_opts=opts.LabelOpts(is_show=False))
             elif data['chart'] == 'line':    
@@ -938,10 +917,10 @@ class deepeye(object):
                     val = [x for x in val if x != '']
                     val = list(map(float, val))
                 chart.add_xaxis(attr).add_yaxis("", val, label_opts=opts.LabelOpts(is_show=False))
-        else : # 在图片上需要展示多组数据
-            attr = data["x_data"][0] # 横坐标
-            for i in range(len(data["classify"])) : # 循环输出每组数据
-                val = data["y_data"][i] # 每组纵坐标的值
+        else:  # Multiple series on chart
+            attr = data["x_data"][0]
+            for i in range(len(data["classify"])):
+                val = data["y_data"][i]
                 name = (data["classify"][i][0] if type(data["classify"][i]) == type(('a','b')) else data["classify"][i])
                 if i == 0:
                     if data['chart'] != 'pie' and data['chart'] != 'scatter':
@@ -952,9 +931,9 @@ class deepeye(object):
                     chart.add_yaxis(name, val, label_opts=opts.LabelOpts(is_show=False))
                 elif data['chart'] == 'pie': 
                     chart.add("", [list(z) for z in zip(attr, val)])
-                elif data['chart'] == 'scatter': 
+                elif data['chart'] == 'scatter':
                     attr_scatter = data["x_data"][i]
-                    if isinstance(attr_scatter[0], str): # 去除散点图的空点，并将字符类型转化为数字类型
+                    if isinstance(attr_scatter[0], str):  # Drop empty points and cast to numeric
                         attr_scatter = [x for x in attr_scatter if x != '']
                         attr_scatter = list(map(float, attr_scatter))
                     if isinstance(val[0], str):
@@ -1010,8 +989,7 @@ class deepeye(object):
             data['x_data'] = view.X
             data['y_data'] = view.Y
             data['title_top'] = 5
-            
-            # 以下代码与html_handle相似
+
             margin = str(data['title_top']) + '%'
             
             if data['chart'] == 'bar':

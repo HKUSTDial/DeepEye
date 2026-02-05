@@ -30,7 +30,7 @@
 
         <div class="flex-1 overflow-x-hidden overflow-y-auto p-8">
             
-            <!-- 4个图表的2x2网格布局 -->
+            <!-- 4 charts in a 2x2 grid layout -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[400px]">
@@ -83,15 +83,15 @@
 // --- 🎨 颜值核心：Template 3 (Design Aesthetics Diary Edition) ---
 const themeName = 'template3_aesthetic';
 const template3Palette = {
-    // 1. 调色盘：完全提取自图片 "Design Aesthetics Diary"
-    // 顺序：Salmon -> Peach -> Sage -> Sky
+    // 1. Palette: fully extracted from the image "Design Aesthetics Diary"
+    // Order: Salmon -> Peach -> Sage -> Sky
     color: [
         '#E18182', // Metric 1 (Primary)
         '#F9CE9C', // Metric 2 (Secondary/Warm)
         '#BBCFC3', // Metric 3 (Tertiary/Nature)
         '#C9DDE3', // Metric 4 (Cold/Neutral)
-        '#D8A49B', // 补充色：深一点的粉
-        '#A5B9C0'  // 补充色：深一点的蓝灰
+        '#D8A49B', // Extra color: deeper pink
+        '#A5B9C0'  // Extra color: deeper blue-gray
     ],
     backgroundColor: 'rgba(0,0,0,0)',
     textStyle: { fontFamily: 'Inter, -apple-system, system-ui, sans-serif' },
@@ -101,7 +101,7 @@ const template3Palette = {
         subtextStyle: { color: '#9ca3af' }
     },
 
-    // 2. 布局：保持宽屏
+    // 2. Layout: keep a widescreen feel
     grid: {
         top: 45,
         left: '1%',
@@ -112,7 +112,7 @@ const template3Palette = {
     },
 
     categoryAxis: {
-        axisLine: { show: true, lineStyle: { color: '#f3f4f6' } }, // 极淡灰线
+        axisLine: { show: true, lineStyle: { color: '#f3f4f6' } }, // Very light gray line
         axisTick: { show: false },
         axisLabel: { color: '#6b7280', margin: 14, fontSize: 11, fontWeight: 500 },
         splitLine: { show: false }
@@ -127,9 +127,9 @@ const template3Palette = {
         }
     },
 
-    // --- 图表样式调整：柔和、哑光质感 ---
+    // --- Chart style adjustments: soft, matte texture ---
 
-    // 1. 折线图：使用 Salmon (#E18182) 渐变
+    // 1. Line chart: use Salmon (#E18182) gradient
     line: {
         smooth: true,
         width: 3,
@@ -153,15 +153,15 @@ const template3Palette = {
         }
     },
 
-    // 2. 柱状图：使用 Sky (#C9DDE3) 到 Sage (#BBCFC3) 的清新渐变
+    // 2. Bar chart: fresh gradient from Sky (#C9DDE3) to Sage (#BBCFC3)
     bar: {
         itemStyle: {
             borderRadius: [4, 4, 0, 0],
             color: {
                 type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
                 colorStops: [
-                    { offset: 0, color: '#BBCFC3' }, // 顶部 Sage
-                    { offset: 1, color: '#C9DDE3' }  // 底部 Sky
+                    { offset: 0, color: '#BBCFC3' }, // Top: Sage
+                    { offset: 1, color: '#C9DDE3' }  // Bottom: Sky
                 ]
             }
         },
@@ -169,11 +169,11 @@ const template3Palette = {
         barCategoryGap: '35%'
     },
 
-    // 3. 箱型图：使用 Peach (#F9CE9C)
+    // 3. Boxplot: use Peach (#F9CE9C)
     boxplot: {
         itemStyle: {
-            color: '#fffbf5',       // 极淡的杏色背景
-            borderColor: '#F9CE9C', // 杏色边框
+            color: '#fffbf5',       // Very light apricot background
+            borderColor: '#F9CE9C', // Apricot border
             borderWidth: 1.5
         },
         emphasis: {
@@ -186,7 +186,7 @@ const template3Palette = {
         boxWidth: [10, 40]
     },
 
-    // 4. 热力图：从 Sky -> Salmon 的冷暖过渡
+    // 4. Heatmap: warm–cool transition from Sky -> Salmon
     heatmap: {
         itemStyle: {
             borderColor: '#fff',
@@ -195,14 +195,14 @@ const template3Palette = {
         label: { show: false }
     },
 
-    // 5. VisualMap：柔和过渡
+    // 5. VisualMap: smooth color transition
     visualMap: {
         type: 'continuous',
         inRange: {
             color: [
                 '#C9DDE3', // Low: Sky
                 '#BBCFC3', // Mid: Sage
-                '#F9CE9C', // Mid-High: Peach
+                '#F9CE9C', // Mid-high: Peach
                 '#E18182'  // High: Salmon
             ]
         },
@@ -216,7 +216,7 @@ const template3Palette = {
         calculable: true
     },
 
-    // 6. 饼图/环形图：直接使用色板的4个色
+    // 6. Pie/donut: directly use four colors from the palette
     pie: {
         itemStyle: {
             borderWidth: 2,
@@ -226,7 +226,7 @@ const template3Palette = {
 
     tooltip: {
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#E18182', // 边框使用主色
+        borderColor: '#E18182', // Use primary color for border
         borderWidth: 0,
         textStyle: { color: '#374151', fontSize: 12 },
         padding: [10, 14],
@@ -239,16 +239,16 @@ const template3Palette = {
     }
 };
 
-// 注册主题到全局，供 app.js 使用
+// Register theme globally for use in app.js
 (function() {
-    // 确保 echarts 已加载
+    // Ensure echarts is loaded
     if (typeof window.echarts !== 'undefined') {
         window.echarts.registerTheme(themeName, template3Palette);
-        // 将主题配置暴露到全局，供 app.js 中的 renderCharts 使用（使用通用变量名）
+        // Expose theme configuration globally for renderCharts in app.js (generic variable names)
         window.currentPalette = template3Palette;
         window.currentThemeName = themeName;
     } else {
-        // 如果 echarts 还未加载，等待加载完成
+        // If echarts is not yet loaded, wait until it is ready
         const checkECharts = setInterval(() => {
             if (typeof window.echarts !== 'undefined') {
                 window.echarts.registerTheme(themeName, template3Palette);
@@ -258,7 +258,7 @@ const template3Palette = {
             }
         }, 50);
         
-        // 10秒后停止检查，避免无限等待
+        // Stop checking after 10 seconds to avoid infinite wait
         setTimeout(() => clearInterval(checkECharts), 10000);
     }
 })();

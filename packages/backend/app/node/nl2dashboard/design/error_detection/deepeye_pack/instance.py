@@ -1,10 +1,10 @@
 """
-此文件定义了ViewPosition和Instance两个类：
-ViewPosition类是用于枚举的辅助类，只有table_pos和view_pos两个数据成员，记录了一个图表对应的table的位置(table_pos)，
-以及该图表在view列表中的位置
-Instance类主要实现了对每个图表评分的工作，其中的getM, getW函数实现了论文中M值的归一化和W值的计算(注意：M值的计算位于
-view.py文件中的getM函数)。随后机器学习排序算法通过加载相应的模型文件对图表进行评分，偏序关系排序算法通过论文中的图算法
-对图表进行评分，这些评分功能分别在getScore_learning_to_rank和getScore函数中实现。
+This file defines ViewPosition and Instance.
+
+ViewPosition: helper enum with table_pos and view_pos, recording the table index and view index for a chart.
+Instance: scores each chart; getM/getW implement M normalization and W computation (M is computed in view.getM).
+Learning-to-rank loads a model to score charts; partial-order uses the paper's graph algorithm. These are
+implemented in getScore_learning_to_rank and getScore.
 """
 
 
@@ -121,9 +121,9 @@ class Instance(object):
         """
         import tempfile
         
-        path = os.path.dirname(__file__) # 此份代码的目录
-        
-        # 使用临时目录而不是当前工作目录，避免在工作目录留下临时文件
+        path = os.path.dirname(__file__)  # Directory of this package
+
+        # Use temp dir instead of cwd to avoid leaving temp files in working directory
         temp_dir = tempfile.mkdtemp(prefix='deepeye_')
         ltr_file = os.path.join(temp_dir, self.table_name + '.ltr')
         score_file = os.path.join(temp_dir, self.table_name + '.score')
@@ -154,7 +154,6 @@ class Instance(object):
                 while line:
                     score = float(line.split()[-1])
                     self.tables[self.views[i].table_pos].views[self.views[i].view_pos].score = score
-                    # print(f"View {i}: Score = {score}")  # 打印每个视图及其分数
                     line = f.readline()
                     i += 1
                 f.close()
@@ -163,7 +162,7 @@ class Instance(object):
             #sort by scores
             self.views.sort(key=lambda view:self.tables[view.table_pos].views[view.view_pos].score,reverse=True)
         finally:
-            # 清理临时文件
+            # Clean up temporary files
             try:
                 if os.path.exists(ltr_file):
                     os.unlink(ltr_file)
@@ -172,7 +171,6 @@ class Instance(object):
                 if os.path.exists(temp_dir):
                     os.rmdir(temp_dir)
             except Exception as e:
-                # 如果清理失败，打印警告但不影响主流程
                 print(f"Warning: Failed to clean up temporary files: {e}")
 
     #for partial_order rank

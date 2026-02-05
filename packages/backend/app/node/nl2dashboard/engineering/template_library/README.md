@@ -1,44 +1,44 @@
-# 模板库 (Template Library)
+# Template Library
 
-这个目录用于存储所有可用的 Dashboard 模板文件。
+This directory stores all available dashboard template files.
 
-## 目录结构
+## Directory Structure
 
 ```
 template_library/
-├── template_base.html          # 基础模板（默认）
-├── template_with_table.html   # 表格模板（适用于多个highlight和大量图表）
-└── ...                        # 其他自定义模板
+├── template_base.html          # Base template (default)
+├── template_with_table.html   # Table template (for multiple highlights and many charts)
+└── ...                        # Other custom templates
 ```
 
-## 模板映射配置
+## Template Mapping Configuration
 
-模板选择规则在 `template_mapping.json` 文件中配置。该文件定义了：
+Template selection rules are configured in the `template_mapping.json` file. This file defines:
 
-1. **模板库路径** (`template_library_path`): 模板文件存储的目录
-2. **默认模板** (`default_template`): 当没有规则匹配时使用的模板
-3. **选择规则** (`rules`): 根据配置中的 highlight 和 view 块数量选择模板的规则
-4. **模板信息** (`templates`): 每个模板的元数据和路径信息
+1. **Template library path** (`template_library_path`): Directory where template files are stored
+2. **Default template** (`default_template`): Template used when no rule matches
+3. **Selection rules** (`rules`): Rules for selecting templates based on the number of `highlight` and `view` blocks in the configuration
+4. **Template metadata** (`templates`): Metadata and path information for each template
 
-## 添加新模板
+## Adding a New Template
 
-1. 将模板文件放入 `template_library/` 目录
-2. 在 `template_mapping.json` 中添加模板信息：
+1. Put the template file into the `template_library/` directory.
+2. Add template metadata in `template_mapping.json`:
    ```json
    "templates": {
      "your_template.html": {
-       "display_name": "你的模板名称",
-       "description": "模板描述",
+       "display_name": "Your template name",
+       "description": "Template description",
        "source_path": "template_library/your_template.html"
      }
    }
    ```
-3. 添加选择规则（可选）：
+3. (Optional) Add selection rules:
    ```json
    "rules": [
      {
        "name": "rule_name",
-       "description": "规则描述",
+       "description": "Rule description",
        "conditions": {
          "highlight_count": {"min": 1},
          "view_count": {"min": 5}
@@ -48,13 +48,13 @@ template_library/
    ]
    ```
 
-## 模板选择流程
+## Template Selection Flow
 
-1. 读取配置文件，统计 highlight 和 view 块的数量
-2. 按照 `rules` 中的顺序匹配规则
-3. 如果匹配成功，使用对应的模板
-4. 如果没有匹配，使用默认模板
-5. 从模板库复制模板到 `va_app/public/templates/`
-6. 进行变量替换（Dashboard名称、描述、图表标题等）
-7. 保存为 `page_customized.html`
+1. Read the configuration file and count the number of `highlight` and `view` blocks.
+2. Match rules in the order listed in `rules`.
+3. If a rule matches, use the corresponding template.
+4. If no rule matches, use the default template.
+5. Copy the chosen template from the template library to `va_app/public/templates/`.
+6. Perform variable replacement (dashboard name, description, chart titles, etc.).
+7. Save the result as `page_customized.html`.
 

@@ -30,29 +30,29 @@
 
         <div class="flex-1 overflow-x-hidden overflow-y-auto p-8">
             
-            <!-- 高亮块容器：动态生成 -->
+            <!-- Highlight cards container: generated dynamically -->
             <div id="highlights-container" class="mb-8"></div>
 
-            <!-- 图表容器：动态生成 -->
+            <!-- Chart container: generated dynamically -->
             <div id="charts-container"></div>
         </div>
     </main>
 </div>
 
-<!-- Template 主题配置脚本 -->
+<!-- Template theme configuration script -->
 <script>
-// --- 🎨 颜值核心：Template 3 (Design Aesthetics Diary Edition) ---
+// --- 🎨 Visual core: Template 3 (Design Aesthetics Diary Edition) ---
 const themeName = 'template3_aesthetic';
 const template3Palette = {
-    // 1. 调色盘：完全提取自图片 "Design Aesthetics Diary"
-    // 顺序：Salmon -> Peach -> Sage -> Sky
+    // 1. Palette: fully extracted from the image "Design Aesthetics Diary"
+    // Order: Salmon -> Peach -> Sage -> Sky
     color: [
         '#E18182', // Metric 1 (Primary)
         '#F9CE9C', // Metric 2 (Secondary/Warm)
         '#BBCFC3', // Metric 3 (Tertiary/Nature)
         '#C9DDE3', // Metric 4 (Cold/Neutral)
-        '#D8A49B', // 补充色：深一点的粉
-        '#A5B9C0'  // 补充色：深一点的蓝灰
+        '#D8A49B', // Extra color: deeper pink
+        '#A5B9C0'  // Extra color: deeper blue-gray
     ],
     backgroundColor: 'rgba(0,0,0,0)',
     textStyle: { fontFamily: 'Inter, -apple-system, system-ui, sans-serif' },
@@ -62,7 +62,7 @@ const template3Palette = {
         subtextStyle: { color: '#9ca3af' }
     },
 
-    // 2. 布局：保持宽屏
+    // 2. Layout: keep a widescreen feel
     grid: {
         top: 45,
         left: '1%',
@@ -73,7 +73,7 @@ const template3Palette = {
     },
 
     categoryAxis: {
-        axisLine: { show: true, lineStyle: { color: '#f3f4f6' } }, // 极淡灰线
+        axisLine: { show: true, lineStyle: { color: '#f3f4f6' } }, // Very light gray line
         axisTick: { show: false },
         axisLabel: { color: '#6b7280', margin: 14, fontSize: 11, fontWeight: 500 },
         splitLine: { show: false }
@@ -88,9 +88,9 @@ const template3Palette = {
         }
     },
 
-    // --- 图表样式调整：柔和、哑光质感 ---
+    // --- Chart style adjustments: soft, matte texture ---
 
-    // 1. 折线图：使用 Salmon (#E18182) 渐变
+    // 1. Line chart: use Salmon (#E18182) gradient
     line: {
         smooth: true,
         width: 3,
@@ -114,15 +114,15 @@ const template3Palette = {
         }
     },
 
-    // 2. 柱状图：使用 Sky (#C9DDE3) 到 Sage (#BBCFC3) 的清新渐变
+    // 2. Bar chart: fresh gradient from Sky (#C9DDE3) to Sage (#BBCFC3)
     bar: {
         itemStyle: {
             borderRadius: [4, 4, 0, 0],
             color: {
                 type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
                 colorStops: [
-                    { offset: 0, color: '#BBCFC3' }, // 顶部 Sage
-                    { offset: 1, color: '#C9DDE3' }  // 底部 Sky
+                    { offset: 0, color: '#BBCFC3' }, // Top: Sage
+                    { offset: 1, color: '#C9DDE3' }  // Bottom: Sky
                 ]
             }
         },
@@ -130,11 +130,11 @@ const template3Palette = {
         barCategoryGap: '35%'
     },
 
-    // 3. 箱型图：使用 Peach (#F9CE9C)
+    // 3. Boxplot: use Peach (#F9CE9C)
     boxplot: {
         itemStyle: {
-            color: '#fffbf5',       // 极淡的杏色背景
-            borderColor: '#F9CE9C', // 杏色边框
+            color: '#fffbf5',       // Very light apricot background
+            borderColor: '#F9CE9C', // Apricot border
             borderWidth: 1.5
         },
         emphasis: {
@@ -147,7 +147,7 @@ const template3Palette = {
         boxWidth: [10, 40]
     },
 
-    // 4. 热力图：从 Sky -> Salmon 的冷暖过渡
+    // 4. Heatmap: warm–cool transition from Sky -> Salmon
     heatmap: {
         itemStyle: {
             borderColor: '#fff',
@@ -156,14 +156,14 @@ const template3Palette = {
         label: { show: false }
     },
 
-    // 5. VisualMap：柔和过渡
+    // 5. VisualMap: smooth color transition
     visualMap: {
         type: 'continuous',
         inRange: {
             color: [
                 '#C9DDE3', // Low: Sky
                 '#BBCFC3', // Mid: Sage
-                '#F9CE9C', // Mid-High: Peach
+                '#F9CE9C', // Mid-high: Peach
                 '#E18182'  // High: Salmon
             ]
         },
@@ -177,7 +177,7 @@ const template3Palette = {
         calculable: true
     },
 
-    // 6. 饼图/环形图：直接使用色板的4个色
+    // 6. Pie/donut: directly use four colors from the palette
     pie: {
         itemStyle: {
             borderWidth: 2,
@@ -187,7 +187,7 @@ const template3Palette = {
 
     tooltip: {
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#E18182', // 边框使用主色
+        borderColor: '#E18182', // Use primary color for border
         borderWidth: 0,
         textStyle: { color: '#374151', fontSize: 12 },
         padding: [10, 14],
@@ -200,16 +200,16 @@ const template3Palette = {
     }
 };
 
-// 注册主题到全局，供 app.js 使用
+// Register theme globally for use in app.js
 (function() {
-    // 确保 echarts 已加载
+    // Ensure echarts is loaded
     if (typeof window.echarts !== 'undefined') {
         window.echarts.registerTheme(themeName, template3Palette);
-        // 将主题配置暴露到全局，供 app.js 中的 renderCharts 使用（使用通用变量名）
+        // Expose theme configuration globally for renderCharts in app.js (generic variable names)
         window.currentPalette = template3Palette;
         window.currentThemeName = themeName;
     } else {
-        // 如果 echarts 还未加载，等待加载完成
+        // If echarts is not yet loaded, wait until it is ready
         const checkECharts = setInterval(() => {
             if (typeof window.echarts !== 'undefined') {
                 window.echarts.registerTheme(themeName, template3Palette);
@@ -219,14 +219,14 @@ const template3Palette = {
             }
         }, 50);
         
-        // 10秒后停止检查，避免无限等待
+        // Stop checking after 10 seconds to avoid infinite wait
         setTimeout(() => clearInterval(checkECharts), 10000);
     }
 })();
 
-// --- 通用模板动态布局生成脚本 ---
+// --- Universal template dynamic layout generation script ---
 (function() {
-    // 高亮块颜色配置
+    // Highlight card color configuration
     const highlightColors = [
         { bg: '#E18182', hover: '#E18182', icon: 'ph-chart-line-up' },
         { bg: '#F9CE9C', hover: '#F9CE9C', icon: 'ph-users' },
@@ -236,16 +236,16 @@ const template3Palette = {
         { bg: '#A5B9C0', hover: '#A5B9C0', icon: 'ph-chart-bar' }
     ];
 
-    // 图表颜色配置
+    // Chart color configuration
     const chartColors = [
         '#E18182', '#BBCFC3', '#F9CE9C', '#C9DDE3', '#D8A49B', '#A5B9C0'
     ];
 
     /**
-     * 计算最优网格列数
-     * @param {number} count - 元素数量
-     * @param {number} maxCols - 最大列数（默认6）
-     * @returns {number} 最优列数
+     * Compute optimal number of grid columns
+     * @param {number} count - Number of elements
+     * @param {number} maxCols - Maximum columns (default 6)
+     * @returns {number} Optimal column count
      */
     function calculateOptimalColumns(count, maxCols = 6) {
         if (count === 0) return 1;
@@ -258,9 +258,9 @@ const template3Palette = {
     }
 
     /**
-     * 获取Tailwind CSS类名（动态列数）
-     * @param {number} cols - 列数
-     * @returns {string} Tailwind CSS类名
+     * Get Tailwind CSS class names (dynamic columns)
+     * @param {number} cols - Column count
+     * @returns {string} Tailwind CSS classes
      */
     function getGridColsClass(cols) {
         const colMap = {
@@ -275,8 +275,8 @@ const template3Palette = {
     }
 
     /**
-     * 生成高亮块HTML（基于配置的blocks，保证ID与后端一致）
-     * @param {Array} highlightBlocks - 高亮块列表
+     * Generate highlight HTML (based on configured blocks, keep IDs consistent with backend)
+     * @param {Array} highlightBlocks - List of highlight blocks
      */
     function generateHighlightsFromBlocks(highlightBlocks) {
         const container = document.getElementById('highlights-container');
@@ -296,7 +296,7 @@ const template3Palette = {
             const blockId = block.id || `highlight_${idx + 1}`;
             const title = (block.blockContent && block.blockContent.title) || `Metric ${idx + 1}`;
             
-            // 注意：ID 需与 app.js 中 renderHighlights 使用的格式保持一致：title-${item.id} / val-${item.id}
+            // Note: IDs must match the format used by renderHighlights in app.js: title-${item.id} / val-${item.id}
             const highlightHTML = `
                 <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group transition-colors" style="border-color: rgba(229, 231, 235, 1);" onmouseover="this.style.borderColor='${color.hover}80'" onmouseout="this.style.borderColor='rgba(229, 231, 235, 1)'">
                     <div class="flex justify-between items-start">
@@ -316,8 +316,8 @@ const template3Palette = {
     }
 
     /**
-     * 生成图表容器HTML（基于配置的blocks，保证ID与后端一致）
-     * @param {Array} viewBlocks - 图表块列表
+     * Generate chart container HTML (based on configured blocks, keep IDs consistent with backend)
+     * @param {Array} viewBlocks - List of chart blocks
      */
     function generateChartsFromBlocks(viewBlocks) {
         const container = document.getElementById('charts-container');
@@ -353,14 +353,14 @@ const template3Palette = {
     }
 
     /**
-     * 从配置中读取blocks并生成布局
+     * Read blocks from configuration and generate layout
      */
     function initializeLayout() {
         console.log('[UniversalTemplate] 🔄 Initializing layout...');
         
         let blocks = null;
         
-        // 方法1: 从内嵌的script标签中读取配置（优先级最高）
+        // Method 1: read config from embedded script tag (highest priority)
         const configScript = document.getElementById('dashboard-config-data');
         if (configScript) {
             try {
@@ -372,13 +372,13 @@ const template3Palette = {
             }
         }
 
-        // 方法2: 从全局配置读取（app.js 加载后可用）
+        // Method 2: read from global config (available after app.js loads)
         if (!blocks && typeof window.dashboardConfig !== 'undefined' && window.dashboardConfig.blocks) {
             blocks = window.dashboardConfig.blocks;
             console.log('[UniversalTemplate] ✅ Found config in window.dashboardConfig, blocks:', blocks.length);
         }
 
-        // 方法3: 从 window.App.config 读取（如果 App 已初始化）
+        // Method 3: read from window.App.config (if App is initialized)
         if (!blocks && window.App && window.App.config && window.App.config.blocks) {
             blocks = window.App.config.blocks;
             console.log('[UniversalTemplate] ✅ Found config in window.App.config, blocks:', blocks.length);
@@ -401,11 +401,11 @@ const template3Palette = {
         return false;
     }
 
-    // 立即尝试初始化（模板脚本执行时，配置可能已经注入）
+    // Try to initialize immediately (config may already be injected when template script runs)
     if (!initializeLayout()) {
-        // 如果失败，等待一段时间后重试（给 app.js 时间加载配置）
+        // If it fails, retry for a short time (give app.js time to load config)
         let retries = 0;
-        const maxRetries = 20; // 最多重试20次，每次100ms，总共2秒
+        const maxRetries = 20; // Retry at most 20 times, every 100ms (2 seconds total)
         const retryInterval = setInterval(function() {
             retries++;
             if (initializeLayout() || retries >= maxRetries) {

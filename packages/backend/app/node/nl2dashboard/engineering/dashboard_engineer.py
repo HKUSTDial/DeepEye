@@ -1,7 +1,7 @@
-"""Dashboard 工程实现器
+"""Dashboard Engineer
 
-负责根据设计结果实现 Dashboard。
-参考 va_system_builder.py 的实现流程。
+Responsible for implementing the Dashboard based on design results.
+Refers to the implementation process of va_system_builder.py.
 """
 
 import json
@@ -18,16 +18,16 @@ from .prompt import LAYOUT_POSITION_GENERATION_PROMPT
 
 
 class DashboardEngineer:
-    """Dashboard 工程实现器
+    """Dashboard Engineer
     
-    根据设计结果，生成实际的 Dashboard 代码或配置文件。
-    参考 va_system_builder.py 的 _build_va_system 方法实现。
+    Generates actual Dashboard code or configuration files based on design results.
+    Refers to the implementation of the _build_va_system method in va_system_builder.py.
     
     Attributes:
-        design_result: 设计结果字典
-        output_path: 输出路径
-        llm_client: LLM 客户端
-        page_theme_content: 页面主题内容（用于图表美化）
+        design_result: Design result dictionary
+        output_path: Output path
+        llm_client: LLM client
+        page_theme_content: Page theme content (for chart beautification)
     
     Example:
         >>> engineer = DashboardEngineer(llm_client=llm_client)
@@ -35,20 +35,20 @@ class DashboardEngineer:
     """
     
     def __init__(self, llm_client: Optional[LLMClient] = None, model: str = "gpt-4o"):
-        """初始化工程实现器
+        """Initialize the Dashboard Engineer
         
         Args:
-            llm_client: LLM 客户端（可选，如果为None则从环境变量获取）
-            model: 使用的模型名
+            llm_client: LLM client (optional, if None, it will be retrieved from environment variables)
+            model: Model name to use
         """
         self.design_result: Optional[Dict[str, Any]] = None
         self.output_path: Optional[str] = None
         self.page_theme_content: str = ""
         
-        # 加载模板映射配置
+        # Load template mapping configuration
         self.template_mapping = self._load_template_mapping()
         
-        # 初始化 LLM 客户端
+        # Initialize LLM client
         if llm_client is None:
             import os
             api_key = os.getenv("DEEPEYE_LLM_API_KEY")
@@ -63,7 +63,7 @@ class DashboardEngineer:
                 self.llm_model = env_model
         else:
             self.llm_client = llm_client
-            self.llm_model = model  # 使用传入的模型名
+            self.llm_model = model  # Use the provided model name
     
     def implement(
         self,
@@ -71,34 +71,34 @@ class DashboardEngineer:
         output_path: str,
         info_doc: Dict[str, Any]
     ) -> str:
-        """实现 Dashboard
+        """Implement Dashboard
         
-        参考 va_system_builder.py 的 _build_va_system 方法实现。
+        Refers to the implementation of the _build_va_system method in va_system_builder.py.
         
         Args:
-            design_result: 设计结果字典，包含：
-                - layout: Dashboard 布局结构
-                - charts: 图表配置列表
-                - filters: 过滤器配置
-                - metadata: 设计元数据
-            output_path: 输出路径
-            info_doc: 信息文档，包含：
-                - question: 用户问题
-                - dataset_path: 数据集路径
-                - output_path: 输出路径
-                - data_schema: 数据schema信息
+            design_result: Design result dictionary, containing:
+                - layout: Dashboard layout structure
+                - charts: List of chart configurations
+                - filters: Filter configurations
+                - metadata: Design metadata
+            output_path: Output path
+            info_doc: Information document, containing:
+                - question: User question
+                - dataset_path: Path to dataset
+                - output_path: Output path
+                - data_schema: Data schema information
         
         Returns:
-            实现的 Dashboard 文件路径（va_app 目录路径）
+            Implemented Dashboard file path (path to va_app directory)
         """
         self.design_result = design_result
         self.output_path = output_path
         
-        # 提取信息
+        # Extract information
         question = info_doc.get("question", "")
         dataset_path = info_doc.get("dataset_path", "")
         
-        # 构建 VA 系统
+        # Build VA system
         va_app_path = self._build_va_system(
             output_path=output_path,
             dataset_path=dataset_path,
@@ -115,37 +115,37 @@ class DashboardEngineer:
         question: str,
         design_result: Dict[str, Any]
     ) -> str:
-        """构建VA系统的核心实现
+        """Core implementation for building the VA system
         
-        参考 va_system_builder.py 的 _build_va_system 方法。
+        Refers to the _build_va_system method in va_system_builder.py.
         
-        实现步骤：
-        1. 前置文件的处理：模板复制、数据集复制、配置文件生成、配置路径更新
-        2. 配置文件的处理：个性化布局实现、Filter组件数据绑定
-        3. 页面模板美化：基于问题主题生成个性化页面样式
-        4. 图表美化：基于页面主题美化图表样式
+        Implementation steps:
+        1. Pre-processing: Template cloning, dataset copying, configuration generation, path updates
+        2. Configuration processing: Personalized layout implementation, Filter component data binding
+        3. Page template beautification: Generating personalized page styles based on the question topic
+        4. Chart beautification: Beautifying chart styles based on the page theme
         
         Args:
-            output_path: 输出路径
-            dataset_path: 数据集路径
-            question: 用户问题
-            design_result: 设计结果
+            output_path: Output path
+            dataset_path: Dataset path
+            question: User question
+            design_result: Design result
         
         Returns:
-            va_app 目录路径
+            Path to va_app directory
         """
-        # ========== 步骤 1: 前置文件的处理 ==========
-        # 1.1 从模板目录克隆整个文件到output_path下
+        # ========== Step 1: Pre-processing ==========
+        # 1.1 Clone all files from template directory to output_path
         template_path = os.path.join(os.path.dirname(__file__), 'template')
         template_path = os.path.abspath(template_path)
         
-        # 创建目标目录下的va_app文件夹
+        # Create va_app folder in the target directory
         va_app_path = os.path.join(output_path, 'va_app')
         if os.path.exists(va_app_path):
             shutil.rmtree(va_app_path)
         shutil.copytree(template_path, va_app_path)
         
-        # 1.2 从设计结果中查找图表代码目录
+        # 1.2 Find chart code directory from design results
         echart_source = None
         if 'charts_directory' in design_result:
             charts_dir = design_result['charts_directory']
@@ -154,19 +154,19 @@ class DashboardEngineer:
             else:
                 echart_source = os.path.join(output_path, charts_dir, 'echart_code')
         
-        # 如果设计结果中没有指定，尝试查找默认位置
+        # If not specified in design results, try to find default location
         if not echart_source or not os.path.exists(echart_source):
-            # 查找 visualizations_* 目录
+            # Look for visualizations_* directories
             viz_charts_dirs = glob.glob(os.path.join(output_path, 'visualizations_*'))
             if viz_charts_dirs:
-                # 使用最新的一个
+                # Use the latest one
                 viz_charts_dirs.sort(reverse=True)
                 echart_source = os.path.join(viz_charts_dirs[0], 'echart_code')
         
         charts_dest = os.path.join(va_app_path, 'public', 'charts')
         
         if echart_source and os.path.exists(echart_source):
-            # 检测并生成HTML文件（如果不存在）
+            # Detect and generate HTML files (if they don't exist)
             # print(f"🔧 Generating HTML from Python charts...")
             # self._generate_html_from_python_charts(
             #     echart_source_dir=echart_source,
@@ -174,35 +174,35 @@ class DashboardEngineer:
             #     max_workers=4
             # )
             
-            # 清空目标charts目录
+            # Clear target charts directory
             if os.path.exists(charts_dest):
                 shutil.rmtree(charts_dest)
             os.makedirs(charts_dest)
             
-            # 复制所有echart文件并处理
+            # Copy all echart files and process
             print(f"📋 Processing and copying chart files...")
             for file in os.listdir(echart_source):
                 src_file = os.path.join(echart_source, file)
                 dst_file = os.path.join(charts_dest, file)
                 if os.path.isfile(src_file) and file.endswith('.html'):
-                    # 读取、处理并写入HTML文件
+                    # Read, process and write HTML file
                     self._process_echart_html(src_file, dst_file)
                 elif os.path.isfile(src_file):
-                    # 非HTML文件直接复制
+                    # Copy non-HTML files directly
                     shutil.copy2(src_file, dst_file)
             print(f"✓ Processed echart code from {echart_source}")
         
-        # 1.3 复制 dashboard_config.json 到 va_app/public/configs 下
-        # 这个文件是由 DashboardDesigner.save_design() 生成的
+        # 1.3 Copy dashboard_config.json to va_app/public/configs
+        # This file is generated by DashboardDesigner.save_design()
         configs_dest = os.path.join(va_app_path, 'public', 'configs')
         
-        # 查找配置文件（可能是 dashboard_config.json 或 dashboard_config_*.json）
+        # Find configuration file (could be dashboard_config.json or dashboard_config_*.json)
         config_files = []
         dashboard_config_path = os.path.join(output_path, 'dashboard_config.json')
         if os.path.exists(dashboard_config_path):
             config_files.append(dashboard_config_path)
         else:
-            # 查找带时间戳的配置文件
+            # Find configuration file with timestamp
             config_pattern = os.path.join(output_path, 'dashboard_config_*.json')
             config_files = glob.glob(config_pattern)
         
@@ -210,7 +210,7 @@ class DashboardEngineer:
         dashboard_config_filename = None
         
         if config_files:
-            # 使用第一个找到的配置文件
+            # Use the first found configuration file
             source_config = config_files[0]
             dashboard_config_filename = os.path.basename(source_config)
             config_file = os.path.join(configs_dest, dashboard_config_filename)
@@ -218,20 +218,20 @@ class DashboardEngineer:
             shutil.copy2(source_config, config_file)
             print(f"✓ Copied config file: {dashboard_config_filename}")
             
-            # 更新配置文件中的 python_code_name 和 html_code_name 字段
+            # Update python_code_name and html_code_name fields in the config file
             if os.path.exists(charts_dest):
                 print(f"🔧 Updating config with HTML names...")
                 self._update_config_with_html_names(config_file, charts_dest)
         else:
             print(f"⚠️  No dashboard_config.json found in {output_path}, generating from design_result...")
-            # 如果找不到配置文件，从 design_result 生成
+            # If config file is not found, generate from design_result
             config_file = self._generate_dashboard_config(design_result, va_app_path)
             if config_file:
                 dashboard_config_filename = os.path.basename(config_file)
                 if os.path.exists(charts_dest):
                     self._update_config_with_html_names(config_file, charts_dest)
         
-        # 1.4 复制数据集到va_app/public/data下
+        # 1.4 Copy dataset to va_app/public/data
         if dataset_path and os.path.exists(dataset_path):
             data_dest = os.path.join(va_app_path, 'public', 'data')
             filename = os.path.basename(dataset_path)
@@ -239,15 +239,15 @@ class DashboardEngineer:
             shutil.copy2(dataset_path, dst_file)
             print(f"✓ Copied dataset to {dst_file}")
         
-        # 1.5 更新app.py中的schema_path配置，指向配置文件
+        # 1.5 Update schema_path configuration in app.py to point to the config file
         if dashboard_config_filename:
             app_py_path = os.path.join(va_app_path, 'app.py')
             self._update_app_config(app_py_path, dashboard_config_filename)
         
-        # ========== 步骤 2: 配置文件的处理 ==========
+        # ========== Step 2: Configuration processing ==========
         if config_file and self.llm_client:
-            # 2.1 个性化布局实现：生成Layout和Position信息
-            # 2.2 Filter组件数据绑定：为Filter组件生成Options
+            # 2.1 Personalized layout implementation: Generate Layout and Position info
+            # 2.2 Filter component data binding: Generate Options for Filter components
             print(f"🔧 Processing dashboard config (layout + filter options)...")
             self._process_dashboard_config(
                 config_file_path=config_file,
@@ -257,8 +257,8 @@ class DashboardEngineer:
                 max_retries=3
             )
         
-        # ========== 步骤 3: 页面模板美化 ==========
-        # 根据配置中的highlight块和图表数量动态选择模板
+        # ========== Step 3: Page template beautification ==========
+        # Dynamically select template based on the number of highlight blocks and charts in the config
         selected_template = self._select_template_by_config(config_file)
         print(f"🎨 Applying {selected_template} with variable substitution...")
         template_success = self._apply_template_with_substitution(
@@ -268,7 +268,7 @@ class DashboardEngineer:
             config_file=config_file
         )
         
-        # 如果页面模板应用成功，更新配置文件中的pageTemplate路径
+        # If page template applied successfully, update pageTemplate path in config
         if template_success and config_file:
             print(f"🔧 Updating page template path in config...")
             self._update_page_template_config(config_file)
@@ -280,36 +280,36 @@ class DashboardEngineer:
         design_result: Dict[str, Any],
         va_app_path: str
     ) -> Optional[str]:
-        """生成 Dashboard 配置文件
+        """Generate Dashboard configuration file
         
         Args:
-            design_result: 设计结果
-            va_app_path: VA应用路径
+            design_result: Design result
+            va_app_path: VA application path
         
         Returns:
-            配置文件路径
+            Path to the configuration file
         """
         configs_dest = os.path.join(va_app_path, 'public', 'configs')
         
-        # 从设计结果生成配置
+        # Generate config from design result
         config = {
             "layout": design_result.get("layout", {}),
             "blocks": design_result.get("blocks", [])
         }
         
-        # 添加 dataSource 信息（必需，否则 app.py 无法找到数据文件）
+        # Add dataSource information (required for app.py to find data file)
         if "dataSource" in design_result:
             data_source = design_result["dataSource"].copy()
-            # 将绝对路径转换为相对于 va_app 的路径
+            # Convert absolute path to path relative to va_app
             if "path" in data_source and os.path.isabs(data_source["path"]):
-                # 数据文件应该在 public/data/ 下
+                # Data file should be in public/data/
                 filename = os.path.basename(data_source["path"])
                 data_source["path"] = f"/data/{filename}"
             config["dataSource"] = data_source
         
-        # 如果没有 blocks，尝试从旧格式的 charts 和 filters 生成
+        # If no blocks, try to generate from old format charts and filters
         if not config["blocks"]:
-            # 添加图表块
+            # Add chart blocks
             charts = design_result.get("charts", [])
             for i, chart in enumerate(charts):
                 config["blocks"].append({
@@ -321,7 +321,7 @@ class DashboardEngineer:
                     }
                 })
             
-            # 添加过滤器块
+            # Add filter blocks
             filters = design_result.get("filters", [])
             for i, filter_config in enumerate(filters):
                 config["blocks"].append({
@@ -334,7 +334,7 @@ class DashboardEngineer:
                     }
                 })
         
-        # 保存配置
+        # Save configuration
         config_file = os.path.join(configs_dest, 'dashboard_config.json')
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
@@ -351,26 +351,26 @@ class DashboardEngineer:
         va_app_path: str,
         max_retries: int = 3
     ):
-        """处理仪表板配置：添加Filter Options、Layout和Position信息
+        """Process dashboard configuration: Add Filter Options, Layout, and Position info
         
-        参考 va_system_builder.py 的 _process_dashboard_config 方法。
+        Refers to the _process_dashboard_config method in va_system_builder.py.
         
         Args:
-            config_file_path: 配置文件路径
-            dataset_path: 数据集路径
-            question: 用户问题
-            va_app_path: VA应用路径
-            max_retries: 最大重试次数
+            config_file_path: Path to configuration file
+            dataset_path: Path to dataset
+            question: User question
+            va_app_path: VA application path
+            max_retries: Maximum number of retries
         """
         if not self.llm_client:
             return
         
         try:
-            # 读取配置文件
+            # Read configuration file
             with open(config_file_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            # 1. 为Filter组件生成Options和Range
+            # 1. Generate Options and Range for Filter components
             if dataset_path and os.path.exists(dataset_path):
                 try:
                     import pandas as pd
@@ -383,18 +383,18 @@ class DashboardEngineer:
                                 field = block['blockContent'].get('field')
                                 control_type = block['blockContent'].get('controlType', 'select')
                                 if field and field in df.columns:
-                                    # 对于 date_range 类型，生成日期格式的 range 配置
+                                    # Generate date range configuration for date_range type
                                     if control_type == 'date_range':
                                         try:
-                                            # 尝试将字段转换为日期类型
+                                            # Try converting field to date type
                                             date_series = pd.to_datetime(df[field], errors='coerce').dropna()
                                             
                                             if len(date_series) > 0:
                                                 min_date = date_series.min()
                                                 max_date = date_series.max()
                                                 
-                                                # 格式化为日期字符串
-                                                # 检查是否只有日期部分（时间为 00:00:00）
+                                                # Format as date string
+                                                # Check if it only has date part (time is 00:00:00)
                                                 if min_date.hour == 0 and min_date.minute == 0 and min_date.second == 0:
                                                     min_date_str = min_date.strftime('%Y/%m/%d')
                                                 else:
@@ -405,13 +405,13 @@ class DashboardEngineer:
                                                 else:
                                                     max_date_str = max_date.strftime('%Y/%m/%d %H:%M:%S')
                                                 
-                                                # 设置 date_range 的 range
+                                                # Set range for date_range
                                                 block['blockContent']['range'] = {
                                                     'min': min_date_str,
                                                     'max': max_date_str
                                                 }
                                                 
-                                                # 移除不需要的 options
+                                                # Remove unneeded options
                                                 if 'options' in block['blockContent']:
                                                     del block['blockContent']['options']
                                                 
@@ -419,14 +419,14 @@ class DashboardEngineer:
                                         except Exception as e:
                                             print(f"  ⚠️  Failed to process date_range for {field}: {e}")
                                             pass
-                                    # 对于 slider 或 range 类型，生成 range 配置
+                                    # Generate range configuration for slider or range type
                                     elif control_type in ('slider', 'range'):
                                         try:
-                                            # 判断是否为时间字段
+                                            # Determine if it's a time field
                                             is_time_field = 'time' in field.lower() or 'hour' in field.lower()
                                             
                                             if is_time_field:
-                                                # 时间字段：从时间字符串中提取小时数
+                                                # Time field: Extract hour from time string
                                                 def extract_hour(time_str):
                                                     if pd.isna(time_str):
                                                         return None
@@ -441,18 +441,18 @@ class DashboardEngineer:
                                                 
                                                 values = df[field].apply(extract_hour).dropna()
                                             else:
-                                                # 数值字段：尝试转换为数值
+                                                # Numeric field: Try converting to numeric
                                                 values = pd.to_numeric(df[field], errors='coerce').dropna()
                                             
                                             if len(values) > 0:
                                                 min_val = float(values.min())
                                                 max_val = float(values.max())
                                                 
-                                                # 计算合适的 step
+                                                # Calculate appropriate step
                                                 if is_time_field:
-                                                    step = 1  # 时间字段步长为1小时
+                                                    step = 1  # 1 hour step for time fields
                                                 else:
-                                                    # 对于数值字段，根据范围自动计算step
+                                                    # Automatically calculate step for numeric fields based on range
                                                     range_size = max_val - min_val
                                                     if range_size <= 10:
                                                         step = 0.1
@@ -463,16 +463,16 @@ class DashboardEngineer:
                                                     elif range_size <= 10000:
                                                         step = 100
                                                     else:
-                                                        step = max(1, int(range_size / 100))  # 大约100个步长
+                                                        step = max(1, int(range_size / 100))  # Approx 100 steps
                                                 
-                                                # 设置 slider 的 range
+                                                # Set range for slider
                                                 block['blockContent']['range'] = {
                                                     'min': min_val,
                                                     'max': max_val,
                                                     'step': step
                                                 }
                                                 
-                                                # 移除不需要的 options
+                                                # Remove unneeded options
                                                 if 'options' in block['blockContent']:
                                                     del block['blockContent']['options']
                                                 
@@ -483,28 +483,28 @@ class DashboardEngineer:
                                             print(f"  ⚠️  Failed to process slider for {field}: {e}")
                                             pass
                                     else:
-                                        # 对于非slider类型，生成options
+                                        # Generate options for non-slider types
                                         unique_values = df[field].dropna().unique().tolist()
-                                        # 限制最多50个选项
+                                        # Limit to maximum 50 options
                                         if len(unique_values) > 50:
                                             unique_values = unique_values[:50]
-                                        # 对于 multiselect 类型不添加 "All" 选项
+                                        # Do not add "All" for multiselect type
                                         if control_type == 'multiselect':
                                             options = [str(v) for v in unique_values]
                                         else:
-                                            # 其他类型（select, checkbox等）添加 "All" 选项
+                                            # Add "All" for other types (select, checkbox, etc.)
                                             options = ["All"] + [str(v) for v in unique_values]
                                         block['blockContent']['options'] = options
                 except Exception as e:
-                    # 如果读取数据集失败，跳过
+                    # Skip if reading dataset fails
                     print(f"  ⚠️  Failed to process filters: {e}")
                     pass
             
-            # 2. 读取图表HTML文件的尺寸信息
+            # 2. Read chart dimensions from HTML files
             chart_dimensions = self._extract_chart_dimensions(config, va_app_path)
             chart_dimensions_str = self._format_chart_dimensions(chart_dimensions)
             
-            # 3. 使用LLM生成Layout和Position信息（带重试机制）
+            # 3. Generate Layout and Position info using LLM (with retry mechanism)
             from .prompt import LAYOUT_POSITION_GENERATION_PROMPT
             
             config_json_str = json.dumps(config, ensure_ascii=False, indent=2)
@@ -517,7 +517,7 @@ class DashboardEngineer:
             
             for attempt in range(1, max_retries + 1):
                 try:
-                    # 调用 LLM
+                    # Call LLM
                     messages = [Message(role="user", content=prompt)]
                     response = self.llm_client.generate(
                         messages,
@@ -528,22 +528,22 @@ class DashboardEngineer:
                     
                     response_content = response.content
                     
-                    # 尝试提取JSON
+                    # Try to extract JSON
                     json_match = re.search(r'```json\s*(.*?)\s*```', response_content, re.DOTALL)
                     if json_match:
                         response_content = json_match.group(1)
                     elif '```' in response_content:
-                        # 如果有代码块但不是json标记
+                        # If there's a code block but no json tag
                         response_content = re.sub(r'```\w*\s*|\s*```', '', response_content)
                     
                     response_content = response_content.strip()
                     
-                    # 尝试解析JSON
+                    # Try to parse JSON
                     try:
                         updated_config = json.loads(response_content)
-                        break  # 成功解析，跳出重试循环
+                        break  # Successfully parsed, exit retry loop
                     except json.JSONDecodeError:
-                        # 尝试修复常见问题
+                        # Try to fix common issues
                         response_fixed = re.sub(r',\s*}', '}', response_content)
                         response_fixed = re.sub(r',\s*\]', ']', response_fixed)
                         
@@ -554,7 +554,7 @@ class DashboardEngineer:
                             if attempt < max_retries:
                                 prompt = f"{prompt}\n\nIMPORTANT: Please return ONLY valid JSON, no explanations."
                             else:
-                                # 使用默认配置
+                                # Use default configuration
                                 updated_config = config
                                 if 'layout' not in updated_config:
                                     updated_config['layout'] = {
@@ -566,7 +566,7 @@ class DashboardEngineer:
                 
                 except Exception as e:
                     if attempt >= max_retries:
-                        # 使用默认配置
+                        # Use default configuration
                         updated_config = config
                         if 'layout' not in updated_config:
                             updated_config['layout'] = {
@@ -576,7 +576,7 @@ class DashboardEngineer:
                                 "pageTemplate": "public/templates/page_default.html"
                             }
             
-            # 如果所有尝试都失败，使用默认配置
+            # If all attempts fail, use default configuration
             if updated_config is None:
                 updated_config = config
                 if 'layout' not in updated_config:
@@ -587,7 +587,7 @@ class DashboardEngineer:
                         "pageTemplate": "public/templates/page_default.html"
                     }
             
-            # 为每个block添加默认position（如果没有）
+            # Add default position for each block (if missing)
             if 'blocks' in updated_config:
                 row = 1
                 col = 1
@@ -604,25 +604,25 @@ class DashboardEngineer:
                             col = 1
                             row += 1
             
-            # 保存更新后的配置
+            # Save updated configuration
             with open(config_file_path, 'w', encoding='utf-8') as f:
                 json.dump(updated_config, f, ensure_ascii=False, indent=2)
         
         except Exception as e:
-            # 如果处理失败，继续执行
+            # Continue execution even if processing fails
             pass
     
     def _extract_chart_dimensions(self, config: dict, va_app_path: str) -> dict:
-        """从HTML文件中提取图表的尺寸信息
+        """Extract chart dimension information from HTML files
         
-        参考 va_system_builder.py 的 _extract_chart_dimensions 方法。
+        Refers to the _extract_chart_dimensions method in va_system_builder.py.
         
         Args:
-            config: 配置文件字典
-            va_app_path: VA应用路径
+            config: Configuration file dictionary
+            va_app_path: VA application path
         
         Returns:
-            字典，格式为 {block_id: {"width": int, "height": int, "aspect_ratio": float, "html_file": str}}
+            Dictionary in the format {block_id: {"width": int, "height": int, "aspect_ratio": float, "html_file": str}}
         """
         dimensions = {}
         charts_dir = os.path.join(va_app_path, 'public', 'charts')
@@ -650,7 +650,7 @@ class DashboardEngineer:
                 with open(html_path, 'r', encoding='utf-8') as f:
                     html_content = f.read()
                 
-                # 从div的style属性中提取 width 和 height
+                # Extract width and height from the div's style attribute
                 width = None
                 height = None
                 
@@ -665,7 +665,7 @@ class DashboardEngineer:
                     if height_match:
                         height = int(height_match.group(1))
                 
-                # 如果成功提取到尺寸，计算长宽比
+                # Calculate aspect ratio if dimensions extracted successfully
                 if width and height:
                     aspect_ratio = round(width / height, 2)
                     dimensions[block_id] = {
@@ -676,7 +676,7 @@ class DashboardEngineer:
                         "description": block_content.get('description', '')
                     }
                 else:
-                    # 使用默认值
+                    # Use default values
                     dimensions[block_id] = {
                         "width": 1000,
                         "height": 500,
@@ -685,7 +685,7 @@ class DashboardEngineer:
                         "description": block_content.get('description', '')
                     }
             except Exception:
-                # 使用默认值
+                # Use default values
                 dimensions[block_id] = {
                     "width": 1000,
                     "height": 500,
@@ -697,15 +697,15 @@ class DashboardEngineer:
         return dimensions
     
     def _format_chart_dimensions(self, dimensions: dict) -> str:
-        """格式化图表尺寸信息为可读的字符串
+        """Format chart dimension information into a readable string
         
-        参考 va_system_builder.py 的 _format_chart_dimensions 方法。
+        Refers to the _format_chart_dimensions method in va_system_builder.py.
         
         Args:
-            dimensions: 图表尺寸字典
+            dimensions: Chart dimensions dictionary
         
         Returns:
-            格式化的字符串
+            Formatted string
         """
         if not dimensions:
             return "No chart dimension information available."
@@ -719,17 +719,17 @@ class DashboardEngineer:
             html_file = info['html_file']
             description = info.get('description', '')
             
-            # 判断图表形状类型
+            # Determine chart shape type
             if ratio > 2.0:
-                shape_type = "Wide (宽横向)"
+                shape_type = "Wide"
             elif ratio > 1.2:
-                shape_type = "Landscape (横向)"
+                shape_type = "Landscape"
             elif ratio >= 0.8:
-                shape_type = "Square (方形)"
+                shape_type = "Square"
             elif ratio >= 0.5:
-                shape_type = "Portrait (竖向)"
+                shape_type = "Portrait"
             else:
-                shape_type = "Tall (高竖向)"
+                shape_type = "Tall"
             
             lines.append(f"**{block_id}**:")
             lines.append(f"  - File: `{html_file}`")
@@ -742,10 +742,10 @@ class DashboardEngineer:
         return "\n".join(lines)
     
     def _load_template_mapping(self) -> Dict[str, Any]:
-        """加载模板映射配置文件
+        """Load template mapping configuration file
         
         Returns:
-            模板映射配置字典
+            Template mapping configuration dictionary
         """
         mapping_file = os.path.join(
             os.path.dirname(__file__),
@@ -758,7 +758,7 @@ class DashboardEngineer:
                     return json.load(f)
             else:
                 print(f"⚠️  Template mapping file not found: {mapping_file}, using default")
-                # 返回默认配置
+                # Return default configuration
                 return {
                     "template_library_path": "template_library",
                     "default_template": "template_base.html",
@@ -775,17 +775,17 @@ class DashboardEngineer:
             }
     
     def _select_template_by_config(self, config_file: Optional[str] = None) -> str:
-        """根据配置文件中的highlight块和图表数量选择模板
+        """Select a template based on the number of highlight blocks and charts in the configuration file
         
-        从映射配置文件中读取规则并匹配。
+        Read rules from mapping configuration and match.
         
         Args:
-            config_file: 配置文件路径（可选）
+            config_file: Configuration file path (optional)
         
         Returns:
-            模板文件名（如 'template_base.html'）
+            Template filename (e.g., 'template_base.html')
         """
-        # 从映射配置获取默认模板
+        # Get default template from mapping config
         default_template = self.template_mapping.get('default_template', 'template_base.html')
         
         if not config_file or not os.path.exists(config_file):
@@ -795,7 +795,7 @@ class DashboardEngineer:
             with open(config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            # 统计highlight块和view块的数量
+            # Count the number of highlight and view blocks
             highlight_count = 0
             view_count = 0
             
@@ -806,13 +806,13 @@ class DashboardEngineer:
                 elif block_type == 'view':
                     view_count += 1
             
-            # 从映射配置读取规则并匹配
+            # Read rules from mapping config and match
             rules = self.template_mapping.get('rules', [])
             for rule in rules:
                 conditions = rule.get('conditions', {})
                 match = True
                 
-                # 检查highlight_count条件
+                # Check highlight_count condition
                 if 'highlight_count' in conditions:
                     highlight_cond = conditions['highlight_count']
                     if 'min' in highlight_cond and highlight_count < highlight_cond['min']:
@@ -820,7 +820,7 @@ class DashboardEngineer:
                     if 'max' in highlight_cond and highlight_count > highlight_cond['max']:
                         match = False
                 
-                # 检查view_count条件
+                # Check view_count condition
                 if 'view_count' in conditions:
                     view_cond = conditions['view_count']
                     if 'min' in view_cond and view_count < view_cond['min']:
@@ -828,14 +828,14 @@ class DashboardEngineer:
                     if 'max' in view_cond and view_count > view_cond['max']:
                         match = False
                 
-                # 如果匹配，返回对应的模板
+                # If matched, return the corresponding template
                 if match:
                     template = rule.get('template')
                     if template:
                         print(f"✓ Matched rule '{rule.get('name', 'unknown')}': {rule.get('description', '')}")
                         return template
             
-            # 如果没有匹配的规则，返回默认模板
+            # If no rule matched, return the default template
             print(f"✓ No rule matched, using default template: {default_template}")
             return default_template
             
@@ -850,49 +850,49 @@ class DashboardEngineer:
         question: str,
         config_file: Optional[str] = None
     ) -> bool:
-        """应用指定的模板并替换变量（通用方法）
+        """Apply the specified template and perform variable substitution (generic method)
         
-        流程：
-        1. 从模板库（template_library）读取模板
-        2. 复制模板到va_app/public/templates/
-        3. 进行变量替换和应用
+        Process:
+        1. Read template from template library (template_library)
+        2. Copy template to va_app/public/templates/
+        3. Perform variable substitution and application
         
         Args:
-            template_name: 模板文件名（如 'template_base.html' 或 'template_with_table.html'）
-            va_app_path: VA应用路径
-            question: 用户问题
-            config_file: 配置文件路径（可选）
+            template_name: Template filename (e.g., 'template_base.html' or 'template_with_table.html')
+            va_app_path: VA application path
+            question: User question
+            config_file: Configuration file path (optional)
         
         Returns:
-            是否成功应用模板
+            Whether template was applied successfully
         """
         try:
-            # 1. 从映射配置获取模板信息
+            # 1. Get template information from mapping config
             templates_info = self.template_mapping.get('templates', {})
             template_info = templates_info.get(template_name, {})
             
-            # 获取模板库路径
+            # Get template library path
             template_library_path = self.template_mapping.get('template_library_path', 'template_library')
             template_library_dir = os.path.join(os.path.dirname(__file__), template_library_path)
             
-            # 2. 确定模板源文件路径
-            # 优先使用映射配置中的source_path
+            # 2. Determine template source file path
+            # Prioritize using source_path from mapping config
             if template_info.get('source_path'):
                 template_source = os.path.join(os.path.dirname(__file__), template_info['source_path'])
             else:
-                # 回退到模板库目录
+                # Fallback to template library directory
                 template_source = os.path.join(template_library_dir, template_name)
             
-            # 如果模板库中不存在，尝试从旧位置查找（向后兼容）
+            # If not present in template library, try finding in old locations (backward compatibility)
             if not os.path.exists(template_source):
-                # 尝试从 ui_templates 目录查找
+                # Try finding from ui_templates directory
                 template_source = os.path.join(
                     os.path.dirname(__file__),
                     'ui_templates',
                     template_name
                 )
                 
-                # 如果还是不存在，尝试从 template/public/templates 查找
+                # If still not found, try template/public/templates
                 if not os.path.exists(template_source):
                     template_source = os.path.join(
                         os.path.dirname(__file__),
@@ -904,7 +904,7 @@ class DashboardEngineer:
             
             if not os.path.exists(template_source):
                 print(f"⚠️  Template {template_name} not found")
-                # 如果找不到指定模板，回退到默认模板
+                # Fallback to default template if specified template not found
                 default_template = self.template_mapping.get('default_template', 'template_base.html')
                 if template_name != default_template:
                     print(f"⚠️  Falling back to {default_template}")
@@ -913,15 +913,15 @@ class DashboardEngineer:
                     )
                 return False
             
-            # 3. 读取模板内容
+            # 3. Read template content
             with open(template_source, 'r', encoding='utf-8') as f:
                 template_content = f.read()
             
-            # 4. 确保目标目录存在
+            # 4. Ensure target directory exists
             templates_dest = os.path.join(va_app_path, 'public', 'templates')
             os.makedirs(templates_dest, exist_ok=True)
             
-            # 5. 从配置文件中读取所有信息
+            # 5. Read all information from configuration file
             dashboard_name = "Dashboard"
             dashboard_description = "Explore data insights and analytics."
             chart_titles = []
@@ -934,18 +934,18 @@ class DashboardEngineer:
                     with open(config_file, 'r', encoding='utf-8') as f:
                         config = json.load(f)
                     
-                    # 1. 从metadata中获取dashboard名字和描述
+                    # 1. Get dashboard name and description from metadata
                     metadata = config.get('metadata', {})
                     dashboard_name = metadata.get('dashboard_name', dashboard_name)
                     dashboard_description = metadata.get('dashboard_description', dashboard_description)
                     
-                    # 如果没有metadata，尝试从layout中获取
+                    # If metadata is missing, try getting from layout
                     if dashboard_name == "Dashboard":
                         layout = config.get('layout', {})
                         dashboard_name = layout.get('dashboard_name', dashboard_name)
                         dashboard_description = layout.get('dashboard_description', dashboard_description)
                     
-                    # 2. 获取所有highlight blocks的标题和ID
+                    # 2. Get titles and IDs for all highlight blocks
                     for block in config.get('blocks', []):
                         if block.get('blockType') == 'highlight':
                             block_id = block.get('id', '')
@@ -956,12 +956,12 @@ class DashboardEngineer:
                             if title:
                                 highlight_titles.append(title)
                     
-                    # 3. 获取所有view blocks的标题和ID（按配置中的顺序）
+                    # 3. Get titles and IDs for all view blocks (following config order)
                     for block in config.get('blocks', []):
                         if block.get('blockType') == 'view':
                             block_id = block.get('id', '')
                             block_content = block.get('blockContent', {})
-                            # 优先使用description，如果没有则使用title
+                            # Prioritize description, fallback to title
                             title = block_content.get('description', '') or block_content.get('title', '')
                             if block_id:
                                 chart_ids.append(block_id)
@@ -969,33 +969,33 @@ class DashboardEngineer:
                                 chart_titles.append(title)
                 except Exception as e:
                     print(f"⚠️  Error reading config file: {e}")
-                    # 如果读取失败，使用question作为fallback
+                    # If reading fails, use question as fallback
                     dashboard_name = self._extract_dashboard_name(question)
                     dashboard_description = self._extract_dashboard_description(question)
             
-            # 替换变量
-            # 1. 替换Dashboard名字
+            # Variable substitution
+            # 1. Replace Dashboard name
             template_content = re.sub(
                 r'<span class="font-bold text-xl tracking-tight text-gray-800">DataMiner</span>',
                 f'<span class="font-bold text-xl tracking-tight text-gray-800">{dashboard_name}</span>',
                 template_content
             )
             
-            # 2. 替换标题和描述
+            # 2. Replace title and description
             template_content = re.sub(
                 r'<h2 class="text-xl font-bold text-gray-800">Maven Roasters Sales</h2>\s*<p class="text-xs text-gray-500 mt-0.5">Explore sales trends and product performance across NYC locations\.</p>',
                 f'<h2 class="text-xl font-bold text-gray-800">{dashboard_name}</h2>\n                <p class="text-xs text-gray-500 mt-0.5">{dashboard_description}</p>',
                 template_content
             )
             
-            # 3. 替换highlight标题（如果模板中有highlight部分）
+            # 3. Replace highlight titles (if highlights exist in the template)
             if highlight_titles:
-                # 查找highlight标题模式（根据实际模板结构调整）
+                # Match highlight title patterns (adjust based on actual template structure)
                 highlight_pattern = r'(<div[^>]*class="[^"]*highlight[^"]*"[^>]*>.*?<[^>]*>)([^<]+)(</[^>]*>)'
-                # 或者更通用的模式：查找包含"highlight"关键词的文本
-                # 这里需要根据实际模板结构调整
+                # Or a more generic pattern: look for text containing "highlight" keyword
+                # This needs adjustment based on actual template structure
             
-            # 4. 替换图表标题（查找所有图表标题并替换）
+            # 4. Replace chart titles (find and replace all chart titles)
             chart_title_pattern = r'(<h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">\s*<span class="w-1 h-4 bg-\[#[^\]]+\] rounded-full"></span>\s*)([^<]+)(</h3>)'
             
             title_index = 0
@@ -1005,7 +1005,7 @@ class DashboardEngineer:
                 current_title = match.group(2).strip()
                 suffix = match.group(3)
                 
-                # 如果有可用的图表标题，使用它；否则保持原样
+                # Use available chart title if available; otherwise keep unchanged
                 if title_index < len(chart_titles):
                     new_title = chart_titles[title_index]
                     title_index += 1
@@ -1014,9 +1014,9 @@ class DashboardEngineer:
             
             template_content = re.sub(chart_title_pattern, replace_chart_title, template_content)
             
-            # 5. 替换图表ID（将模板中的 intent_X_goal_0_chart0 替换为配置文件中的实际ID）
+            # 5. Replace chart IDs (replace intent_X_goal_0_chart0 in template with actual IDs from config)
             if chart_ids:
-                # 查找所有图表ID模式：intent_数字_goal_数字_chart数字
+                # Find all chart ID patterns: intent_DIGIT_goal_DIGIT_chartDIGIT
                 chart_id_pattern = r'id="(intent_\d+_goal_\d+_chart\d+)"'
                 
                 chart_id_index = 0
@@ -1024,7 +1024,7 @@ class DashboardEngineer:
                     nonlocal chart_id_index
                     old_id = match.group(1)
                     
-                    # 如果有可用的图表ID，使用它；否则保持原样
+                    # Use available chart ID if available; otherwise keep unchanged
                     if chart_id_index < len(chart_ids):
                         new_id = chart_ids[chart_id_index]
                         chart_id_index += 1
@@ -1033,41 +1033,41 @@ class DashboardEngineer:
                 
                 template_content = re.sub(chart_id_pattern, replace_chart_id, template_content)
             
-            # 6. 如果是通用模板，注入配置数据供JavaScript使用
+            # 6. Inject configuration data for JavaScript if using the universal template
             if template_name == 'template_universal.html' and config_file and os.path.exists(config_file):
                 try:
                     with open(config_file, 'r', encoding='utf-8') as f:
                         config_data = json.load(f)
                     
-                    # 将配置数据注入到HTML中
+                    # Inject configuration data into HTML
                     config_json_str = json.dumps(config_data, ensure_ascii=False)
                     config_script = f'\n<script id="dashboard-config-data" type="application/json">{config_json_str}</script>\n'
                     
-                    # 优先在第一个 <script> 标签之前插入，确保配置在模板脚本执行前可用
+                    # Insert before the first <script> tag to ensure config is available before template script runs
                     first_script_pos = template_content.find('<script')
                     if first_script_pos != -1:
                         template_content = template_content[:first_script_pos] + config_script + template_content[first_script_pos:]
                     elif '</body>' in template_content:
                         template_content = template_content.replace('</body>', config_script + '</body>')
                     elif '</div>' in template_content:
-                        # 找到最后一个</div>之前插入
+                        # Insert before the last </div>
                         last_div_pos = template_content.rfind('</div>')
                         if last_div_pos != -1:
                             template_content = template_content[:last_div_pos] + config_script + template_content[last_div_pos:]
                     else:
-                        # 如果没有找到，在末尾插入
+                        # Fallback: append to end
                         template_content = template_content + config_script
                     
                     print(f"✓ Injected dashboard config data for universal template")
                 except Exception as e:
                     print(f"⚠️  Failed to inject config data for universal template: {e}")
             
-            # 7. 保存替换后的模板到目标路径（templates_dest已在前面创建）
+            # 7. Save replaced template to target path (templates_dest already created)
             customized_template_path = os.path.join(templates_dest, 'page_customized.html')
             with open(customized_template_path, 'w', encoding='utf-8') as f:
                 f.write(template_content)
             
-            # 保存主题内容供图表美化使用
+            # Store theme content for chart beautification
             self.page_theme_content = template_content
             
             print(f"✓ Applied {template_name} with substitutions")
@@ -1080,66 +1080,65 @@ class DashboardEngineer:
             return False
     
     def _extract_dashboard_name(self, question: str) -> str:
-        """从问题中提取Dashboard名字
+        """Extract Dashboard name from the question
         
         Args:
-            question: 用户问题
+            question: User question
         
         Returns:
-            Dashboard名字
+            Dashboard name
         """
         if not question:
             return "Dashboard"
         
-        # 尝试提取关键名词作为名字
-        # 移除常见的问句词汇
+        # Try extracting key nouns as the name
+        # Remove common question words
         question_clean = question.strip()
         
-        # 如果问题很短，直接使用
+        # Use directly if question is short
         if len(question_clean) <= 30:
-            # 移除问号、句号等
+            # Remove punctuation
             question_clean = re.sub(r'[?。！？]$', '', question_clean)
             return question_clean[:30]
         
-        # 如果问题很长，提取前几个关键词
-        # 简单处理：取前20个字符
+        # If long, extract first few keywords
+        # Simple approach: take first 20 characters
         question_clean = re.sub(r'[?。！？]$', '', question_clean)
         return question_clean[:20] + "..."
     
     def _extract_dashboard_description(self, question: str) -> str:
-        """从问题中提取Dashboard描述
+        """Extract Dashboard description from the question
         
         Args:
-            question: 用户问题
+            question: User question
         
         Returns:
-            Dashboard描述
+            Dashboard description
         """
         if not question:
             return "Explore data insights and analytics."
         
-        # 如果问题很短，直接使用
+        # Use directly if question is short
         if len(question) <= 60:
             return question
         
-        # 如果问题很长，使用前50个字符
+        # Use first 50 characters if long
         return question[:50] + "..."
     
-    
     def _update_app_config(self, app_py_path: str, config_filename: str):
-        """更新app.py中的配置文件路径
+        """Update configuration file path in app.py
         
-        参考 va_system_builder.py 的 _update_app_config 方法。
+        Refers to the _update_app_config method in va_system_builder.py.
         
         Args:
-            app_py_path: app.py文件路径
-            config_filename: 配置文件名
+            app_py_path: Path to app.py file
+            config_filename: Configuration filename
         """
         try:
             with open(app_py_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # 替换schema_path配置
+            # Replace schema_path configuration
             pattern = r'schema_path\s*=\s*os\.path\.join\(CONFIGS_DIR,\s*["\'][^"\']*["\']\)'
             replacement = f'schema_path = os.path.join(CONFIGS_DIR, "{config_filename}")'
             
@@ -1151,18 +1150,18 @@ class DashboardEngineer:
             pass
     
     def _update_page_template_config(self, config_file_path: str):
-        """更新配置文件中的pageTemplate路径
+        """Update pageTemplate path in the configuration file
         
-        参考 va_system_builder.py 的 _update_page_template_config 方法。
+        Refers to the _update_page_template_config method in va_system_builder.py.
         
         Args:
-            config_file_path: 配置文件路径
+            config_file_path: Path to configuration file
         """
         try:
             with open(config_file_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            # 更新layout中的pageTemplate
+            # Update pageTemplate in layout
             if 'layout' in config:
                 config['layout']['pageTemplate'] = 'public/templates/page_customized.html'
                 
@@ -1177,21 +1176,20 @@ class DashboardEngineer:
         dataset_path: str,
         max_workers: int = 4
     ):
-        """
-        检测echart_code目录中是否有HTML文件，如果没有则运行Python代码生成
+        """Detect if HTML files exist in echart_code directory; run Python code to generate them if not.
         
-        参考 va_system_builder.py 的 _generate_html_from_python_charts 方法。
+        Refers to the _generate_html_from_python_charts method in va_system_builder.py.
         
         Args:
-            echart_source_dir: echart_code目录路径
-            dataset_path: 数据集路径
-            max_workers: 最大并行worker数
+            echart_source_dir: Path to echart_code directory
+            dataset_path: Path to dataset
+            max_workers: Maximum number of parallel workers
         """
         if not os.path.exists(echart_source_dir):
             print(f"⚠️  EChart source directory not found: {echart_source_dir}")
             return
         
-        # 1. 检查是否已有HTML文件
+        # 1. Check if HTML files already exist
         html_files = [f for f in os.listdir(echart_source_dir) if f.endswith('.html')]
         python_files = [f for f in os.listdir(echart_source_dir) if f.endswith('.py')]
         
@@ -1205,68 +1203,68 @@ class DashboardEngineer:
         
         print(f"🔧 No HTML files found, generating from {len(python_files)} Python files...")
         
-        # 2. 准备数据路径（检查数据集是否存在）
+        # 2. Prepare data path (verify dataset exists)
         if not os.path.exists(dataset_path):
             print(f"❌ Dataset not found: {dataset_path}")
             return
         
-        # 3. 定义单个Python文件的执行函数
+        # 3. Define execution function for a single Python file
         def execute_python_chart(py_file: str) -> Tuple[str, bool, str]:
-            """执行单个Python图表文件生成HTML"""
+            """Execute a single Python chart file to generate HTML"""
             py_path = os.path.join(echart_source_dir, py_file)
             chart_name = os.path.splitext(py_file)[0]
             
             try:
-                # 读取Python代码
+                # Read Python code
                 with open(py_path, 'r', encoding='utf-8') as f:
                     code = f.read()
                 
-                # 检查代码结构：是否有plot函数定义？
+                # Check code structure: is plot function defined?
                 has_plot_function = 'def plot(' in code
                 
-                # 创建临时执行环境
+                # Create temporary execution environment
                 exec_globals = {
                     '__file__': py_path,
                     '__name__': '__main__',
                     'dataset_path': dataset_path,
                 }
                 
-                # 构建执行代码
+                # Build execution code
                 if has_plot_function:
-                    # LIDA生成的代码：有plot(data)函数
+                    # Code generated by LIDA: has plot(data) function
                     exec_code = f"""
 import pandas as pd
 from pyecharts import options as opts
 from pyecharts.charts import *
 import os
 
-# 加载数据
+# Load data
 data = pd.read_csv(r'{dataset_path}')
 
-# 执行原始代码（定义plot函数）
+# Execute original code (defining plot function)
 {code}
 
-# 调用plot函数生成图表
+# Call plot function to generate chart
 chart = plot(data)
 
-# 渲染HTML文件
+# Render HTML file
 chart.render(r'{os.path.join(echart_source_dir, chart_name + ".html")}')
 """
                 else:
-                    # 直接生成图表的代码
+                    # Code that generates chart directly
                     exec_code = f"""
 import pandas as pd
 from pyecharts import options as opts
 from pyecharts.charts import *
 import os
 
-# 加载数据
+# Load data
 data = pd.read_csv(r'{dataset_path}')
 
-# 执行原始代码
+# Execute original code
 {code}
 
-# 查找chart对象并渲染
+# Find chart object and render
 for var_name in dir():
     var = locals().get(var_name)
     if hasattr(var, 'render') and hasattr(var, 'options'):
@@ -1274,10 +1272,10 @@ for var_name in dir():
         break
 """
                 
-                # 执行代码生成HTML
+                # Execute code to generate HTML
                 exec(exec_code, exec_globals)
                 
-                # 检查是否生成了HTML文件
+                # Check if HTML file was generated
                 expected_html = os.path.join(echart_source_dir, f"{chart_name}.html")
                 if os.path.exists(expected_html):
                     return py_file, True, f"✓ Generated {chart_name}.html"
@@ -1287,22 +1285,22 @@ for var_name in dir():
             except Exception as e:
                 import traceback
                 error_detail = traceback.format_exc()
-                # 记录完整的错误信息
+                # Log full error info
                 print(f"❌ Error executing {py_file}:\n{error_detail}")
                 return py_file, False, f"✗ Error: {str(e)}"
         
-        # 4. 使用线程池并行执行
+        # 4. Execute in parallel using thread pool
         success_count = 0
         failed_files = []
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 提交所有任务
+            # Submit all tasks
             future_to_file = {
                 executor.submit(execute_python_chart, py_file): py_file 
                 for py_file in python_files
             }
             
-            # 收集结果
+            # Collect results
             for future in as_completed(future_to_file):
                 py_file, success, message = future.result()
                 if success:
@@ -1312,7 +1310,7 @@ for var_name in dir():
                     failed_files.append((py_file, message))
                     print(f"  {message}")
         
-        # 5. 输出汇总
+        # 5. Output summary
         print(f"HTML generation completed: {success_count}/{len(python_files)} succeeded")
         if failed_files:
             print(f"⚠️  Failed files ({len(failed_files)}):")
@@ -1320,19 +1318,19 @@ for var_name in dir():
                 print(f"  - {py_file}: {error}")
     
     def _process_echart_html(self, src_file: str, dst_file: str):
-        """处理ECharts HTML文件：删除title，截取数据只保留前10个示例
+        """Process ECharts HTML file: Remove title, truncate data to retain only first 10 examples.
         
-        参考 va_system_builder.py 的 _process_echart_html 方法。
+        Refers to the _process_echart_html method in va_system_builder.py.
         
         Args:
-            src_file: 源文件路径
-            dst_file: 目标文件路径
+            src_file: Source file path
+            dst_file: Target file path
         """
         try:
             with open(src_file, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # 查找 option 配置的起始位置
+            # Find starting position of option configuration
             option_pattern = r'var option_[a-zA-Z0-9_]+ = ({.*?});'
             match = re.search(option_pattern, content, re.DOTALL)
             
@@ -1340,14 +1338,14 @@ for var_name in dir():
                 option_json_str = match.group(1)
                 
                 try:
-                    # 解析JSON配置
+                    # Parse JSON configuration
                     option_config = json.loads(option_json_str)
                     
-                    # 1. 删除title配置
+                    # 1. Delete title configuration
                     if 'title' in option_config:
                         del option_config['title']
                     
-                    # 2. 处理series中的数据，只保留前10个
+                    # 2. Process series data, keep only first 10 items
                     if 'series' in option_config:
                         for series in option_config['series']:
                             if 'data' in series and isinstance(series['data'], list):
@@ -1355,11 +1353,11 @@ for var_name in dir():
                                 if original_length > 10:
                                     series['data'] = series['data'][:10]
                             
-                            # 将label隐藏
+                            # Hide labels
                             if 'label' in series:
                                 series['label']['show'] = False
                     
-                    # 3. 处理xAxis中的数据，只保留前10个
+                    # 3. Process xAxis data, keep only first 10 items
                     if 'xAxis' in option_config:
                         x_axes = option_config['xAxis'] if isinstance(option_config['xAxis'], list) else [option_config['xAxis']]
                         for x_axis in x_axes:
@@ -1368,7 +1366,7 @@ for var_name in dir():
                                 if original_length > 10:
                                     x_axis['data'] = x_axis['data'][:10]
                     
-                    # 4. 处理grid
+                    # 4. Process grid
                     if 'grid' in option_config:
                         option_config['grid']['containLabel'] = True
                     else:
@@ -1376,9 +1374,9 @@ for var_name in dir():
                             "containLabel": True
                         }
 
-                    # 5. 处理legend中的top配置
+                    # 5. Process top configuration in legend
                     if 'legend' in option_config:
-                        # legend 可能是字典或列表
+                        # legend can be dict or list
                         if isinstance(option_config['legend'], dict):
                             option_config['legend']['top'] = '5%'
                         elif isinstance(option_config['legend'], list):
@@ -1386,43 +1384,42 @@ for var_name in dir():
                                 if isinstance(legend, dict):
                                     legend['top'] = '5%'
                     
-                    # 将修改后的配置转回JSON字符串
+                    # Convert modified configuration back to JSON string
                     new_option_json = json.dumps(option_config, ensure_ascii=False, indent=4)
                     
-                    # 替换原内容中的option配置
+                    # Replace option configuration in original content
                     new_content = content[:match.start(1)] + new_option_json + content[match.end(1):]
                     
-                    # 写入目标文件
+                    # Write to target file
                     with open(dst_file, 'w', encoding='utf-8') as f:
                         f.write(new_content)
                     
                 except json.JSONDecodeError:
-                    # 解析失败，直接复制原文件
+                    # If parsing fails, copy original file directly
                     shutil.copy2(src_file, dst_file)
             else:
-                # 找不到配置，直接复制原文件
+                # If configuration not found, copy original file directly
                 shutil.copy2(src_file, dst_file)
                 
         except Exception:
-            # 处理失败，直接复制原文件
+            # If processing fails, copy original file directly
             shutil.copy2(src_file, dst_file)
     
     def _update_config_with_html_names(self, config_file_path: str, charts_dir: str):
-        """
-        更新配置文件中的python_code_name和html_code_name字段，确保指向实际生成的文件
+        """Update python_code_name and html_code_name fields in configuration file to ensure they point to actual generated files.
         
-        参考 va_system_builder.py 的 _update_config_with_html_names 方法。
+        Refers to the _update_config_with_html_names method in va_system_builder.py.
         
         Args:
-            config_file_path: 配置文件路径
-            charts_dir: charts目录路径
+            config_file_path: Path to configuration file
+            charts_dir: Path to charts directory
         """
         try:
-            # 读取配置文件
+            # Read configuration file
             with open(config_file_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            # 获取charts目录中的所有文件
+            # Get all files in charts directory
             if not os.path.exists(charts_dir):
                 print(f"⚠️  Charts directory not found: {charts_dir}")
                 return
@@ -1430,16 +1427,16 @@ for var_name in dir():
             available_files = set(os.listdir(charts_dir))
             updated_count = 0
             
-            # 遍历所有blocks
+            # Traverse all blocks
             for block in config.get('blocks', []):
                 if block.get('blockType') == 'view':
                     block_content = block.get('blockContent', {})
                     
-                    # 检查是否已有python_code_name和html_code_name
+                    # Check if python_code_name and html_code_name already exist
                     python_name = block_content.get('python_code_name', '')
                     html_name = block_content.get('html_code_name', '')
                     
-                    # 如果字段不存在，尝试从layers中提取
+                    # If fields missing, try extracting from layers
                     if not python_name:
                         layers = block_content.get('layers', [])
                         if layers and 'code_file' in layers[0]:
@@ -1447,15 +1444,15 @@ for var_name in dir():
                             python_name = os.path.basename(code_file) if code_file else ''
                             html_name = python_name.replace('.py', '.html') if python_name else ''
                     
-                    # 验证文件是否存在
+                    # Verify file existence
                     if python_name:
-                        # 更新字段
+                        # Update fields
                         block_content['python_code_name'] = python_name
                         block_content['html_code_name'] = html_name
                         
                         updated_count += 1
             
-            # 保存更新后的配置
+            # Save updated configuration
             with open(config_file_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
             
@@ -1465,16 +1462,16 @@ for var_name in dir():
             print(f"❌ Error updating config with HTML names: {str(e)}")
     
     def _reprocess_charts_after_beautify(self, charts_dest: str):
-        """在图表美化后，对所有图表再次应用标准化处理（原地处理）
+        """Apply standardization treatment to all charts again after beautification (in-place processing).
         
-        参考 va_system_builder.py 的 _reprocess_charts_after_beautify 方法。
+        Refers to the _reprocess_charts_after_beautify method in va_system_builder.py.
         
-        - 统一隐藏 series.label
-        - 截断 series/xAxis 的 data 至前 10 条
-        - 保持 grid.containLabel 为 True
+        - Uniformly hide series.label
+        - Truncate data in series/xAxis to first 10 items
+        - Keep grid.containLabel as True
         
         Args:
-            charts_dest: 图表目录路径
+            charts_dest: Path to charts directory
         """
         try:
             if not os.path.exists(charts_dest):
@@ -1484,7 +1481,7 @@ for var_name in dir():
             for file in os.listdir(charts_dest):
                 src_path = os.path.join(charts_dest, file)
                 if os.path.isfile(src_path) and file.endswith('.html'):
-                    # 原地处理：src 与 dst 相同
+                    # In-place processing: src and dst are the same
                     self._process_echart_html(src_path, src_path)
             
             print("✓ Reprocessed charts after beautify (labels hidden, data trimmed)")

@@ -1,20 +1,20 @@
-// 获取主题配置的辅助函数（从模板中获取或使用默认值）
+// Helper function to get theme configuration (from template or use default)
 function getThemeConfig() {
-    // 从模板中获取主题配置（模板通过 window.currentPalette 和 window.currentThemeName 暴露）
+    // Get theme configuration from template (exposed via window.currentPalette and window.currentThemeName)
     if (window.currentPalette && window.currentThemeName) {
         return {
             palette: window.currentPalette,
             themeName: window.currentThemeName
         };
     }
-    // 回退到默认主题（如果模板未加载主题配置）
+    // Fallback to default theme (if template didn't load theme configuration)
     return {
         palette: null,
         themeName: null
     };
 }
 
-// 防抖工具函数
+// Debounce utility function
 function debounce(func, wait) {
     let timeout;
     return function(...args) {
@@ -99,12 +99,12 @@ const App = {
             this.config = data;
             console.log("✅ Init data received:", data);
             
-            // 加载模板
+            // Load template
             const templatePath = data.layout?.pageTemplate || 'public/templates/template_base.html';
             await this.loadTemplate(templatePath);
             
             console.log("🎨 Rendering components...");
-            // 渲染内容
+            // Render content
             this.renderHighlights(data.highlights);
             this.renderCharts(data.charts);
             this.renderFilters(data.blocks);
@@ -112,7 +112,7 @@ const App = {
             this.connectWS();
             console.log("✨ Dashboard Ready!");
             
-            // 窗口调整时重绘
+            // Redraw on window resize
             window.addEventListener('resize', () => {
                 Object.values(this.charts).forEach(c => c.resize());
             });
@@ -129,22 +129,22 @@ const App = {
 
     loadTemplate: async function(url) {
         console.log(`📥 Loading template from: ${url}`);
-        // 添加时间戳防止缓存问题
+        // Add timestamp to prevent caching issues
         const cacheBuster = `?t=${Date.now()}`;
         const res = await fetch(url + cacheBuster);
         if(!res.ok) throw new Error(`Template not found: ${url}`);
         const html = await res.text();
         const root = document.getElementById('app-root');
         if(root) {
-            // 处理完整的 HTML 文档：提取 body 内容
+            // Handle full HTML document: extract body content
             let content = html;
             if (html.includes('<body')) {
-                // 提取 body 标签内的内容
+                // Extract content inside body tag
                 const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
                 if (bodyMatch) {
                     content = bodyMatch[1];
                 } else {
-                    // 如果没有闭合标签，尝试提取 body 开始后的内容
+                    // If no closing tag, try to extract content after body start
                     const bodyStartMatch = html.match(/<body[^>]*>([\s\S]*)/i);
                     if (bodyStartMatch) {
                         content = bodyStartMatch[1];
@@ -215,7 +215,7 @@ const App = {
     },
 
     renderCharts: function(chartsData) {
-        // 获取主题配置（从模板中获取）
+        // Get theme configuration (from template)
         const themeConfig = getThemeConfig();
         const palette = themeConfig.palette;
         const themeName = themeConfig.themeName;
@@ -224,7 +224,7 @@ const App = {
             const el = document.getElementById(id);
             if (!el) return;
 
-            // 强制修复高度
+            // Force fix height
             if (el.clientHeight < 20) {
                 el.style.height = '300px'; 
                 el.style.width = '100%';
@@ -238,26 +238,26 @@ const App = {
 
             let chart = this.charts[id];
             if (!chart) {
-                // 使用模板中注册的主题名称，如果没有则使用默认主题
+                // Use theme name registered in template, or use default theme if none
                 chart = echarts.init(el, themeName || null);
                 this.charts[id] = chart;
             }
             
             let finalOption = data.option || {};
             
-            // 只有在模板提供了主题配置时才应用样式
+            // Only apply styling if template provided theme configuration
             if (palette) {
                 try {
-                    // 尝试提取核心数据进行重构
+                    // Try to extract core data for restructuring
                     const rawSeries = finalOption.series?.[0];
                     const rawXAxis = Array.isArray(finalOption.xAxis) ? finalOption.xAxis[0] : finalOption.xAxis;
                     const rawYAxis = Array.isArray(finalOption.yAxis) ? finalOption.yAxis[0] : finalOption.yAxis;
 
-                    // 统一处理所有支持的图表类型
+                    // Unified handling for all supported chart types
                     if (rawSeries) {
                         const type = rawSeries.type;
 
-                        // 1. 基础图表 (Bar/Line)
+                        // 1. Basic charts (Bar/Line)
                         if ((type === 'bar' || type === 'line') && rawXAxis && rawXAxis.data) {
                             finalOption = {
                                 grid: palette.grid,
@@ -283,7 +283,7 @@ const App = {
                                 }]
                             };
                         }
-                        // 2. 热力图 (Heatmap)
+                        // 2. Heatmap
                         else if (type === 'heatmap') {
                             const vMap = finalOption.visualMap || palette.visualMap;
                             finalOption = {
@@ -295,7 +295,7 @@ const App = {
                                     ...palette.categoryAxis
                                 },
                                 yAxis: {
-                                    type: 'category', // 热力图 Y 轴也是类目
+                                    type: 'category', // Heatmap Y-axis is also category
                                     data: rawYAxis ? rawYAxis.data : [],
                                     ...palette.categoryAxis
                                 },
@@ -307,7 +307,7 @@ const App = {
                                 }]
                             };
                         }
-                        // 3. 箱型图 (Boxplot)
+                        // 3. Boxplot
                         else if (type === 'boxplot') {
                              finalOption = {
                                 grid: palette.grid,
@@ -329,19 +329,19 @@ const App = {
                                 }]
                             };
                         }
-                        // 4. 饼图 (Pie)
+                        // 4. Pie chart
                         else if (type === 'pie') {
                             finalOption = {
                                 tooltip: { ...palette.tooltip, trigger: 'item' },
                                 legend: { ...palette.legend, bottom: 0 },
                                 series: [{
                                     ...rawSeries,
-                                    radius: ['40%', '70%'], // 强制使用甜甜圈风格
+                                    radius: ['40%', '70%'], // Force donut style
                                     itemStyle: { borderWidth: 2, borderColor: '#ffffff' },
                                     label: { show: false }
                                 }]
                             };
-                            // 饼图不需要轴和网格
+                            // Pie charts don't need axes and grid
                             delete finalOption.xAxis;
                             delete finalOption.yAxis;
                             delete finalOption.grid;
@@ -385,18 +385,18 @@ const App = {
           const wrap = document.createElement('div');
           wrap.className = "mb-6 border-b border-gray-100 pb-4 last:border-0";
           
-          // 标题
+          // Title
           wrap.innerHTML = `
               <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1">
                   ${label}
               </label>
           `;
           
-          // 1. Single Select (单选下拉)
+          // 1. Single Select (dropdown)
           if (type === 'select') {
               const selectWrap = document.createElement('div');
               selectWrap.className = "relative";
-              // 修改颜色：focus:ring-[#E18182]
+              // Color modification: focus:ring-[#E18182]
               selectWrap.innerHTML = `
                   <select class="block w-full pl-3 pr-8 py-2 text-sm border border-gray-200 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E18182] focus:border-transparent cursor-pointer hover:border-gray-300 transition-colors appearance-none">
                   </select>
@@ -419,7 +419,7 @@ const App = {
               wrap.appendChild(selectWrap);
           }
           
-          // 2. Multi Select (Checkbox 列表)
+          // 2. Multi Select (Checkbox list)
           else if (type === 'multiselect') {
               const checkWrap = document.createElement('div');
               checkWrap.className = "max-h-48 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent space-y-2";
@@ -448,10 +448,10 @@ const App = {
                   const item = document.createElement('div');
                   item.className = "flex items-start";
                   
-                  // 默认只选中 "All"
+                  // Only "All" is checked by default
                   const isChecked = (opt === 'All');
                   
-                  // 修改颜色：text-[#E18182] focus:ring-[#E18182]
+                  // Color modification: text-[#E18182] focus:ring-[#E18182]
                   item.innerHTML = `
                       <div class="flex items-center h-5">
                           <input id="${id}" type="checkbox" value="${opt}" ${isChecked ? 'checked' : ''} class="w-4 h-4 text-[#E18182] border-gray-300 rounded focus:ring-[#E18182] cursor-pointer transition duration-150 ease-in-out">
@@ -469,10 +469,10 @@ const App = {
   
                       if (val === 'All') {
                           if (input.checked) {
-                              // 选中 "All" 时，取消选中其他所有选项
+                              // When "All" is checked, uncheck all other options
                               otherChks.forEach(el => el.checked = false);
                           } else {
-                              // 如果取消选中 "All"，且没有其他选项被选中，则重新选中 "All"
+                              // If "All" is unchecked and no other option is selected, re-check "All"
                               const anyOtherChecked = Array.from(otherChks).some(el => el.checked);
                               if (!anyOtherChecked) {
                                   input.checked = true;
@@ -480,10 +480,10 @@ const App = {
                           }
                       } else {
                           if (input.checked) {
-                              // 选中其他选项时，取消选中 "All"
+                              // When other options are checked, uncheck "All"
                               if (allChk) allChk.checked = false;
                           } else {
-                              // 如果取消选中了一个选项，且没有任何其他选项（包括 "All"）被选中，则重新选中 "All"
+                              // If an option is unchecked and no other option (including "All") is selected, re-check "All"
                               const anyChecked = Array.from(checkWrap.querySelectorAll('input')).some(el => el.checked);
                               if (!anyChecked && allChk) {
                                   allChk.checked = true;
@@ -501,7 +501,7 @@ const App = {
               wrap.appendChild(checkWrap);
           }
           
-          // 3. Range / Slider (双滑块)
+          // 3. Range / Slider (dual slider)
           else if (type === 'range' || type === 'slider') {
               const rangeWrap = document.createElement('div');
               rangeWrap.className = "space-y-4";
@@ -509,7 +509,7 @@ const App = {
               const max = parseFloat(content.range?.max ?? 100);
               const step = content.range?.step || (max - min) / 100;
               
-              // 修改颜色：轨道 bg-[#E18182]，手柄 bg-[#E18182]
+              // Color modification: track bg-[#E18182], handle bg-[#E18182]
               rangeWrap.innerHTML = `
                   <div class="relative h-2 w-full mt-2">
                       <div class="absolute w-full h-1 bg-gray-200 rounded-full top-0.5"></div>
@@ -612,7 +612,7 @@ const App = {
               wrap.appendChild(rangeWrap);
           }
           
-          // 4. Date Range (日期范围)
+          // 4. Date Range
           else if (type === 'date_range') {
                   const dateWrap = document.createElement('div');
                   dateWrap.className = "flex flex-col gap-2";
@@ -635,7 +635,7 @@ const App = {
                       }
                   }
   
-                  // 修改颜色：focus:ring-[#E18182]
+                  // Color modification: focus:ring-[#E18182]
                   dateWrap.innerHTML = `
                   <div class="relative group">
                       <label class="text-[10px] text-gray-400 font-bold ml-1 mb-0.5 block">FROM</label>
@@ -701,15 +701,15 @@ const App = {
 
     sendFilter: function(field, val, op = 'equals') {
         if(this.socket && this.socket.readyState === WebSocket.OPEN) {
-            // 处理 All 的情况
+            // Handle "All" case
             if (val === 'All' || (Array.isArray(val) && val.length === 0)) val = null;
             
-            // 构建 Filter 对象
+            // Build Filter object
             const filterObj = {};
             if (val !== null) {
                 filterObj[field] = { operator: op, value: val };
             } else {
-                // 发送空值以清除过滤器
+                // Send null value to clear filter
                 filterObj[field] = { operator: op, value: null };
             }
 
@@ -736,7 +736,7 @@ const App = {
     }
 };
 
-// 确保脚本动态加载时也能触发初始化
+// Ensure initialization is triggered even when script is loaded dynamically
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => App.init());
 } else {
