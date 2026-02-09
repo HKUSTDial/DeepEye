@@ -22,8 +22,10 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const [input, setInput] = useState('')
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
+  const [csvFiles, setCsvFiles] = useState<File[]>([])
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadBases()
@@ -40,14 +42,17 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   }
 
   const handleSend = () => {
-    if (input.trim() && !isStreaming) {
-      const kbIds = extractKbIds(input)
-      sendMessage(input.trim(), dataSourceIds, kbIds)
-      setInput('')
-      setShowMentions(false)
-      setMentionQuery('')
-      if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    }
+    const canSend = (input.trim() || csvFiles.length > 0) && !isStreaming
+    if (!canSend) return
+    const query = input.trim() || 'Generate a comprehensive report.'
+    const kbIds = extractKbIds(query)
+    sendMessage(query, dataSourceIds, kbIds, csvFiles.length > 0 ? csvFiles : undefined)
+    setInput('')
+    setCsvFiles([])
+    setShowMentions(false)
+    setMentionQuery('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const autoResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -164,7 +169,50 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
       {/* Input Area */}
       <div className="chat-input-container">
         <div className="max-w-3xl mx-auto px-4 py-4">
+          {csvFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2 items-center">
+              <span className="text-xs text-[var(--main-text-muted)]">CSV for report:</span>
+              {csvFiles.map((f, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[var(--sidebar-bg)] text-sm"
+                >
+                  {f.name}
+                  <button
+                    type="button"
+                    onClick={() => setCsvFiles((prev) => prev.filter((_, j) => j !== i))}
+                    className="hover:opacity-70"
+                    aria-label="Remove file"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="chat-input-wrapper">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const list = e.target.files ? Array.from(e.target.files) : []
+                setCsvFiles((prev) => [...prev, ...list].filter((f) => f.name.toLowerCase().endsWith('.csv')))
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 rounded-lg hover:bg-white/10 text-[var(--main-text-muted)]"
+              title="Upload CSV for report"
+              disabled={isStreaming}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+            </button>
             <textarea
               ref={textareaRef}
               value={input}
@@ -185,7 +233,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               rows={1}
               className="chat-input"
               style={{ maxHeight: '200px' }}
-              placeholder="Message DeepEye..."
+              placeholder={csvFiles.length > 0 ? 'Describe what report you want (or send as-is)...' : 'Message DeepEye...'}
               disabled={isStreaming}
             />
             {showMentions && mentionMatches.length > 0 && (
@@ -207,7 +255,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             )}
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isStreaming}
+              disabled={(!input.trim() && csvFiles.length === 0) || isStreaming}
               className="chat-send-btn"
             >
               <svg

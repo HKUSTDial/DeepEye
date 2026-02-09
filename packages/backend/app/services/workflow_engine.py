@@ -27,10 +27,10 @@ def build_registry() -> NodeRegistry:
     return registry
 
 
-def build_engine(db: Session, user_id, sandbox=None) -> ExecutionEngine:
+def build_engine(db: Session, user_id, sandbox=None, session_id: str | None = None) -> ExecutionEngine:
     registry = build_registry()
     engine = ExecutionEngine(node_registry=registry)
-    register_node_handlers(engine, db, user_id, sandbox=sandbox)
+    register_node_handlers(engine, db, user_id, sandbox=sandbox, session_id=session_id)
     engine.register_condition("always", AlwaysTrueCondition())
     engine.register_transform("identity", IdentityTransform())
     return engine

@@ -367,3 +367,14 @@ body.dark-theme .chat-input:focus {
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: var(--border-hover);
 }
+
+/* Report Steps Code Block */
+.message-content pre code.language-report-steps {
+  display: block;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--main-text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}

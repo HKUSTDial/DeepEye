@@ -1,7 +1,7 @@
 from typing import Any, AsyncIterator
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
@@ -12,6 +12,8 @@ from deepeye.graph.state import AgentState
 
 
 DEFAULT_MAX_STEPS = 50
+# Max messages to send to the model (older messages dropped to avoid context_length_exceeded)
+DEFAULT_MAX_CONTEXT_MESSAGES = 20
 
 
 class ReActAgent(BaseAgent):
@@ -24,9 +26,11 @@ class ReActAgent(BaseAgent):
         system_prompt: str = "",
         checkpointer: BaseCheckpointSaver | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
+        max_context_messages: int = DEFAULT_MAX_CONTEXT_MESSAGES,
     ):
         self._bound_model = model.bind_tools(tools)
         self.max_steps = max_steps
+        self.max_context_messages = max_context_messages
         super().__init__(model, tools, system_prompt, checkpointer)
 
     def _build_graph(self) -> Any:
@@ -41,6 +45,17 @@ class ReActAgent(BaseAgent):
     async def _call_model(self, state: AgentState, config: RunnableConfig) -> dict:
         """Model node - callbacks from config are automatically used."""
         messages = state["messages"]
+        if self.max_context_messages and len(messages) > self.max_context_messages:
+            messages = list(messages)[-self.max_context_messages:]
+        # OpenAI API requires: every AIMessage with tool_calls must be followed by ToolMessage(s).
+        # If we truncated and the last message is an AIMessage with tool_calls (without its ToolMessages), drop it to avoid 400.
+        while messages and isinstance(messages[-1], AIMessage) and getattr(messages[-1], "tool_calls", None):
+            messages = list(messages)[:-1]
+        if not messages:
+            fallback = list(state["messages"])
+            while fallback and isinstance(fallback[-1], AIMessage) and getattr(fallback[-1], "tool_calls", None):
+                fallback = fallback[:-1]
+            messages = fallback[-1:] if fallback else list(state["messages"])[-1:]
         if self.system_prompt:
             messages = [SystemMessage(content=self.system_prompt)] + list(messages)
         response = await self._bound_model.ainvoke(messages, config=config)

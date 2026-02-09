@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# 使用国内镜像，避免 pull docker.io 超时；可改为 python:3.11-slim（需能访问 Docker Hub）
+FROM docker.m.daocloud.io/library/python:3.11-slim
 
 WORKDIR /app
 

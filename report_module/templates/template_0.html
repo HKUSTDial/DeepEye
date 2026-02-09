@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> <style>
+        @media print { .no-print { display: none; } body { font-size: 12pt; } }
+        .report-section { background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 2rem; margin-bottom: 2rem; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans leading-relaxed">
+
+    <header class="bg-blue-800 text-white p-6 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold">{{ title }}</h1>
+                <p class="text-blue-200 mt-2">📅 Generation Date：{{ generation_date }}</p>
+            </div>
+            <button onclick="window.print()" class="no-print bg-white text-blue-800 px-4 py-2 rounded font-bold hover:bg-blue-50 transition">🖨️ Print Report</button>
+        </div>
+    </header>
+
+    <main class="container mx-auto py-8 px-4">
+
+        <section class="report-section">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                1. Executive Summary</h2>
+            <div class="mb-4 text-gray-700 leading-relaxed">
+                {{ summary_text | safe }}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                {% for kpi in kpis %}
+                <div class="bg-gray-50 p-4 rounded border-l-4 border-{{ kpi.color }}-500">
+                    <h3 class="font-bold text-{{ kpi.color }}-800">{{ kpi.label }}</h3>
+                    <p class="text-2xl font-extrabold mt-1">{{ kpi.value }}</p>
+                    <p class="text-sm text-gray-500 mt-1">{{ kpi.sub_label }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="report-section">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">2. Detailed analysis</h2>
+
+            {% for section in analysis_sections %}
+            <div class="mb-10">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">{{ section.title }}</h3>
+                <div class="mb-4 text-gray-600 bg-blue-50 p-4 rounded border border-blue-100">
+                    {{ section.desc }}
+                </div>
+                <div class="bg-white p-2 border rounded shadow-sm">
+                    {{ section.chart_html | safe }}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+
+        <section class="report-section border-l-8 border-blue-600">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">3. Conclusions and Recommendations</h2>
+            <div class="space-y-4 text-gray-700">
+                {{ conclusion_text | safe }}
+            </div>
+        </section>
+
+    </main>
+</body>
+</html>

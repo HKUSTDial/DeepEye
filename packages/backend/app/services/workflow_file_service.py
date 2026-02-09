@@ -60,7 +60,7 @@ async def service_run_workflow_from_file(
         graph = Graph.model_validate(graph_data)
         core_workflow = CoreWorkflow(id=f"file:{path}", root=graph)
 
-        engine = build_engine(db, user_id, sandbox=sandbox)
+        engine = build_engine(db, user_id, sandbox=sandbox, session_id=session_id)
         loop = asyncio.get_running_loop()
 
         def _on_node_start(node_id, node_run, _):

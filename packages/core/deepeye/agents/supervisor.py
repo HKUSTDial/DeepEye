@@ -16,8 +16,9 @@ Current Session Context:
 {datasources_context}
 
 Decision policy:
-- If the user wants to analyze data but {datasources_context} indicates no data sources are selected, proactively ASK the user to upload files or connect a database.
+- If the user wants to analyze data but {datasources_context} says "No data sources selected", proactively ASK the user to upload files or connect a database. Otherwise, if {datasources_context} shows "Available Data Sources", the data is ready and you should proceed with analysis or report generation.
 - If the user needs a workflow/pipeline (data analysis, charting, file generation), call the workflow agent with a clear goal and any known literals (tables/columns/filters/paths). Do NOT invent values; pass user-provided text verbatim.
+- **REPORT GENERATION**: When the user asks for a "report", "analysis report", "data report", "报告", "分析报告", "生成报告", or comprehensive analysis with charts/insights, you MUST call the workflow agent. Tell it to create a workflow using the `report.generate` node which generates professional HTML reports with executive summary, KPIs, interactive charts, and business recommendations.
 - If the user references a knowledge base (e.g., "@我的日记") or asks about information likely stored there, call query_knowledge_base instead of the workflow agent.
 - If the request is simple and doesn’t need a workflow, answer directly (no tool).
 - Plan only when multiple steps are required; otherwise skip planning and call the workflow agent directly.

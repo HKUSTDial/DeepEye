@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useChatStore } from '../stores/chat'
 import { useRightPanelStore } from '../stores/rightPanel'
+import { useReportStore } from '../stores/report'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
-import { chatApi, type AgentEvent } from '../api'
+import { chatApi, reportApi, type AgentEvent } from '../api'
 
 /**
  * Chat hook - handles SSE connection and message sending.
@@ -24,6 +25,7 @@ export function useChat() {
   const setSandboxReady = useChatStore((state) => state.setSandboxReady)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
+  const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
   const ensureWorkflowSession = useWorkflowSessionsStore((state) => state.ensureSession)
   const setWorkflowError = useWorkflowSessionsStore((state) => state.setError)
   const addWorkflowNode = useWorkflowSessionsStore((state) => state.addDraftNode)
@@ -38,9 +40,11 @@ export function useChat() {
   const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
   const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
   const isStreaming = useChatStore((state) => state.isStreaming)
-  
+  const setReportResult = useReportStore((state) => state.setReportResult)
+
   const [error, setError] = useState<string | null>(null)
   const esRef = useRef<EventSource | null>(null)
+  const closedNormallyRef = useRef(false)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -53,7 +57,7 @@ export function useChat() {
   }, [])
 
   const connectToSSE = useCallback((sessionId: string) => {
-    // Close existing connection
+    closedNormallyRef.current = false
     if (esRef.current) {
       esRef.current.close()
     }
@@ -206,13 +210,24 @@ export function useChat() {
           }
         }
 
+        if (agentEvent.type === 'report_done') {
+          const data = agentEvent.data as { report_html?: string; steps?: string[]; report_filename?: string; error?: string } | undefined
+          setReportResult(data?.report_html ?? null, data?.steps ?? [], data?.report_filename ?? null, data?.error ?? null)
+          // Open the Report panel and enlarge the right panel for better reading
+          openOrFocusTab('report')
+          setRightPanelRatio(50)
+        }
+
         pushEvent(agentEvent)
 
         if (agentEvent.type === 'agent_end' || agentEvent.type === 'error') {
+          closedNormallyRef.current = agentEvent.type === 'agent_end'
           es.close()
           esRef.current = null
           stopStreaming()
-          if (agentEvent.type === 'error') {
+          if (agentEvent.type === 'agent_end') {
+            setError(null)
+          } else {
             setError(agentEvent.content || 'Unknown error')
           }
         }
@@ -223,6 +238,13 @@ export function useChat() {
 
     es.onerror = () => {
       if (es.readyState === EventSource.CLOSED) return
+      if (closedNormallyRef.current) {
+        closedNormallyRef.current = false
+        es.close()
+        esRef.current = null
+        stopStreaming()
+        return
+      }
       es.close()
       esRef.current = null
       stopStreaming()
@@ -232,6 +254,7 @@ export function useChat() {
     setSandboxReady,
     notifyFilesChanged,
     openOrFocusTab,
+    setReportResult,
     setWorkflowError,
     addWorkflowNode,
     addWorkflowEdge,
@@ -247,50 +270,66 @@ export function useChat() {
     stopStreaming,
   ])
 
-  const sendMessage = useCallback(async (text: string, datasourceIds?: string[], kbIds?: string[]) => {
-    if (!text.trim()) return
+  const sendMessage = useCallback(
+    async (text: string, datasourceIds?: string[], kbIds?: string[], csvFiles?: File[]) => {
+      if (!text.trim() && (!csvFiles || csvFiles.length === 0)) return
 
-    setError(null)
-    
-    // Ensure we have a session (create if needed)
-    let session_id = sessionId
-    if (!currentSession || currentSession.isDraft || !session_id) {
-      const created = await createSession()
-      if (!created) {
-        setError('Failed to create session')
-        return
-      }
-      session_id = created.id
-    }
-    
-    // Check if this is the first message (for title update)
-    const isFirstMessage = messages.length === 0
-    
-    startStreaming()
-    addUserMessage(text)
+      setError(null)
 
-    try {
-      // Send message with session_id from backend
-      await chatApi.start({
-        message: text,
-        session_id: session_id,
-        datasource_ids: datasourceIds,
-        kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
-      })
-
-      // Update session title with first message content
-      if (isFirstMessage) {
-        const title = text.length > 50 ? text.substring(0, 47) + '...' : text
-        await updateSessionTitle(session_id, title)
+      // Ensure we have a session (create if needed)
+      let session_id = sessionId
+      if (!currentSession || currentSession.isDraft || !session_id) {
+        const created = await createSession()
+        if (!created) {
+          setError('Failed to create session')
+          return
+        }
+        session_id = created.id
       }
 
-      fetchSessions()
-      connectToSSE(session_id)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to send')
-      stopStreaming()
-    }
-  }, [currentSession, sessionId, messages.length, createSession, startStreaming, addUserMessage, updateSessionTitle, fetchSessions, stopStreaming, connectToSSE])
+      const isFirstMessage = messages.length === 0
+      const query = text.trim() || 'Generate a comprehensive report.'
+      startStreaming()
+      addUserMessage(query)
+
+      try {
+        if (csvFiles && csvFiles.length > 0) {
+          connectToSSE(session_id)
+          await reportApi.generate(session_id, query, csvFiles)
+        } else {
+          await chatApi.start({
+            message: query,
+            session_id: session_id,
+            datasource_ids: datasourceIds,
+            kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
+          })
+          connectToSSE(session_id)
+        }
+
+        if (isFirstMessage) {
+          const title = query.length > 50 ? query.substring(0, 47) + '...' : query
+          await updateSessionTitle(session_id, title)
+        }
+
+        fetchSessions()
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Failed to send')
+        stopStreaming()
+      }
+    },
+    [
+      currentSession,
+      sessionId,
+      messages.length,
+      createSession,
+      startStreaming,
+      addUserMessage,
+      updateSessionTitle,
+      fetchSessions,
+      stopStreaming,
+      connectToSSE,
+    ],
+  )
 
   return { sendMessage, error }
 }

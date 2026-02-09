@@ -96,14 +96,25 @@ def _render_schema_context(tables: list[dict[str, object]] | None) -> str:
     return "\n".join(lines).strip()
 
 
+# Cap size of schema/datasource text to avoid context_length_exceeded (128k) with message history
+_MAX_SCHEMA_CHARS = 12_000
+_MAX_DATASOURCE_CHARS = 4_000
+
+
+def _truncate(s: str, max_chars: int, suffix: str = "\n... (truncated for context limit)") -> str:
+    if not s or len(s) <= max_chars:
+        return s
+    return s[: max_chars - len(suffix)] + suffix
+
+
 def build_workflow_prompt(
     registry: NodeRegistry,
     datasource: dict[str, str] | list[dict[str, str]] | None = None,
     tables: list[dict[str, object]] | None = None,
 ) -> str:
     specs_text = render_node_specs(registry.all())
-    datasource_text = _render_datasource_context(datasource)
-    schema_text = _render_schema_context(tables)
+    datasource_text = _truncate(_render_datasource_context(datasource), _MAX_DATASOURCE_CHARS)
+    schema_text = _truncate(_render_schema_context(tables), _MAX_SCHEMA_CHARS)
     return f"""You are a Workflow Designer for data analysis.
 Your job is to translate a user's analysis goal into a JSON workflow definition.
 You currently have a lean toolbox (primarily python.code) and should compose logic with it.
@@ -123,6 +134,31 @@ Rules (strict, structured JSON only):
 10) After creation or update, call `run_workflow_from_file` with payload {{ "file_path": "...json" }} to execute. Do NOT output bash commands.
 11) Summarize the outputs concisely in the user's language.
 12) Do NOT guess categorical values. Only use values explicitly provided by the user or datasource context; if unknown, omit instead of inventing.
+
+REPORT GENERATION (IMPORTANT):
+When the user asks for a "report", "analysis report", "data report", "comprehensive analysis", 
+"报告", "分析报告", "生成报告", or similar report-related requests, you MUST use the `report.generate` node:
+- This node generates professional HTML reports with executive summary, KPIs, interactive charts, and recommendations.
+- Required params: file_paths (list of CSV paths like ["/workspace/data/sales.csv"]) OR connect data input.
+- Optional params: query (analysis focus), template ("template_0.html" or "template_1.html"), output_path.
+- Example workflow for report generation:
+  {{
+    "nodes": {{
+      "report": {{
+        "id": "report",
+        "type": "report.generate",
+        "inputs": {{}},
+        "outputs": {{ "report_path": {{ "schema": "string" }}, "status": {{ "schema": "string" }}, "message": {{ "schema": "string" }} }},
+        "params": {{
+          "file_paths": ["/workspace/data/your_data.csv"],
+          "query": "Analyze sales trends and customer behavior",
+          "template": "template_1.html"
+        }},
+        "metadata": {{ "position": {{ "x": 100, "y": 100 }} }}
+      }}
+    }},
+    "edges": {{}}
+  }}
 
 Example (full workflow payload for create_workflow):
 {{

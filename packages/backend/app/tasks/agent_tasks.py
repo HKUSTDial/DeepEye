@@ -24,7 +24,7 @@ from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
 
 
-def _get_datasources_info(datasource_ids: list[str] | None) -> list[dict[str, str]]:
+def _get_datasources_info(datasource_ids: list[str] | None, user_id: uuid.UUID | None = None) -> list[dict[str, str]]:
     if not datasource_ids:
         return []
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
@@ -32,7 +32,11 @@ def _get_datasources_info(datasource_ids: list[str] | None) -> list[dict[str, st
     items = []
     with Session() as db:
         for ds_id in datasource_ids:
-            ds = DataSourceRepository(db).get(ds_id)
+            try:
+                ds_uuid = uuid.UUID(ds_id)
+            except (ValueError, TypeError):
+                continue
+            ds = DataSourceRepository(db).get_by_id_and_user(ds_uuid, user_id) if user_id else DataSourceRepository(db).get(ds_uuid)
             if ds:
                 info = {
                     "id": str(ds.id),
@@ -46,7 +50,7 @@ def _get_datasources_info(datasource_ids: list[str] | None) -> list[dict[str, st
     return items
 
 
-def _get_datasources_schema(datasource_ids: list[str] | None, max_tables: int = 20, max_columns: int = 20) -> list[dict[str, object]]:
+def _get_datasources_schema(datasource_ids: list[str] | None, user_id: uuid.UUID | None = None, max_tables: int = 20, max_columns: int = 20) -> list[dict[str, object]]:
     if not datasource_ids:
         return []
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
@@ -55,7 +59,11 @@ def _get_datasources_schema(datasource_ids: list[str] | None, max_tables: int = 
     
     with Session() as db:
         for ds_id in datasource_ids:
-            ds = DataSourceRepository(db).get(ds_id)
+            try:
+                ds_uuid = uuid.UUID(ds_id)
+            except (ValueError, TypeError):
+                continue
+            ds = DataSourceRepository(db).get_by_id_and_user(ds_uuid, user_id) if user_id else DataSourceRepository(db).get(ds_uuid)
             if not ds:
                 continue
             
@@ -66,7 +74,8 @@ def _get_datasources_schema(datasource_ids: list[str] | None, max_tables: int = 
                     continue
                 try:
                     from sqlalchemy import create_engine as sa_create_engine, inspect
-                    data_engine = sa_create_engine(connection_string)
+                    from app.node.utils import normalize_connection_string
+                    data_engine = sa_create_engine(normalize_connection_string(connection_string))
                     inspector = inspect(data_engine)
                     tables = inspector.get_table_names()[:max_tables]
                     
@@ -164,21 +173,24 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         logger.info(f"[AgentTask] Syncing {len(file_datasources)} file datasources to sandbox")
         await sandbox_manager.sync_datasource_files(session_id, file_datasources)
 
+    user_id = _get_user_id(session_id)
+
     # Build tools - all agents share the same sandbox
     logger.info(f"[AgentTask] Building tools...")
     tools = []
-    datasources_info = _get_datasources_info(datasource_ids)
-    datasources_schema = _get_datasources_schema(datasource_ids)
+    datasources_info = _get_datasources_info(datasource_ids, user_id)
+    datasources_schema = _get_datasources_schema(datasource_ids, user_id)
     
-    # Prepare datasources context for Supervisor
+    # Prepare datasources context for Supervisor. Include id (UUID) so the agent
+    # passes it to generate_report instead of the name (e.g. "insurance.csv").
     ds_context_lines = []
     for ds in datasources_info:
-        line = f"- {ds['name']} ({ds['category']})"
+        line = f"- id: {ds['id']}, name: {ds['name']} ({ds['category']})"
         if ds['category'] == 'file':
             line += f", path: {ds.get('local_path', '')}"
         ds_context_lines.append(line)
-    
-    datasources_context = "Available Data Sources:\n" + "\n".join(ds_context_lines) if ds_context_lines else "No data sources selected."
+    header = "Available Data Sources (use the file paths for workflow nodes like report.generate):\n"
+    datasources_context = header + "\n".join(ds_context_lines) if ds_context_lines else "No data sources selected."
 
     workflow_prompt = build_workflow_prompt(
         build_registry(),
@@ -188,7 +200,6 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     tools.append(create_design_workflow_tool(model, session_id, workflow_prompt, callbacks=[cb_workflow]))
     tools.append(create_run_workflow_from_file_tool(session_id))
 
-    user_id = _get_user_id(session_id)
     user_input = agent_input.user_input
 
     if user_id and agent_input.kb_ids:

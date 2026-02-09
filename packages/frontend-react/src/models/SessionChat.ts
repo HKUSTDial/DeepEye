@@ -175,6 +175,19 @@ export class SessionChat {
           }
         }
       }
+      else if (type === 'report_step' && current) {
+        // Wrap report steps in code block for better visibility
+        if (!current.content.includes('```report-steps')) {
+          current.content += '\n```report-steps\n'
+        }
+        current.content += (content || '') + '\n'
+      }
+      else if (type === 'report_done' && current) {
+        // Close code block when report is done
+        if (current.content.includes('```report-steps')) {
+          current.content += '```\n\n✅ 报告生成完成！请在右侧面板查看 HTML 报告。\n'
+        }
+      }
       else if (type === 'agent_end' || type === 'error') {
         if (current) result.push(current)
         current = null

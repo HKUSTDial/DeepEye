@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# 使用国内镜像，避免 pull docker.io 超时
+FROM docker.m.daocloud.io/library/python:3.11-slim
 
 # Use Tsinghua mirror for apt (consistent with Dockerfile.backend)
 RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \

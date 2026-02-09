@@ -45,6 +45,12 @@ export interface DataSourceCreate {
   connection_string?: string | null
 }
 
+export interface DataSourceUpdate {
+  name?: string
+  type?: string
+  connection_string?: string | null
+}
+
 // API types
 export interface ChatPayload {
   message: string
