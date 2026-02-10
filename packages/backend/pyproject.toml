@@ -29,6 +29,7 @@ dependencies = [
     "pandas",
     "openpyxl",
     "pyarrow",
+    "pyecharts",
 ]
 
 [tool.uv.sources]

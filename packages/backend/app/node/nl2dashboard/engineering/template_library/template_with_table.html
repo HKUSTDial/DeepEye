@@ -1,0 +1,461 @@
+<div class="flex h-screen overflow-hidden font-sans bg-[#F0F4F8]">
+        
+        <!-- SIDEBAR -->
+        <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col z-20 shadow-xl flex-shrink-0">
+            <div class="p-6 border-b border-gray-100 flex items-center gap-3 bg-white flex-shrink-0">
+                <div class="w-8 h-8 bg-[#2A4C71] rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-[#2A4C71]/20">
+                    C
+                </div>
+                <span class="font-bold text-xl tracking-tight text-[#2A4C71]">CoolDash</span>
+            </div>
+
+            <!-- Added overflow-y-auto and flex-1 to allow nav to scroll on small screens -->
+            <nav class="mt-6 px-0 space-y-1 flex-1 overflow-y-auto no-scrollbar">
+                <button onclick="window.switchPage('overview')" id="nav-overview" class="w-full flex items-center px-6 py-4 transition-all nav-active group">
+                    <i class="ph ph-squares-four text-xl mr-3"></i>
+                    <span class="font-medium">Overview</span>
+                </button>
+                <button onclick="window.switchPage('details')" id="nav-details" class="w-full flex items-center px-6 py-4 transition-all nav-inactive group">
+                    <i class="ph ph-table text-xl mr-3"></i>
+                    <span class="font-medium">Detailed Data</span>
+                </button>
+            </nav>
+
+            <!-- Filters pushed to bottom, flex-shrink-0 prevents it from being squashed -->
+            <div class="p-6 border-t border-gray-100 bg-[#D3E6EF]/20 flex-shrink-0">
+                <h4 class="text-xs font-bold text-[#2A4C71] uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <i class="ph ph-faders"></i> Filters
+                </h4>
+            <div id="filter-container" class="space-y-5"></div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <div class="flex-1 flex flex-col h-full overflow-hidden relative bg-[#F0F4F8]">
+            
+            <header class="bg-white/90 backdrop-blur-md border-b border-[#D3E6EF] px-8 py-4 flex justify-between items-center z-10 sticky top-0 flex-shrink-0">
+                <div>
+                    <h2 id="page-title" class="text-xl font-bold text-[#2A4C71]">Music Wrapped Insights</h2>
+                    <p class="text-xs text-[#9897BC] mt-0.5">Uncover Your Yearly Musical Journey and Trends</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button class="relative p-2 text-[#9897BC] hover:text-[#2A4C71] transition-colors">
+                        <i class="ph ph-bell text-xl"></i>
+                    </button>
+                    <div class="h-9 w-9 bg-[#2A4C71] rounded-full border-2 border-[#D3E6EF] shadow-sm flex items-center justify-center text-white text-xs font-bold">
+                        AD
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-x-hidden overflow-y-auto scroll-smooth relative">
+                
+                <!-- OVERVIEW PAGE -->
+                <div id="page-overview" class="fade-in block p-6 lg:p-8 pb-20">
+                    <!-- Highlights -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
+                        <!-- Metric 1 -->
+                        <div class="bg-white p-5 rounded-xl border border-[#D3E6EF] shadow-sm hover:shadow-md transition-all group">
+                            <div class="flex justify-between items-start">
+                                <p class="text-[10px] text-[#9897BC] uppercase font-bold tracking-widest" id="title-highlight_1">Metric 1</p>
+                                <div class="p-2 bg-[#2A4C71]/10 text-[#2A4C71] rounded-lg group-hover:bg-[#2A4C71] group-hover:text-white transition-colors">
+                                    <i class="ph ph-currency-dollar"></i>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline gap-2 mt-3">
+                                <h3 class="text-2xl font-bold text-[#2A4C71]" id="val-highlight_1">--</h3>
+                                <span class="text-xs font-medium text-[#94B5D7]" id="unit-highlight_1"></span>
+                            </div>
+                        </div>
+                        <!-- Metric 2 -->
+                        <div class="bg-white p-5 rounded-xl border border-[#D3E6EF] shadow-sm hover:shadow-md transition-all group">
+                            <div class="flex justify-between items-start">
+                                <p class="text-[10px] text-[#9897BC] uppercase font-bold tracking-widest" id="title-highlight_2">Metric 2</p>
+                                <div class="p-2 bg-[#C8B8D4]/20 text-[#9f8eb0] rounded-lg group-hover:bg-[#C8B8D4] group-hover:text-white transition-colors">
+                                    <i class="ph ph-users"></i>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline gap-2 mt-3">
+                                <h3 class="text-2xl font-bold text-[#2A4C71]" id="val-highlight_2">--</h3>
+                                <span class="text-xs font-medium text-[#C8B8D4]" id="unit-highlight_2"></span>
+                            </div>
+                        </div>
+                        <!-- Metric 3 -->
+                        <div class="bg-white p-5 rounded-xl border border-[#D3E6EF] shadow-sm hover:shadow-md transition-all group">
+                            <div class="flex justify-between items-start">
+                                <p class="text-[10px] text-[#9897BC] uppercase font-bold tracking-widest" id="title-highlight_3">Metric 3</p>
+                                <div class="p-2 bg-[#94B5D7]/20 text-[#6fa3cc] rounded-lg group-hover:bg-[#94B5D7] group-hover:text-white transition-colors">
+                                    <i class="ph ph-package"></i>
+                                </div>
+                            </div>
+                             <div class="flex items-baseline gap-2 mt-3">
+                                <h3 class="text-2xl font-bold text-[#2A4C71]" id="val-highlight_3">--</h3>
+                                <span class="text-xs font-medium text-[#94B5D7]" id="unit-highlight_3"></span>
+                            </div>
+                        </div>
+                        <!-- Metric 4 -->
+                        <div class="bg-white p-5 rounded-xl border border-[#D3E6EF] shadow-sm hover:shadow-md transition-all group">
+                            <div class="flex justify-between items-start">
+                                <p class="text-[10px] text-[#9897BC] uppercase font-bold tracking-widest" id="title-highlight_4">Metric 4</p>
+                                <div class="p-2 bg-[#9897BC]/20 text-[#9897BC] rounded-lg group-hover:bg-[#9897BC] group-hover:text-white transition-colors">
+                                    <i class="ph ph-activity"></i>
+                                </div>
+                            </div>
+                            <div class="flex items-baseline gap-2 mt-3">
+                                <h3 class="text-2xl font-bold text-[#2A4C71]" id="val-highlight_4">--</h3>
+                                <span class="text-xs font-medium text-[#E18182]" id="unit-highlight_4"></span>
+                            </div>
+                        </div>
+                        <!-- Metric 5 -->
+                        <div class="bg-white p-5 rounded-xl border border-[#D3E6EF] shadow-sm hover:shadow-md transition-all group">
+                            <div class="flex justify-between items-start">
+                                <p class="text-[10px] text-[#9897BC] uppercase font-bold tracking-widest" id="title-highlight_5">Metric 5</p>
+                                <div class="p-2 bg-[#D3E6EF]/50 text-[#6b8c9e] rounded-lg group-hover:bg-[#2A4C71] group-hover:text-white transition-colors">
+                                    <i class="ph ph-clock"></i>
+                                </div>
+                            </div>
+                             <div class="flex items-baseline gap-2 mt-3">
+                                <h3 class="text-2xl font-bold text-[#2A4C71]" id="val-highlight_5">--</h3>
+                                <span class="text-xs font-medium text-[#94B5D7]" id="unit-highlight_5"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-8">
+                        <div class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-[#D3E6EF] p-6 flex flex-col min-h-[400px] overflow-hidden">
+                            <h3 class="font-bold text-[#2A4C71] mb-4 text-sm uppercase tracking-wide flex items-center gap-2 flex-shrink-0">
+                                <span class="w-1.5 h-4 bg-[#2A4C71] rounded-full"></span>
+                                Listen Time by Hour
+                            </h3>
+                            <div class="flex-1 w-full relative min-h-0">
+                                <div id="intent_4_goal_0_chart0" class="absolute inset-0 w-full h-full"></div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-[#D3E6EF] p-6 flex flex-col min-h-[400px] overflow-hidden">
+                            <h3 class="font-bold text-[#2A4C71] mb-4 text-sm uppercase tracking-wide flex items-center gap-2 flex-shrink-0">
+                                <span class="w-1.5 h-4 bg-[#C8B8D4] rounded-full"></span>
+                                Shuffle Impact
+                            </h3>
+                             <div class="flex-1 w-full relative min-h-0">
+                                <div id="intent_9_goal_0_chart0" class="absolute inset-0 w-full h-full"></div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-[#D3E6EF] p-6 flex flex-col min-h-[350px] overflow-hidden">
+                            <h3 class="font-bold text-[#2A4C71] mb-4 text-sm uppercase tracking-wide flex items-center gap-2 flex-shrink-0">
+                                <span class="w-1.5 h-4 bg-[#94B5D7] rounded-full"></span>
+                                Platform Prefs
+                            </h3>
+                             <div class="flex-1 w-full relative min-h-0">
+                                <div id="intent_6_goal_0_chart0" class="absolute inset-0 w-full h-full"></div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-[#D3E6EF] p-6 flex flex-col min-h-[350px] overflow-hidden">
+                            <h3 class="font-bold text-[#2A4C71] mb-4 text-sm uppercase tracking-wide flex items-center gap-2 flex-shrink-0">
+                                <span class="w-1.5 h-4 bg-[#9897BC] rounded-full"></span>
+                                Shuffle vs Platform
+                            </h3>
+                             <div class="flex-1 w-full relative min-h-0">
+                                <div id="intent_14_goal_0_chart0" class="absolute inset-0 w-full h-full"></div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-[#D3E6EF] p-6 flex flex-col min-h-[350px] overflow-hidden">
+                            <h3 class="font-bold text-[#2A4C71] mb-4 text-sm uppercase tracking-wide flex items-center gap-2 flex-shrink-0">
+                                <span class="w-1.5 h-4 bg-[#2A4C71] rounded-full"></span>
+                                Start Reasons
+                            </h3>
+                             <div class="flex-1 w-full relative min-h-0">
+                                <div id="intent_7_goal_0_chart0" class="absolute inset-0 w-full h-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DETAILED DATA PAGE (Fixed Height Mode) -->
+                <div id="page-details" class="fade-in hidden h-full flex flex-col p-6 lg:p-8">
+                    <div class="flex-1 bg-white rounded-xl shadow-sm border border-[#D3E6EF] overflow-hidden flex flex-col">
+                        <div class="px-6 py-5 border-b border-[#D3E6EF] bg-[#F8FAFC] flex justify-between items-center shrink-0">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-[#D3E6EF]/50 flex items-center justify-center text-[#2A4C71]">
+                                    <i class="ph ph-database text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-[#2A4C71] text-sm uppercase tracking-wide">Data Warehouse Records</h3>
+                                    <p id="data-status" class="text-[10px] text-[#9897BC] font-medium flex items-center gap-1">Status: Idle</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex-1 overflow-auto relative">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="sticky top-0 bg-white z-10 shadow-sm">
+                                    <tr class="text-[#9897BC] text-xs uppercase tracking-wider border-b border-[#D3E6EF]">
+                                        <th class="px-6 py-4 font-semibold">Track Name</th>
+                                        <th class="px-6 py-4 font-semibold">Artist</th>
+                                        <th class="px-6 py-4 font-semibold">Timestamp</th>
+                                        <th class="px-6 py-4 font-semibold">Platform</th>
+                                        <th class="px-6 py-4 font-semibold">Duration (ms)</th>
+                                        <th class="px-6 py-4 font-semibold">Shuffle</th>
+                                        <th class="px-6 py-4 font-semibold">Skipped</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transaction-table-body" class="text-[#2A4C71] text-sm"></tbody>
+                            </table>
+                            <div id="table-loading" class="hidden absolute inset-0 bg-white/80 z-20 flex items-center justify-center">
+                                <div class="flex flex-col items-center gap-2 text-[#2A4C71]">
+                                    <i class="ph ph-spinner animate-spin text-3xl"></i>
+                                    <span class="text-sm font-medium">Loading Data...</span>
+                                </div>
+                            </div>
+                            <div id="table-message" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div class="text-center text-[#9897BC]">
+                                    <p>No data loaded.</p>
+                                <p class="text-xs mt-1">Data will be loaded when available.</p>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+<!-- Template 1 theme configuration script -->
+    <script>
+// --- 🎨 Template 1 (Cool Tone Aesthetics) ---
+const themeName = 'template1_aesthetic';
+const templatePalette = {
+            color: [
+                '#2A4C71', // Deep Blue
+                '#C8B8D4', // Lilac
+                '#94B5D7', // Steel Blue
+                '#9897BC', // Muted Purple
+                '#D3E6EF', // Ice Blue
+                '#73A5C6'
+            ],
+            backgroundColor: 'rgba(0,0,0,0)',
+            textStyle: { fontFamily: 'Inter, -apple-system, system-ui, sans-serif' },
+
+            title: {
+                textStyle: { color: '#2A4C71', fontWeight: '700', fontSize: 16 },
+                subtextStyle: { color: '#9897BC' }
+            },
+
+            grid: {
+                top: 45,
+                left: '2%',
+                right: '2%',
+                bottom: '5%',
+                containLabel: true,
+                borderWidth: 0
+            },
+
+            categoryAxis: {
+                axisLine: { show: true, lineStyle: { color: '#D3E6EF' } }, 
+                axisTick: { show: false },
+                axisLabel: { color: '#9897BC', margin: 14, fontSize: 11, fontWeight: 500 },
+                splitLine: { show: false }
+            },
+            valueAxis: {
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel: { color: '#9897BC', margin: 10, fontSize: 11 },
+                splitLine: {
+                    show: true,
+                    lineStyle: { color: '#F0F4F8', type: 'dashed', width: 1 }
+                }
+            },
+
+            line: {
+                smooth: true,
+                width: 3,
+                symbol: 'circle',
+                symbolSize: 6,
+                showSymbol: false,
+                itemStyle: { 
+                    borderWidth: 1, 
+                    borderColor: '#fff',
+                    color: '#2A4C71' 
+                },
+                areaStyle: {
+                    opacity: 0.2, 
+                    color: {
+                        type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: '#2A4C71' },
+                            { offset: 1, color: 'rgba(255, 255, 255, 0)' }
+                        ]
+                    }
+                }
+            },
+
+            bar: {
+                itemStyle: {
+                    borderRadius: [4, 4, 0, 0],
+                    color: {
+                        type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: '#94B5D7' }, 
+                            { offset: 1, color: '#D3E6EF' }
+                        ]
+                    }
+                },
+                barMaxWidth: 40,
+                barCategoryGap: '35%'
+            },
+
+            boxplot: {
+                itemStyle: {
+                    color: '#fdfbff',       
+                    borderColor: '#C8B8D4', 
+                    borderWidth: 1.5
+                },
+                emphasis: {
+                    itemStyle: {
+                        color: '#C8B8D4',
+                        borderColor: '#9897BC',
+                        borderWidth: 2
+                    }
+                },
+                boxWidth: [10, 40]
+            },
+
+            heatmap: {
+                itemStyle: {
+                    borderColor: '#fff',
+                    borderWidth: 2
+                },
+                label: { show: false }
+            },
+
+            visualMap: {
+                type: 'continuous',
+                inRange: {
+                    color: ['#D3E6EF', '#94B5D7', '#C8B8D4', '#2A4C71']
+                },
+                itemWidth: 12,
+                itemHeight: 100,
+                orient: 'horizontal',
+                left: 'center',
+                top: 0,
+                text: ['High', 'Low'],
+                textStyle: { color: '#9897BC', fontSize: 10 },
+                calculable: true
+            },
+
+            pie: {
+                itemStyle: {
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }
+            },
+
+            tooltip: {
+                backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                borderColor: '#2A4C71', 
+                borderWidth: 0,
+                textStyle: { color: '#2A4C71', fontSize: 12 },
+                padding: [10, 14],
+                extraCssText: 'box-shadow: 0 4px 20px -5px rgba(42, 76, 113, 0.2); border-left: 4px solid #2A4C71; border-radius: 4px;'
+            },
+            
+            legend: {
+                icon: 'circle',
+                textStyle: { color: '#9897BC' }
+            }
+        };
+
+// Register theme globally for use in app.js
+(function() {
+    // Ensure echarts is loaded
+    if (typeof window.echarts !== 'undefined') {
+        window.echarts.registerTheme(themeName, templatePalette);
+        // Expose theme configuration globally for renderCharts in app.js (generic variable names)
+        window.currentPalette = templatePalette;
+        window.currentThemeName = themeName;
+                } else {
+        // If echarts is not yet loaded, wait until it is ready
+        const checkECharts = setInterval(() => {
+            if (typeof window.echarts !== 'undefined') {
+                window.echarts.registerTheme(themeName, templatePalette);
+                window.currentPalette = templatePalette;
+                window.currentThemeName = themeName;
+                clearInterval(checkECharts);
+            }
+        }, 50);
+        
+        // Stop checking after 10 seconds to avoid infinite wait
+        setTimeout(() => clearInterval(checkECharts), 10000);
+    }
+})();
+
+// 页面切换功能（模板特定功能）
+if (!window.switchPage) {
+    window.switchPage = function(pageId) {
+        const overview = document.getElementById('page-overview');
+        const details = document.getElementById('page-details');
+        const navOverview = document.getElementById('nav-overview');
+        const navDetails = document.getElementById('nav-details');
+        const title = document.getElementById('page-title');
+
+        if (!overview || !details || !navOverview || !navDetails || !title) {
+        console.warn('Page elements not found, waiting for DOM...');
+            setTimeout(() => window.switchPage(pageId), 100);
+                return;
+        }
+
+        if (pageId === 'overview') {
+            overview.classList.remove('hidden');
+            details.classList.add('hidden');
+            navOverview.classList.add('nav-active');
+            navOverview.classList.remove('nav-inactive');
+            navDetails.classList.add('nav-inactive');
+            navDetails.classList.remove('nav-active');
+            if (title) title.textContent = 'Dashboard Overview';
+            setTimeout(() => {
+                if (App && App.charts && Object.keys(App.charts).length > 0) {
+                    Object.values(App.charts).forEach(c => {
+                        if (c && typeof c.resize === 'function') {
+                            c.resize();
+                        }
+                    });
+                }
+            }, 50);
+        } else {
+            overview.classList.add('hidden');
+            details.classList.remove('hidden');
+            navDetails.classList.add('nav-active');
+            navDetails.classList.remove('nav-inactive');
+            navOverview.classList.add('nav-inactive');
+            navOverview.classList.remove('nav-active');
+            if (title) title.textContent = 'Music Wrapped Insights';
+            // Data fetching like fetchRealData is handled in app.js or other modules
+        }
+    };
+}
+    </script>
+
+<!-- Template 1 styles (required for template-specific features) -->
+<style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .nav-active {
+        background-color: rgba(42, 76, 113, 0.08);
+        color: #2A4C71;
+        border-right: 3px solid #2A4C71;
+    }
+    .nav-inactive {
+        color: #64748b;
+    }
+    .nav-inactive:hover {
+        background-color: #f8fafc;
+        color: #2A4C71;
+    }
+</style>

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Temporary files and output
+data/
+*.log
+detection_report.txt
+*.ltr
+*.score
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+venv/
+env/
+.venv
+
+# System files
+.DS_Store
+Thumbs.db
+

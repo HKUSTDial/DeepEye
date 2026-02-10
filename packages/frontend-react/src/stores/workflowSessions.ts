@@ -23,6 +23,7 @@ export interface WorkflowSessionState {
   error: string | null
   activeRun: WorkflowRun | null
   runOutput: string
+  dashboardRefreshKey: number
   lastUpdated: number | null
 }
 
@@ -46,6 +47,7 @@ interface WorkflowSessionsStore {
   setError: (sessionId: string, error: string | null) => void
   setActiveRun: (sessionId: string, run: WorkflowRun | null) => void
   setRunOutput: (sessionId: string, output: string) => void
+  triggerDashboardRefresh: (sessionId: string) => void
 }
 
 const createEmptySession = (): WorkflowSessionState => ({
@@ -64,6 +66,7 @@ const createEmptySession = (): WorkflowSessionState => ({
   error: null,
   activeRun: null,
   runOutput: '',
+  dashboardRefreshKey: 0,
   lastUpdated: null,
 })
 
@@ -317,6 +320,20 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
           [sessionId]: {
             ...current,
             runOutput,
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
+  triggerDashboardRefresh: (sessionId) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...current,
+            dashboardRefreshKey: current.dashboardRefreshKey + 1,
             lastUpdated: Date.now(),
           },
         },
