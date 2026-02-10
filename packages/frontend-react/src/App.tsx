@@ -88,23 +88,23 @@ function App() {
   }), [rightPanelCollapsed, rightPanelRatio])
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="app-shell flex h-screen w-screen overflow-hidden">
       {/* Sidebar */}
       <aside
         className={`sidebar flex flex-col h-full flex-shrink-0 transition-all duration-300 ${
-          sidebarCollapsed ? 'w-0' : 'w-64'
+          sidebarCollapsed ? 'w-20' : 'w-64'
         }`}
         style={{ background: 'var(--sidebar-bg)' }}
       >
-        <div
-          className={`flex-1 overflow-hidden flex flex-col transition-opacity duration-200 ${
-            sidebarCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          }`}
-        >
-          <Sidebar />
-          <DataSourceManager 
-            selectedIds={selectedDataSourceIds} 
-            onToggle={handleDataSourceToggle} 
+        <div className="flex-1 overflow-visible flex flex-col">
+          <Sidebar
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebar}
+          />
+          <DataSourceManager
+            selectedIds={selectedDataSourceIds}
+            onToggle={handleDataSourceToggle}
+            collapsed={sidebarCollapsed}
           />
         </div>
       </aside>
@@ -114,25 +114,7 @@ function App() {
         {/* Chat Area */}
         <div className="flex flex-col min-w-0 relative" style={chatAreaStyle}>
           {/* Top Control Bar */}
-          <div className="absolute top-3 left-3 right-3 z-50 flex items-center justify-between pointer-events-none">
-            {/* Toggle Sidebar Button */}
-            <button
-              onClick={toggleSidebar}
-              className="btn p-2 rounded-xl hover:bg-white/10 pointer-events-auto"
-              title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`w-5 h-5 transition-transform duration-300 ${!sidebarCollapsed ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              </svg>
-            </button>
-
+          <div className="absolute top-3 right-3 z-50 flex items-center justify-end pointer-events-none">
             {/* Toggle Files Panel Button */}
             {sessionId && (
               <button

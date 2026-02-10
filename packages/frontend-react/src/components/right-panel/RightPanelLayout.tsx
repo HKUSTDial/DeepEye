@@ -149,7 +149,7 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
                   className="right-panel-action-btn"
                   title="Split pane"
                 >
-                  <span className="text-xs">Split</span>
+                  <span className="right-panel-split-label">Split</span>
                 </button>
                 {panes.length > 1 && (
                   <button

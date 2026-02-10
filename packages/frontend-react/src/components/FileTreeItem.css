@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  font-size: 13px;
+  font-size: var(--ui-font-sm);
   color: var(--main-text);
   cursor: pointer;
   transition: background 0.15s ease;
@@ -51,7 +51,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--ui-font-sm);
   color: var(--main-text);
   cursor: pointer;
   border-radius: 4px;

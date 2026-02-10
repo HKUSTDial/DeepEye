@@ -1,3 +1,11 @@
+.app-shell {
+  --ui-font-xs: 13px;
+  --ui-font-sm: 14px;
+  --ui-font-md: 15px;
+  --ui-font-lg: 17px;
+  --ui-font-xl: 24px;
+}
+
 .sidebar {
   will-change: width;
 }
