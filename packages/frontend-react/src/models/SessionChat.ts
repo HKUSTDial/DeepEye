@@ -144,7 +144,11 @@ export class SessionChat {
     }
 
     for (const e of eventList) {
-      const { type, source, content = '', data = {} } = e
+      const { type, data = {} } = e
+      const d = data as Record<string, unknown>
+      // Token：后端 workflow 进度放在 data 里，顶层 source 为 "system"，需优先用 data 以正确展示
+      const content = (typeof e.content === 'string' ? e.content : (typeof d?.content === 'string' ? d.content : '')) ?? ''
+      const source = (typeof d?.source === 'string' ? d.source : (typeof e.source === 'string' ? e.source : '')) ?? ''
 
       if (type === 'agent_start') {
         if (current) result.push(current)
@@ -152,19 +156,32 @@ export class SessionChat {
         stepStack = []
       }
       else if (type === 'token') {
+        if (!content) continue
         if (source === 'supervisor') {
           if (current) {
             current.content += content
             appendTextToTimeline(current, content, this.isStreaming)
           } else {
-            // Late token after agent_end, append to last assistant message if exists
+            // Late token after agent_end, append to last assistant message if exists.
             const last = result[result.length - 1]
             if (last && last.role === 'assistant') {
               last.content += content
               appendTextToTimeline(last, content, false)
+            } else {
+              current = { role: 'assistant', content, steps: [], timeline: [] }
+              appendTextToTimeline(current, content, false)
             }
           }
+        } else if (source === 'workflow' || !source) {
+          // workflow tokens are progress lines; keep each token on a separate line.
+          if (!current) {
+            current = { role: 'assistant', content: '', steps: [], timeline: [] }
+          }
+          const chunk = current.content ? `\n${content}` : content
+          current.content += chunk
+          appendTextToTimeline(current, chunk, this.isStreaming)
         } else {
+          // 对于其他来源的 token，追加到当前步骤的 thought
           const pending = pendingBySource[source]
           const step = pending ? pending[pending.length - 1] : null
           if (!step) {
@@ -282,4 +299,3 @@ export class SessionChat {
     return session
   }
 }
-

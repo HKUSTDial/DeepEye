@@ -3,6 +3,7 @@ import { useChatStore } from '../stores/chat'
 import { useRightPanelStore } from '../stores/rightPanel'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { chatApi, type AgentEvent } from '../api'
+import { saveVideoConfig, extractVideoOutputParams } from '../api/video'
 
 /**
  * Chat hook - handles SSE connection and message sending.
@@ -154,6 +155,7 @@ export function useChat() {
             return
           }
           if (phase === 'run_start') {
+            useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, true)
             setRunStatus(sessionId, 'running', null)
             setViewState(sessionId, 'ready')
             setActiveRun(sessionId, {
@@ -163,7 +165,10 @@ export function useChat() {
               created_at: new Date().toISOString(),
               finished_at: null,
             })
-            openOrFocusTab('workflow')
+            // 仅数据视频生成工作流（file_path 含 data_video）才在开始时打开 Video Preview，便于看进度
+            if (filePath?.includes('data_video')) {
+              openOrFocusTab('video-preview', {})
+            }
             return
           }
           if (phase === 'node_status') {
@@ -182,6 +187,13 @@ export function useChat() {
           if (phase === 'run_end') {
             const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
             const error = typeof payload?.error === 'string' ? payload?.error : null
+            const isDataVideoWorkflow = filePath?.includes('data_video')
+            const runSucceeded = status === 'finished' || status === 'success'
+            // 非数据视频：立即隐藏进度。数据视频且成功：隐藏进度以便面板显示播放器；数据视频且失败：保留进度以显示错误
+            if (!isDataVideoWorkflow || runSucceeded) {
+              useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, false)
+            }
+            
             setRunStatus(sessionId, status, error)
             setActiveRun(sessionId, {
               id: `file:${filePath || ''}`,
@@ -193,6 +205,64 @@ export function useChat() {
             })
             if (payload?.outputs && typeof payload.outputs === 'object') {
               setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
+              console.log('🎬 useChat: run_end phase, checking for video output...')
+              const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
+              console.log('🎬 useChat: Extracted video params:', videoParams)
+              const taskIdToOpen = videoParams.taskId ?? null
+              if (taskIdToOpen || videoParams.configPath) {
+                console.log('🎬 useChat: Video output detected, opening preview panel...', {
+                  taskId: taskIdToOpen,
+                  configPath: videoParams.configPath,
+                  hasConfig: !!videoParams.config,
+                })
+                const openVideoPanel = () => openOrFocusTab('video-preview', taskIdToOpen ? { taskId: taskIdToOpen } : {})
+                if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
+                  console.log('🎬 useChat: Saving video config first...')
+                  saveVideoConfig(videoParams.taskId, videoParams.config as any)
+                    .then(() => {
+                      console.log('✅ useChat: Config saved, focusing video panel')
+                      openVideoPanel()
+                    })
+                    .catch((e: unknown) => {
+                      const isAbort = e instanceof Error && e.name === 'AbortError'
+                      if (isAbort) {
+                        console.warn('🎬 useChat: saveVideoConfig cancelled or timed out, focusing video panel anyway.')
+                      } else {
+                        console.error('❌ useChat: saveVideoConfig failed', e)
+                      }
+                      openVideoPanel()
+                    })
+                } else {
+                  console.log('🎬 useChat: Focusing video panel (runOutput already set)')
+                  openVideoPanel()
+                }
+              } else {
+                console.log('⚠️ useChat: No video output detected in payload.outputs, trying to extract from messages...')
+                // 如果 outputs 中没有找到，尝试从消息文本中提取 taskId
+                const lastMessage = messages[messages.length - 1]
+                if (lastMessage?.role === 'assistant' && lastMessage.content) {
+                  const taskIdMatch = String(lastMessage.content).match(/Task ID:\s*(\d{8}_\d{6})/i)
+                  if (taskIdMatch) {
+                    const extractedTaskId = taskIdMatch[1]
+                    console.log('✅ useChat: Found taskId from message text:', extractedTaskId)
+                    const currentRunOutput = useWorkflowSessionsStore.getState().sessions[sessionId]?.runOutput || ''
+                    setRunOutput(sessionId, currentRunOutput + `\nTask ID: ${extractedTaskId}`)
+                    openOrFocusTab('video-preview', { taskId: extractedTaskId })
+                  } else {
+                    console.log('⚠️ useChat: Could not find taskId in message text either')
+                    // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
+                    if (isDataVideoWorkflow) {
+                      openOrFocusTab('video-preview', {})
+                    }
+                  }
+                } else if (isDataVideoWorkflow) {
+                  // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
+                  openOrFocusTab('video-preview', {})
+                }
+              }
+            } else if (isDataVideoWorkflow) {
+              // 数据视频工作流失败时，即使没有 outputs，也确保 Video Preview 面板已打开
+              openOrFocusTab('video-preview', {})
             }
             return
           }
@@ -213,6 +283,25 @@ export function useChat() {
           const name = typeof agentEvent.data?.name === 'string' ? agentEvent.data.name : ''
           if (name === 'create_workflow') {
             openOrFocusTab('workflow')
+          }
+        }
+
+        if (agentEvent.type === 'token') {
+          const data = (agentEvent.data || {}) as Record<string, unknown>
+          if (data.source === 'workflow' && typeof data.content === 'string') {
+            const store = useWorkflowSessionsStore.getState()
+            store.appendVideoProgressLog(sessionId, data.content)
+            // task_id 后端在 Step 2 开始时就生成并推送，一收到就打开预览并传入，无需等 run_end
+            const taskIdMatch = data.content.match(/Task ID:\s*(\d{8}_\d{6})/i)
+            if (taskIdMatch) {
+              openOrFocusTab('video-preview', { taskId: taskIdMatch[1] })
+            }
+            const stepMatch = data.content.match(/Step\s*(\d)\s*\/\s*4/)
+            if (stepMatch?.[1]) {
+              store.setVideoProgressVisible(sessionId, true)
+              const stepIndex = parseInt(stepMatch[1], 10) - 1
+              if (stepIndex >= 0 && stepIndex <= 3) store.setVideoProgressStep(sessionId, stepIndex)
+            }
           }
         }
 

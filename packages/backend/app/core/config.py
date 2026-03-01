@@ -1,4 +1,5 @@
 from typing import List, Union
+from pathlib import Path
 from pydantic import AnyHttpUrl, computed_field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
@@ -96,7 +97,15 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str
     LLM_MODEL: str
     LLM_TEMPERATURE: float = 0.7
+    LLM_MAX_TOKENS: int = 16000  # max tokens for completion (video TSX, config, etc.)
     
+    # Azure Speech TTS (optional, for data video narration)
+    AZURE_SPEECH_KEY: str | None = None
+    AZURE_SPEECH_REGION: str | None = None
+
+    # Video workspace: config and TSX output dirs. Default: /workspace (Docker); locally use VIDEO_WORKSPACE_DIR or auto fallback.
+    VIDEO_WORKSPACE_DIR: str | None = None
+
     # JWT Authentication
     JWT_SECRET_KEY: str = "your-secret-key-change-this-in-production"  # ⚠️ 生产环境必须修改
     JWT_ALGORITHM: str = "HS256"
@@ -111,3 +120,22 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
+
+def get_video_workspace_root() -> Path:
+    """Return base path for video_configs and video_components. Writable; works in Docker and locally."""
+    if settings.VIDEO_WORKSPACE_DIR:
+        root = Path(settings.VIDEO_WORKSPACE_DIR)
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+    p = Path("/workspace")
+    if p.exists():
+        try:
+            (p / ".write_test").write_text("")
+            (p / ".write_test").unlink(missing_ok=True)
+            return p
+        except OSError:
+            pass
+    root = Path.cwd() / ".video_workspace"
+    root.mkdir(parents=True, exist_ok=True)
+    return root

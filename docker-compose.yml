@@ -93,6 +93,8 @@ services:
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
+      - .:/app/project
+      - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
@@ -114,6 +116,8 @@ services:
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
+      - .:/app/project
+      - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
@@ -152,6 +156,7 @@ volumes:
   minio_data:
   school_db_data:
   deepeye_db_data:
+  workspace_data:
 
 networks:
   default:

@@ -89,6 +89,8 @@
   font-size: var(--chat-font-md);
   line-height: 1.65;
   max-width: min(100%, 760px);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .message-bubble.user .message-content {

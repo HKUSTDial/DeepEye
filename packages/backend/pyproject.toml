@@ -30,6 +30,7 @@ dependencies = [
     "openpyxl",
     "pyarrow",
     "pyecharts",
+    "azure-cognitiveservices-speech>=1.40.0",
 ]
 
 [tool.uv.sources]

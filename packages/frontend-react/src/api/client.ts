@@ -15,6 +15,7 @@ interface RequestOptions {
   body?: unknown
   headers?: Record<string, string>
   skipAuth?: boolean  // 是否跳过自动添加 token（用于登录/注册等）
+  timeout?: number    // 毫秒，不传则用 config.api.timeout
 }
 
 export class ApiError extends Error {
@@ -40,7 +41,8 @@ async function request<T>(
   options: RequestOptions = {}
 ): Promise<T> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), config.api.timeout)
+  const timeoutMs = options.timeout ?? config.api.timeout
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     // 1. 准备 headers
@@ -257,10 +259,13 @@ async function authRequest<T>(
 
 // 业务 API（需要鉴权）
 export const http = {
-  get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, { body }),
-  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body }),
-  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),
+  get: <T>(path: string, options?: RequestOptions) => request<T>('GET', path, options),
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('POST', path, { ...options, body }),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PUT', path, { ...options, body }),
+  patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PATCH', path, { ...options, body }),
   delete: <T>(path: string) => request<T>('DELETE', path),
   getResponse: (path: string) => requestResponse('GET', path),
 }
