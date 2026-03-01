@@ -38,3 +38,7 @@ packages/deepeye-frontend
 packages/frontend
 
 AGENTS.md
+
+# IDE
+.idea/
+**/.idea/

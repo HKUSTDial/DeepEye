@@ -52,6 +52,8 @@ class NL2SQLPipelineConfig:
             # Value Retrieval
             value_retrieval_n_results: int = 10,
             value_similarity_threshold: float = 0.6,
+            value_retrieval_use_live_db: bool = True,
+            value_retrieval_db_sample_limit: int = 200,
             # Schema Linking
             direct_linking_budget: int = 1,
             reversed_linking_budget: int = 1,
@@ -72,6 +74,8 @@ class NL2SQLPipelineConfig:
         # Value Retrieval
         self.value_retrieval_n_results = value_retrieval_n_results
         self.value_similarity_threshold = value_similarity_threshold
+        self.value_retrieval_use_live_db = value_retrieval_use_live_db
+        self.value_retrieval_db_sample_limit = value_retrieval_db_sample_limit
         # Schema Linking
         self.direct_linking_budget = direct_linking_budget
         self.reversed_linking_budget = reversed_linking_budget
@@ -132,6 +136,7 @@ class NL2SQLPipeline:
         self.value_retriever = ValueRetriever(
             n_results=self.config.value_retrieval_n_results,
             similarity_threshold=self.config.value_similarity_threshold,
+            db_sample_limit=self.config.value_retrieval_db_sample_limit,
         )
 
         # Schema Linkers
@@ -285,7 +290,9 @@ class NL2SQLPipeline:
 
             # 基于字符串相似度检索值（不使用向量数据库）
             retrieved_values = self.value_retriever.retrieve_values(
-                keywords, metadata
+                keywords,
+                metadata,
+                database_path=self.database_path if self.config.value_retrieval_use_live_db else None,
             )
             result["retrieved_values"] = retrieved_values
 
@@ -494,4 +501,3 @@ async def nl2sql(
     config = NL2SQLPipelineConfig(**kwargs) if kwargs else None
     pipeline = NL2SQLPipeline(llm, db_metadata, database_path, config)
     return await pipeline.generate_sql(question, evidence)
-
