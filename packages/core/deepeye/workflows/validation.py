@@ -39,7 +39,7 @@ def validate_workflow_graph(
 
     issues.extend(_validate_nodes(graph, registry, _loc))
     issues.extend(_validate_edges(graph, schema_check, _loc))
-    issues.extend(_validate_required_inputs(graph, _loc))
+    issues.extend(_validate_required_inputs(graph, registry, _loc))
     issues.extend(_validate_group_nodes(graph, registry, schema_check, _loc))
     issues.extend(_validate_dag(graph, _loc))
 
@@ -127,7 +127,11 @@ def _validate_edges(
     return issues
 
 
-def _validate_required_inputs(graph: Graph, loc: Callable[[str], str]) -> list[ValidationIssue]:
+def _validate_required_inputs(
+    graph: Graph,
+    registry: NodeRegistry | None,
+    loc: Callable[[str], str],
+) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     incoming: dict[tuple[str, str], int] = {}
     for edge in graph.edges.values():
@@ -135,6 +139,7 @@ def _validate_required_inputs(graph: Graph, loc: Callable[[str], str]) -> list[V
         incoming[key] = incoming.get(key, 0) + 1
 
     for node in graph.nodes.values():
+        spec = registry.get(node.type) if registry else None
         for port_id, port in node.inputs.items():
             count = incoming.get((node.id, port_id), 0)
             if not port.multiple and count > 1:
@@ -145,7 +150,14 @@ def _validate_required_inputs(graph: Graph, loc: Callable[[str], str]) -> list[V
                         location=loc(f"nodes.{node.id}.inputs.{port_id}"),
                     )
                 )
-            if port.required and count == 0 and port.default is None:
+            # Use registry's required flag when available (authoritative), else use node's port
+            required = port.required
+            if spec and spec.inputs and port_id in spec.inputs:
+                required = spec.inputs[port_id].required
+            # Allow required input to be satisfied by params (e.g. video.generator params.query)
+            if required and count == 0 and port.default is None:
+                if port_id == "query" and node.params.get("query"):
+                    continue
                 issues.append(
                     ValidationIssue(
                         code="input.required.missing",

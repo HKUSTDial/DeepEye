@@ -77,8 +77,9 @@ export const useRightPanelStore = create<RightPanelState>()(
             collapsed: false,
           }
         }),
-      openOrFocusTab: (pluginId, params, paneId) =>
-        set((state) => {
+      openOrFocusTab: (pluginId, params, paneId) => {
+        console.log('🎬 openOrFocusTab called:', { pluginId, params, paneId })
+        return set((state) => {
           const targetParams = normalizeParams(params)
           for (const pane of state.panes) {
             const existing = pane.tabs.find(
@@ -87,6 +88,7 @@ export const useRightPanelStore = create<RightPanelState>()(
                 normalizeParams(tab.params as Record<string, unknown> | undefined) === targetParams,
             )
             if (existing) {
+              console.log('✅ openOrFocusTab: Found existing tab, focusing:', existing.id)
               return {
                 panes: state.panes.map((p) =>
                   p.id === pane.id ? { ...p, activeTabId: existing.id } : p,
@@ -97,6 +99,7 @@ export const useRightPanelStore = create<RightPanelState>()(
             }
           }
 
+          console.log('🆕 openOrFocusTab: Creating new tab for plugin:', pluginId)
           const panes = [...state.panes]
           let targetPaneId = paneId || state.activePaneId
           let paneIndex = panes.findIndex((pane) => pane.id === targetPaneId)
@@ -105,6 +108,7 @@ export const useRightPanelStore = create<RightPanelState>()(
             targetPaneId = createId('pane')
             panes.push({ id: targetPaneId, tabs: [], activeTabId: null })
             paneIndex = panes.length - 1
+            console.log('🆕 openOrFocusTab: Created new pane:', targetPaneId)
           }
 
           const tabId = createId('tab')
@@ -116,12 +120,14 @@ export const useRightPanelStore = create<RightPanelState>()(
             activeTabId: tabId,
           }
 
+          console.log('✅ openOrFocusTab: Created new tab:', tabId, 'in pane:', targetPaneId)
           return {
             panes,
             activePaneId: targetPaneId,
             collapsed: false,
           }
-        }),
+        })
+      },
       closeTab: (paneId, tabId) =>
         set((state) => {
           const panes = state.panes.map((pane) => {

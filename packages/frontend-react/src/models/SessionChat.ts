@@ -110,17 +110,28 @@ export class SessionChat {
     const pendingBySource: Record<string, ToolStep[]> = {}
 
     for (const e of eventList) {
-      const { type, source, content = '', data = {} } = e
+      const { type, data = {} } = e
+      const d = data as Record<string, unknown>
+      // Token：后端 workflow 进度放在 data 里，顶层 source 为 "system"，需优先用 data 以正确展示
+      const content = (typeof e.content === 'string' ? e.content : (typeof d?.content === 'string' ? d.content : '')) ?? ''
+      const source = (typeof d?.source === 'string' ? d.source : (typeof e.source === 'string' ? e.source : '')) ?? ''
 
       if (type === 'agent_start') {
         if (current) result.push(current)
         current = { role: 'assistant', content: '', steps: [] }
         stepStack = []
       }
-      else if (type === 'token' && current) {
-        if (source === 'supervisor') {
-          current.content += content
+      else if (type === 'token') {
+        if (!content) continue
+        // 如果没有 current，创建一个新的 assistant 消息（用于 workflow 进度消息）
+        if (!current) {
+          current = { role: 'assistant', content: '', steps: [] }
+        }
+        if (source === 'supervisor' || source === 'workflow' || !source) {
+          // 对于 supervisor 或 workflow 来源的 token，每行一个步骤追加到 content
+          current.content += (current.content ? '\n' : '') + content
         } else {
+          // 对于其他来源的 token，追加到当前步骤的 thought
           const pending = pendingBySource[source]
           const step = pending ? pending[pending.length - 1] : null
           if (!step) {

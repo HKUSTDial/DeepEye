@@ -5,6 +5,7 @@ import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { chatApi } from '../../../api'
+import { saveVideoConfig, extractVideoOutputParams } from '../../../api/video'
 import { workflowFilesApi } from '../../../api/workflowFiles'
 import { workflowsApi } from '../../../api/workflows'
 import { sandboxApi } from '../../../api/sandbox'
@@ -12,6 +13,7 @@ import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { useChatStore } from '../../../stores/chat'
 import { useWorkflowNodesStore } from '../../../stores/workflowNodes'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
+import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
 
 const NODE_TYPES = { workflowNode: WorkflowNode }
@@ -172,6 +174,10 @@ export function WorkflowLivePanel({
   const setFileError = useWorkflowSessionsStore((state) => state.setFileError)
   const setValidatedGraph = useWorkflowSessionsStore((state) => state.setValidatedGraph)
   const clearValidated = useWorkflowSessionsStore((state) => state.clearValidated)
+  const setVideoProgressVisible = useWorkflowSessionsStore((state) => state.setVideoProgressVisible)
+  const appendVideoProgressLog = useWorkflowSessionsStore((state) => state.appendVideoProgressLog)
+  const setVideoProgressStep = useWorkflowSessionsStore((state) => state.setVideoProgressStep)
+  const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
 
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
@@ -270,6 +276,19 @@ export function WorkflowLivePanel({
     es.onmessage = (event) => {
       try {
         const agentEvent = JSON.parse(event.data) as { type?: string; data?: Record<string, unknown> }
+        if (agentEvent.type === 'token') {
+          const data = agentEvent.data || {}
+          if (data.source === 'workflow' && typeof data.content === 'string') {
+            appendVideoProgressLog(sessionId, data.content)
+            const stepMatch = data.content.match(/Step\s*(\d)\s*\/\s*4/)
+            if (stepMatch) {
+              setVideoProgressVisible(sessionId, true)
+              const stepIndex = parseInt(stepMatch[1], 10) - 1
+              if (stepIndex >= 0 && stepIndex <= 3) setVideoProgressStep(sessionId, stepIndex)
+            }
+          }
+          return
+        }
         if (agentEvent.type !== 'workflow_event') {
           return
         }
@@ -280,12 +299,24 @@ export function WorkflowLivePanel({
         if (filePath && activeFilePathRef.current && activeFilePathRef.current !== filePath) {
           return
         }
+        if (phase === 'run_start') {
+          setVideoProgressVisible(sessionId, true)
+          openOrFocusTab('video-preview', {})
+          return
+        }
         if (phase === 'node_status') {
           const nodeId = typeof payload?.node_id === 'string' ? payload?.node_id : ''
           const status = typeof payload?.status === 'string' ? payload?.status : ''
           const outputs = typeof payload?.outputs === 'object' ? payload?.outputs : undefined
           if (nodeId && status) {
             setNodeStatus(sessionId, nodeId, status, outputs as Record<string, unknown> | undefined)
+            const session = useWorkflowSessionsStore.getState().sessions[sessionId]
+            const root = (session?.definition as Record<string, { nodes?: Record<string, { type?: string }> }> | null)?.root
+            const nodesMap = session?.validatedNodes ?? root?.nodes ?? {}
+            const nodeType = (nodesMap[nodeId] as { type?: string } | undefined)?.type
+            if (nodeType === 'video.generator') {
+              setVideoProgressVisible(sessionId, status === 'running')
+            }
           }
           return
         }
@@ -324,6 +355,7 @@ export function WorkflowLivePanel({
           return
         }
         if (phase === 'run_end') {
+          setVideoProgressVisible(sessionId, false)
           const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
           const error = typeof payload?.error === 'string' ? payload?.error : null
           setRunStatus(sessionId, status, error)
@@ -337,6 +369,42 @@ export function WorkflowLivePanel({
           })
           if (payload?.outputs && typeof payload.outputs === 'object') {
             setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
+            console.log('🎬 WorkflowLivePanel: run_end phase, checking for video output...')
+            console.log('📊 WorkflowLivePanel: Full outputs object:', JSON.stringify(payload.outputs, null, 2))
+            console.log('📊 WorkflowLivePanel: Output keys:', Object.keys(payload.outputs))
+            const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
+            console.log('🎬 WorkflowLivePanel: Extracted video params:', videoParams)
+            if (!videoParams.taskId && !videoParams.configPath) {
+              console.warn('⚠️ WorkflowLivePanel: No video output detected. Output structure:', {
+                nodeIds: Object.keys(payload.outputs),
+                firstNodeOutput: payload.outputs[Object.keys(payload.outputs)[0]],
+              })
+            }
+            if (videoParams.taskId || videoParams.configPath) {
+              console.log('🎬 WorkflowLivePanel: Video output detected, opening preview panel...', {
+                taskId: videoParams.taskId,
+                configPath: videoParams.configPath,
+                hasConfig: !!videoParams.config,
+              })
+              if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
+                console.log('🎬 WorkflowLivePanel: Saving video config first...')
+                saveVideoConfig(videoParams.taskId, videoParams.config as any)
+                  .then(() => {
+                    console.log('✅ WorkflowLivePanel: Config saved, opening preview panel')
+                    openOrFocusTab('video-preview', videoParams)
+                  })
+                  .catch((e) => {
+                    console.error('❌ WorkflowLivePanel: saveVideoConfig failed', e)
+                    console.log('🎬 WorkflowLivePanel: Opening preview panel anyway...')
+                    openOrFocusTab('video-preview', videoParams)
+                  })
+              } else {
+                console.log('🎬 WorkflowLivePanel: Opening preview panel directly (no config to save)')
+                openOrFocusTab('video-preview', videoParams)
+              }
+            } else {
+              console.log('⚠️ WorkflowLivePanel: No video output detected in payload.outputs')
+            }
           } else if (error) {
             setRunOutput(sessionId, error)
           }
@@ -358,6 +426,9 @@ export function WorkflowLivePanel({
     setRunStatus,
     setActiveRun,
     setRunOutput,
+    setVideoProgressVisible,
+    appendVideoProgressLog,
+    setVideoProgressStep,
     clearWorkflow,
     clearValidated,
     setActiveFilePath,
@@ -366,6 +437,7 @@ export function WorkflowLivePanel({
     setWorkflowError,
     addWorkflowNode,
     addWorkflowEdge,
+    openOrFocusTab,
   ])
 
   useEffect(() => {
@@ -850,6 +922,7 @@ export function WorkflowLivePanel({
             onClick={async () => {
               if (sessionId && activeFilePathForControls) {
                 setIsRunning(true)
+                setVideoProgressVisible(sessionId, false)
                 setRunStatus(sessionId, 'running', null)
                 setActiveRun(sessionId, {
                   id: `file:${activeFilePathForControls}`,
@@ -887,6 +960,17 @@ export function WorkflowLivePanel({
                     })
                     if (response.outputs) {
                       setRunOutput(sessionId, JSON.stringify(response.outputs, null, 2))
+                      const videoParams = extractVideoOutputParams(response.outputs as Record<string, unknown>)
+                      if (videoParams.taskId || videoParams.configPath) {
+                        if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
+                          try {
+                            await saveVideoConfig(videoParams.taskId!, videoParams.config as any)
+                          } catch (e) {
+                            console.error('saveVideoConfig failed', e)
+                          }
+                        }
+                        openOrFocusTab('video-preview', videoParams)
+                      }
                     } else if (response.status && response.status !== 'queued') {
                       setRunOutput(sessionId, '')
                     }

@@ -11,7 +11,16 @@ Rules (strict, structured JSON only):
 1) Use only node types and port ids from the specifications. Do NOT invent ports or node types.
 2) Include every required input/output exactly as the spec defines (e.g., sql.execute.rows). If the spec defines an output, include it even if only one port is used.
 3) Port multiplicity: only ports with `multiple=true` may have more than one incoming edge; all other inputs must have at most one incoming edge.
-4) Keep the workflow minimal and logical. Do NOT call external agents (code_agent, sql_agent, etc.); all logic is workflow nodes (primarily python.code).
+4) Keep the workflow minimal and logical. PREFER specialized nodes over python.code when available:
+   - For reading data from datasources: Use `datasource.read` node (outputs `rows: list[dict]`) instead of python.code
+   - For video generation: Use `video.generator` node directly with `rows` from datasource.read and `query` in params.query
+   - For SQL queries: Use `sql.execute` node instead of python.code
+   - Only use python.code when no specialized node exists for the task
+5) VIDEO GENERATION WORKFLOW PATTERN (preferred):
+   - If user wants to generate a video from a datasource:
+     * Node 1: `datasource.read` with params.datasource_id (outputs `rows`)
+     * Node 2: `video.generator` with inputs.rows from Node 1 and params.query from user's natural language request
+     * This is the SIMPLEST approach - only 2 nodes needed!
 5) python.code inputs: runner pipes ALL inputs as a JSON dict to stdin. Always read: `import sys, json; data = json.load(sys.stdin)` then access as `data['input']`, `data['code']`, etc. Do not rely on env vars. Code source: prefer params.code_path; code_b64 is allowed but avoid unless necessary; small snippets can use params.code. IMPORTANT: For outputs, prefer returning Python objects (e.g., list/dict) instead of printing JSON strings; downstream nodes receive structured data directly. Only parse with json.loads if the upstream output is explicitly a JSON string. For multi-line text output, use triple quotes like print('''line1\\nline2''') or f-strings to avoid JSON escape issues. Never write `print("` followed by a newline; Python will raise an unterminated string error. Use `\\n` or triple quotes instead.
 6) Layout: include positions ONLY under node.metadata.position (x, y). Do NOT use a top-level "position" field.
 7) Tool calls MUST be structured JSON frames (one object per call, no wrapping). Create the entire workflow in ONE call:

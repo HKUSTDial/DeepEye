@@ -76,6 +76,8 @@
   font-size: 14px;
   line-height: 1.5;
   max-width: min(100%, 720px);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .message-bubble.user .message-content {

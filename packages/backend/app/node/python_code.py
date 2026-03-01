@@ -109,7 +109,15 @@ class PythonCodeHandler:
                 stderr = f"{stderr}\nINPUT_PREVIEW (first 10 lines):\n{preview}\n"
             else:
                 stderr = f"{stderr}\nINPUT_PREVIEW: <empty>\n"
-        return {"stdout": stdout, "stderr": stderr, "exit_code": int(exit_code)}
+        result = {"stdout": stdout, "stderr": stderr, "exit_code": int(exit_code)}
+        # When stdout is a JSON array of objects, expose as rows for video.generator etc.
+        try:
+            parsed = json.loads(stdout.strip())
+            if isinstance(parsed, list) and all(isinstance(x, dict) for x in parsed):
+                result["rows"] = parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return result
 
 
 class PythonCodeNode(BaseNode):
@@ -139,6 +147,11 @@ class PythonCodeNode(BaseNode):
                 "stdout": Port(schema="string", description="Standard output from the script."),
                 "stderr": Port(schema="string", description="Standard error from the script."),
                 "exit_code": Port(schema="int", description="Process exit code."),
+                "rows": Port(
+                    schema="list[dict]",
+                    required=False,
+                    description="Set when stdout is a JSON array of objects (e.g. print(df.to_json(orient='records'))). Use this to connect to video.generator.rows.",
+                ),
             },
         )
 

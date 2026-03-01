@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-from typing import Any
 import asyncio
+import json
+import threading
+from datetime import datetime, timezone
+from typing import Any, Callable
 
 from app.infra import RedisEventBus
 from app.sandbox import sandbox_manager
@@ -14,6 +15,24 @@ from pydantic import ValidationError
 from deepeye.workflows.models import Graph, Workflow as CoreWorkflow
 from deepeye.workflows.runtime import ExecutionContext
 from deepeye.workflows.validation import WorkflowValidationError
+
+# 全局字典：存储 session_id -> 进度发布函数
+_progress_publishers: dict[str, Callable[[str], None]] = {}
+# 全局字典：存储 workflow_id -> session_id 的映射
+_workflow_to_session: dict[str, str] = {}
+
+
+def get_progress_publisher(session_id: str) -> Callable[[str], None] | None:
+    """获取指定 session 的进度发布函数"""
+    return _progress_publishers.get(session_id)
+
+
+def get_progress_publisher_by_workflow_id(workflow_id: str) -> Callable[[str], None] | None:
+    """通过 workflow_id 获取进度发布函数"""
+    session_id = _workflow_to_session.get(workflow_id)
+    if session_id:
+        return _progress_publishers.get(session_id)
+    return None
 
 
 async def service_run_workflow_from_file(
@@ -59,19 +78,61 @@ async def service_run_workflow_from_file(
         graph_data = definition.get("root", definition)
         graph = Graph.model_validate(graph_data)
         core_workflow = CoreWorkflow(id=f"file:{path}", root=graph)
+        
+        # 注册 workflow_id -> session_id 映射
+        _workflow_to_session[core_workflow.id] = session_id
 
         engine = build_engine(db, user_id, sandbox=sandbox)
         loop = asyncio.get_running_loop()
+        result_holder: list = []  # [ExecutionContext] or [Exception]
+
+        # 进度回调：从 worker 线程通过主循环发送 TOKEN，保证中途过程能实时展示
+        def _publish_progress_message(message: str):
+            line = message if message.endswith("\n") else message + "\n"
+            payload = {"content": line, "source": "workflow"}
+
+            def _schedule():
+                asyncio.create_task(_publish(AgentEventType.TOKEN, payload))
+
+            loop.call_soon_threadsafe(_schedule)
+
+        _progress_publishers[session_id] = _publish_progress_message
 
         def _on_node_start(node_id, node_run, _):
             data = {"node_id": node_id, "status": node_run.status}
-            loop.create_task(_publish_workflow_event("node_status", data))
+
+            def _schedule():
+                asyncio.create_task(_publish_workflow_event("node_status", data))
+
+            loop.call_soon_threadsafe(_schedule)
 
         def _on_node_end(node_id, node_run, _):
             data = {"node_id": node_id, "status": node_run.status, "outputs": node_run.outputs}
-            loop.create_task(_publish_workflow_event("node_status", data))
 
-        context = engine.run(core_workflow, on_node_start=_on_node_start, on_node_end=_on_node_end)
+            def _schedule():
+                asyncio.create_task(_publish_workflow_event("node_status", data))
+
+            loop.call_soon_threadsafe(_schedule)
+
+        def _run_workflow_sync():
+            try:
+                ctx = engine.run(
+                    core_workflow,
+                    on_node_start=_on_node_start,
+                    on_node_end=_on_node_end,
+                )
+                result_holder.append(ctx)
+            except Exception as e:
+                result_holder.append(e)
+
+        thread = threading.Thread(target=_run_workflow_sync)
+        thread.start()
+        while not result_holder:
+            await asyncio.sleep(0.05)
+
+        if isinstance(result_holder[0], Exception):
+            raise result_holder[0]
+        context = result_holder[0]
         outputs = _collect_final_outputs(graph, context)
         await _publish_workflow_event(
             "run_end",
@@ -137,6 +198,12 @@ async def service_run_workflow_from_file(
         )
         return {"status": "failed", "error": str(exc)}
     finally:
+        # 清理进度发布函数和映射
+        _progress_publishers.pop(session_id, None)
+        # 清理所有指向此 session_id 的 workflow_id 映射
+        workflows_to_remove = [wid for wid, sid in _workflow_to_session.items() if sid == session_id]
+        for wid in workflows_to_remove:
+            _workflow_to_session.pop(wid, None)
         await event_bus.close()
 
 

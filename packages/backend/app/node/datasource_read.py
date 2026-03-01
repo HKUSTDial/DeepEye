@@ -39,7 +39,10 @@ class DataSourceReadHandler:
                 if not self.sandbox:
                     raise RuntimeError("Sandbox not available for file datasource")
                 
-                local_path = f"/workspace/data/{ds.name}"
+                # Use consistent filename extraction
+                from app.sandbox.manager import _get_datasource_filename
+                original_filename = _get_datasource_filename(ds)
+                local_path = f"/workspace/data/{original_filename}"
                 # Use pandas in sandbox to read file
                 read_cmd = ""
                 ext = ds.name.split('.')[-1].lower()

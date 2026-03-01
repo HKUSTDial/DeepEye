@@ -202,7 +202,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       }
       set({ isSwitchingSession: false })
     } catch (e) {
-      console.error('Failed to load session', e)
+      const isAbort = e instanceof Error && e.name === 'AbortError'
+      if (isAbort) {
+        console.warn('Load session was cancelled (e.g. switched session or request timed out).')
+      } else {
+        console.error('Failed to load session', e)
+      }
       set({ isSwitchingSession: false })
     }
   },

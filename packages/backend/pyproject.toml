@@ -29,6 +29,7 @@ dependencies = [
     "pandas",
     "openpyxl",
     "pyarrow",
+    "azure-cognitiveservices-speech>=1.40.0",
 ]
 
 [tool.uv.sources]

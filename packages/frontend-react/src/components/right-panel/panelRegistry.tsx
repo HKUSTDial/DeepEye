@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { FolderOpen, Workflow as WorkflowIcon } from 'lucide-react'
+import { FolderOpen, Workflow as WorkflowIcon, Video } from 'lucide-react'
 import { FilesPanel } from './plugins/FilesPanel'
 import { WorkflowLivePanel } from './plugins/WorkflowLivePanel'
+import { VideoPreviewPanel } from './plugins/VideoPreviewPanel'
 
 export type PanelRenderContext = {
   sessionId: string | null
@@ -30,6 +31,18 @@ export const panelRegistry: PanelPlugin[] = [
       <WorkflowLivePanel 
         sessionId={context.sessionId} 
         dataSourceIds={context.dataSourceIds} 
+      />
+    ),
+  },
+  {
+    id: 'video-preview',
+    title: (params) => (params?.taskId ? `Video: ${params.taskId}` : 'Video Preview'),
+    icon: <Video className="h-4 w-4" />,
+    render: (context, params) => (
+      <VideoPreviewPanel
+        sessionId={context.sessionId}
+        taskId={params?.taskId as string | undefined}
+        configPath={params?.configPath as string | undefined}
       />
     ),
   },
