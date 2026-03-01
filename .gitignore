@@ -36,3 +36,5 @@ packages/deepeye-core
 packages/deepeye-backend
 packages/deepeye-frontend
 packages/frontend
+
+AGENTS.md
