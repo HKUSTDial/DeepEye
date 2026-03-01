@@ -1,11 +1,20 @@
-/* Tool Steps - Minimal Tree Style */
+/* Tool Steps - Minimal timeline style */
 
 .tool-tree-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #111827;
-  overflow: hidden;
+  position: relative;
+  display: block;
+  padding-left: 14px;
+}
+
+.tool-tree-item::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #d8d8d8;
+  opacity: 1;
 }
 
 .tool-header {
@@ -13,57 +22,74 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: #ffffff;
+  padding: 2px 0;
+  background: transparent;
   border: none;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease;
-}
-
-.tool-header:hover {
-  background: #f7f7f8;
+  color: #2f2f2f;
 }
 
 .tool-node {
-  width: 8px;
-  height: 8px;
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
-  background: #111827;
+  border: 1.5px solid #b8b8b8;
+  background: #f6f6f6;
   flex-shrink: 0;
+  position: relative;
 }
 
 .tool-name {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--ui-font-md);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tool-status {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-weight: 500;
-  flex-shrink: 0;
+.tool-node.running {
+  border-color: #b8b8b8;
+  background: #ffffff;
 }
 
-.tool-status.running {
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
+.tool-node.done {
+  border-color: #b8b8b8;
+  background: #d9d9d9;
 }
 
-.tool-status.done {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+.tool-node.done::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 5px;
+  height: 8px;
+  border: solid #7a7a7a;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.tool-node.error {
+  border-color: #b8b8b8;
+  background: #ebebeb;
+}
+
+.tool-node.error::after {
+  content: '!';
+  position: absolute;
+  left: 3px;
+  top: -1px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #8a8a8a;
 }
 
 .tool-chevron {
-  width: 14px;
-  height: 14px;
-  color: #6b7280;
+  width: 13px;
+  height: 13px;
+  color: #8a8a8a;
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
@@ -73,63 +99,67 @@
 }
 
 .tool-details {
-  padding: 10px 12px 12px;
-  border-top: 1px solid #e5e7eb;
-  background: #ffffff;
-  display: grid;
-  gap: 10px;
-}
-
-.tool-block {
+  margin: 4px 0 8px 22px;
   display: grid;
   gap: 6px;
 }
 
+.tool-block {
+  display: grid;
+  gap: 4px;
+}
+
 .tool-label {
-  font-size: 10px;
+  font-size: var(--ui-font-xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #6b7280;
+  letter-spacing: 0.06em;
+  color: #9a9a9a;
   font-weight: 600;
 }
 
 .tool-pre {
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f5f5f5;
+  border: 1px solid #e3e3e3;
   font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  max-height: 240px;
-  overflow: auto;
+  font-size: var(--ui-font-sm);
+  line-height: 1.4;
+  color: #676767;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tool-children {
-  border-left: 2px solid #e5e7eb;
-  padding-left: 10px;
+  border-left: 1px dashed #d8d8d8;
+  padding-left: 8px;
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .tool-thought {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 2px 0;
-  color: #6b7280;
-  font-size: 12px;
+  padding-left: 10px;
+  color: #7d7d7d;
+  font-size: var(--ui-font-sm);
 }
 
-.tool-thought .tool-node {
-  margin-top: 6px;
-  background: #9ca3af;
+.tool-thought-dot {
+  width: 10px;
+  display: inline-flex;
+  justify-content: center;
+  margin-top: -1px;
+  color: #9a9a9a;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .tool-thought-text {
   font-style: italic;
   line-height: 1.5;
+  color: #6f6f6f;
 }

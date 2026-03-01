@@ -370,7 +370,7 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
           <div className="h-full flex flex-col items-center justify-center p-4 text-center">
             <FolderOpen size={32} className="text-[#606060] mb-2" />
             <p className="text-xs text-[#808080]">Empty directory</p>
-            <p className="text-[10px] text-[#606060] mt-1">No files in /workspace</p>
+            <p className="text-xs text-[#606060] mt-1">No files in /workspace</p>
           </div>
         )}
       </div>

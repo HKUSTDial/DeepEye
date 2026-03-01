@@ -149,7 +149,7 @@ export function DashboardPanel({
           <LayoutDashboard className="h-3.5 w-3.5" />
           <span className="font-semibold">Dashboard Preview</span>
           {(!isReady || isChecking) && (
-            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+            <div className="flex items-center gap-1 text-xs text-slate-500">
               <Loader2 className="h-3 w-3 animate-spin" />
               Waiting for service...
             </div>
@@ -161,7 +161,7 @@ export function DashboardPanel({
               setIsReady(false)
               setLocalRefreshKey(prev => prev + 1)
             }}
-            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition-colors ${
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
               isDark 
                 ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
                 : 'border-slate-300 text-slate-700 hover:bg-slate-100'
@@ -174,7 +174,7 @@ export function DashboardPanel({
             href={fullDashboardUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition-colors ${
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
               isDark 
                 ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
                 : 'border-slate-300 text-slate-700 hover:bg-slate-100'
@@ -193,7 +193,7 @@ export function DashboardPanel({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-50/50 backdrop-blur-[2px] z-10">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
             <p className="text-sm text-slate-500">Starting dashboard service...</p>
-            <p className="text-[10px] text-slate-400 max-w-[200px] text-center">
+            <p className="text-xs text-slate-400 max-w-[200px] text-center">
               This might take up to 30 seconds to install dependencies and start the server.
             </p>
           </div>

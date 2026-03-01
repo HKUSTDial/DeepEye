@@ -9,19 +9,24 @@ interface StepItemProps {
 export default function StepItem({ step }: StepItemProps) {
   const [expanded, setExpanded] = useState(false)
   const isRunning = useMemo(() => step.status === 'running', [step.status])
+  const nodeStateClass = useMemo(() => {
+    if (step.status === 'completed') return 'done'
+    if (step.status === 'error') return 'error'
+    return 'running'
+  }, [step.status])
 
   // Thought Step
   if (step.type === 'thought') {
     return (
       <div className="tool-thought">
-        {step.status === 'running' ? (
+        {isRunning ? (
           <span className="thinking-dots">
             <span></span>
             <span></span>
             <span></span>
           </span>
         ) : (
-          <span className="tool-node"></span>
+          <span className="tool-thought-dot">·</span>
         )}
         <span className="tool-thought-text">{step.thought}</span>
       </div>
@@ -32,11 +37,8 @@ export default function StepItem({ step }: StepItemProps) {
   return (
     <div className="tool-tree-item">
       <button onClick={() => setExpanded(!expanded)} className="tool-header">
-        <span className="tool-node"></span>
+        <span className={`tool-node ${nodeStateClass}`}></span>
         <span className="tool-name">{step.name}</span>
-        <span className={`tool-status ${isRunning ? 'running' : 'done'}`}>
-          {isRunning ? 'Running' : 'Done'}
-        </span>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           className={`tool-chevron ${expanded ? 'expanded' : ''}`}

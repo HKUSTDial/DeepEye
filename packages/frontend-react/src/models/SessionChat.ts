@@ -122,24 +122,46 @@ export class SessionChat {
     let current: Message | null = null
     let stepStack: ToolStep[] = []
     const pendingBySource: Record<string, ToolStep[]> = {}
+    const appendTextToTimeline = (message: Message, text: string, isStreaming: boolean = false) => {
+      if (!message.timeline) message.timeline = []
+      const last = message.timeline[message.timeline.length - 1]
+      if (last && last.kind === 'text') {
+        last.content += text
+        last.isStreaming = isStreaming
+      } else {
+        message.timeline.push({ kind: 'text', content: text, isStreaming })
+      }
+    }
+    const appendStepToTimeline = (message: Message, step: ToolStep) => {
+      if (!message.timeline) message.timeline = []
+      message.timeline.push({ kind: 'step', step })
+    }
+    const markLastTextStreaming = (message: Message, streaming: boolean) => {
+      const last = message.timeline?.[message.timeline.length - 1]
+      if (last && last.kind === 'text') {
+        last.isStreaming = streaming
+      }
+    }
 
     for (const e of eventList) {
       const { type, source, content = '', data = {} } = e
 
       if (type === 'agent_start') {
         if (current) result.push(current)
-        current = { role: 'assistant', content: '', steps: [] }
+        current = { role: 'assistant', content: '', steps: [], timeline: [] }
         stepStack = []
       }
       else if (type === 'token') {
         if (source === 'supervisor') {
           if (current) {
             current.content += content
+            appendTextToTimeline(current, content, this.isStreaming)
           } else {
             // Late token after agent_end, append to last assistant message if exists
             const last = result[result.length - 1]
             if (last && last.role === 'assistant') {
               last.content += content
+              appendTextToTimeline(last, content, false)
             }
           }
         } else {
@@ -165,9 +187,10 @@ export class SessionChat {
         }
       }
       else if (type === 'tool_start' && current) {
-        const step: ToolStep = { type: 'tool', name: String(data.name || ''), source, input: String(data.input || ''), status: 'completed', subSteps: [] }
+        const step: ToolStep = { type: 'tool', name: String(data.name || ''), source, input: String(data.input || ''), status: 'running', subSteps: [] }
         if (source === 'supervisor') {
           current.steps!.push(step)
+          appendStepToTimeline(current, step)
           stepStack = [step]
         } else {
           const parent = stepStack[0]
@@ -175,6 +198,7 @@ export class SessionChat {
             parent.subSteps!.push(step)
           } else {
             current.steps!.push(step)
+            appendStepToTimeline(current, step)
           }
           pendingBySource[source] ??= []
           pendingBySource[source].push(step)
@@ -185,12 +209,35 @@ export class SessionChat {
         const output = typeof rawOutput === 'object' && rawOutput && 'content' in rawOutput ? String((rawOutput as { content: unknown }).content) : String(rawOutput || '')
         if (source === 'supervisor' && stepStack.length > 0) {
           stepStack[stepStack.length - 1]!.output = output
+          stepStack[stepStack.length - 1]!.status = 'completed'
           if (stepStack.length > 1) stepStack.pop()
         } else {
           const pending = pendingBySource[source]
           if (pending && pending.length > 0) {
             const step = pending.shift()!
             step.output = output
+            step.status = 'completed'
+            if (pending.length === 0) {
+              delete pendingBySource[source]
+            }
+          }
+        }
+      }
+      else if (type === 'tool_error' && current) {
+        const rawError = data.output ?? data.error
+        const errorText = typeof rawError === 'object' && rawError && 'content' in rawError
+          ? String((rawError as { content: unknown }).content)
+          : String(rawError || '')
+        if (source === 'supervisor' && stepStack.length > 0) {
+          stepStack[stepStack.length - 1]!.output = errorText
+          stepStack[stepStack.length - 1]!.status = 'error'
+          if (stepStack.length > 1) stepStack.pop()
+        } else {
+          const pending = pendingBySource[source]
+          if (pending && pending.length > 0) {
+            const step = pending.shift()!
+            step.output = errorText
+            step.status = 'error'
             if (pending.length === 0) {
               delete pendingBySource[source]
             }
@@ -198,6 +245,9 @@ export class SessionChat {
         }
       }
       else if (type === 'agent_end' || type === 'error') {
+        if (current) {
+          markLastTextStreaming(current, false)
+        }
         if (current) result.push(current)
         current = null
         stepStack = []

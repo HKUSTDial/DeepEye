@@ -1,10 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useChatStore } from '../stores/chat'
-import ThemeToggle from './ThemeToggle'
 import './Sidebar.css'
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean
+  onToggleCollapse: () => void
+}
+
+export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -100,16 +104,31 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden sidebar">
-      {/* Logo & Theme Toggle */}
-      <div className="p-4 flex items-center justify-between border-b border-[var(--sidebar-border)]">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-            DE
-          </div>
-          <span className="font-semibold text-base">DeepEye</span>
+    <div className={`flex flex-col h-full overflow-hidden sidebar ${collapsed ? 'collapsed text-hidden' : 'text-shown'}`}>
+      {/* Logo & Collapse Toggle */}
+      <div className="sidebar-header border-b border-[var(--sidebar-border)] p-3">
+        <div className={`sidebar-header-row ${collapsed ? 'is-collapsed' : ''}`}>
+          {!collapsed && (
+            <div className="sidebar-brand min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                  DE
+                </div>
+                <span className="font-semibold text-base truncate sidebar-logo-text">DeepEye</span>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={onToggleCollapse}
+            className={`sidebar-toggle-btn hover:bg-[var(--sidebar-hover)] transition-colors ${collapsed ? '' : 'ml-auto'}`}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg className={`w-5 h-5 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
-        <ThemeToggle />
       </div>
 
       {/* Navigation */}
@@ -118,34 +137,37 @@ export default function Sidebar() {
           <button
             onClick={() => navigate('/')}
             className={`nav-item ${isActive('/') && !isActive('/workflows') && !isActive('/knowledge-bases') ? 'active' : ''}`}
+            title="Chat"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <span>Chat</span>
+            <span className="sidebar-label">Chat</span>
           </button>
           <button
             onClick={() => navigate('/workflows')}
             className={`nav-item ${isActive('/workflows') ? 'active' : ''}`}
+            title="Workflows"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <span>Workflows</span>
+            <span className="sidebar-label">Workflows</span>
           </button>
           <button
             onClick={() => navigate('/knowledge-bases')}
             className={`nav-item ${isActive('/knowledge-bases') ? 'active' : ''}`}
+            title="Knowledge Base"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span>Knowledge Base</span>
+            <span className="sidebar-label">Knowledge Base</span>
           </button>
         </div>
 
         {/* Conversations */}
-        <div className="mb-4">
+        <div className="mb-4 sidebar-section">
           <div className="flex items-center justify-between mb-2 px-2">
             <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase">Conversations</span>
             <button

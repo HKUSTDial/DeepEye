@@ -658,7 +658,7 @@ export function WorkflowLivePanel({
   ) {
     const hasDataSources = dataSourceIds.length > 0
     return (
-      <div className={`h-full w-full flex flex-col items-center justify-center p-8 text-center ${
+      <div className={`workflow-live-panel h-full w-full flex flex-col items-center justify-center p-8 text-center ${
         isDark ? 'bg-slate-950' : 'bg-slate-50'
       }`}>
         <div className={`mb-6 rounded-2xl p-4 ring-1 ${
@@ -677,7 +677,7 @@ export function WorkflowLivePanel({
         
         {hasDataSources && (
           <div className="mt-8 flex flex-col gap-2 w-full max-w-xs">
-            <div className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${
+            <div className={`text-xs font-semibold uppercase tracking-wider mb-1 ${
               isDark ? 'text-slate-500' : 'text-slate-400'
             }`}>Suggested prompts</div>
             {[
@@ -703,7 +703,7 @@ export function WorkflowLivePanel({
   }
 
   return (
-    <div className={`h-full w-full flex flex-col ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
+    <div className={`workflow-live-panel h-full w-full flex flex-col ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
       <div className={`flex items-center justify-between border-b px-3 py-2 text-xs ${
         isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'
       }`}>
