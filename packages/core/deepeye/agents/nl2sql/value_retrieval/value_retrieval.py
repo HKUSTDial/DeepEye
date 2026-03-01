@@ -15,6 +15,7 @@ from langchain_core.language_models import BaseChatModel
 
 from deepeye.datasource.datasource import DatabaseMetadata
 from deepeye.agents.nl2sql.utils.llm_extractor import LLMExtractor
+from deepeye.agents.nl2sql.utils.db_utils import execute_sql
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,8 @@ class ValueRetriever:
     def __init__(
             self,
             n_results: int = 10,
-            similarity_threshold: float = 0.6
+            similarity_threshold: float = 0.6,
+            db_sample_limit: int = 200,
     ):
         """
         初始化值检索器
@@ -150,9 +152,11 @@ class ValueRetriever:
         Args:
             n_results: 每列检索的最大结果数量
             similarity_threshold: 相似度阈值，高于此值才认为匹配
+            db_sample_limit: 当metadata缺少示例值时，从数据库采样的最大去重值数量
         """
         self.n_results = n_results
         self.similarity_threshold = similarity_threshold
+        self.db_sample_limit = max(1, db_sample_limit)
         self.extractor = LLMExtractor()
 
     async def extract_keywords(
@@ -243,7 +247,8 @@ class ValueRetriever:
     def retrieve_values(
             self,
             keywords: List[str],
-            metadata: DatabaseMetadata
+            metadata: DatabaseMetadata,
+            database_path: Optional[str] = None,
     ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
         """
         基于字符串相似度从数据库元数据中检索相关值
@@ -251,6 +256,7 @@ class ValueRetriever:
         Args:
             keywords: 关键词列表
             metadata: 数据库元数据（包含示例值和枚举值）
+            database_path: 数据库路径或SQLAlchemy URL。仅在metadata缺少候选值时使用
 
         Returns:
             检索结果字典 {table_name: {column_name: [{value, similarity}]}}
@@ -262,20 +268,15 @@ class ValueRetriever:
 
         for table in metadata.tables:
             for column in table.columns:
-                # 收集该列的所有候选值（示例值 + 枚举值）
-                candidate_values = set()
-
-                # 添加示例值
-                if column.examples:
-                    for ex in column.examples:
-                        if ex is not None:
-                            candidate_values.add(str(ex))
-
-                # 添加枚举值
-                if column.enums:
-                    for enum in column.enums:
-                        if hasattr(enum, 'value') and enum.value is not None:
-                            candidate_values.add(str(enum.value))
+                # 先用metadata内的 examples/enums；没有候选值时再尝试在线采样数据库。
+                candidate_values = self._collect_candidate_values(
+                    table_name=table.name,
+                    column_name=column.name,
+                    column_type=column.type,
+                    metadata_examples=column.examples,
+                    metadata_enums=column.enums,
+                    database_path=database_path,
+                )
 
                 if not candidate_values:
                     continue
@@ -304,6 +305,102 @@ class ValueRetriever:
                     retrieved_values[table.name][column.name] = matched_values[:self.n_results]
 
         return dict(retrieved_values)
+
+    @staticmethod
+    def _quote_ident(identifier: str) -> str:
+        """ANSI SQL quoting for identifiers."""
+        escaped = identifier.replace('"', '""')
+        return f'"{escaped}"'
+
+    @staticmethod
+    def _is_textual_column(column_type: Optional[str]) -> bool:
+        if not column_type:
+            return False
+        t = str(column_type).upper()
+        keywords = ("CHAR", "TEXT", "STRING", "UUID")
+        return any(k in t for k in keywords)
+
+    def _collect_candidate_values(
+            self,
+            table_name: str,
+            column_name: str,
+            column_type: Optional[str],
+            metadata_examples: Optional[List[Any]],
+            metadata_enums: Optional[List[Any]],
+            database_path: Optional[str],
+    ) -> List[str]:
+        candidates: List[str] = []
+        seen = set()
+
+        if metadata_examples:
+            for value in metadata_examples:
+                if value is None:
+                    continue
+                value_str = str(value)
+                if value_str not in seen:
+                    seen.add(value_str)
+                    candidates.append(value_str)
+
+        if metadata_enums:
+            for enum in metadata_enums:
+                enum_value = enum.value if hasattr(enum, "value") else enum
+                if enum_value is None:
+                    continue
+                value_str = str(enum_value)
+                if value_str not in seen:
+                    seen.add(value_str)
+                    candidates.append(value_str)
+
+        # Metadata无候选值时，按需从真实数据库采样，避免value retrieval完全失效。
+        if not candidates and database_path and self._is_textual_column(column_type):
+            db_candidates = self._fetch_distinct_values_from_db(
+                table_name=table_name,
+                column_name=column_name,
+                database_path=database_path,
+            )
+            for value_str in db_candidates:
+                if value_str not in seen:
+                    seen.add(value_str)
+                    candidates.append(value_str)
+
+        return candidates
+
+    def _fetch_distinct_values_from_db(
+            self,
+            table_name: str,
+            column_name: str,
+            database_path: str,
+    ) -> List[str]:
+        q_table = self._quote_ident(table_name)
+        q_column = self._quote_ident(column_name)
+        limit = max(1, min(self.db_sample_limit, 1000))
+        sql = (
+            f"SELECT DISTINCT {q_column} "
+            f"FROM {q_table} "
+            f"WHERE {q_column} IS NOT NULL "
+            f"LIMIT {limit}"
+        )
+
+        result = execute_sql(database_path=database_path, sql=sql)
+        if result.result_type not in {"success", "empty_result", "all_null_result"}:
+            logger.debug(
+                "Live value sampling failed for %s.%s: %s",
+                table_name,
+                column_name,
+                result.error_message,
+            )
+            return []
+
+        sampled_values: List[str] = []
+        for row in result.result_rows or []:
+            if not row:
+                continue
+            value = row[0]
+            if value is None:
+                continue
+            sampled_values.append(str(value))
+
+        return sampled_values
 
     def retrieve_values_sync(
             self,
@@ -404,4 +501,3 @@ class SimpleValueMatcher:
 
 if __name__ == '__main__':
     vr = ValueRetriever()
-

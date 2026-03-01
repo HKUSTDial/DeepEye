@@ -17,7 +17,6 @@ import os
 import sqlite3
 import time
 from typing import List, Tuple, Dict, Optional, Any
-from tabulate import tabulate
 from dataclasses import dataclass
 from sqlalchemy import create_engine, text
 
@@ -31,6 +30,42 @@ class ExecutionResult:
     result_table_str: Optional[str] = None   # 记录了表名
     error_message: Optional[str] = None
     execution_time: float = 0.0
+
+
+def _format_result_table(
+        rows: List[Tuple[Any, ...]],
+        columns: List[str],
+        max_rows: int = 20
+) -> str:
+    """Format query rows into a readable plain-text table."""
+    if not rows:
+        return "Query returned no results"
+
+    display_rows = rows[:max_rows]
+    truncated = len(rows) > max_rows
+
+    widths = [len(str(col)) for col in columns]
+    for row in display_rows:
+        for idx, value in enumerate(row):
+            cell = "NULL" if value is None else str(value)
+            widths[idx] = max(widths[idx], len(cell))
+
+    header = " | ".join(str(col).ljust(widths[idx]) for idx, col in enumerate(columns))
+    sep = "-+-".join("-" * widths[idx] for idx in range(len(widths)))
+    lines = [header, sep]
+
+    for row in display_rows:
+        lines.append(
+            " | ".join(
+                ("NULL" if value is None else str(value)).ljust(widths[idx])
+                for idx, value in enumerate(row)
+            )
+        )
+
+    if truncated:
+        lines.append(f"... ({len(rows) - max_rows} more rows)")
+
+    return "\n".join(lines)
 
 
 def _looks_like_sqlalchemy_url(value: str) -> bool:
@@ -75,7 +110,7 @@ def execute_sql(database_path: str, sql: str, timeout: float = 30.0) -> Executio
         # 检查是否全空
         all_null = all(all(val is None for val in row) for row in results_rows)
 
-        result_table_str = tabulate(results_rows, headers=columns, tablefmt="grid")
+        result_table_str = _format_result_table(results_rows, columns)
 
         if not _looks_like_sqlalchemy_url(database_path):
             conn.close()
@@ -107,7 +142,6 @@ if __name__ == "__main__":
 
     result = execute_sql(database_path=database_path,
                          sql="SELECT * FROM cards LIMIT 3",)
-
 
 
 

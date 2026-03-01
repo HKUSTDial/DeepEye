@@ -9,7 +9,6 @@ import re
 from typing import Dict, List, Tuple, Optional, Any
 from collections import Counter
 
-import numpy as np
 from langchain_core.language_models import BaseChatModel
 
 from deepeye.datasource.datasource import DatabaseMetadata
@@ -208,8 +207,11 @@ class SQLSelector:
         total_tokens = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         n = len(candidates)
 
-        # 初始化胜利矩阵
-        win_matrix = np.zeros((n, n, self.evaluator_budget))
+        # 初始化胜利矩阵 [candidate_i][candidate_j][vote_k]
+        win_matrix: List[List[List[float]]] = [
+            [[0.0 for _ in range(self.evaluator_budget)] for _ in range(n)]
+            for _ in range(n)
+        ]
 
         # 生成所有对
         pairs = []
@@ -235,25 +237,35 @@ class SQLSelector:
             # 更新胜利矩阵
             for k, vote in enumerate(votes):
                 if vote == "A":
-                    win_matrix[i, j, k] = 1
-                    win_matrix[j, i, k] = 0
+                    win_matrix[i][j][k] = 1.0
+                    win_matrix[j][i][k] = 0.0
                 elif vote == "B":
-                    win_matrix[j, i, k] = 1
-                    win_matrix[i, j, k] = 0
+                    win_matrix[j][i][k] = 1.0
+                    win_matrix[i][j][k] = 0.0
                 else:  # TIE
-                    win_matrix[i, j, k] = 0.5
-                    win_matrix[j, i, k] = 0.5
+                    win_matrix[i][j][k] = 0.5
+                    win_matrix[j][i][k] = 0.5
 
         # 计算最终得分
-        robust_matrix = np.mean(win_matrix, axis=2)
-        scores = np.mean(robust_matrix, axis=1)
+        robust_matrix: List[List[float]] = []
+        for i in range(n):
+            robust_row = []
+            for j in range(n):
+                robust_row.append(sum(win_matrix[i][j]) / max(1, self.evaluator_budget))
+            robust_matrix.append(robust_row)
+
+        scores = [sum(row) / max(1, n) for row in robust_matrix]
 
         # 加权一致性分数
-        consistency_weights = np.array([c[2] for c in candidates])
-        consistency_weights = consistency_weights / consistency_weights.sum()
-        final_scores = scores * consistency_weights
+        consistency_weights = [c[2] for c in candidates]
+        weight_sum = sum(consistency_weights)
+        if weight_sum <= 0:
+            normalized_weights = [1.0 / n for _ in range(n)]
+        else:
+            normalized_weights = [w / weight_sum for w in consistency_weights]
+        final_scores = [scores[idx] * normalized_weights[idx] for idx in range(n)]
 
-        best_idx = np.argmax(final_scores)
+        best_idx = max(range(n), key=lambda idx: final_scores[idx])
         return candidates[best_idx][0], total_tokens
 
     async def _compare_pair(
