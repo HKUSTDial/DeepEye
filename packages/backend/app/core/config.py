@@ -3,6 +3,7 @@ from pathlib import Path
 from pydantic import AnyHttpUrl, computed_field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
+import re
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "DeepEye API"
@@ -121,6 +122,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+_SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+
 
 def get_video_workspace_root() -> Path:
     """Return base path for video_configs and video_components. Writable; works in Docker and locally."""
@@ -139,3 +142,30 @@ def get_video_workspace_root() -> Path:
     root = Path.cwd() / ".video_workspace"
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+def normalize_session_id(session_id: str | None) -> str | None:
+    """Normalize and validate session_id for filesystem path usage."""
+    if session_id is None:
+        return None
+    value = session_id.strip()
+    if not value:
+        return None
+    if not _SESSION_ID_PATTERN.fullmatch(value):
+        raise ValueError("Invalid session_id format")
+    return value
+
+
+def get_video_session_root(session_id: str | None) -> Path:
+    """
+    Return per-session workspace root for video artifacts.
+    - session_id is set: /workspace/sessions/{session_id}
+    - session_id is empty: legacy shared /workspace
+    """
+    root = get_video_workspace_root()
+    normalized = normalize_session_id(session_id)
+    if not normalized:
+        return root
+    session_root = root / "sessions" / normalized
+    session_root.mkdir(parents=True, exist_ok=True)
+    return session_root

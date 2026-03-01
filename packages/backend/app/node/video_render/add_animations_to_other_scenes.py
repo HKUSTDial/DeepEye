@@ -25,6 +25,15 @@ from app.node.video_config.generator import LLMClient
 API_BASE = settings.LLM_BASE_URL or os.getenv("LLM_BASE_URL", "https://newapi.deepwisdom.ai")
 API_KEY = settings.LLM_API_KEY or os.getenv("LLM_API_KEY", "")
 DEFAULT_MODEL = settings.LLM_MODEL or os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
+VIDEO_RUNTIME_BASE = os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runtime")
+DEFAULT_COMPONENTS_INPUT_DIR = os.getenv(
+    "VIDEO_COMPONENTS_OUTPUT_BASE",
+    os.path.join(VIDEO_RUNTIME_BASE, "claude_tsx_components"),
+)
+DEFAULT_ANIMATED_OUTPUT_DIR = os.getenv(
+    "VIDEO_ANIMATED_OUTPUT_BASE",
+    os.path.join(VIDEO_RUNTIME_BASE, "claude_tsx_animated"),
+)
 
 if not API_KEY:
     raise ValueError("LLM_API_KEY is required. Please set it in .env file or environment variable.")
@@ -728,10 +737,10 @@ def main():
                        default='infographic_generation/generated_20251216_045823_aligned_flight.json',
                        help='配置文件路径')
     parser.add_argument('--static-dir', type=str,
-                       default='infographic_generation_modularity/output/claude_tsx_components',
+                       default=DEFAULT_COMPONENTS_INPUT_DIR,
                        help='静态组件目录（基础路径）')
     parser.add_argument('--animated-dir', type=str,
-                       default='infographic_generation_modularity/output/claude_tsx_animated',
+                       default=DEFAULT_ANIMATED_OUTPUT_DIR,
                        help='动画组件输出目录（基础路径）')
     parser.add_argument('--task-id', type=str, default=None,
                        help='任务ID（用于子目录隔离）')
@@ -837,4 +846,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

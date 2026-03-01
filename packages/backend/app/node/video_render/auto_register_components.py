@@ -4,7 +4,7 @@
 
 功能：
 1. 扫描生成的 TSX 组件
-2. 复制到 src/components/CustomInfographic/
+2. 复制到目标目录（默认 copy-only 模式写入运行时目录）
 3. 自动在 src/Root.tsx 中注册
 4. 配置持续时间（根据配置文件）
 """
@@ -13,6 +13,21 @@ import shutil
 import json
 import re
 from typing import List, Dict, Any
+
+
+VIDEO_RUNTIME_BASE = os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runtime")
+DEFAULT_COMPONENTS_OUTPUT_BASE = os.getenv(
+    "VIDEO_COMPONENTS_OUTPUT_BASE",
+    os.path.join(VIDEO_RUNTIME_BASE, "claude_tsx_components"),
+)
+DEFAULT_ANIMATED_OUTPUT_BASE = os.getenv(
+    "VIDEO_ANIMATED_OUTPUT_BASE",
+    os.path.join(VIDEO_RUNTIME_BASE, "claude_tsx_animated"),
+)
+DEFAULT_COPY_TARGET_DIR = os.getenv(
+    "VIDEO_REGISTER_TARGET_DIR",
+    os.path.join(VIDEO_RUNTIME_BASE, "registered_components"),
+)
 
 
 def scan_generated_components(output_dir: str) -> List[Dict[str, str]]:
@@ -243,14 +258,21 @@ def main():
                        help='任务ID（用于扫描子目录）')
     parser.add_argument('--copy-only', action='store_true',
                        help='只复制组件文件，不注册为 Composition')
+    parser.add_argument('--base-output-dir', type=str, default=None,
+                       help='覆盖默认输出基础目录（用于外部自定义渲染目录）')
+    parser.add_argument('--target-dir', type=str, default=None,
+                       help='复制目标目录（默认 copy-only 写入运行时目录，注册模式写入 src/components/CustomInfographic）')
     args = parser.parse_args()
     
     # 配置路径
-    if args.animated:
-        base_output_dir = "infographic_generation_modularity/output/claude_tsx_animated"
+    if args.base_output_dir:
+        base_output_dir = args.base_output_dir
+        print(f"🚀 使用自定义输出目录扫描组件: {base_output_dir}")
+    elif args.animated:
+        base_output_dir = DEFAULT_ANIMATED_OUTPUT_BASE
         print("🚀 自动注册**动画**组件到 Remotion 项目...")
     else:
-        base_output_dir = "infographic_generation_modularity/output/claude_tsx_components"
+        base_output_dir = DEFAULT_COMPONENTS_OUTPUT_BASE
         print("🚀 自动注册**静态**组件到 Remotion 项目...")
     
     # 如果提供了 task_id，则扫描子目录
@@ -261,7 +283,14 @@ def main():
         output_dir = base_output_dir
         print(f"📁 扫描默认目录: {output_dir}")
     
-    target_dir = "src/components/CustomInfographic"
+    if args.target_dir:
+        target_dir = args.target_dir
+    elif args.copy_only:
+        target_dir = DEFAULT_COPY_TARGET_DIR
+    else:
+        target_dir = "src/components/CustomInfographic"
+
+    print(f"📂 复制目标目录: {target_dir}")
     root_tsx_path = "src/Root.tsx"
     config_path = args.config
     
@@ -306,4 +335,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -32,19 +32,36 @@ export interface VideoConfigResponse {
   config: VideoConfig
   config_path: string
   task_id?: string | null
+  session_id?: string | null
 }
 
-export async function getVideoConfig(taskId: string): Promise<VideoConfigResponse> {
-  return http.get<VideoConfigResponse>(`/video/config/${taskId}`)
+function withSessionQuery(url: string, sessionId?: string | null): string {
+  if (!sessionId) return url
+  const sep = url.includes('?') ? '&' : '?'
+  return `${url}${sep}session_id=${encodeURIComponent(sessionId)}`
 }
 
-export async function getVideoConfigByPath(path: string): Promise<VideoConfigResponse> {
-  return http.get<VideoConfigResponse>(`/video/config/by-path?path=${encodeURIComponent(path)}`)
+export async function getVideoConfig(taskId: string, sessionId?: string | null): Promise<VideoConfigResponse> {
+  return http.get<VideoConfigResponse>(withSessionQuery(`/video/config/${taskId}`, sessionId))
+}
+
+export async function getVideoConfigByPath(path: string, sessionId?: string | null): Promise<VideoConfigResponse> {
+  return http.get<VideoConfigResponse>(
+    withSessionQuery(`/video/config/by-path?path=${encodeURIComponent(path)}`, sessionId),
+  )
 }
 
 /** Save video config from workflow run output so GET /config/{task_id} can find it. */
-export async function saveVideoConfig(taskId: string, config: VideoConfig): Promise<VideoConfigResponse> {
-  return http.post<VideoConfigResponse>('/video/config', { task_id: taskId, config }, { timeout: 600_000 })
+export async function saveVideoConfig(
+  taskId: string,
+  config: VideoConfig,
+  sessionId?: string | null,
+): Promise<VideoConfigResponse> {
+  return http.post<VideoConfigResponse>(
+    withSessionQuery('/video/config', sessionId),
+    { task_id: taskId, config, session_id: sessionId ?? null },
+    { timeout: 600_000 },
+  )
 }
 
 /** Extract taskId/configPath/config from workflow outputs (shared by useChat and WorkflowLivePanel). */
@@ -88,7 +105,7 @@ export function extractVideoOutputParams(outputs: Record<string, unknown>): {
       taskId = String(videoInfo.task_id)
       console.log(`✅ extractVideoOutputParams: Found taskId from video_info: ${taskId}`)
     } else if (videoPath) {
-      const m = String(videoPath).match(/claude_tsx_animated[/\\](\d{8}_\d{6})/)
+      const m = String(videoPath).match(/(?:claude_tsx_animated|video_components)[/\\](\d{8}_\d{6})/)
       if (m) {
         taskId = m[1]
         console.log(`✅ extractVideoOutputParams: Extracted taskId from video_path: ${taskId}`)
@@ -112,11 +129,11 @@ export function extractVideoOutputParams(outputs: Record<string, unknown>): {
   return {}
 }
 
-/** Public API base for audio (no auth). Returns absolute URL so Remotion/browser loads audio reliably. */
-export function getAudioFileUrl(filename: string): string {
+/** Public API base for audio (no auth), session-scoped when sessionId is provided. */
+export function getAudioFileUrl(filename: string, sessionId?: string | null): string {
   const apiBase = import.meta.env.VITE_API_URL || '/api/v1'
   const publicApiBase = apiBase.replace(/\/api\/v1\/?$/, '/api/public')
-  const path = `${publicApiBase}/video/audio/${encodeURIComponent(filename)}`
+  const path = withSessionQuery(`${publicApiBase}/video/audio/${encodeURIComponent(filename)}`, sessionId)
   if (typeof window !== 'undefined' && path.startsWith('/')) {
     return `${window.location.origin}${path}`
   }
@@ -126,34 +143,43 @@ export function getAudioFileUrl(filename: string): string {
 /** 获取某 task 的组件 registry：scene_id -> filename */
 export interface VideoComponentRegistryResponse {
   task_id: string
+  session_id?: string | null
   registry: Record<string, string>
 }
 
-export async function getVideoComponentRegistry(taskId: string): Promise<VideoComponentRegistryResponse> {
-  return http.get<VideoComponentRegistryResponse>(`/video/components/${taskId}/registry`)
+export async function getVideoComponentRegistry(
+  taskId: string,
+  sessionId?: string | null,
+): Promise<VideoComponentRegistryResponse> {
+  return http.get<VideoComponentRegistryResponse>(withSessionQuery(`/video/components/${taskId}/registry`, sessionId))
 }
 
 /** 获取动态组件 TSX 源码的 URL（public，无鉴权） */
-export function getVideoComponentFileUrl(taskId: string, filename: string): string {
+export function getVideoComponentFileUrl(taskId: string, filename: string, sessionId?: string | null): string {
   const apiBase = import.meta.env.VITE_API_URL || '/api/v1'
   const publicApiBase = apiBase.replace(/\/api\/v1\/?$/, '/api/public')
-  return `${publicApiBase}/video/components/${encodeURIComponent(taskId)}/${encodeURIComponent(filename)}`
+  return withSessionQuery(
+    `${publicApiBase}/video/components/${encodeURIComponent(taskId)}/${encodeURIComponent(filename)}`,
+    sessionId,
+  )
 }
 
 /** 按 task_id 一次拉取：config + registry + 所有 TSX 源码，供前端注册后按 id 预览 */
 export interface VideoFullResponse {
   task_id: string
+  session_id?: string | null
   config: VideoConfig
   registry: Record<string, string>
   files: Record<string, string>
 }
 
-export async function getVideoFull(taskId: string): Promise<VideoFullResponse> {
+export async function getVideoFull(taskId: string, sessionId?: string | null): Promise<VideoFullResponse> {
   // 使用公开接口，无需认证（视频预览应该公开）
   const apiBase = import.meta.env.VITE_API_URL || '/api/v1'
   const publicApiBase = apiBase.replace(/\/api\/v1\/?$/, '/api/public')
   // 直接 fetch，不使用 http client（避免自动添加 token）
-  const response = await fetch(`${publicApiBase}/video/full/${taskId}`)
+  const url = withSessionQuery(`${publicApiBase}/video/full/${taskId}`, sessionId)
+  const response = await fetch(url)
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }))
     throw new Error(error.detail || `Failed to fetch video: ${response.status}`)

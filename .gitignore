@@ -42,3 +42,8 @@ AGENTS.md
 # IDE
 .idea/
 **/.idea/
+
+# Generated video render intermediates (backend runtime artifacts)
+packages/backend/app/node/infographic_generation_modularity/output/
+packages/backend/app/node/video_render/infographic_generation_modularity/output/
+packages/backend/app/node/src/components/CustomInfographic/

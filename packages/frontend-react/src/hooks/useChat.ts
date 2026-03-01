@@ -218,7 +218,7 @@ export function useChat() {
                 const openVideoPanel = () => openOrFocusTab('video-preview', taskIdToOpen ? { taskId: taskIdToOpen } : {})
                 if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
                   console.log('🎬 useChat: Saving video config first...')
-                  saveVideoConfig(videoParams.taskId, videoParams.config as any)
+                  saveVideoConfig(videoParams.taskId, videoParams.config as any, sessionId)
                     .then(() => {
                       console.log('✅ useChat: Config saved, focusing video panel')
                       openVideoPanel()

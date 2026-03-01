@@ -10,10 +10,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from app.core.config import settings, get_video_workspace_root
+from app.core.config import get_video_session_root, settings
 from app.node.base import BaseNode
 from app.node.video_config.generator import create_generator
-from app.services.workflow_file_service import get_progress_publisher_by_workflow_id
+from app.services.workflow_file_service import (
+    get_progress_publisher_by_workflow_id,
+    get_session_id_by_workflow_id,
+)
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.runtime import ExecutionContext
@@ -119,7 +122,11 @@ class VideoGeneratorHandler:
         return config_with_times
 
     def _generate_audio_and_align(
-        self, config: dict[str, Any], language: str, task_id: str | None = None
+        self,
+        config: dict[str, Any],
+        language: str,
+        task_id: str | None = None,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         """Generate audio and align timeline."""
         try:
@@ -214,7 +221,7 @@ class VideoGeneratorHandler:
 
             # 复制音频文件到 workspace/public/audio/ 并更新路径
             import shutil
-            workspace_root = get_video_workspace_root()
+            workspace_root = get_video_session_root(session_id)
             public_audio_dir = workspace_root / "public" / "audio"
             public_audio_dir.mkdir(parents=True, exist_ok=True)
             
@@ -274,13 +281,15 @@ class VideoGeneratorHandler:
             return self._add_default_time_ranges(config)
 
     def _render_video(
-        self, config: dict[str, Any], config_path: Path, workers: int = 5
+        self,
+        config_path: Path,
+        workers: int = 5,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Render video components from configuration.
         
         Args:
-            config: Video configuration dict
             config_path: Path to saved config file
             workers: Number of workers for parallel processing
             
@@ -291,10 +300,12 @@ class VideoGeneratorHandler:
             # 提取 task_id
             task_id = _extract_task_id_from_config_path(config_path)
             
-            # 确定输出目录（Docker 用 /workspace，本地用 VIDEO_WORKSPACE_DIR 或 .video_workspace）
-            workspace_root = get_video_workspace_root()
-            output_base = workspace_root / "video_components"
+            # 会话隔离目录：中间产物与最终组件均写入 /workspace/sessions/{session_id}/...
+            session_root = get_video_session_root(session_id)
+            output_base = session_root / "video_components"
             output_base.mkdir(parents=True, exist_ok=True)
+            intermediate_base = session_root / ".video_intermediate" / "claude_tsx_components"
+            intermediate_base.mkdir(parents=True, exist_ok=True)
             
             logger.info(f"Starting video rendering pipeline (task_id: {task_id})")
             
@@ -313,25 +324,18 @@ class VideoGeneratorHandler:
                     }
                 }
             
-            # 调用 pipeline 脚本
-            # 注意：渲染脚本使用相对路径输出到 infographic_generation_modularity/output/
-            # 工作目录设置为 script_dir.parent (app/node/)，所以实际输出在：
-            # app/node/infographic_generation_modularity/output/claude_tsx_animated/{task_id}/
-            # 
-            # 为了统一输出位置，我们设置环境变量或修改工作目录
-            # 但当前脚本不支持自定义输出路径，所以先使用默认路径，然后检查实际输出
             cmd = [
                 "python",
                 str(pipeline_script),
                 "--config", str(config_path),
                 "--workers", str(workers),
                 "--serial",  # 使用串行模式更稳定
+                "--components-output-base", str(intermediate_base),
+                "--animated-output-base", str(output_base),
+                "--skip-copy",
+                "--skip-compose",
             ]
-            
-            # 设置环境变量，让脚本知道输出应该在哪里
-            # 但当前脚本可能不支持，所以先检查实际输出位置
             env = os.environ.copy()
-            env["VIDEO_OUTPUT_BASE"] = str(output_base)
             
             logger.info(f"Executing video render pipeline: {' '.join(cmd)}")
             logger.info(f"Working directory: {script_dir.parent}")
@@ -395,50 +399,35 @@ class VideoGeneratorHandler:
                     }
                 }
             
-            # 确定实际输出路径（渲染脚本使用的默认路径）
-            # 渲染脚本输出到：infographic_generation_modularity/output/claude_tsx_animated/{task_id}/
-            actual_output_base = script_dir.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
-            actual_output_dir = actual_output_base / task_id
-            
-            # 同时创建 workspace 目录（用于 API 访问和文件浏览器显示）
+            # 输出已直接落到 session 作用域目录
             video_output_dir = output_base / task_id
             video_output_dir.mkdir(parents=True, exist_ok=True)
-            
+
+            try:
+                import shutil
+                shutil.rmtree(intermediate_base / task_id, ignore_errors=True)
+            except Exception:
+                logger.warning("Failed to cleanup intermediate video output for task_id=%s", task_id)
+
             # 检查输出目录和文件
-            if actual_output_dir.exists():
-                files = list(actual_output_dir.glob("*.tsx"))
+            if video_output_dir.exists():
+                files = list(video_output_dir.glob("*.tsx"))
                 if files:
-                    logger.info(f"Video rendering completed: {len(files)} TSX components generated in {actual_output_dir}")
-                    
-                    # 将文件复制到 workspace 目录，以便文件浏览器可以显示
-                    import shutil
-                    copied_count = 0
-                    try:
-                        for src_file in files:
-                            dst_file = video_output_dir / src_file.name
-                            shutil.copy2(src_file, dst_file)
-                            copied_count += 1
-                        logger.info(f"Copied {copied_count} files to workspace: {video_output_dir}")
-                        print(f"\n✅ 已复制 {copied_count} 个组件文件到 workspace: {video_output_dir}")
-                    except Exception as e:
-                        logger.warning(f"Failed to copy files to workspace: {e}")
-                        print(f"\n⚠️  复制文件到 workspace 失败: {e}")
-                    
+                    logger.info(f"Video rendering completed: {len(files)} TSX components generated in {video_output_dir}")
                     return {
-                        "video_path": str(video_output_dir),  # 返回 workspace 路径，而不是后端代码路径
+                        "video_path": str(video_output_dir),
                         "video_info": {
                             "status": "success",
                             "task_id": task_id,
                             "config_path": str(config_path),
-                            "output_dir": str(actual_output_dir),
-                            "workspace_dir": str(video_output_dir),
+                            "output_dir": str(video_output_dir),
+                            "session_id": session_id,
                             "component_count": len(files),
-                            "copied_to_workspace": copied_count,
                         }
                     }
                 else:
                     # 目录存在但没有文件，说明脚本执行失败但没有正确返回错误码
-                    logger.warning(f"Output directory exists but no TSX files found: {actual_output_dir}")
+                    logger.warning(f"Output directory exists but no TSX files found: {video_output_dir}")
                     logger.warning(f"This usually means the render script failed silently. Check stdout/stderr above.")
                     # 返回失败状态，包含 stdout/stderr 信息用于调试
                     error_msg = "No TSX files generated. Render script may have failed silently."
@@ -453,12 +442,13 @@ class VideoGeneratorHandler:
                             "status": "failed",
                             "task_id": task_id,
                             "error": error_msg,
-                            "output_dir": str(actual_output_dir),
+                            "output_dir": str(video_output_dir),
+                            "session_id": session_id,
                         }
                     }
             else:
                 # 目录不存在，说明脚本完全没有执行或执行失败
-                logger.warning(f"Output directory does not exist: {actual_output_dir}")
+                logger.warning(f"Output directory does not exist: {video_output_dir}")
                 error_msg = "Output directory was not created. Render script may have failed early."
                 if result.stderr:
                     error_msg += f"\nStderr: {result.stderr[:500]}"
@@ -469,6 +459,7 @@ class VideoGeneratorHandler:
                         "status": "failed",
                         "task_id": task_id,
                         "error": error_msg,
+                        "session_id": session_id,
                     }
                 }
             
@@ -495,8 +486,10 @@ class VideoGeneratorHandler:
         """Execute complete video generation (config + audio + rendering)."""
         # 获取进度发布函数（如果可用）
         publish_progress = None
+        session_id = None
         if isinstance(context, ExecutionContext):
             publish_progress = get_progress_publisher_by_workflow_id(context.workflow_id)
+            session_id = get_session_id_by_workflow_id(context.workflow_id)
         
         # 从 inputs 获取数据和查询
         rows = inputs.get("rows", [])
@@ -538,7 +531,7 @@ class VideoGeneratorHandler:
         logger.info("Step 2/4: Generating audio and aligning timeline")
         if publish_progress:
             publish_progress(step2_msg)
-        config = self._generate_audio_and_align(config, language, task_id=task_id)
+        config = self._generate_audio_and_align(config, language, task_id=task_id, session_id=session_id)
         if publish_progress:
             total_duration = config.get("meta", {}).get("video_duration", 0)
             publish_progress(f"✅ Step 2/4 Done: Audio generated, video duration {total_duration:.2f} seconds")
@@ -548,8 +541,8 @@ class VideoGeneratorHandler:
         logger.info("Step 3/4: Saving configuration")
         if publish_progress:
             publish_progress(step3_msg)
-        workspace_root = get_video_workspace_root()
-        config_dir = workspace_root / "video_configs"
+        session_root = get_video_session_root(session_id)
+        config_dir = session_root / "video_configs"
         config_dir.mkdir(parents=True, exist_ok=True)
         config_filename = f"generated_{task_id}_aligned.json"
         config_path = config_dir / config_filename
@@ -577,7 +570,7 @@ class VideoGeneratorHandler:
         logger.info("Step 4/4: Rendering video components")
         if publish_progress:
             publish_progress(step4_msg)
-        video_result = self._render_video(config, config_path, workers=workers)
+        video_result = self._render_video(config_path, workers=workers, session_id=session_id)
         video_info = video_result.get("video_info", {})
         video_status = video_info.get("status", "unknown")
         
@@ -624,6 +617,7 @@ class VideoGeneratorHandler:
             "config": config,  # 也返回配置，以便需要时使用
             "config_path": str(config_path),
             "task_id": task_id,  # 显式返回 task_id，方便前端使用
+            "session_id": session_id,
         }
 
 

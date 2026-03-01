@@ -35,6 +35,11 @@ def get_progress_publisher_by_workflow_id(workflow_id: str) -> Callable[[str], N
     return None
 
 
+def get_session_id_by_workflow_id(workflow_id: str) -> str | None:
+    """通过 workflow_id 获取 session_id（用于会话隔离存储）。"""
+    return _workflow_to_session.get(workflow_id)
+
+
 async def service_run_workflow_from_file(
     db,
     user_id,

@@ -38,10 +38,12 @@ function extractComponentPrefix(config: VideoConfig): string {
 function VideoPreviewComponent({
   config,
   taskId,
+  sessionId,
   registeredSceneComponents,
 }: {
   config: VideoConfig
   taskId?: string | null
+  sessionId?: string | null
   registeredSceneComponents?: Record<string, React.FC<any>> | null
 }) {
   const componentPrefix = useMemo(() => extractComponentPrefix(config), [config])
@@ -51,6 +53,7 @@ function VideoPreviewComponent({
       configJson={config}
       componentPrefix={componentPrefix}
       taskId={taskId}
+      sessionId={sessionId}
       registeredSceneComponents={registeredSceneComponents}
     />
   )
@@ -59,7 +62,7 @@ function VideoPreviewComponent({
 /** 从任意字符串中提取 taskId / configPath（用于 JSON 内的 stdout 等字段） */
 function extractVideoInfoFromString(str: string): { taskId?: string; configPath?: string } | null {
   if (typeof str !== 'string' || !str) return null
-  const configPathMatch = str.match(/video_configs[\/\\]generated_(\d{8}_\d{6})_aligned\.json|generated_(\d{8}_\d{6})_aligned\.json/)
+  const configPathMatch = str.match(/video_configs[/\\]generated_(\d{8}_\d{6})_aligned\.json|generated_(\d{8}_\d{6})_aligned\.json/)
   if (configPathMatch) {
     const taskId = configPathMatch[1] || configPathMatch[2]
     return taskId ? { taskId, configPath: undefined } : null
@@ -93,7 +96,7 @@ function extractVideoInfoFromOutput(runOutput: string): { taskId?: string; confi
         if (videoInfo?.task_id) {
           taskId = videoInfo.task_id
         } else if (typeof videoPath === 'string') {
-          const m = videoPath.match(/claude_tsx_animated[\/\\](\d{8}_\d{6})/)
+          const m = videoPath.match(/(?:claude_tsx_animated|video_components)[/\\](\d{8}_\d{6})/)
           taskId = m ? m[1] : undefined
         } else if (typeof configPath === 'string') {
           const m = configPath.match(/generated_(\d{8}_\d{6})_aligned\.json/)
@@ -225,10 +228,10 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
         let response
         if (effectiveTaskId) {
           console.log('🎬 Using taskId to load config:', effectiveTaskId)
-          response = await getVideoConfig(effectiveTaskId)
+          response = await getVideoConfig(effectiveTaskId, sessionId)
         } else if (effectiveConfigPath) {
           console.log('🎬 Using configPath to load config:', effectiveConfigPath)
-          response = await getVideoConfigByPath(effectiveConfigPath)
+          response = await getVideoConfigByPath(effectiveConfigPath, sessionId)
         } else {
           throw new Error('Either taskId or configPath must be provided')
         }
@@ -281,7 +284,7 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
     return () => {
       loadCancelledRef.current = true
     }
-  }, [effectiveConfigPath, effectiveTaskId, taskId, configPath, extractedInfo, runOutput, manualTaskId, runStatus])
+  }, [effectiveConfigPath, effectiveTaskId, taskId, configPath, extractedInfo, runOutput, manualTaskId, runStatus, sessionId])
 
   // 当 config + taskId 就绪且为「动态任务」时，从后端拉取并注册组件（按 id 预览）
   useEffect(() => {
@@ -298,7 +301,7 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
       setRegisterError(null)
       return
     }
-    const cached = getRegisteredVideo(effectiveTaskId)
+    const cached = getRegisteredVideo(effectiveTaskId, sessionId)
     if (cached) {
       setRegisteredSceneComponents(cached.components)
       setRegisterLoading(false)
@@ -307,7 +310,7 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
     }
     setRegisterLoading(true)
     setRegisterError(null)
-    registerVideoByTaskId(effectiveTaskId)
+    registerVideoByTaskId(effectiveTaskId, sessionId)
       .then((entry) => {
         if (entry) {
           setRegisteredSceneComponents(entry.components)
@@ -322,7 +325,7 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
         setRegisterError(e?.message || '注册视频组件失败')
       })
       .finally(() => setRegisterLoading(false))
-  }, [config, effectiveTaskId])
+  }, [config, effectiveTaskId, sessionId])
 
   // 处理手动输入 taskId
   const handleManualLoad = async () => {
@@ -343,7 +346,7 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
     setLoading(true)
     
     try {
-      const response = await getVideoConfig(manualTaskId.trim())
+      const response = await getVideoConfig(manualTaskId.trim(), sessionId)
       console.log('🎬 Config loaded successfully from manual input:', {
         hasConfig: !!response.config,
         scenesCount: response.config?.scenes?.length
@@ -778,6 +781,7 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
             inputProps={{
               config,
               taskId: effectiveTaskId,
+              sessionId,
               registeredSceneComponents: registeredSceneComponents ?? undefined,
             }}
           />

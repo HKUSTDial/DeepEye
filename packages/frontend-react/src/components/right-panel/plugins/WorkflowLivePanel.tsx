@@ -178,8 +178,6 @@ export function WorkflowLivePanel({
   const appendVideoProgressLog = useWorkflowSessionsStore((state) => state.appendVideoProgressLog)
   const setVideoProgressStep = useWorkflowSessionsStore((state) => state.setVideoProgressStep)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
-
-  const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
   const sandboxReadySessionId = useChatStore((state) => state.sandboxReadySessionId)

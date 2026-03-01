@@ -80,6 +80,7 @@ interface VideoComposerProps {
   configJson: any
   componentPrefix?: string
   taskId?: string | null
+  sessionId?: string | null
   includeOpeningClosing?: boolean
   /** 已注册的场景组件（由前端拉取后端 full 接口后编译并缓存，按 id 预览时传入） */
   registeredSceneComponents?: Record<string, React.FC<any>> | null
@@ -89,6 +90,7 @@ const VideoComposerComponent: React.FC<VideoComposerProps> = ({
   configJson,
   componentPrefix = '分析学生成绩分布生成数据视频',
   taskId,
+  sessionId,
   includeOpeningClosing = true,
   registeredSceneComponents,
 }) => {
@@ -144,13 +146,11 @@ const VideoComposerComponent: React.FC<VideoComposerProps> = ({
       return
     }
 
-    getVideoComponentRegistry(taskId)
+    getVideoComponentRegistry(taskId, sessionId)
       .then((res) => {
         const registry = res.registry || {}
-        const apiBase = import.meta.env.VITE_API_URL || '/api/v1'
-        const publicBase = apiBase.replace(/\/api\/v1\/?$/, '/api/public')
         const fetchPromises = Object.entries(registry).map(([sceneId, filename]) => {
-          const url = `${publicBase}/video/components/${encodeURIComponent(taskId)}/${encodeURIComponent(filename)}`
+          const url = getVideoComponentFileUrl(taskId, filename, sessionId)
           return fetch(url)
             .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${filename}: ${r.status}`))))
             .then((tsx) => compileTsxAndGetComponent(tsx, filename))
@@ -171,7 +171,7 @@ const VideoComposerComponent: React.FC<VideoComposerProps> = ({
         setDynamicComponents(null)
         setDynamicLoadError('加载组件失败：' + (e?.message || '请确认该任务已生成视频组件。'))
       })
-  }, [useDynamic, taskId, componentPrefix, configJson?.scenes, registeredSceneComponents])
+  }, [useDynamic, taskId, componentPrefix, configJson?.scenes, registeredSceneComponents, sessionId])
 
   const SCENE_COMPONENTS = useMemo(() => {
     // 如果使用动态加载，优先使用已注册的组件
@@ -276,7 +276,7 @@ const VideoComposerComponent: React.FC<VideoComposerProps> = ({
         if (durationInFrames <= 0) return null
         const audioFilename = (segment.audioFile || '').split('/').pop() || segment.audioFile
         if (!audioFilename) return null
-        const audioSrc = getAudioFileUrl(audioFilename)
+        const audioSrc = getAudioFileUrl(audioFilename, sessionId)
         return (
           <Sequence key={`audio-${idx}`} from={startFrame} durationInFrames={durationInFrames}>
             <Audio src={audioSrc} />

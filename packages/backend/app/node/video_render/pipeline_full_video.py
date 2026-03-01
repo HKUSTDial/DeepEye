@@ -119,6 +119,16 @@ def count_scenes_from_config(config_path):
 
 
 def main():
+    runtime_base = os.environ.get("VIDEO_RUNTIME_BASE", "/workspace/video_runtime")
+    default_components_output = os.environ.get(
+        "VIDEO_COMPONENTS_OUTPUT_BASE",
+        f"{runtime_base}/claude_tsx_components",
+    )
+    default_animated_output = os.environ.get(
+        "VIDEO_ANIMATED_OUTPUT_BASE",
+        f"{runtime_base}/claude_tsx_animated",
+    )
+
     parser = argparse.ArgumentParser(description='完整视频生成流水线（包含所有场景类型）')
     parser.add_argument('--config', required=True, help='JSON配置文件路径')
     parser.add_argument('--workers', type=int, default=5, help='每个任务的并行线程数（默认5）')
@@ -126,6 +136,20 @@ def main():
     parser.add_argument('--skip-animation', action='store_true', help='跳过动画生成')
     parser.add_argument('--skip-other-scenes', action='store_true', help='跳过其他场景生成（opening/closing/stat_cards）')
     parser.add_argument('--serial', action='store_true', help='使用串行模式（更稳定，但较慢）')
+    parser.add_argument(
+        '--components-output-base',
+        type=str,
+        default=default_components_output,
+        help='静态组件输出基础目录（任务会写入子目录）',
+    )
+    parser.add_argument(
+        '--animated-output-base',
+        type=str,
+        default=default_animated_output,
+        help='动画组件输出基础目录（任务会写入子目录）',
+    )
+    parser.add_argument('--skip-copy', action='store_true', help='跳过 Step 3/5 复制组件文件')
+    parser.add_argument('--skip-compose', action='store_true', help='跳过 Step 4/5 组装完整视频')
     
     args = parser.parse_args()
     
@@ -142,6 +166,8 @@ def main():
     print("🎬"*30)
     print(f"\n📊 配置文件: {config_path}")
     print(f"🆔 任务ID: {task_id}")
+    print(f"📁 静态输出目录: {args.components_output_base}")
+    print(f"📁 动画输出目录: {args.animated_output_base}")
     
     # 每个任务使用的线程数（简单直接：直接用 workers）
     workers_per_task = args.workers
@@ -187,14 +213,20 @@ def main():
         
         # 任务1: 生成图表场景静态图
         chart_script = script_dir / "generate_with_claude.py"
-        chart_cmd = f'python "{chart_script}" --config "{args.config}" --workers {workers_per_task} --task-id {task_id}'
+        chart_cmd = (
+            f'python "{chart_script}" --config "{args.config}" --workers {workers_per_task} '
+            f'--output "{args.components_output_base}" --task-id {task_id}'
+        )
         chart_desc = f"生成图表场景静态TSX组件 ({scene_counts['chart'] if scene_counts else '?'} 个场景)"
         tasks.append((chart_cmd, chart_desc, "[图表]"))
         
         # 任务2: 生成其他场景静态图（如果未跳过）
         if not args.skip_other_scenes:
             other_script = script_dir / "generate_other_scenes.py"
-            other_cmd = f'python "{other_script}" --config "{args.config}" --workers {workers_per_task} --task-id {task_id}'
+            other_cmd = (
+                f'python "{other_script}" --config "{args.config}" --workers {workers_per_task} '
+                f'--output "{args.components_output_base}" --task-id {task_id}'
+            )
             other_desc = f"生成其他场景静态TSX组件 ({scene_counts['other'] if scene_counts else '?'} 个场景)"
             tasks.append((other_cmd, other_desc, "[其他]"))
         
@@ -262,14 +294,20 @@ def main():
         
         # 任务1: 为图表场景添加动画
         chart_anim_script = script_dir / "add_animations_to_static.py"
-        chart_anim_cmd = f'python "{chart_anim_script}" --config "{args.config}" --workers {workers_per_task} --task-id {task_id}'
+        chart_anim_cmd = (
+            f'python "{chart_anim_script}" --config "{args.config}" --workers {workers_per_task} '
+            f'--input "{args.components_output_base}" --output "{args.animated_output_base}" --task-id {task_id}'
+        )
         chart_anim_desc = f"为图表场景添加动画 ({scene_counts['chart'] if scene_counts else '?'} 个场景)"
         tasks.append((chart_anim_cmd, chart_anim_desc, "[图表]"))
         
         # 任务2: 为其他场景添加动画（如果未跳过）
         if not args.skip_other_scenes:
             other_anim_script = script_dir / "add_animations_to_other_scenes.py"
-            other_anim_cmd = f'python "{other_anim_script}" --config "{args.config}" --workers {workers_per_task} --task-id {task_id}'
+            other_anim_cmd = (
+                f'python "{other_anim_script}" --config "{args.config}" --workers {workers_per_task} '
+                f'--static-dir "{args.components_output_base}" --animated-dir "{args.animated_output_base}" --task-id {task_id}'
+            )
             other_anim_desc = f"为其他场景添加动画 ({scene_counts['other'] if scene_counts else '?'} 个场景)"
             tasks.append((other_anim_cmd, other_anim_desc, "[其他]"))
         
@@ -318,20 +356,29 @@ def main():
         print(f"\n⏭️  跳过 Step 2/5: 添加动画")
     
     # ========== Step 3: 复制组件文件（但不注册为独立Composition）==========
-    register_script = script_dir / "auto_register_components.py"
-    register_cmd = f'python "{register_script}" --animated --task-id {task_id} --copy-only'
-    if not run_command(register_cmd, "Step 3/5: 复制组件文件"):
-        print("\n⚠️  组件复制失败，但继续执行...")
+    if args.skip_copy:
+        print("\n⏭️  跳过 Step 3/5: 复制组件文件")
+    else:
+        register_script = script_dir / "auto_register_components.py"
+        register_cmd = (
+            f'python "{register_script}" --animated --task-id {task_id} --copy-only '
+            f'--base-output-dir "{args.animated_output_base}"'
+        )
+        if not run_command(register_cmd, "Step 3/5: 复制组件文件"):
+            print("\n⚠️  组件复制失败，但继续执行...")
     
     # ========== Step 4: 组装完整视频 ==========
-    # 注意：在 Docker 环境中，Remotion 项目可能不存在，这一步可能会失败
-    # 但这是正常的，TSX 组件文件已经生成，可以在 Remotion 项目中手动注册
-    compose_script = script_dir / "auto_compose_video.py"
-    compose_cmd = f'python "{compose_script}" --config "{args.config}" --task-id {task_id}'
-    if not run_command(compose_cmd, "Step 4/5: 组装完整视频"):
-        print("\n⚠️  组装完整视频失败（这在 Docker 环境中是正常的）")
-        print("   TSX 组件文件已生成，可以在 Remotion 项目中手动注册")
-        # 不中断流水线，继续执行
+    if args.skip_compose:
+        print("\n⏭️  跳过 Step 4/5: 组装完整视频")
+    else:
+        # 注意：在 Docker 环境中，Remotion 项目可能不存在，这一步可能会失败
+        # 但这是正常的，TSX 组件文件已经生成，可以在 Remotion 项目中手动注册
+        compose_script = script_dir / "auto_compose_video.py"
+        compose_cmd = f'python "{compose_script}" --config "{args.config}" --task-id {task_id}'
+        if not run_command(compose_cmd, "Step 4/5: 组装完整视频"):
+            print("\n⚠️  组装完整视频失败（这在 Docker 环境中是正常的）")
+            print("   TSX 组件文件已生成，可以在 Remotion 项目中手动注册")
+            # 不中断流水线，继续执行
     
     # 完成！
     total_elapsed = time.time() - total_start
@@ -353,5 +400,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
