@@ -11,6 +11,7 @@ import argparse
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Tuple, Optional
 
 # 导入项目配置和 LLM 客户端
@@ -20,6 +21,32 @@ if backend_path not in sys.path:
 
 from app.core.config import settings
 from app.node.video_config.generator import LLMClient
+from app.node.video_render.tsx_sanitize import sanitize_tsx_for_browser, validate_component_syntax
+
+# ---------------------------------------------------------------------------
+# Retry helpers (align with DataMagic core)
+# ---------------------------------------------------------------------------
+def should_retry_on_error(error_msg: str, attempt: int, elapsed_time: float, max_general_retries: int = 10) -> Tuple[bool, str]:
+    err = str(error_msg).lower()
+    if any(k in err for k in ["余额不足", "insufficient", "quota exceeded", "no credit"]):
+        return False, "余额不足（永久性错误）"
+    if any(k in err for k in ["401", "403", "unauthorized", "forbidden"]):
+        return False, "认证失败（永久性错误）"
+    if "429" in err or "rate limit" in err or "throttling" in err or "too many requests" in err:
+        if elapsed_time < 30 * 60:
+            return True, "Rate Limit（允许重试至30分钟）"
+        return False, "Rate Limit 超过最大时间限制"
+    if attempt < max_general_retries:
+        return True, f"临时性错误（最多{max_general_retries}次）"
+    return False, f"已达到最大重试次数（{max_general_retries}次）"
+
+
+def calculate_retry_wait_time(error_msg: str, attempt: int) -> int:
+    err = str(error_msg).lower()
+    if "429" in err or "rate limit" in err:
+        return min(2 ** attempt, 60)
+    return 2
+
 
 # ---------------------------------------------------------------------------
 # Timeline fallback (when config has no aligned timestamps)
@@ -574,7 +601,8 @@ if (frame >= animEnd) {{
   2. **Collect all data items that need highlighting** (use `Set<string>` to store matching data item identifiers, like `d[xField]`)
   3. **Process all data points at once** (iterate through all bars/points, check if in highlightedItems, avoid loop overwriting)
 - Highlighted bars use red border (`stroke: '#ff6b6b'`, `stroke-width: 3-5px`)
-- Add glow effect: `drop-shadow(0 0 15px rgba(255, 107, 107, 0.8))`
+- Add glow effect: `drop-shadow(0 0 15px rgba(255, 107, 107, 0.8))` — write the full string in one go; never truncate.
+- Do NOT use `declare module 'd3'` or any `declare module`; if you need a helper (e.g. leastSquares), use `(d3 as any).leastSquares = function(...) { ... }` at runtime.
 - Pulse effect should not be too exaggerated, scale range `Math.sin(...) * 0.05 + 1` (1.0-1.05x)
 - Non-highlighted bars reduce opacity to `0.3`
 - For scatter plots, also handle `.dot` or `.circle` elements
@@ -656,17 +684,28 @@ def add_animations_with_llm(static_tsx_path, animations_config, narrations, scen
         if animated_code.endswith("```"):
             animated_code = animated_code[:-3]
         animated_code = animated_code.strip()
+        animated_code = sanitize_tsx_for_browser(animated_code)
         
         # 保存文件
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(animated_code)
-        
+
         if verbose:
             print(f"   ✅ 生成成功: {os.path.basename(output_path)}")
             print(f"   文件大小: {len(animated_code)} 字符 (增加了 {len(animated_code) - len(static_code)} 字符)")
-        
+
+        # 语法校验，不通过则返回失败以触发重试
+        if verbose:
+            print(f"   🔍 验证语法...")
+        is_valid, error_msg = validate_component_syntax(Path(output_path))
+        if not is_valid:
+            if verbose:
+                print(f"   ❌ 语法验证失败: {error_msg}")
+            return (False, error_msg or "语法验证失败")
+        if verbose:
+            print(f"   ✅ 语法验证通过")
         return (True, None)
-    
+
     except Exception as e:
         err_msg = f"{type(e).__name__}: {e}"
         # 始终打印详细错误，便于排查（不依赖 verbose）
@@ -685,87 +724,95 @@ def process_single_scene_wrapper(
     llm_client,
     static_input_dir: str,
     output_dir: str,
-    task_id: str = None
+    video_meta: dict,
+    task_id: str = None,
+    max_retries: int = 5
 ) -> Tuple[int, str, bool, str]:
     """
-    包装函数，用于并行执行
+    包装函数，用于并行执行。支持语法校验 + 失败重试（最多 max_retries 次）。
     """
     scene_id = scene.get('id', f'scene_{idx}')
     scene_title = scene.get('content', {}).get('title', 'Unknown')
     dataset_name = extract_dataset_name(video_meta)
     scene_id_camel = ''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())
     
-    # 如果提供了 task_id，文件名包含任务ID
     if task_id:
         component_name = f"{dataset_name}_{scene_id_camel}_{task_id}"
     else:
         component_name = f"{dataset_name}_{scene_id_camel}"
     
-    # 输入文件路径（静态文件）
     static_tsx_path = os.path.join(static_input_dir, f"{component_name}.tsx")
     if not os.path.exists(static_tsx_path):
         return (idx, scene_id, False, f"❌ {scene_title} - 静态文件不存在: {component_name}.tsx")
     
-    # 输出文件路径（动画文件，文件名包含任务ID）
     output_path = os.path.join(output_dir, f"{component_name}Animated.tsx")
-    
     animations_config = scene.get('animations', [])
     narrations = scene.get('narration', [])
     scene_time_range = scene.get('time_range', [0, 10])
     
-    try:
-        success, err_detail = add_animations_with_llm(
-            static_tsx_path,
-            animations_config,
-            narrations,
-            scene_title,
-            scene_time_range,
-            llm_client,
-            output_path,
-            verbose=False
-        )
-        
-        if success:
-            file_size = os.path.getsize(output_path)
-            return (idx, scene_id, True, f"✅ {scene_title} ({file_size} 字节)")
-        else:
-            # Fallback: 动画生成失败时，使用静态组件（无动画但可播放）
-            detail = err_detail or "生成失败"
-            print(f"   ⚠️  动画生成失败，使用静态组件作为fallback: {scene_title}")
-            try:
-                # 读取静态组件
-                with open(static_tsx_path, 'r', encoding='utf-8') as f:
-                    static_code = f.read()
-                
-                # 修改 export 名称：SceneComponent -> SceneComponentAnimated
-                # 或 ComponentName -> ComponentNameAnimated（对于其他场景）
-                import re
-                # 匹配 export const ComponentName 或 export const ComponentName: React.FC
-                pattern = r'export const (\w+)(\s*:\s*React\.FC[^=]*)?\s*='
-                match = re.search(pattern, static_code)
-                if match:
-                    original_export = match.group(1)
-                    # 如果已经是 Animated 结尾，不重复添加
-                    if not original_export.endswith('Animated'):
-                        new_export = original_export + 'Animated'
-                        static_code = re.sub(
-                            rf'export const {re.escape(original_export)}(\s*:\s*React\.FC[^=]*)?\s*=',
-                            f'export const {new_export}\\1 =',
-                            static_code,
-                            count=1
-                        )
-                
-                # 保存为动画组件（实际是静态的，但文件名和export名匹配）
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    f.write(static_code)
-                
+    last_error = None
+    start_time = time.time()
+    attempt = 0
+    
+    while True:
+        attempt += 1
+        elapsed = time.time() - start_time
+        try:
+            success, err_detail = add_animations_with_llm(
+                static_tsx_path,
+                animations_config,
+                narrations,
+                scene_title,
+                scene_time_range,
+                llm_client,
+                output_path,
+                verbose=(attempt > 1),
+            )
+            if success:
                 file_size = os.path.getsize(output_path)
-                return (idx, scene_id, True, f"⚠️  {scene_title} - 动画生成失败，已使用静态组件 ({file_size} 字节)")
-            except Exception as fallback_err:
-                print(f"   ❌ Fallback也失败: {fallback_err}")
-                return (idx, scene_id, False, f"❌ {scene_title} - {detail} (fallback失败: {fallback_err})")
-    except Exception as e:
-        return (idx, scene_id, False, f"❌ {scene_title} - {type(e).__name__}: {e}")
+                retry_info = f" (重试 {attempt}次)" if attempt > 1 else ""
+                return (idx, scene_id, True, f"✅ {scene_title} ({file_size} 字节){retry_info}")
+            last_error = err_detail or "添加动画失败（返回 False）"
+        except Exception as e:
+            last_error = str(e)
+            if attempt == 1:
+                traceback.print_exc()
+        
+        should_retry, reason = should_retry_on_error(last_error, attempt, elapsed, max_retries)
+        if should_retry:
+            wait_time = calculate_retry_wait_time(last_error, attempt)
+            print(f"   ⚠️  [{idx}/{total}] {scene_title} - 第 {attempt} 次尝试失败，{wait_time}秒后重试...")
+            time.sleep(wait_time)
+            continue
+        print(f"   ❌ [{idx}/{total}] {scene_title} - 停止重试: {reason}")
+        break
+    
+    # 重试用尽，fallback 到静态组件
+    detail = last_error or "生成失败"
+    print(f"   ⚠️  动画生成失败，使用静态组件作为fallback: {scene_title}")
+    try:
+        import re
+        with open(static_tsx_path, 'r', encoding='utf-8') as f:
+            static_code = f.read()
+        pattern = r'export const (\w+)(\s*:\s*React\.FC[^=]*)?\s*='
+        match = re.search(pattern, static_code)
+        if match:
+            original_export = match.group(1)
+            if not original_export.endswith('Animated'):
+                new_export = original_export + 'Animated'
+                static_code = re.sub(
+                    rf'export const {re.escape(original_export)}(\s*:\s*React\.FC[^=]*)?\s*=',
+                    f'export const {new_export}\\1 =',
+                    static_code,
+                    count=1
+                )
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(static_code)
+        file_size = os.path.getsize(output_path)
+        return (idx, scene_id, True, f"⚠️  {scene_title} - 动画生成失败，已使用静态组件 ({file_size} 字节)")
+    except Exception as fallback_err:
+        print(f"   ❌ Fallback也失败: {fallback_err}")
+        return (idx, scene_id, False, f"❌ {scene_title} - {detail} (fallback失败: {fallback_err})")
 
 
 if __name__ == "__main__":
@@ -846,7 +893,7 @@ if __name__ == "__main__":
                 executor.submit(
                     process_single_scene_wrapper,
                     scene, idx, len(chart_scenes),
-                    llm_client, input_dir, output_dir, args.task_id
+                    llm_client, input_dir, output_dir, video_meta, args.task_id
                 ): idx for idx, scene in enumerate(chart_scenes, 1)
             }
             
@@ -860,46 +907,14 @@ if __name__ == "__main__":
         # 按场景顺序排序
         results.sort(key=lambda x: x[0])
     else:
-        # 串行模式
+        # 串行模式（同样走 wrapper，带校验+重试）
         print("📝 使用串行模式生成...\n")
         for idx, scene in enumerate(chart_scenes, 1):
-            scene_id = scene.get('id', f'scene_{idx}')
-            scene_title = scene.get('content', {}).get('title', 'Unknown')
-            dataset_name = extract_dataset_name(video_meta)
-            scene_id_camel = ''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())
-            
-            # 如果提供了 task_id，文件名包含任务ID
-            if args.task_id:
-                component_name = f"{dataset_name}_{scene_id_camel}_{args.task_id}"
-            else:
-                component_name = f"{dataset_name}_{scene_id_camel}"
-            
-            static_tsx_path = os.path.join(input_dir, f"{component_name}.tsx")
-            if not os.path.exists(static_tsx_path):
-                print(f"[{idx}/{len(chart_scenes)}] ❌ {scene_title} - 静态文件不存在")
-                continue
-            
-            output_path = os.path.join(output_dir, f"{component_name}Animated.tsx")
-            
-            animations_config = scene.get('animations', [])
-            narrations = scene.get('narration', [])
-            scene_time_range = scene.get('time_range', [0, 10])
-            
-            print(f"[{idx}/{len(chart_scenes)}]")
-            print(f"   📊 {scene_title}")
-            print(f"   🎬 {len(animations_config)} 个动画, 💬 {len(narrations)} 条字幕")
-            
-            success = add_animations_with_llm(
-                static_tsx_path,
-                animations_config,
-                narrations,
-                scene_title,
-                scene_time_range,
-                llm_client,
-                output_path,
-                verbose=True
+            _, _, success, message = process_single_scene_wrapper(
+                scene, idx, len(chart_scenes),
+                llm_client, input_dir, output_dir, video_meta, args.task_id
             )
-            
+            print(f"[{idx}/{len(chart_scenes)}] {message}")
             if success:
                 success_count += 1
     

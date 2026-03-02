@@ -131,8 +131,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3">
+      {/* Navigation：min-h-0 使 flex 子项在内容过长时可收缩，从而出现滚动条 */}
+      <nav className="flex-1 min-h-0 overflow-y-auto p-3">
         <div className="space-y-1 mb-6">
           <button
             onClick={() => navigate('/')}

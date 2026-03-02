@@ -16,7 +16,9 @@ import json
 import os
 import sys
 import argparse
+import time
 import traceback
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Tuple, Optional
 
@@ -27,6 +29,7 @@ if backend_path not in sys.path:
 
 from app.core.config import settings
 from app.node.video_config.generator import LLMClient
+from app.node.video_render.tsx_sanitize import sanitize_tsx_for_browser, validate_component_syntax
 
 # 从环境变量或 settings 获取配置
 API_BASE = settings.LLM_BASE_URL or os.getenv("LLM_BASE_URL", "https://newapi.deepwisdom.ai")
@@ -40,6 +43,28 @@ DEFAULT_COMPONENTS_OUTPUT_DIR = os.getenv(
 
 if not API_KEY:
     raise ValueError("LLM_API_KEY is required. Please set it in .env file or environment variable.")
+
+
+def should_retry_on_error(error_msg: str, attempt: int, elapsed_time: float, max_general_retries: int = 10) -> Tuple[bool, str]:
+    err = str(error_msg).lower()
+    if any(k in err for k in ["余额不足", "insufficient", "quota exceeded", "no credit"]):
+        return False, "余额不足（永久性错误）"
+    if any(k in err for k in ["401", "403", "unauthorized", "forbidden"]):
+        return False, "认证失败（永久性错误）"
+    if "429" in err or "rate limit" in err or "throttling" in err or "too many requests" in err:
+        if elapsed_time < 30 * 60:
+            return True, "Rate Limit（允许重试至30分钟）"
+        return False, "Rate Limit 超过最大时间限制"
+    if attempt < max_general_retries:
+        return True, f"临时性错误（最多{max_general_retries}次）"
+    return False, f"已达到最大重试次数（{max_general_retries}次）"
+
+
+def calculate_retry_wait_time(error_msg: str, attempt: int) -> int:
+    err = str(error_msg).lower()
+    if "429" in err or "rate limit" in err:
+        return min(2 ** attempt, 60)
+    return 2
 
 
 def extract_dataset_name(video_meta):
@@ -780,6 +805,7 @@ export const {component_name}: React.FC = () => {{
 Generate ONLY the complete TypeScript code - NO markdown blocks, NO explanations.
 Start with imports, end with closing brace.
 All D3 elements should be in FINAL visible state (full height, opacity 1).
+Write every string literal in full (e.g. .style('filter', '...') and rgba(r,g,b,a) must be complete with closing quotes and parentheses).
 """
     return prompt
 
@@ -832,6 +858,7 @@ def generate_tsx_component(scene_data, video_meta, llm_client, output_path, verb
         if tsx_code.endswith("```"):
             tsx_code = tsx_code[:-3]
         tsx_code = tsx_code.strip()
+        tsx_code = sanitize_tsx_for_browser(tsx_code)
         
         # 保存文件
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -841,6 +868,14 @@ def generate_tsx_component(scene_data, video_meta, llm_client, output_path, verb
             print(f"   ✅ 生成成功: {os.path.basename(output_path)}")
             print(f"   文件大小: {len(tsx_code)} 字符")
         
+        is_valid, syntax_err = validate_component_syntax(Path(output_path))
+        if not is_valid:
+            err_msg = f"语法验证失败: {syntax_err}"
+            if verbose:
+                print(f"   ❌ {err_msg}")
+            return (False, err_msg)
+        if verbose:
+            print(f"   ✅ 语法验证通过")
         return (True, None)
     
     except Exception as e:
@@ -854,48 +889,58 @@ def generate_tsx_component(scene_data, video_meta, llm_client, output_path, verb
 
 
 def generate_single_scene_wrapper(
-    scene, 
+    scene,
     idx: int,
     total: int,
-    video_meta, 
-    llm_client, 
+    video_meta,
+    llm_client,
     output_dir: str,
-    task_id: str = None
+    task_id: str = None,
+    max_retries: int = 5,
 ) -> Tuple[int, str, bool, str]:
     """
-    包装函数，用于并行执行（返回结果用于汇总）
+    包装函数，用于并行执行（带校验+重试）
     """
     scene_id = scene.get('id', f'scene_{idx}')
     dataset_name = extract_dataset_name(video_meta)
     scene_id_camel = ''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())
-    
-    # 如果提供了 task_id，文件名包含任务ID
     if task_id:
         component_name = f"{dataset_name}_{scene_id_camel}_{task_id}"
     else:
         component_name = f"{dataset_name}_{scene_id_camel}"
-    
     output_file = os.path.join(output_dir, f"{component_name}.tsx")
     chart_title = scene.get('content', {}).get('title', 'Visualization')
-    
-    try:
-        success, error_detail = generate_tsx_component(
-            scene,
-            video_meta,
-            llm_client,
-            output_file,
-            verbose=False,
-            scene_index=idx,
-            total_scenes=total
-        )
-        if success:
-            file_size = os.path.getsize(output_file)
-            return (idx, scene_id, True, f"✅ {chart_title} ({file_size} 字节)")
+    last_error = None
+    start_time = time.time()
+    attempt = 0
+    while True:
+        attempt += 1
+        elapsed = time.time() - start_time
+        try:
+            success, error_detail = generate_tsx_component(
+                scene, video_meta, llm_client, output_file,
+                verbose=(attempt > 1), scene_index=idx, total_scenes=total
+            )
+            if success:
+                file_size = os.path.getsize(output_file)
+                retry_info = f" (重试 {attempt}次)" if attempt > 1 else ""
+                return (idx, scene_id, True, f"✅ {chart_title} ({file_size} 字节){retry_info}")
+            last_error = error_detail or "生成失败"
+        except Exception as e:
+            last_error = str(e)
+        if attempt >= max_retries:
+            should_retry, reason = False, f"已达到最大重试次数（{max_retries}次）"
         else:
-            detail = f" - {error_detail}" if error_detail else " - 生成失败"
-            return (idx, scene_id, False, f"❌ {chart_title}{detail}")
-    except Exception as e:
-        return (idx, scene_id, False, f"❌ {chart_title} - {str(e)}")
+            should_retry, reason = should_retry_on_error(last_error, attempt, elapsed, max_general_retries=max_retries)
+        if should_retry:
+            wait_time = calculate_retry_wait_time(last_error, attempt)
+            print(f"   ⚠️  [{idx}/{total}] {chart_title} - 第 {attempt} 次失败，{wait_time}秒后重试...", flush=True)
+            time.sleep(wait_time)
+            continue
+        print(f"   ❌ [{idx}/{total}] {chart_title} - 停止重试: {reason}", flush=True)
+        break
+    detail = f" - {last_error}" if last_error else " - 生成失败"
+    return (idx, scene_id, False, f"❌ {chart_title}{detail} (尝试 {attempt} 次后失败)")
 
 
 def main():
@@ -986,26 +1031,34 @@ def main():
         # 按原始顺序排序（可选）
         results.sort(key=lambda x: x[0])
     else:
-        # 串行模式
+        # 串行模式（带校验+重试）
         print("📝 使用串行模式生成...\n")
+        max_retries = 5
         for idx, scene in enumerate(chart_scenes, 1):
             scene_id = scene.get('id', f'scene_{idx}')
             dataset_name = extract_dataset_name(video_meta)
             component_name = f"{dataset_name}_{''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())}"
             output_file = os.path.join(output_dir, f"{component_name}.tsx")
-            
             print(f"[{idx}/{len(chart_scenes)}]", end=" ")
-            success, _ = generate_tsx_component(
-                scene,
-                video_meta,
-                llm_client,
-                output_file,
-                verbose=True,
-                scene_index=idx,
-                total_scenes=len(chart_scenes)
-            )
-            if success:
-                success_count += 1
+            last_error = None
+            start_time = time.time()
+            for attempt in range(1, max_retries + 1):
+                success, error_detail = generate_tsx_component(
+                    scene, video_meta, llm_client, output_file,
+                    verbose=True, scene_index=idx, total_scenes=len(chart_scenes)
+                )
+                if success:
+                    success_count += 1
+                    break
+                last_error = error_detail or "生成失败"
+                elapsed = time.time() - start_time
+                should_retry, reason = should_retry_on_error(last_error, attempt, elapsed, max_general_retries=max_retries)
+                if not should_retry or attempt == max_retries:
+                    print(f"   ❌ 停止重试: {reason}", flush=True)
+                    break
+                wait_time = calculate_retry_wait_time(last_error, attempt)
+                print(f"   ⚠️ 第 {attempt} 次失败，{wait_time}秒后重试...", flush=True)
+                time.sleep(wait_time)
     
     # 总结
     print("\n" + "="*70)

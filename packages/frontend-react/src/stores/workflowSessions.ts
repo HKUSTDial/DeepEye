@@ -38,6 +38,8 @@ export interface WorkflowSessionState {
   runOutput: string
   dashboardRefreshKey: number
   videoProgress: VideoProgressState
+  /** URL of a ready video-preview container (set when video_preview_ready event fires) */
+  videoPreviewUrl: string | null
   lastUpdated: number | null
 }
 
@@ -65,6 +67,8 @@ interface WorkflowSessionsStore {
   setVideoProgressVisible: (sessionId: string, visible: boolean) => void
   appendVideoProgressLog: (sessionId: string, message: string) => void
   setVideoProgressStep: (sessionId: string, step: number) => void
+  setVideoProgressPercent: (sessionId: string, percent: number) => void
+  setVideoPreviewUrl: (sessionId: string, url: string | null) => void
 }
 
 const initialVideoProgress: VideoProgressState = {
@@ -92,6 +96,7 @@ const createEmptySession = (): WorkflowSessionState => ({
   runOutput: '',
   dashboardRefreshKey: 0,
   videoProgress: { ...initialVideoProgress },
+  videoPreviewUrl: null,
   lastUpdated: null,
 })
 
@@ -405,13 +410,43 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
     set((state) => {
       const current = withSession(state.sessions, sessionId)
       const prev = current.videoProgress ?? initialVideoProgress
-      const percent = Math.min(100, Math.round(((step + 1) / 4) * 100))
+      // 步骤 0..3 对应 0%, 25%, 50%, 75%；100% 仅在完成时由 setVideoProgressPercent 设置
+      const percent = Math.min(99, Math.round((step / 4) * 100))
       return {
         sessions: {
           ...state.sessions,
           [sessionId]: {
             ...current,
             videoProgress: { ...prev, step, percent },
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
+  setVideoProgressPercent: (sessionId, percent) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      const prev = current.videoProgress ?? initialVideoProgress
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...current,
+            videoProgress: { ...prev, percent: Math.min(100, Math.max(0, percent)) },
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
+  setVideoPreviewUrl: (sessionId, url) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...current,
+            videoPreviewUrl: url,
             lastUpdated: Date.now(),
           },
         },

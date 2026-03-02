@@ -1,16 +1,36 @@
 """Video generation API endpoints."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from app.core.config import get_video_session_root, normalize_session_id
+from app.core.config import get_video_session_root, get_video_workspace_root, normalize_session_id
+from app.services.video_deploy_service import video_deployer
 from deepeye.utils.logger import logger
 
 router = APIRouter(prefix="/video", tags=["video"])
+
+# Task ID 格式 YYYYMMDD_HHMMSS，用于校验与按 task 启动预览
+_TASK_ID_RE = re.compile(r"^\d{8}_\d{6}$")
+
+
+def _find_session_for_task(task_id: str) -> Optional[str]:
+    """在 workspace/sessions 下查找包含该 task_id 配置的 session_id。"""
+    root = get_video_workspace_root()
+    sessions_dir = root / "sessions"
+    if not sessions_dir.exists():
+        return None
+    config_name = f"generated_{task_id}_aligned.json"
+    for path in sessions_dir.iterdir():
+        if path.is_dir():
+            config_path = path / "video_configs" / config_name
+            if config_path.exists():
+                return path.name
+    return None
 
 
 def _resolve_session_id_or_400(session_id: Optional[str]) -> str | None:
@@ -217,6 +237,49 @@ async def get_video_full(task_id: str, session_id: Optional[str] = Query(default
         raise
     except Exception as e:
         logger.error(f"Error building full video payload: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class StartPreviewRequest(BaseModel):
+    """按 task_id 启动已有视频的预览容器（可省略 session_id，由后端按 workspace 查找）。"""
+
+    task_id: str
+    session_id: Optional[str] = None
+
+
+@router.post("/start-preview")
+async def start_video_preview(body: StartPreviewRequest):
+    """
+    为指定 task_id 启动预览容器（例如之前生成过的 20260302_140132）。
+    若未传 session_id，则在 workspace/sessions 下自动查找包含该 task 配置的 session。
+    返回与测试预览一致的 { status, url, task_id }，前端可据此继续轮询 iframe 就绪。
+    """
+    task_id = (body.task_id or "").strip()
+    if not _TASK_ID_RE.match(task_id):
+        raise HTTPException(
+            status_code=400,
+            detail="task_id must be in format YYYYMMDD_HHMMSS (e.g. 20260302_140132)",
+        )
+    session_id: Optional[str] = body.session_id and body.session_id.strip() or None
+    if not session_id:
+        session_id = _find_session_for_task(task_id)
+        if not session_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No session found with config for task_id: {task_id}. Ensure the video was generated in this workspace.",
+            )
+    try:
+        result = await video_deployer.deploy(task_id=task_id, session_id=session_id)
+        url = result.get("url") or f"/video-previews/deepeye-video-{task_id}/"
+        return {
+            "status": result.get("status", "running"),
+            "task_id": task_id,
+            "url": url,
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception("Start video preview failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
