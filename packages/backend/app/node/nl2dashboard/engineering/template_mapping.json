@@ -1,0 +1,160 @@
+{
+  "template_library_path": "template_library",
+  "default_template": "template_base.html",
+  "rules": [
+    {
+      "name": "rule_1",
+      "description": "4 highlight blocks and chart count = 4",
+      "conditions": {
+        "highlight_count": {
+          "min": 4,
+          "max": 4
+        },
+        "view_count": {
+          "min": 4,
+          "max": 4
+        }
+      },
+      "template": "template_4highlights_4charts.html"
+    },
+    {
+      "name": "rule_2",
+      "description": "4 highlight blocks and chart count = 5",
+      "conditions": {
+        "highlight_count": {
+          "min": 4,
+          "max": 4
+        },
+        "view_count": {
+          "min": 5,
+          "max": 5
+        }
+      },
+      "template": "template_base.html"
+    },
+    {
+      "name": "rule_3",
+      "description": "4 highlight blocks and chart count = 6",
+      "conditions": {
+        "highlight_count": {
+          "min": 4,
+          "max": 4
+        },
+        "view_count": {
+          "min": 6,
+          "max": 6
+        }
+      },
+      "template": "template_4highlights_6charts.html"
+    },
+    {
+      "name": "rule_4",
+      "description": "5 highlight blocks and chart count = 5",
+      "conditions": {
+        "highlight_count": {
+          "min": 5,
+          "max": 5
+        },
+        "view_count": {
+          "min": 5,
+          "max": 5
+        }
+      },
+      "template": "template_with_table.html"
+    },
+    {
+      "name": "rule_5",
+      "description": "No highlight blocks and chart count = 4",
+      "conditions": {
+        "highlight_count": {
+          "min": 0,
+          "max": 0
+        },
+        "view_count": {
+          "min": 4,
+          "max": 4
+        }
+      },
+      "template": "template_0highlights_4charts.html"
+    },
+    {
+      "name": "rule_6",
+      "description": "No highlight blocks and chart count = 5",
+      "conditions": {
+        "highlight_count": {
+          "min": 0,
+          "max": 0
+        },
+        "view_count": {
+          "min": 5,
+          "max": 5
+        }
+      },
+      "template": "template_0highlights_5charts.html"
+    },
+    {
+      "name": "rule_7",
+      "description": "No highlight blocks and chart count = 6",
+      "conditions": {
+        "highlight_count": {
+          "min": 0,
+          "max": 0
+        },
+        "view_count": {
+          "min": 6,
+          "max": 6
+        }
+      },
+      "template": "template_0highlights_6charts.html"
+    },
+    {
+      "name": "rule_8",
+      "description": "Universal template: suitable for any number of highlights and charts",
+      "conditions": {},
+      "template": "template_universal.html"
+    }
+  ],
+  "templates": {
+    "template_base.html": {
+      "display_name": "Base Template",
+      "description": "Basic layout suitable for a small number of charts and highlights",
+      "source_path": "template_library/template_base.html"
+    },
+    "template_4highlights_4charts.html": {
+      "display_name": "4 Highlights 4 Charts Template",
+      "description": "2x2 grid layout suitable for 4 highlight blocks and 4 charts",
+      "source_path": "template_library/template_4highlights_4charts.html"
+    },
+    "template_4highlights_6charts.html": {
+      "display_name": "4 Highlights 6 Charts Template",
+      "description": "3x2 grid layout suitable for 4 highlight blocks and 6 charts",
+      "source_path": "template_library/template_4highlights_6charts.html"
+    },
+    "template_0highlights_4charts.html": {
+      "display_name": "0 Highlights 4 Charts Template",
+      "description": "2x2 grid layout suitable for no highlight blocks and 4 charts",
+      "source_path": "template_library/template_0highlights_4charts.html"
+    },
+    "template_0highlights_5charts.html": {
+      "display_name": "0 Highlights 5 Charts Template",
+      "description": "2+3 layout suitable for no highlight blocks and 5 charts",
+      "source_path": "template_library/template_0highlights_5charts.html"
+    },
+    "template_0highlights_6charts.html": {
+      "display_name": "0 Highlights 6 Charts Template",
+      "description": "3x2 grid layout suitable for no highlight blocks and 6 charts",
+      "source_path": "template_library/template_0highlights_6charts.html"
+    },
+    "template_universal.html": {
+      "display_name": "Universal Template",
+      "description": "Dynamic layout that automatically adapts to any number of highlight and chart blocks",
+      "source_path": "template_library/template_universal.html"
+    },
+    "template_with_table.html": {
+      "display_name": "Table Template",
+      "description": "Table layout suitable for multiple highlights and a large number of charts",
+      "source_path": "template_library/template_with_table.html"
+    }
+  }
+}
+

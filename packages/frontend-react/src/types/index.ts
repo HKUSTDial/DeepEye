@@ -13,11 +13,16 @@ export interface ToolStep {
   subSteps?: ToolStep[]
 }
 
+export type MessageTimelineItem =
+  | { kind: 'step'; step: ToolStep }
+  | { kind: 'text'; content: string; isStreaming?: boolean }
+
 export interface Message {
   role: 'user' | 'assistant'
   content: string
   isStreaming?: boolean
   steps?: ToolStep[]
+  timeline?: MessageTimelineItem[]
 }
 
 export interface Session {

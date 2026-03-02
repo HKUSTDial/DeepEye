@@ -1,0 +1,179 @@
+{
+  "dataSource": {
+    "type": "csv",
+    "path": "/data/Coffee Shop Sales.csv",
+    "schema": {
+      "fields": [
+        {
+          "name": "transaction_id",
+          "dataType": "categorical",
+          "description": "transaction_id"
+        },
+        {
+          "name": "transaction_date",
+          "dataType": "temporal",
+          "description": "The date of the transaction"
+        },
+        {
+          "name": "transaction_time",
+          "dataType": "temporal",
+          "description": "The time(hour:minute:second) of the transaction"
+        },
+        {
+          "name": "transaction_qty",
+          "dataType": "categorical",
+          "description": "The quantity of the transaction"
+        },
+        {
+          "name": "store_id",
+          "dataType": "categorical",
+          "description": "The id of the store"
+        },
+        {
+          "name": "store_location",
+          "dataType": "categorical",
+          "description": "The location of the store"
+        },
+        {
+          "name": "product_id",
+          "dataType": "categorical",
+          "description": "The id of the product"
+        },
+        {
+          "name": "unit_price",
+          "dataType": "numeric",
+          "description": "The price of the product"
+        },
+        {
+          "name": "product_category",
+          "dataType": "categorical",
+          "description": "The category of the product"
+        },
+        {
+          "name": "product_type",
+          "dataType": "categorical",
+          "description": "The sub-type of the product"
+        },
+        {
+          "name": "product_detail",
+          "dataType": "categorical",
+          "description": "The details of the product"
+        }
+      ]
+    }
+  },
+  "layout": {
+    "type": "grid",
+    "columns": 3,
+    "gap": 1.0,
+    "pageTemplate": "/public/templates/page_coffee.html"
+  },
+  "blocks": [
+    {
+      "id": "highlight_1",
+      "blockType": "highlight",
+      "position": {
+        "col": 1,
+        "row": 1
+      },
+      "blockContent": {
+        "title": "Product Categories",
+        "dataField": "product_category",
+        "highlightType": "nunique",
+        "unit": ""
+      }
+    },
+    {
+      "id": "highlight_2",
+      "blockType": "highlight",
+      "position": {
+        "col": 2,
+        "row": 1
+      },
+      "blockContent": {
+        "title": "Average Unit Price",
+        "dataField": "unit_price",
+        "highlightType": "mean",
+        "unit": "$"
+      }
+    },
+    {
+      "id": "highlight_3",
+      "blockType": "highlight",
+      "position": {
+        "col": 3,
+        "row": 1
+      },
+      "blockContent": {
+        "title": "Store Locations",
+        "dataField": "store_location",
+        "highlightType": "nunique",
+        "unit": ""
+      }
+    },
+    {
+      "id": "chart_1",
+      "blockType": "view",
+      "blockContent": {
+        "python_code_name": "goal0_chart0_echarts.py",
+        "html_code_name": "goal0_chart0_iteration1.html",
+        "render_mode": "template_based",
+        "title": "Sales Trend Over Time"
+      }
+    },
+    {
+      "id": "chart_2",
+      "blockType": "view",
+      "blockContent": {
+        "python_code_name": "goal1_chart0_echarts.py",
+        "html_code_name": "goal1_chart0_iteration2.html",
+        "render_mode": "template_based",
+        "title": "Sales Volume by Store Location"
+      }
+    },
+    {
+      "id": "chart_3",
+      "blockType": "view",
+      "blockContent": {
+        "python_code_name": "goal2_chart0_echarts.py",
+        "html_code_name": "goal2_chart0_iteration2.html",
+        "render_mode": "template_based",
+        "title": "Popular Product Categories"
+      }
+    },
+    {
+      "id": "chart_5",
+      "blockType": "view",
+      "blockContent": {
+        "python_code_name": "goal5_chart0_echarts.py",
+        "html_code_name": "goal5_chart0_iteration1.html",
+        "render_mode": "template_based",
+        "title": "Most Profitable Product Types"
+      }
+    },
+    {
+      "id": "filter_1",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "select",
+        "field": "product_category",
+        "label": "Filter by Product Category",
+        "operator": "equals",
+        "target": "chart_2",
+        "options": ["All", "Coffee", "Tea", "Drinking Chocolate", "Bakery", "Branded", "Packaged Chocolate"]
+      }
+    },
+    {
+      "id": "filter_2",
+      "blockType": "filter",
+      "blockContent": {
+        "controlType": "select",
+        "field": "store_location",
+        "label": "Filter by Store Location",
+        "operator": "equals",
+        "target": "chart_3",
+        "options": ["All", "Astoria", "Lower Manhattan", "Hell's Kitchen"]
+      }
+    }
+  ]
+}

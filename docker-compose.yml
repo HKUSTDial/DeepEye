@@ -58,6 +58,23 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # DeepEye 测试数据库
+  deepeye-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=deepeye
+      - POSTGRES_PASSWORD=deepeye123
+      - POSTGRES_DB=deepeye_demo
+    volumes:
+      - deepeye_db_data:/var/lib/postgresql/data
+      - ./docker/test-db/deepeye_dataset_pg.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deepeye -d deepeye_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend-api:
     build:
       context: .
@@ -78,6 +95,8 @@ services:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
       - ./report_module:/app/report_module
+      - .:/app/project
+      - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
@@ -106,6 +125,8 @@ services:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
       - ./report_module:/app/report_module
+      - .:/app/project
+      - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
@@ -145,6 +166,8 @@ volumes:
   postgres_data:
   minio_data:
   school_db_data:
+  deepeye_db_data:
+  workspace_data:
 
 networks:
   default:

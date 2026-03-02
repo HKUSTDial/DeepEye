@@ -189,7 +189,9 @@ async def delete_datasource(
             from app.sandbox.manager import sandbox_manager
             try:
                 sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-                dest_path = f"/workspace/data/{ds.name}"
+                from app.sandbox.manager import _get_datasource_filename
+                original_filename = _get_datasource_filename(ds)
+                dest_path = f"/workspace/data/{original_filename}"
                 await sandbox.exec_command(f"rm {dest_path}")
                 
                 # Notify frontend about file change

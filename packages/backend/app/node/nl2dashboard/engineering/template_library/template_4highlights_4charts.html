@@ -1,0 +1,311 @@
+<div class="flex h-screen overflow-hidden font-sans bg-[#F9FAFB]">
+    
+    <aside class="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-10 shadow-lg hidden md:flex">
+        <div class="p-6 border-b border-gray-100 flex items-center gap-2">
+            <div class="w-8 h-8 bg-[#E18182] rounded-lg flex items-center justify-center text-white font-bold shadow-[#E18182]/30 shadow-lg">D</div>
+            <span class="font-bold text-xl tracking-tight text-gray-800">DataMiner</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-8">
+            <div id="filter-container" class="space-y-6"></div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+        <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-20">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Maven Roasters Sales</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Explore sales trends and product performance across NYC locations.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 bg-[#BBCFC3]/20 px-3 py-1 rounded-full border border-[#BBCFC3]/30">
+                    <div class="h-2 w-2 bg-[#BBCFC3] rounded-full animate-pulse"></div>
+                    <span class="text-xs font-semibold text-gray-600">System Online</span>
+                </div>
+                <div class="h-10 w-10 bg-gray-100 rounded-full border border-gray-200 flex items-center justify-center text-gray-500">
+                    <i class="ph ph-user text-xl"></i>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-x-hidden overflow-y-auto p-8">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#E18182]/50 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_1">Metric 1</p>
+                        <div class="p-2 bg-[#E18182]/10 text-[#E18182] rounded-lg group-hover:bg-[#E18182] group-hover:text-white transition-colors">
+                            <i class="ph ph-chart-line-up"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-4">
+                        <h3 class="text-2xl font-bold text-gray-900" id="val-highlight_1">--</h3>
+                        <span class="text-xs font-medium text-gray-400" id="unit-highlight_1"></span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#F9CE9C]/80 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_2">Metric 2</p>
+                        <div class="p-2 bg-[#F9CE9C]/20 text-[#dcb17f] rounded-lg group-hover:bg-[#F9CE9C] group-hover:text-white transition-colors">
+                            <i class="ph ph-users"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-4" id="val-highlight_2">--</h3>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#BBCFC3]/80 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_3">Metric 3</p>
+                        <div class="p-2 bg-[#BBCFC3]/20 text-[#8fa696] rounded-lg group-hover:bg-[#BBCFC3] group-hover:text-white transition-colors">
+                            <i class="ph ph-package"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-4" id="val-highlight_3">--</h3>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-[#C9DDE3]/80 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-highlight_4">Metric 4</p>
+                        <div class="p-2 bg-[#C9DDE3]/20 text-[#8fa8b0] rounded-lg group-hover:bg-[#C9DDE3] group-hover:text-white transition-colors">
+                            <i class="ph ph-currency-dollar"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mt-4" id="val-highlight_4">--</h3>
+                </div>
+            </div>
+
+            <!-- 4 charts in a 2x2 grid layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[400px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#E18182] rounded-full"></span>
+                        Chart 1
+                    </h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_0_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[400px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#BBCFC3] rounded-full"></span>
+                        Chart 2
+                    </h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_1_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[400px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#F9CE9C] rounded-full"></span>
+                        Chart 3
+                    </h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_2_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[400px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 bg-[#C9DDE3] rounded-full"></span>
+                        Chart 4
+                    </h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="intent_3_goal_0_chart0" class="absolute inset-0"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Template 主题配置脚本 -->
+<script>
+// --- 🎨 颜值核心：Template 3 (Design Aesthetics Diary Edition) ---
+const themeName = 'template3_aesthetic';
+const template3Palette = {
+    // 1. Palette: fully extracted from the image "Design Aesthetics Diary"
+    // Order: Salmon -> Peach -> Sage -> Sky
+    color: [
+        '#E18182', // Metric 1 (Primary)
+        '#F9CE9C', // Metric 2 (Secondary/Warm)
+        '#BBCFC3', // Metric 3 (Tertiary/Nature)
+        '#C9DDE3', // Metric 4 (Cold/Neutral)
+        '#D8A49B', // Extra color: deeper pink
+        '#A5B9C0'  // Extra color: deeper blue-gray
+    ],
+    backgroundColor: 'rgba(0,0,0,0)',
+    textStyle: { fontFamily: 'Inter, -apple-system, system-ui, sans-serif' },
+
+    title: {
+        textStyle: { color: '#374151', fontWeight: '700', fontSize: 16 },
+        subtextStyle: { color: '#9ca3af' }
+    },
+
+    // 2. Layout: keep a widescreen feel
+    grid: {
+        top: 45,
+        left: '1%',
+        right: '1%',
+        bottom: '2%',
+        containLabel: true,
+        borderWidth: 0
+    },
+
+    categoryAxis: {
+        axisLine: { show: true, lineStyle: { color: '#f3f4f6' } }, // Very light gray line
+        axisTick: { show: false },
+        axisLabel: { color: '#6b7280', margin: 14, fontSize: 11, fontWeight: 500 },
+        splitLine: { show: false }
+    },
+    valueAxis: {
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#9ca3af', margin: 10, fontSize: 11 },
+        splitLine: {
+            show: true,
+            lineStyle: { color: '#f3f4f6', type: 'dashed', width: 1 }
+        }
+    },
+
+    // --- Chart style adjustments: soft, matte texture ---
+
+    // 1. Line chart: use Salmon (#E18182) gradient
+    line: {
+        smooth: true,
+        width: 3,
+        symbol: 'circle',
+        symbolSize: 6,
+        showSymbol: false,
+        itemStyle: { 
+            borderWidth: 1, 
+            borderColor: '#fff',
+            color: '#E18182' 
+        },
+        areaStyle: {
+            opacity: 0.2, 
+            color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                    { offset: 0, color: '#E18182' },
+                    { offset: 1, color: 'rgba(255, 255, 255, 0)' }
+                ]
+            }
+        }
+    },
+
+    // 2. Bar chart: fresh gradient from Sky (#C9DDE3) to Sage (#BBCFC3)
+    bar: {
+        itemStyle: {
+            borderRadius: [4, 4, 0, 0],
+            color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                    { offset: 0, color: '#BBCFC3' }, // Top: Sage
+                    { offset: 1, color: '#C9DDE3' }  // Bottom: Sky
+                ]
+            }
+        },
+        barMaxWidth: 40,
+        barCategoryGap: '35%'
+    },
+
+    // 3. Boxplot: use Peach (#F9CE9C)
+    boxplot: {
+        itemStyle: {
+            color: '#fffbf5',       // Very light apricot background
+            borderColor: '#F9CE9C', // Apricot border
+            borderWidth: 1.5
+        },
+        emphasis: {
+            itemStyle: {
+                color: '#F9CE9C',
+                borderColor: '#E6B07E',
+                borderWidth: 2
+            }
+        },
+        boxWidth: [10, 40]
+    },
+
+    // 4. Heatmap: warm–cool transition from Sky -> Salmon
+    heatmap: {
+        itemStyle: {
+            borderColor: '#fff',
+            borderWidth: 2
+        },
+        label: { show: false }
+    },
+
+    // 5. VisualMap: smooth color transition
+    visualMap: {
+        type: 'continuous',
+        inRange: {
+            color: [
+                '#C9DDE3', // Low: Sky
+                '#BBCFC3', // Mid: Sage
+                '#F9CE9C', // Mid-high: Peach
+                '#E18182'  // High: Salmon
+            ]
+        },
+        itemWidth: 12,
+        itemHeight: 100,
+        orient: 'horizontal',
+        left: 'center',
+        top: 0,
+        text: ['High', 'Low'],
+        textStyle: { color: '#9ca3af', fontSize: 10 },
+        calculable: true
+    },
+
+    // 6. Pie/donut: directly use four colors from the palette
+    pie: {
+        itemStyle: {
+            borderWidth: 2,
+            borderColor: '#ffffff'
+        }
+    },
+
+    tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#E18182', // Use primary color for border
+        borderWidth: 0,
+        textStyle: { color: '#374151', fontSize: 12 },
+        padding: [10, 14],
+        extraCssText: 'box-shadow: 0 4px 20px -5px rgba(225, 129, 130, 0.2); border-left: 4px solid #E18182; border-radius: 4px;'
+    },
+    
+    legend: {
+        icon: 'circle',
+        textStyle: { color: '#6b7280' }
+    }
+};
+
+// Register theme globally for use in app.js
+(function() {
+    // Ensure echarts is loaded
+    if (typeof window.echarts !== 'undefined') {
+        window.echarts.registerTheme(themeName, template3Palette);
+        // Expose theme configuration globally for renderCharts in app.js (generic variable names)
+        window.currentPalette = template3Palette;
+        window.currentThemeName = themeName;
+    } else {
+        // If echarts is not yet loaded, wait until it is ready
+        const checkECharts = setInterval(() => {
+            if (typeof window.echarts !== 'undefined') {
+                window.echarts.registerTheme(themeName, template3Palette);
+                window.currentPalette = template3Palette;
+                window.currentThemeName = themeName;
+                clearInterval(checkECharts);
+            }
+        }, 50);
+        
+        // Stop checking after 10 seconds to avoid infinite wait
+        setTimeout(() => clearInterval(checkECharts), 10000);
+    }
+})();
+</script>
+

@@ -64,7 +64,7 @@ async def _event_generator(session_id: str) -> AsyncGenerator[str, None]:
                     yield SSEMessage(data=payload).to_sse_string()
                     # Also check for AgentEventType.AGENT_END or similar "done" markers
                     # Depending on how the end of stream is signaled
-                    if payload.get("type") in ("done", "agent_end", "error"):
+                    if payload.get("type") in ("done", "error"):
                         break
                 except json.JSONDecodeError:
                     yield SSEMessage(data=data_str).to_sse_string()

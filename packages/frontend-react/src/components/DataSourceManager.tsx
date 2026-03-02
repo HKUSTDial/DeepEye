@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { datasourceApi, type DatasourceTablesResponse } from '../api'
 import { useChatStore } from '../stores/chat'
 import type { DataSource } from '../types'
@@ -7,9 +7,10 @@ import './DataSourceManager.css'
 interface DataSourceManagerProps {
   selectedIds: string[]
   onToggle: (id: string) => void
+  collapsed?: boolean
 }
 
-export default function DataSourceManager({ selectedIds, onToggle }: DataSourceManagerProps) {
+export default function DataSourceManager({ selectedIds, onToggle, collapsed = false }: DataSourceManagerProps) {
   const sessionId = useChatStore((state) => state.sessionId)
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [isCreating, setIsCreating] = useState(false)
@@ -22,6 +23,8 @@ export default function DataSourceManager({ selectedIds, onToggle }: DataSourceM
   const [editingDsId, setEditingDsId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', type: 'mysql', connection_string: '' })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [showCollapsedPanel, setShowCollapsedPanel] = useState(false)
+  const collapsedPanelRef = useRef<HTMLDivElement>(null)
 
   const loadDataSources = async () => {
     setError(null)
@@ -173,11 +176,29 @@ export default function DataSourceManager({ selectedIds, onToggle }: DataSourceM
     loadDataSources()
   }, [])
 
-  return (
-    <div className="border-t border-[var(--sidebar-border)] p-2">
+  useEffect(() => {
+    if (!collapsed) {
+      setShowCollapsedPanel(false)
+    }
+  }, [collapsed])
+
+  useEffect(() => {
+    if (!showCollapsedPanel) return
+    const onMouseDown = (event: MouseEvent) => {
+      if (!collapsedPanelRef.current) return
+      if (!collapsedPanelRef.current.contains(event.target as Node)) {
+        setShowCollapsedPanel(false)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [showCollapsedPanel])
+
+  const managerContent = (
+    <>
       {/* Header */}
       <div className="flex items-center justify-between px-2 py-1.5 mb-1">
-        <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">
+        <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider whitespace-nowrap truncate">
           Data Sources
         </span>
         <div className="flex gap-1">
@@ -434,6 +455,39 @@ export default function DataSourceManager({ selectedIds, onToggle }: DataSourceM
           </div>
         ))}
       </div>
+    </>
+  )
+
+  if (collapsed) {
+    return (
+      <div className="data-source-manager border-t border-[var(--sidebar-border)] p-2 relative">
+        <div className="flex justify-start pl-[14px]">
+          <button
+            onClick={() => setShowCollapsedPanel((prev) => !prev)}
+            className="btn w-12 h-12 p-0 rounded-xl hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text)] relative inline-flex items-center justify-center"
+            title="Data Sources"
+            aria-label="Data Sources"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            </svg>
+            {selectedIds.length > 0 && (
+              <span className="ds-badge">{selectedIds.length}</span>
+            )}
+          </button>
+        </div>
+        {showCollapsedPanel && (
+          <div ref={collapsedPanelRef} className="collapsed-ds-panel">
+            {managerContent}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="data-source-manager border-t border-[var(--sidebar-border)] p-2">
+      {managerContent}
     </div>
   )
 }

@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@babel/standalone": "^7.29.1",
+    "@remotion/player": "^4.0.0",
+    "d3": "^7.9.0",
     "framer-motion": "^12.23.28",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
@@ -19,6 +22,7 @@
     "reactflow": "^11.11.4",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "remotion": "^4.0.0",
     "shiki": "^3.20.0",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.9"

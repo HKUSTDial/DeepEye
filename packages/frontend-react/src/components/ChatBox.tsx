@@ -5,6 +5,7 @@ import { useChat } from '../hooks/useChat'
 import { useChatStore } from '../stores/chat'
 import { useKnowledgeBasesStore } from '../stores/knowledgeBases'
 import StepItem from './StepItem'
+import type { Message } from '../types'
 import './ChatBox.css'
 
 interface ChatBoxProps {
@@ -98,6 +99,50 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     }
   }
 
+  const renderAssistantMessage = (msg: Message) => {
+    const timeline = msg.timeline && msg.timeline.length > 0 ? msg.timeline : null
+
+    if (timeline) {
+      return (
+        <div className="assistant-timeline">
+          {timeline.map((item, idx) => {
+            if (item.kind === 'step') {
+              return <StepItem key={`timeline-step-${idx}`} step={item.step} />
+            }
+            return (
+              <div key={`timeline-text-${idx}`} className="message-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {item.content || ''}
+                </ReactMarkdown>
+                {item.isStreaming && <span className="typing-cursor">|</span>}
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+
+    return (
+      <>
+        {msg.steps && msg.steps.length > 0 && (
+          <div className="space-y-2 mb-3">
+            {msg.steps.map((step, sIdx) => (
+              <StepItem key={`step-${sIdx}`} step={step} />
+            ))}
+          </div>
+        )}
+        {(msg.content || msg.isStreaming) && (
+          <div className="message-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {msg.content || ''}
+            </ReactMarkdown>
+            {msg.isStreaming && <span className="typing-cursor">|</span>}
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
     <div className="chat-container">
       {/* Messages Area */}
@@ -120,29 +165,12 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
           <div className="max-w-4xl mx-auto">
             {messages.map((msg, index) => (
               <div key={`msg-${index}`} className={`message-bubble ${msg.role}`}>
-                {/* Tool Steps */}
-                {msg.steps && msg.steps.length > 0 && msg.role !== 'user' && (
-                  <div className="space-y-2 mb-3">
-                    {msg.steps.map((step, sIdx) => (
-                      <StepItem key={`step-${sIdx}`} step={step} />
-                    ))}
-                  </div>
-                )}
-
-                {/* Message Content */}
-                {(msg.content || msg.isStreaming) && (
+                {msg.role === 'user' ? (
                   <div className="message-content">
-                    {msg.role === 'user' ? (
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
-                    ) : (
-                      <>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {msg.content || ''}
-                        </ReactMarkdown>
-                        {msg.isStreaming && <span className="typing-cursor">|</span>}
-                      </>
-                    )}
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
                   </div>
+                ) : (
+                  renderAssistantMessage(msg)
                 )}
 
                 {/* Thinking indicator */}

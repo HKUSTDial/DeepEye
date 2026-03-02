@@ -16,6 +16,23 @@ from app.core.config import settings
 from app.services.minio_service import download_bytes
 
 
+def _get_datasource_filename(ds) -> str:
+    """
+    Extract the original filename from a datasource object.
+    Tries storage_path first (which contains the original filename),
+    falls back to ds.name if needed.
+    """
+    import os
+    if ds.storage_path:
+        # storage_path format: datasource-files/{user_id}/{datasource_id}/{filename}
+        original_filename = os.path.basename(ds.storage_path)
+        # Only use if it's different from the full path (i.e., extraction succeeded)
+        if original_filename and original_filename != ds.storage_path:
+            return original_filename
+    # Fallback to ds.name
+    return ds.name
+
+
 class SandboxManager:
     """
     Manage sandbox instances with Named Volume persistence and auto-cleanup.
@@ -138,17 +155,36 @@ class SandboxManager:
         
         for ds in file_datasources:
             if ds.category != 'file' or not ds.storage_path:
+                logger.warning(f"[SandboxManager] Skipping datasource {ds.id}: category={ds.category}, storage_path={ds.storage_path}")
                 continue
             
-            logger.info(f"[SandboxManager] Syncing file datasource {ds.name} to sandbox {session_id}")
+            logger.info(f"[SandboxManager] Syncing file datasource {ds.name} (id={ds.id}) to sandbox {session_id}")
+            logger.info(f"[SandboxManager] Storage path: {ds.storage_path}, Name: {ds.name}")
+            
             try:
+                # Download from MinIO
+                logger.info(f"[SandboxManager] Downloading from MinIO bucket: {settings.MINIO_DATA_BUCKET}, path: {ds.storage_path}")
                 data = download_bytes(settings.MINIO_DATA_BUCKET, ds.storage_path)
-                # Save to /workspace/data/{ds.name} or similar
-                dest_path = f"/workspace/data/{ds.name}"
+                logger.info(f"[SandboxManager] Downloaded {len(data)} bytes")
+                
+                # Use consistent filename extraction
+                original_filename = _get_datasource_filename(ds)
+                dest_path = f"/workspace/data/{original_filename}"
+                logger.info(f"[SandboxManager] Writing to sandbox path: {dest_path} (from name: {ds.name}, storage_path: {ds.storage_path})")
                 await sandbox.write_file(dest_path, data)
-                logger.info(f"[SandboxManager] Synced {ds.name} to {dest_path}")
+                
+                # Verify file was written
+                result = await sandbox.exec_command(f"test -f {dest_path} && echo 'EXISTS' || echo 'NOT_FOUND'")
+                if 'EXISTS' in result.stdout:
+                    logger.info(f"[SandboxManager] ✅ Successfully synced {ds.name} to {dest_path} ({len(data)} bytes)")
+                else:
+                    logger.error(f"[SandboxManager] ❌ File write appeared to succeed but file not found at {dest_path}")
+                    logger.error(f"[SandboxManager] Command result: stdout={result.stdout}, stderr={result.stderr}, exit_code={result.exit_code}")
+                    
             except Exception as e:
-                logger.error(f"[SandboxManager] Failed to sync file datasource {ds.name}: {e}")
+                logger.error(f"[SandboxManager] ❌ Failed to sync file datasource {ds.name} (id={ds.id}): {e}", exc_info=True)
+                # Re-raise to prevent silent failures
+                raise RuntimeError(f"Failed to sync datasource {ds.name} to sandbox: {e}") from e
     
     async def get_sandbox(self, session_id: str, index: int = 0) -> DockerSandbox | None:
         """

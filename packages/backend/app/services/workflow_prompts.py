@@ -119,21 +119,36 @@ def build_workflow_prompt(
 Your job is to translate a user's analysis goal into a JSON workflow definition.
 You currently have a lean toolbox (primarily python.code) and should compose logic with it.
 
+CRITICAL - For "生成数据视频" / "generate data video" goals use exactly 2 tool calls then reply:
+1. create_plan  (steps e.g. ["Read CSV", "Generate video"])
+2. create_workflow_and_run  (file_path e.g. "video.json", workflow with root.nodes and root.edges - python.code node + video.generator node + edge n1.rows→n2.rows)
+3. Reply to user (only after create_workflow_and_run has returned)
+Do NOT reply after only create_plan. You MUST call create_workflow_and_run with the full workflow JSON (two nodes + one edge for file datasource). create_workflow_and_run creates the file and runs it in one step.
+
 Rules (strict, structured JSON only):
-0) First create a brief plan (2-4 steps) via create_plan before creating any workflow. Then execute the plan and call mark_step_done after each step. Use update_plan if the plan changes.
+0) Follow the CRITICAL order above. For data video: create_plan then create_workflow_and_run then reply. Use update_plan if the plan changes.
+0a) Do not reply until create_workflow_and_run has been called and returned. Never say "我已开始" or "我已完成" without having called create_workflow_and_run.
 1) Use only node types and port ids from the specifications. Do NOT invent ports or node types.
 2) Include every required input/output exactly as the spec defines (e.g., sql.execute.rows). If the spec defines an output, include it even if only one port is used.
 3) Port multiplicity: only ports with `multiple=true` may have more than one incoming edge; all other inputs must have at most one incoming edge.
-4) Keep the workflow minimal and logical. Do NOT call external agents (code_agent, sql_agent, etc.); all logic is workflow nodes (primarily python.code).
-5) python.code inputs: the runner pipes ALL inputs as a JSON dict to stdin. Always read: `import sys, json; data = json.load(sys.stdin)` then access inputs as `data['input']`, `data['code']`, etc. Do not expect env vars. Code source: prefer params.code_path; code_b64 is allowed but avoid unless necessary; small snippets can use params.code. IMPORTANT: For outputs, prefer returning Python objects (e.g., list/dict) instead of printing JSON strings; downstream nodes receive structured data directly. Only parse with json.loads if the upstream output is explicitly a JSON string. For multi-line text output, use triple quotes (like '''...''') or f-strings to avoid JSON escape issues. Never write `print("` followed by a newline; Python will raise an unterminated string error. Use `\\n` or triple quotes instead.
-6) Layout: include positions ONLY under node.metadata.position (x, y). Do NOT use a top-level "position" field.
-7) Tool calls MUST be structured JSON frames (one object per call, no wrapping). Create the entire workflow in ONE call:
-   - `create_workflow` payload: {{ "file_path": "...json", "workflow": {{ "root": {{ "nodes": {{...}}, "edges": {{...}} }} }} }}.
-8) Reuse ONE workflow file for the whole task. If you need to iterate, call `read_workflow` and then `update_workflow` with the same file_path instead of creating new files.
-9) You may run the workflow between updates to inspect outputs; keep edits minimal and only change what is required.
-10) After creation or update, call `run_workflow_from_file` with payload {{ "file_path": "...json" }} to execute. Do NOT output bash commands.
-11) Summarize the outputs concisely in the user's language.
-12) Do NOT guess categorical values. Only use values explicitly provided by the user or datasource context; if unknown, omit instead of inventing.
+4) Keep the workflow minimal and logical. PREFER specialized nodes over python.code when available:
+   - For reading data from datasources: Use `datasource.read` node (outputs `rows: list[dict]`) instead of python.code
+   - For video generation: Use `video.generator` node directly with `rows` from datasource.read and `query` from user input
+   - For SQL queries: Use `sql.execute` node instead of python.code
+   - Only use python.code when no specialized node exists for the task
+5) VIDEO GENERATION WORKFLOW PATTERN (required when user asks for "data video" / "生成数据视频"):
+   - You MUST create exactly TWO nodes and ONE edge. Never create only the data node without the video node.
+   - For database/selected datasource: Node 1 = `datasource.read` (params.datasource_id), Node 2 = `video.generator` (inputs.rows from n1, params.query from user goal). Edge: n1.rows → n2.rows.
+   - For file datasource (e.g. CSV): Node 1 = `python.code` that reads the file and prints JSON array of records (e.g. pandas read_csv then print(df.to_json(orient='records'))). Node 2 = `video.generator` (inputs.rows from n1, params.query from user goal). Edge: n1.rows → n2.rows. python.code exposes "rows" when stdout is a JSON array.
+6) python.code inputs: the runner pipes ALL inputs as a JSON dict to stdin. Always read: `import sys, json; data = json.load(sys.stdin)` then access inputs as `data['input']`, `data['code']`, etc. Do not expect env vars. Code source: prefer params.code_path; code_b64 is allowed but avoid unless necessary; small snippets can use params.code. IMPORTANT: For outputs, prefer returning Python objects (e.g., list/dict) instead of printing JSON strings; downstream nodes receive structured data directly. Only parse with json.loads if the upstream output is explicitly a JSON string. For multi-line text output, use triple quotes (like '''...''') or f-strings to avoid JSON escape issues. Never write `print("` followed by a newline; Python will raise an unterminated string error. Use `\\n` or triple quotes instead.
+7) Layout: include positions ONLY under node.metadata.position (x, y). Do NOT use a top-level "position" field.
+8) Tool calls MUST be structured JSON frames. For data video call create_workflow_and_run once with full workflow:
+   - create_workflow_and_run: {{ "file_path": "video.json", "workflow": {{ "root": {{ "nodes": {{...}}, "edges": {{...}} }} }} }}.
+9) Reuse ONE workflow file for the whole task. If you need to iterate, call `read_workflow` and then `update_workflow` with the same file_path instead of creating new files.
+10) You may run the workflow between updates to inspect outputs; keep edits minimal and only change what is required.
+11) After creation or update, you MUST call `run_workflow_from_file` with payload {{ "file_path": "...json" }} to execute. Do NOT skip this step. Do NOT output bash commands.
+12) Only after run_workflow_from_file returns, summarize the outputs concisely in the user's language. Do not claim the video is generated before running the workflow.
+13) Do NOT guess categorical values. Only use values explicitly provided by the user or datasource context; if unknown, omit instead of inventing.
 
 REPORT GENERATION (IMPORTANT):
 When the user asks for a "report", "analysis report", "data report", "comprehensive analysis", 
@@ -160,9 +175,87 @@ When the user asks for a "report", "analysis report", "data report", "comprehens
     "edges": {{}}
   }}
 
-Example (full workflow payload for create_workflow):
+Example 1 - Video Generation (SIMPLEST pattern):
 {{
-  "file_path": "example.json",
+  "file_path": "video_example.json",
+  "workflow": {{
+    "root": {{
+      "nodes": {{
+        "n1": {{
+          "id": "n1",
+          "type": "datasource.read",
+          "inputs": {{}},
+          "outputs": {{ "rows": {{ "schema": "list[dict]" }} }},
+          "params": {{ "datasource_id": "<datasource_id>" }},
+          "metadata": {{ "position": {{ "x": 100, "y": 100 }} }}
+        }},
+        "n2": {{
+          "id": "n2",
+          "type": "video.generator",
+          "inputs": {{
+            "rows": {{ "schema": "list[dict]", "required": true }}
+          }},
+          "outputs": {{
+            "video_path": {{ "schema": "string" }},
+            "video_info": {{ "schema": "dict" }},
+            "config": {{ "schema": "dict" }},
+            "config_path": {{ "schema": "string" }}
+          }},
+          "params": {{
+            "query": "请分析数据并生成包含可视化图表的中文视频",
+            "language": "Chinese"
+          }},
+          "metadata": {{ "position": {{ "x": 320, "y": 100 }} }}
+        }}
+      }},
+      "edges": {{
+        "e1": {{
+          "id": "e1",
+          "source": {{ "node_id": "n1", "port_id": "rows" }},
+          "target": {{ "node_id": "n2", "port_id": "rows" }}
+        }}
+      }}
+    }}
+  }}
+}}
+Note: For video.generator, set params.query from the user's goal (e.g. "分析航班延误数据并生成中文数据视频"). Always 2 nodes + 1 edge.
+
+Example 2 - File datasource + video (CSV → video):
+{{
+  "file_path": "flight_video.json",
+  "workflow": {{
+    "root": {{
+      "nodes": {{
+        "n1": {{
+          "id": "n1",
+          "type": "python.code",
+          "inputs": {{}},
+          "outputs": {{ "stdout": {{ "schema": "string" }}, "rows": {{ "schema": "list[dict]" }} }},
+          "params": {{
+            "code": "import pandas as pd\\ndf = pd.read_csv('/workspace/data/<filename>.csv')\\nprint(df.to_json(orient='records'))"
+          }},
+          "metadata": {{ "position": {{ "x": 100, "y": 100 }} }}
+        }},
+        "n2": {{
+          "id": "n2",
+          "type": "video.generator",
+          "inputs": {{ "rows": {{ "schema": "list[dict]", "required": true }}, "query": {{ "schema": "string", "required": true }} }},
+          "outputs": {{ "video_path": {{ "schema": "string" }}, "video_info": {{ "schema": "dict" }}, "config": {{ "schema": "dict" }}, "config_path": {{ "schema": "string" }} }},
+          "params": {{ "query": "Analyze the data and generate a Chinese data video with charts", "language": "Chinese" }},
+          "metadata": {{ "position": {{ "x": 320, "y": 100 }} }}
+        }}
+      }},
+      "edges": {{
+        "e1": {{ "id": "e1", "source": {{ "node_id": "n1", "port_id": "rows" }}, "target": {{ "node_id": "n2", "port_id": "rows" }} }}
+      }}
+    }}
+  }}
+}}
+Use the actual file path from datasource context (e.g. /workspace/data/flight_delay_statistics2015.csv). video.generator needs BOTH rows (from edge) and query (in params).
+
+Example 3 - SQL Query:
+{{
+  "file_path": "sql_example.json",
   "workflow": {{
     "root": {{
       "nodes": {{
@@ -173,23 +266,9 @@ Example (full workflow payload for create_workflow):
           "outputs": {{ "rows": {{ "schema": "list[dict]" }} }},
           "params": {{ "datasource_id": "<id>", "query": "SELECT 1" }},
           "metadata": {{ "position": {{ "x": 100, "y": 100 }} }}
-        }},
-        "n2": {{
-          "id": "n2",
-          "type": "python.code",
-          "inputs": {{ "input": {{ "schema": "list[dict]", "required": true }} }},
-          "outputs": {{ "stdout": {{ "schema": "string" }} }},
-          "params": {{ "code": "import sys, json\nprint(json.load(sys.stdin))" }},
-          "metadata": {{ "position": {{ "x": 320, "y": 100 }} }}
         }}
       }},
-      "edges": {{
-        "e1": {{
-          "id": "e1",
-          "source": {{ "node_id": "n1", "port_id": "rows" }},
-          "target": {{ "node_id": "n2", "port_id": "input" }}
-        }}
-      }}
+      "edges": {{}}
     }}
   }}
 }}

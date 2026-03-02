@@ -5,6 +5,19 @@
   flex-direction: column;
   height: 100%;
   background: var(--main-bg);
+  --chat-font-xs: var(--ui-font-xs);
+  --chat-font-sm: var(--ui-font-sm);
+  --chat-font-md: var(--ui-font-md);
+  --chat-font-lg: var(--ui-font-lg);
+  --chat-font-xl: var(--ui-font-xl);
+}
+
+.chat-container .text-xs {
+  font-size: var(--chat-font-xs);
+}
+
+.chat-container .text-sm {
+  font-size: var(--chat-font-sm);
 }
 
 .chat-messages {
@@ -32,14 +45,14 @@
 }
 
 .chat-empty-title {
-  font-size: 20px;
+  font-size: var(--chat-font-xl);
   font-weight: 600;
   margin-bottom: 8px;
   color: var(--main-text);
 }
 
 .chat-empty-subtitle {
-  font-size: 14px;
+  font-size: var(--chat-font-lg);
   color: var(--main-text-muted);
 }
 
@@ -71,16 +84,19 @@
 }
 
 .message-content {
-  padding: 10px 14px;
-  border-radius: 18px;
-  font-size: 14px;
-  line-height: 1.5;
-  max-width: min(100%, 720px);
+  padding: 0;
+  border-radius: 0;
+  font-size: var(--chat-font-md);
+  line-height: 1.65;
+  max-width: min(100%, 760px);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .message-bubble.user .message-content {
-  background: var(--main-bg-alt);
+  background: transparent;
   color: var(--main-text);
+  border: none;
 }
 
 .message-bubble.assistant .message-content {
@@ -88,6 +104,24 @@
   border: none;
   padding: 0;
   color: var(--main-text);
+}
+
+.assistant-timeline {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 760px);
+}
+
+.message-bubble {
+  margin-bottom: 14px;
+}
+
+.message-bubble.user {
+  align-items: flex-end;
+}
+
+.message-bubble.user .message-content {
+  text-align: right;
 }
 
 /* Markdown Styles */
@@ -103,9 +137,9 @@
   color: var(--main-text);
 }
 
-.message-content h1 { font-size: 24px; }
-.message-content h2 { font-size: 20px; }
-.message-content h3 { font-size: 18px; }
+.message-content h1 { font-size: var(--chat-font-xl); }
+.message-content h2 { font-size: 21px; }
+.message-content h3 { font-size: 19px; }
 
 .message-content p {
   margin-bottom: 12px;
@@ -115,7 +149,7 @@
   background: var(--input-bg);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--chat-font-sm);
   font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
   border: 1px solid var(--border-color);
 }
@@ -173,7 +207,7 @@
 .message-content th {
   background: var(--main-bg-alt);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--chat-font-sm);
 }
 
 .message-content tr:last-child td {
@@ -210,7 +244,7 @@
   border: none;
   outline: none;
   color: var(--main-text);
-  font-size: 14px;
+  font-size: var(--chat-font-md);
   line-height: 1.5;
   resize: none;
   max-height: 200px;
@@ -293,7 +327,7 @@ body.dark-theme .chat-input:focus {
 
 .mention-header {
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: var(--chat-font-xs);
   font-weight: 500;
   color: var(--main-text-muted);
   border-bottom: 1px solid var(--border-color);
@@ -330,7 +364,7 @@ body.dark-theme .chat-input:focus {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
-  font-size: 13px;
+  font-size: var(--chat-font-sm);
   color: var(--main-text);
   font-family: inherit;
 }
@@ -346,7 +380,7 @@ body.dark-theme .chat-input:focus {
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
   color: #ef4444;
-  font-size: 13px;
+  font-size: var(--chat-font-sm);
   margin: 16px 24px;
 }
 

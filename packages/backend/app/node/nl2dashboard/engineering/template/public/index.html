@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepEye Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Import base libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.8s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 flex items-center justify-center min-h-screen font-sans">
+
+    <!-- Actual Dashboard mount point -->
+    <div id="app-root" class="w-full h-screen">
+        <div id="init-loader" class="flex flex-col items-center justify-center h-full text-indigo-600 font-medium bg-white">
+            <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-indigo-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>Initializing chart engine...</p>
+        </div>
+    </div>
+
+    <!-- Script loading logic -->
+    <script>
+        window.addEventListener('load', function() {
+            console.log("Dashboard container loaded. Initializing...");
+            
+            // Immediately try to load core logic
+            const script = document.createElement('script');
+            script.src = "public/app.js"; // Relative path
+            script.onload = function() {
+                console.log("Core JS loaded successfully.");
+            };
+            script.onerror = function() {
+                showError('❌ Chart engine (app.js) failed to load, please check for 404/500 errors');
+            };
+            document.body.appendChild(script);
+        });
+
+        function showError(msg) {
+            const root = document.getElementById('app-root');
+            if (root) {
+                root.innerHTML = `<div class="flex items-center justify-center h-full w-full">
+                    <div class="p-8 text-red-500 bg-red-50 border border-red-200 rounded-lg m-4 max-w-md shadow-sm">
+                        <h3 class="font-bold mb-2">Initialization Failed</h3>
+                        <p>${msg}</p>
+                    </div>
+                </div>`;
+            }
+        }
+        
+        // Globally catch async errors from App.js
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            showError('Dashboard data loading failed: ' + (event.reason.message || 'Unknown error'));
+        });
+    </script>
+</body>
+</html>

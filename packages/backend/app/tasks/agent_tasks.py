@@ -13,13 +13,17 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.infra import RedisEventBus
 from app.repositories import DataSourceRepository, SessionRepository
-from app.sandbox.manager import SandboxManager
+from app.sandbox.manager import SandboxManager, _get_datasource_filename
 from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
 from app.services.workflow_engine import build_registry
 from app.services.workflow_prompts import build_workflow_prompt
 from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
 from deepeye.agents import AgentFactory
-from app.tools.workflow_tools import create_run_workflow_from_file_tool, create_design_workflow_tool
+from app.tools.workflow_tools import (
+    create_run_workflow_from_file_tool,
+    create_design_workflow_tool,
+    create_generate_data_video_tool,
+)
 from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
 
@@ -45,7 +49,8 @@ def _get_datasources_info(datasource_ids: list[str] | None, user_id: uuid.UUID |
                     "category": getattr(ds, "category", "database"),
                 }
                 if info["category"] == "file":
-                    info["local_path"] = f"/workspace/data/{ds.name}"
+                    original_filename = _get_datasource_filename(ds)
+                    info["local_path"] = f"/workspace/data/{original_filename}"
                 items.append(info)
     return items
 
@@ -98,7 +103,7 @@ def _get_datasources_schema(datasource_ids: list[str] | None, user_id: uuid.UUID
                         "datasource_name": ds.name,
                         "name": ds.name,
                         "kind": "file",
-                        "local_path": f"/workspace/data/{ds.name}",
+                        "local_path": f"/workspace/data/{_get_datasource_filename(ds)}",
                         "columns": metadata["columns"],
                         "preview": metadata.get("preview", [])
                     })
@@ -191,6 +196,9 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         ds_context_lines.append(line)
     header = "Available Data Sources (use the file paths for workflow nodes like report.generate):\n"
     datasources_context = header + "\n".join(ds_context_lines) if ds_context_lines else "No data sources selected."
+
+    # One-shot data video tool (like query_knowledge_base): no sub-agent, one call does create+run
+    tools.append(create_generate_data_video_tool(session_id, datasources_info))
 
     workflow_prompt = build_workflow_prompt(
         build_registry(),

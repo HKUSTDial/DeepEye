@@ -1,0 +1,1 @@
+"""Video config generation module."""

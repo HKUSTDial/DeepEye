@@ -1,0 +1,421 @@
+<div class="flex h-screen overflow-hidden font-sans bg-[#F9FAFB]">
+    
+    <aside class="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-10 shadow-lg hidden md:flex">
+        <div class="p-6 border-b border-gray-100 flex items-center gap-2">
+            <div class="w-8 h-8 bg-[#E18182] rounded-lg flex items-center justify-center text-white font-bold shadow-[#E18182]/30 shadow-lg">D</div>
+            <span class="font-bold text-xl tracking-tight text-gray-800">DataMiner</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-8">
+            <div id="filter-container" class="space-y-6"></div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+        <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-20">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Maven Roasters Sales</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Explore sales trends and product performance across NYC locations.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 bg-[#BBCFC3]/20 px-3 py-1 rounded-full border border-[#BBCFC3]/30">
+                    <div class="h-2 w-2 bg-[#BBCFC3] rounded-full animate-pulse"></div>
+                    <span class="text-xs font-semibold text-gray-600">System Online</span>
+                </div>
+                <div class="h-10 w-10 bg-gray-100 rounded-full border border-gray-200 flex items-center justify-center text-gray-500">
+                    <i class="ph ph-user text-xl"></i>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-x-hidden overflow-y-auto p-8">
+            
+            <!-- Highlight cards container: generated dynamically -->
+            <div id="highlights-container" class="mb-8"></div>
+
+            <!-- Chart container: generated dynamically -->
+            <div id="charts-container"></div>
+        </div>
+    </main>
+</div>
+
+<!-- Template theme configuration script -->
+<script>
+// --- 🎨 Visual core: Template 3 (Design Aesthetics Diary Edition) ---
+const themeName = 'template3_aesthetic';
+const template3Palette = {
+    // 1. Palette: fully extracted from the image "Design Aesthetics Diary"
+    // Order: Salmon -> Peach -> Sage -> Sky
+    color: [
+        '#E18182', // Metric 1 (Primary)
+        '#F9CE9C', // Metric 2 (Secondary/Warm)
+        '#BBCFC3', // Metric 3 (Tertiary/Nature)
+        '#C9DDE3', // Metric 4 (Cold/Neutral)
+        '#D8A49B', // Extra color: deeper pink
+        '#A5B9C0'  // Extra color: deeper blue-gray
+    ],
+    backgroundColor: 'rgba(0,0,0,0)',
+    textStyle: { fontFamily: 'Inter, -apple-system, system-ui, sans-serif' },
+
+    title: {
+        textStyle: { color: '#374151', fontWeight: '700', fontSize: 16 },
+        subtextStyle: { color: '#9ca3af' }
+    },
+
+    // 2. Layout: keep a widescreen feel
+    grid: {
+        top: 45,
+        left: '1%',
+        right: '1%',
+        bottom: '2%',
+        containLabel: true,
+        borderWidth: 0
+    },
+
+    categoryAxis: {
+        axisLine: { show: true, lineStyle: { color: '#f3f4f6' } }, // Very light gray line
+        axisTick: { show: false },
+        axisLabel: { color: '#6b7280', margin: 14, fontSize: 11, fontWeight: 500 },
+        splitLine: { show: false }
+    },
+    valueAxis: {
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#9ca3af', margin: 10, fontSize: 11 },
+        splitLine: {
+            show: true,
+            lineStyle: { color: '#f3f4f6', type: 'dashed', width: 1 }
+        }
+    },
+
+    // --- Chart style adjustments: soft, matte texture ---
+
+    // 1. Line chart: use Salmon (#E18182) gradient
+    line: {
+        smooth: true,
+        width: 3,
+        symbol: 'circle',
+        symbolSize: 6,
+        showSymbol: false,
+        itemStyle: { 
+            borderWidth: 1, 
+            borderColor: '#fff',
+            color: '#E18182' 
+        },
+        areaStyle: {
+            opacity: 0.2, 
+            color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                    { offset: 0, color: '#E18182' },
+                    { offset: 1, color: 'rgba(255, 255, 255, 0)' }
+                ]
+            }
+        }
+    },
+
+    // 2. Bar chart: fresh gradient from Sky (#C9DDE3) to Sage (#BBCFC3)
+    bar: {
+        itemStyle: {
+            borderRadius: [4, 4, 0, 0],
+            color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                    { offset: 0, color: '#BBCFC3' }, // Top: Sage
+                    { offset: 1, color: '#C9DDE3' }  // Bottom: Sky
+                ]
+            }
+        },
+        barMaxWidth: 40,
+        barCategoryGap: '35%'
+    },
+
+    // 3. Boxplot: use Peach (#F9CE9C)
+    boxplot: {
+        itemStyle: {
+            color: '#fffbf5',       // Very light apricot background
+            borderColor: '#F9CE9C', // Apricot border
+            borderWidth: 1.5
+        },
+        emphasis: {
+            itemStyle: {
+                color: '#F9CE9C',
+                borderColor: '#E6B07E',
+                borderWidth: 2
+            }
+        },
+        boxWidth: [10, 40]
+    },
+
+    // 4. Heatmap: warm–cool transition from Sky -> Salmon
+    heatmap: {
+        itemStyle: {
+            borderColor: '#fff',
+            borderWidth: 2
+        },
+        label: { show: false }
+    },
+
+    // 5. VisualMap: smooth color transition
+    visualMap: {
+        type: 'continuous',
+        inRange: {
+            color: [
+                '#C9DDE3', // Low: Sky
+                '#BBCFC3', // Mid: Sage
+                '#F9CE9C', // Mid-high: Peach
+                '#E18182'  // High: Salmon
+            ]
+        },
+        itemWidth: 12,
+        itemHeight: 100,
+        orient: 'horizontal',
+        left: 'center',
+        top: 0,
+        text: ['High', 'Low'],
+        textStyle: { color: '#9ca3af', fontSize: 10 },
+        calculable: true
+    },
+
+    // 6. Pie/donut: directly use four colors from the palette
+    pie: {
+        itemStyle: {
+            borderWidth: 2,
+            borderColor: '#ffffff'
+        }
+    },
+
+    tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#E18182', // Use primary color for border
+        borderWidth: 0,
+        textStyle: { color: '#374151', fontSize: 12 },
+        padding: [10, 14],
+        extraCssText: 'box-shadow: 0 4px 20px -5px rgba(225, 129, 130, 0.2); border-left: 4px solid #E18182; border-radius: 4px;'
+    },
+    
+    legend: {
+        icon: 'circle',
+        textStyle: { color: '#6b7280' }
+    }
+};
+
+// Register theme globally for use in app.js
+(function() {
+    // Ensure echarts is loaded
+    if (typeof window.echarts !== 'undefined') {
+        window.echarts.registerTheme(themeName, template3Palette);
+        // Expose theme configuration globally for renderCharts in app.js (generic variable names)
+        window.currentPalette = template3Palette;
+        window.currentThemeName = themeName;
+    } else {
+        // If echarts is not yet loaded, wait until it is ready
+        const checkECharts = setInterval(() => {
+            if (typeof window.echarts !== 'undefined') {
+                window.echarts.registerTheme(themeName, template3Palette);
+                window.currentPalette = template3Palette;
+                window.currentThemeName = themeName;
+                clearInterval(checkECharts);
+            }
+        }, 50);
+        
+        // Stop checking after 10 seconds to avoid infinite wait
+        setTimeout(() => clearInterval(checkECharts), 10000);
+    }
+})();
+
+// --- Universal template dynamic layout generation script ---
+(function() {
+    // Highlight card color configuration
+    const highlightColors = [
+        { bg: '#E18182', hover: '#E18182', icon: 'ph-chart-line-up' },
+        { bg: '#F9CE9C', hover: '#F9CE9C', icon: 'ph-users' },
+        { bg: '#BBCFC3', hover: '#BBCFC3', icon: 'ph-package' },
+        { bg: '#C9DDE3', hover: '#C9DDE3', icon: 'ph-currency-dollar' },
+        { bg: '#D8A49B', hover: '#D8A49B', icon: 'ph-trend-up' },
+        { bg: '#A5B9C0', hover: '#A5B9C0', icon: 'ph-chart-bar' }
+    ];
+
+    // Chart color configuration
+    const chartColors = [
+        '#E18182', '#BBCFC3', '#F9CE9C', '#C9DDE3', '#D8A49B', '#A5B9C0'
+    ];
+
+    /**
+     * Compute optimal number of grid columns
+     * @param {number} count - Number of elements
+     * @param {number} maxCols - Maximum columns (default 6)
+     * @returns {number} Optimal column count
+     */
+    function calculateOptimalColumns(count, maxCols = 6) {
+        if (count === 0) return 1;
+        if (count === 1) return 1;
+        if (count === 2) return 2;
+        if (count <= 4) return Math.min(count, 4);
+        if (count <= 6) return 3;
+        if (count <= 9) return 3;
+        return Math.min(Math.ceil(Math.sqrt(count)), maxCols);
+    }
+
+    /**
+     * Get Tailwind CSS class names (dynamic columns)
+     * @param {number} cols - Column count
+     * @returns {string} Tailwind CSS classes
+     */
+    function getGridColsClass(cols) {
+        const colMap = {
+            1: 'grid-cols-1',
+            2: 'md:grid-cols-2',
+            3: 'md:grid-cols-2 lg:grid-cols-3',
+            4: 'md:grid-cols-2 lg:grid-cols-4',
+            5: 'md:grid-cols-2 lg:grid-cols-5',
+            6: 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'
+        };
+        return colMap[cols] || 'md:grid-cols-2 lg:grid-cols-3';
+    }
+
+    /**
+     * Generate highlight HTML (based on configured blocks, keep IDs consistent with backend)
+     * @param {Array} highlightBlocks - List of highlight blocks
+     */
+    function generateHighlightsFromBlocks(highlightBlocks) {
+        const container = document.getElementById('highlights-container');
+        if (!container || !highlightBlocks || highlightBlocks.length === 0) {
+            if (container) container.style.display = 'none';
+            return;
+        }
+
+        const count = highlightBlocks.length;
+        container.style.display = 'block';
+        const cols = calculateOptimalColumns(count, 6);
+        container.className = `grid grid-cols-1 ${getGridColsClass(cols)} gap-6 mb-8`;
+
+        container.innerHTML = '';
+        highlightBlocks.forEach((block, idx) => {
+            const color = highlightColors[idx % highlightColors.length];
+            const blockId = block.id || `highlight_${idx + 1}`;
+            const title = (block.blockContent && block.blockContent.title) || `Metric ${idx + 1}`;
+            
+            // Note: IDs must match the format used by renderHighlights in app.js: title-${item.id} / val-${item.id}
+            const highlightHTML = `
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between group transition-colors" style="border-color: rgba(229, 231, 235, 1);" onmouseover="this.style.borderColor='${color.hover}80'" onmouseout="this.style.borderColor='rgba(229, 231, 235, 1)'">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider" id="title-${blockId}">${title}</p>
+                        <div class="p-2 rounded-lg transition-colors" style="background-color: ${color.bg}1A; color: ${color.bg};" onmouseover="this.style.backgroundColor='${color.bg}'; this.style.color='white';" onmouseout="this.style.backgroundColor='${color.bg}1A'; this.style.color='${color.bg}';">
+                            <i class="ph ${color.icon}"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-4">
+                        <h3 class="text-2xl font-bold text-gray-900" id="val-${blockId}">--</h3>
+                        <span class="text-xs font-medium text-gray-400" id="unit-${blockId}"></span>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += highlightHTML;
+        });
+    }
+
+    /**
+     * Generate chart container HTML (based on configured blocks, keep IDs consistent with backend)
+     * @param {Array} viewBlocks - List of chart blocks
+     */
+    function generateChartsFromBlocks(viewBlocks) {
+        const container = document.getElementById('charts-container');
+        if (!container || !viewBlocks || viewBlocks.length === 0) {
+            if (container) container.innerHTML = '<p class="text-gray-500 text-center py-8">No charts available</p>';
+            return;
+        }
+
+        const count = viewBlocks.length;
+        const cols = calculateOptimalColumns(count, 4);
+        container.className = `grid grid-cols-1 ${getGridColsClass(cols)} gap-6`;
+
+        container.innerHTML = '';
+        viewBlocks.forEach((block, idx) => {
+            const color = chartColors[idx % chartColors.length];
+            const chartId = block.id || `intent_${idx}_goal_0_chart0`;
+            const content = block.blockContent || {};
+            const title = content.description || content.title || `Chart ${idx + 1}`;
+            
+            const chartHTML = `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col min-h-[400px]">
+                    <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span class="w-1 h-4 rounded-full" style="background-color: ${color};"></span>
+                        ${title}
+                    </h3>
+                    <div class="flex-1 w-full relative">
+                        <div id="${chartId}" class="absolute inset-0"></div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += chartHTML;
+        });
+    }
+
+    /**
+     * Read blocks from configuration and generate layout
+     */
+    function initializeLayout() {
+        console.log('[UniversalTemplate] 🔄 Initializing layout...');
+        
+        let blocks = null;
+        
+        // Method 1: read config from embedded script tag (highest priority)
+        const configScript = document.getElementById('dashboard-config-data');
+        if (configScript) {
+            try {
+                const config = JSON.parse(configScript.textContent);
+                blocks = config.blocks;
+                console.log('[UniversalTemplate] ✅ Found config in script tag, blocks:', blocks ? blocks.length : 0);
+            } catch (e) {
+                console.warn('[UniversalTemplate] ⚠️ Failed to parse config from script tag:', e);
+            }
+        }
+
+        // Method 2: read from global config (available after app.js loads)
+        if (!blocks && typeof window.dashboardConfig !== 'undefined' && window.dashboardConfig.blocks) {
+            blocks = window.dashboardConfig.blocks;
+            console.log('[UniversalTemplate] ✅ Found config in window.dashboardConfig, blocks:', blocks.length);
+        }
+
+        // Method 3: read from window.App.config (if App is initialized)
+        if (!blocks && window.App && window.App.config && window.App.config.blocks) {
+            blocks = window.App.config.blocks;
+            console.log('[UniversalTemplate] ✅ Found config in window.App.config, blocks:', blocks.length);
+        }
+
+        if (blocks && Array.isArray(blocks)) {
+            const highlightBlocks = blocks.filter(b => b.blockType === 'highlight');
+            const viewBlocks = blocks.filter(b => b.blockType === 'view');
+            
+            console.log('[UniversalTemplate] Generating layout:', highlightBlocks.length, 'highlights,', viewBlocks.length, 'charts');
+            
+            generateHighlightsFromBlocks(highlightBlocks);
+            generateChartsFromBlocks(viewBlocks);
+            
+            console.log('[UniversalTemplate] ✅ Layout generated successfully');
+            return true;
+        }
+
+        console.warn('[UniversalTemplate] ⚠️ No blocks found, will retry...');
+        return false;
+    }
+
+    // Try to initialize immediately (config may already be injected when template script runs)
+    if (!initializeLayout()) {
+        // If it fails, retry for a short time (give app.js time to load config)
+        let retries = 0;
+        const maxRetries = 20; // Retry at most 20 times, every 100ms (2 seconds total)
+        const retryInterval = setInterval(function() {
+            retries++;
+            if (initializeLayout() || retries >= maxRetries) {
+                clearInterval(retryInterval);
+                if (retries >= maxRetries) {
+                    console.error('[UniversalTemplate] ❌ Failed to initialize layout after', maxRetries, 'retries');
+                }
+            }
+        }, 100);
+    }
+})();
+</script>
+
