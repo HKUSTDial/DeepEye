@@ -1,14 +1,9 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTheme } from '../../../hooks/useTheme'
-import type React from 'react'
-import { Player } from '@remotion/player'
-import { getVideoConfig, getVideoConfigByPath, type VideoConfig } from '../../../api/video'
-import { getFallbackConfig, FALLBACK_TASK_IDS } from '../../../api/videoFallbackConfigs'
-import { registerVideoByTaskId, getRegisteredVideo } from '../../../api/videoRegistration'
-import { VideoComposer } from '../../video/VideoComposer'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
-
-const KNOWN_PREFIXES = ['分析学生成绩分布生成数据视频', 'Createavideoreportex']
+import { config } from '../../../config'
+import { http } from '../../../api/client'
 
 interface VideoPreviewPanelProps {
   configPath?: string
@@ -16,116 +11,37 @@ interface VideoPreviewPanelProps {
   sessionId?: string | null
 }
 
-/**
- * 从配置文件的 meta.title 提取 componentPrefix
- * 逻辑：去掉空格和特殊字符，只保留字母数字，截取前20个字符
- */
-function extractComponentPrefix(config: VideoConfig): string {
-  const title = config.meta.title || ''
-  if (!title) {
-    return '分析学生成绩分布生成数据视频' // 默认模板
-  }
-  
-  // 去掉空格和特殊字符，只保留“字母/数字”（包含中文等非 ASCII 字母）
-  // 与后端 `str.isalnum()` 的行为保持一致
-  const datasetName = title.replace(/[^\p{L}\p{N}]/gu, '')
-  // 如果太长，截取前20个字符
-  const prefix = datasetName.length > 20 ? datasetName.substring(0, 20) : datasetName
-  return prefix || '分析学生成绩分布生成数据视频'
+/** Task ID 格式：YYYYMMDD_HHMMSS，仅允许该格式用于 URL，避免误粘贴整段控制台输出 */
+const TASK_ID_REGEX = /^\d{8}_\d{6}$/
+
+/** 从粘贴内容中规范出合法 Task ID：精确匹配或从长文本中提取第一处 \d{8}_\d{6} */
+function normalizePastedTaskId(raw: string): string | undefined {
+  const trimmed = raw.trim()
+  if (!trimmed) return undefined
+  if (TASK_ID_REGEX.test(trimmed)) return trimmed
+  const extracted = trimmed.match(/(\d{8}_\d{6})/)
+  return extracted ? extracted[1] : undefined
 }
 
-// 视频预览组件（使用 VideoComposer，可传入已注册的场景组件实现按 id 预览）
-function VideoPreviewComponent({
-  config,
-  taskId,
-  sessionId,
-  registeredSceneComponents,
-}: {
-  config: VideoConfig
-  taskId?: string | null
-  sessionId?: string | null
-  registeredSceneComponents?: Record<string, React.FC<any>> | null
-}) {
-  const componentPrefix = useMemo(() => extractComponentPrefix(config), [config])
-
-  return (
-    <VideoComposer
-      configJson={config}
-      componentPrefix={componentPrefix}
-      taskId={taskId}
-      sessionId={sessionId}
-      registeredSceneComponents={registeredSceneComponents}
-    />
-  )
-}
-
-/** 从任意字符串中提取 taskId / configPath（用于 JSON 内的 stdout 等字段） */
-function extractVideoInfoFromString(str: string): { taskId?: string; configPath?: string } | null {
-  if (typeof str !== 'string' || !str) return null
-  const configPathMatch = str.match(/video_configs[/\\]generated_(\d{8}_\d{6})_aligned\.json|generated_(\d{8}_\d{6})_aligned\.json/)
-  if (configPathMatch) {
-    const taskId = configPathMatch[1] || configPathMatch[2]
-    return taskId ? { taskId, configPath: undefined } : null
-  }
-  const taskIdLabelMatch = str.match(/Task ID:\s*(\d{8}_\d{6})/i)
-  if (taskIdLabelMatch) return { taskId: taskIdLabelMatch[1], configPath: undefined }
-  const taskIdMatch = str.match(/(\d{8}_\d{6})/)
-  if (taskIdMatch) return { taskId: taskIdMatch[1], configPath: undefined }
-  return null
-}
-
-/**
- * 从工作流输出中提取视频信息。
- * 支持：1) 节点输出中的 video_info / config_path / video_path；2) 节点输出中任意字符串（如 stdout）；3) 整段 runOutput 文本。
- */
-function extractVideoInfoFromOutput(runOutput: string): { taskId?: string; configPath?: string } {
-  if (!runOutput) return {}
-
+/** 从工作流输出中提取 Task ID（支持 JSON 与纯文本） */
+function extractTaskIdFromOutput(runOutput: string): string | undefined {
+  if (!runOutput || typeof runOutput !== 'string') return undefined
+  const taskIdLabelMatch = runOutput.match(/Task ID:\s*(\d{8}_\d{6})/i)
+  if (taskIdLabelMatch) return taskIdLabelMatch[1]
   try {
-    const outputs = JSON.parse(runOutput)
-    if (outputs && typeof outputs === 'object') {
-      for (const nodeId of Object.keys(outputs)) {
-        const nodeOutputs = outputs[nodeId]
-        if (!nodeOutputs || typeof nodeOutputs !== 'object') continue
-
-        const videoInfo = nodeOutputs.video_info
-        const configPath = nodeOutputs.config_path
-        const videoPath = nodeOutputs.video_path
-
-        let taskId: string | undefined
-        if (videoInfo?.task_id) {
-          taskId = videoInfo.task_id
-        } else if (typeof videoPath === 'string') {
-          const m = videoPath.match(/(?:claude_tsx_animated|video_components)[/\\](\d{8}_\d{6})/)
-          taskId = m ? m[1] : undefined
-        } else if (typeof configPath === 'string') {
-          const m = configPath.match(/generated_(\d{8}_\d{6})_aligned\.json/)
-          taskId = m ? m[1] : undefined
-        }
-
-        if (videoInfo || configPath || videoPath) {
-          return { taskId, configPath: typeof configPath === 'string' ? configPath : undefined }
-        }
-
-        // 节点没有 video 字段时，在其所有字符串值中搜索（如 stdout 里打印了 Task ID）
-        for (const key of Object.keys(nodeOutputs)) {
-          const v = nodeOutputs[key]
-          if (typeof v === 'string') {
-            const fromField = extractVideoInfoFromString(v)
-            if (fromField) return fromField
-          }
-        }
+    const data = JSON.parse(runOutput)
+    if (data && typeof data === 'object') {
+      for (const key of Object.keys(data)) {
+        const node = data[key]
+        if (node && typeof node === 'object' && typeof node.task_id === 'string') return node.task_id
+        if (node && typeof node === 'object' && node.video_info?.task_id) return node.video_info.task_id
       }
     }
   } catch {
-    // 非 JSON，下面用文本方式提取
+    // not JSON, continue
   }
-
-  // 整段文本中提取（兼容非 JSON 或视频信息只在某段文本里的情况）
-  const fromText = extractVideoInfoFromString(runOutput)
-  if (fromText) return fromText
-
-  return {}
+  const taskIdMatch = runOutput.match(/(\d{8}_\d{6})/)
+  return taskIdMatch ? taskIdMatch[1] : undefined
 }
 
 const STEP_LABELS = [
@@ -135,31 +51,39 @@ const STEP_LABELS = [
   { icon: '🎬', label: 'Render components', index: 3 },
 ]
 
-/** 根据日志内容返回条目类型，用于高亮 */
+const STEP_MESSAGES: Record<number, string> = {
+  0: '📹 Step 1/4: Generating video configuration...',
+  1: '🎵 Step 2/4: Generating audio and aligning timeline...',
+  2: '💾 Step 3/4: Saving configuration file...',
+  3: '🎬 Step 4/4: Rendering video components...',
+}
+
 function getLogEntryType(message: string): 'success' | 'warn' | 'error' | 'info' | null {
   const t = message.trim()
-  if (t.includes('✅') || t.includes('✓') || /完成!?/.test(t)) return 'success'
-  if (t.includes('⚠️') || t.includes('Warning') || t.includes('未找到')) return 'warn'
-  if (t.includes('❌') || t.includes('Error') || t.includes('Failed') || t.includes('失败')) return 'error'
-  if (t.includes('📊') || t.includes('Step') || /^\s*\[?\d+\/\d+\]/.test(t) || t.includes('耗时')) return 'info'
+  if (t.includes('✅') || t.includes('✓')) return 'success'
+  if (t.includes('⚠️') || t.includes('Warning')) return 'warn'
+  if (t.includes('❌') || t.includes('Error') || t.includes('Failed')) return 'error'
+  if (t.includes('📊') || t.includes('Step') || /^\s*\[?\d+\/\d+\]/.test(t)) return 'info'
   return null
 }
 
-export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPreviewPanelProps) {
+/**
+ * Video Preview panel: Doc Docker only.
+ * - When video_preview_ready: show iframe (container URL).
+ * - When container deploying: show "starting…".
+ * - When generating: show progress (steps + logs).
+ * - Otherwise: show empty state (no manual Task ID / in-page player).
+ */
+export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const videoProgressLogsRef = useRef<HTMLDivElement | null>(null)
+  const [pastedTaskId, setPastedTaskId] = useState('')
+  const [testStarting, setTestStarting] = useState(false)
+  const [testError, setTestError] = useState<string | null>(null)
+  const [startPreviewLoading, setStartPreviewLoading] = useState(false)
+  const [startPreviewError, setStartPreviewError] = useState<string | null>(null)
 
-  const [config, setConfig] = useState<VideoConfig | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [manualTaskId, setManualTaskId] = useState<string>('')
-  const [showManualInput, setShowManualInput] = useState(false)
-  const [registeredSceneComponents, setRegisteredSceneComponents] = useState<Record<string, React.FC<any>> | null>(null)
-  const [registerLoading, setRegisterLoading] = useState(false)
-  const [registerError, setRegisterError] = useState<string | null>(null)
-
-  // 如果没有提供 configPath 或 taskId，尝试从工作流输出中提取
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
@@ -167,202 +91,238 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
   const videoProgress = sessionState?.videoProgress ?? { visible: false, step: 0, percent: 0, logs: [] }
   const runStatus = sessionState?.runStatus ?? null
   const runError = sessionState?.runError ?? null
+  const videoPreviewUrl = sessionState?.videoPreviewUrl ?? null
+  const [isPreviewReady, setIsPreviewReady] = useState(false)
+  const [isCheckingPreview, setIsCheckingPreview] = useState(false)
+  const previewCheckIntervalRef = useRef<number | null>(null)
+
+  // 与仪表盘一致：从 node 输出收集 video_url，取最后一个并拼完整 URL
+  const videoUrlsFromNode = useMemo(() => {
+    if (!sessionState?.nodeStatus) return []
+    const urls: { nodeId: string; url: string }[] = []
+    Object.entries(sessionState.nodeStatus).forEach(([nodeId, statusInfo]) => {
+      const info = statusInfo as { outputs?: Record<string, unknown> }
+      const u = info.outputs?.video_url
+      if (typeof u === 'string' && u) urls.push({ nodeId, url: u })
+    })
+    return urls
+  }, [sessionState?.nodeStatus])
+
+  const latestVideoUrlFromNode = videoUrlsFromNode[videoUrlsFromNode.length - 1]?.url
+  const fullPreviewUrlFromNode = useMemo(() => {
+    if (!latestVideoUrlFromNode) return ''
+    if (latestVideoUrlFromNode.startsWith('http')) return latestVideoUrlFromNode
+    const base = config.api.baseUrl.replace('/api/v1', '')
+    return `${base}${latestVideoUrlFromNode.startsWith('/') ? '' : '/'}${latestVideoUrlFromNode}`
+  }, [latestVideoUrlFromNode])
+
+  const pastedNormalized = normalizePastedTaskId(pastedTaskId)
+  const displayTaskId = taskId || extractTaskIdFromOutput(runOutput) || pastedNormalized || undefined
+
+  // 约定 URL：有 taskId 但尚无事件/节点输出时使用（与后端容器命名一致）
+  const constructedPreviewUrl =
+    displayTaskId && typeof window !== 'undefined'
+      ? `${window.location.origin}/video-previews/deepeye-video-${displayTaskId}/`
+      : null
+
+  // 统一预览 URL 优先级：事件 > 节点输出 > 约定 URL（与仪表盘逻辑一致）
+  const effectivePreviewUrl =
+    videoPreviewUrl || fullPreviewUrlFromNode || constructedPreviewUrl || null
+
+  // 与仪表盘一致：有预览 URL 时轮询就绪，就绪后再显示 iframe。用 GET 避免 Vite 对 HEAD 返回异常导致 502
+  useEffect(() => {
+    if (!effectivePreviewUrl) {
+      setIsPreviewReady(false)
+      return
+    }
+    setIsPreviewReady(false)
+
+    const checkReady = async () => {
+      setIsCheckingPreview(true)
+      try {
+        // GET 更可靠：Vite 对 HEAD 可能未正确响应，nginx 易报 502
+        const res = await fetch(effectivePreviewUrl, { method: 'GET', cache: 'no-store' })
+        // 仅当来自「预览路由」且 200 时才视为就绪，避免误把主站首页当预览（若被错误转发到前端会缺 X-Video-Preview）
+        const fromPreviewRoute = res.headers.get('X-Video-Preview') === '1'
+        if (res.ok && fromPreviewRoute) {
+          setIsPreviewReady(true)
+          if (previewCheckIntervalRef.current) {
+            window.clearInterval(previewCheckIntervalRef.current)
+            previewCheckIntervalRef.current = null
+          }
+        }
+      } catch {
+        // 502/网络错误时继续轮询，容器可能仍在启动
+      } finally {
+        setIsCheckingPreview(false)
+      }
+    }
+
+    // 首次延迟 3s 再开始轮询，减少容器刚启动时的 502
+    const t = window.setTimeout(() => {
+      checkReady()
+      previewCheckIntervalRef.current = window.setInterval(checkReady, 2000)
+    }, 3000)
+
+    return () => {
+      window.clearTimeout(t)
+      if (previewCheckIntervalRef.current) {
+        window.clearInterval(previewCheckIntervalRef.current)
+        previewCheckIntervalRef.current = null
+      }
+    }
+  }, [effectivePreviewUrl])
+
+  useEffect(() => {
+    setStartPreviewError(null)
+  }, [effectivePreviewUrl])
+
+  // 控制台调试信息，便于排查预览不加载
+  useEffect(() => {
+    const prefix = '[VideoPreview]'
+    if (effectivePreviewUrl) {
+      console.info(prefix, 'Preview URL (will poll until ready):', {
+        source: videoPreviewUrl ? 'event' : fullPreviewUrlFromNode ? 'node output' : 'constructed',
+        url: effectivePreviewUrl,
+      })
+      return
+    }
+    if (sessionId != null || (runOutput?.length ?? 0) > 0) {
+      console.info(prefix, 'No preview URL (paste Task ID or wait for event):', {
+        sessionId: sessionId ?? null,
+        taskIdFromProps: taskId ?? null,
+        extractedFromRunOutput: extractTaskIdFromOutput(runOutput) ?? null,
+        pastedTaskId: pastedNormalized ?? (pastedTaskId.trim() || null),
+        runOutputLength: runOutput?.length ?? 0,
+      })
+    }
+  }, [effectivePreviewUrl, videoPreviewUrl, fullPreviewUrlFromNode, sessionId, taskId, pastedNormalized, pastedTaskId, runOutput])
 
   useEffect(() => {
     if (videoProgress.visible && videoProgress.logs.length > 0 && videoProgressLogsRef.current) {
       videoProgressLogsRef.current.scrollTop = videoProgressLogsRef.current.scrollHeight
     }
   }, [videoProgress.visible, videoProgress.logs.length])
-  
-  // 自动从工作流输出中提取视频信息（taskId / configPath）
-  const extractedInfo = useMemo(() => {
-    if (!configPath && !taskId && runOutput) {
-      return extractVideoInfoFromOutput(runOutput)
-    }
-    return {}
-  }, [configPath, taskId, runOutput])
-  
-  // 使用提供的参数、提取的参数或手动输入的参数
-  const effectiveTaskId = taskId || extractedInfo.taskId || manualTaskId
-  const effectiveConfigPath = configPath || extractedInfo.configPath
-  const loadCancelledRef = useRef(false)
 
-  useEffect(() => {
-    loadCancelledRef.current = false
-    const loadConfig = async (retryCount = 0) => {
-      setLoading(true)
-      setError(null)
+  const runInProgress = runStatus === 'running' || runStatus === null
 
-      const taskIdStr = effectiveTaskId ? String(effectiveTaskId).trim() : ''
-      const fallback = taskIdStr ? getFallbackConfig(taskIdStr) : null
-
-      if (fallback) {
-        setConfig(fallback)
-        setLoading(false)
-        return
-      }
-
-      // 如果 run 还在进行中，延迟加载（等 Step 4/4 完成，config 文件就绪）
-      const runInProgress = runStatus === 'running' || runStatus === null
-      if (runInProgress && effectiveTaskId) {
-        console.log('⏳ VideoPreviewPanel: Run in progress, delaying config load until run completes...', {
-          runStatus,
-          effectiveTaskId
-        })
-        setLoading(false)
-        return
-      }
-
-      try {
-        console.log('🎬 VideoPreviewPanel: Loading config...', {
-          effectiveTaskId,
-          effectiveConfigPath,
-          taskId,
-          configPath,
-          extractedInfo,
-          hasRunOutput: !!runOutput,
-          runStatus,
-          retryCount
-        })
-
-        let response
-        if (effectiveTaskId) {
-          console.log('🎬 Using taskId to load config:', effectiveTaskId)
-          response = await getVideoConfig(effectiveTaskId, sessionId)
-        } else if (effectiveConfigPath) {
-          console.log('🎬 Using configPath to load config:', effectiveConfigPath)
-          response = await getVideoConfigByPath(effectiveConfigPath, sessionId)
-        } else {
-          throw new Error('Either taskId or configPath must be provided')
-        }
-
-        if (loadCancelledRef.current) return
-        console.log('🎬 Config loaded successfully:', {
-          hasConfig: !!response.config,
-          scenesCount: response.config?.scenes?.length,
-          configPath: response.config_path,
-          taskId: response.task_id
-        })
-        setConfig(response.config)
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
-          // 请求被取消（如 effect 重跑、超时），不展示为错误
-          return
-        }
-        
-        // 404 且 run 已完成：可能是文件同步延迟，重试几次
-        const is404 = err?.message?.includes('404') || err?.message?.includes('not found')
-        const maxRetries = 3
-        const retryDelay = 2000 // 2秒
-        
-        if (is404 && retryCount < maxRetries && (runStatus === 'finished' || runStatus === 'success')) {
-          console.log(`⏳ VideoPreviewPanel: Config not found (404), retrying in ${retryDelay}ms... (${retryCount + 1}/${maxRetries})`)
-          await new Promise(resolve => setTimeout(resolve, retryDelay))
-          if (!loadCancelledRef.current) {
-            return loadConfig(retryCount + 1)
-          }
-          return
-        }
-        
-        console.error('❌ Failed to load video config:', err)
-        const msg = err?.message || 'Failed to load video configuration'
-        const hint = FALLBACK_TASK_IDS.length > 0
-          ? ` 可用的内置预览 Task ID：${FALLBACK_TASK_IDS.join('、')}。其他 ID 需后端存在对应配置文件。`
-          : ''
-        setError(msg + hint)
-      } finally {
-        if (!loadCancelledRef.current) setLoading(false)
-      }
-    }
-
-    if (effectiveConfigPath || effectiveTaskId) {
-      loadConfig()
-    } else {
-      setLoading(false)
-      setShowManualInput(true)
-    }
-    return () => {
-      loadCancelledRef.current = true
-    }
-  }, [effectiveConfigPath, effectiveTaskId, taskId, configPath, extractedInfo, runOutput, manualTaskId, runStatus, sessionId])
-
-  // 当 config + taskId 就绪且为「动态任务」时，从后端拉取并注册组件（按 id 预览）
-  useEffect(() => {
-    if (!config || !effectiveTaskId) {
-      setRegisteredSceneComponents(null)
-      setRegisterLoading(false)
-      setRegisterError(null)
-      return
-    }
-    const prefix = extractComponentPrefix(config)
-    if (KNOWN_PREFIXES.includes(prefix)) {
-      setRegisteredSceneComponents(null)
-      setRegisterLoading(false)
-      setRegisterError(null)
-      return
-    }
-    const cached = getRegisteredVideo(effectiveTaskId, sessionId)
-    if (cached) {
-      setRegisteredSceneComponents(cached.components)
-      setRegisterLoading(false)
-      setRegisterError(null)
-      return
-    }
-    setRegisterLoading(true)
-    setRegisterError(null)
-    registerVideoByTaskId(effectiveTaskId, sessionId)
-      .then((entry) => {
-        if (entry) {
-          setRegisteredSceneComponents(entry.components)
-          setRegisterError(null)
-        } else {
-          setRegisteredSceneComponents(null)
-          setRegisterError('注册视频组件失败')
-        }
-      })
-      .catch((e) => {
-        setRegisteredSceneComponents(null)
-        setRegisterError(e?.message || '注册视频组件失败')
-      })
-      .finally(() => setRegisterLoading(false))
-  }, [config, effectiveTaskId, sessionId])
-
-  // 处理手动输入 taskId
-  const handleManualLoad = async () => {
-    if (!manualTaskId.trim()) {
-      setError('Please enter a task ID')
-      return
-    }
-    
-    // 验证格式（YYYYMMDD_HHMMSS）
-    const taskIdPattern = /^\d{8}_\d{6}$/
-    if (!taskIdPattern.test(manualTaskId.trim())) {
-      setError('Invalid task ID format. Expected format: YYYYMMDD_HHMMSS (e.g., 20260114_134845)')
-      return
-    }
-    
-    setShowManualInput(false)
-    setError(null)
-    setLoading(true)
-    
-    try {
-      const response = await getVideoConfig(manualTaskId.trim(), sessionId)
-      console.log('🎬 Config loaded successfully from manual input:', {
-        hasConfig: !!response.config,
-        scenesCount: response.config?.scenes?.length
-      })
-      setConfig(response.config)
-    } catch (err: any) {
-      console.error('❌ Failed to load video config from manual input:', err)
-      setError(err.message || 'Failed to load video configuration')
-      setShowManualInput(true) // 重新显示输入框
-    } finally {
-      setLoading(false)
-    }
+  // 1) 有预览 URL：轮询就绪后显示 iframe（与仪表盘一致，避免 502/主应用）
+  if (effectivePreviewUrl) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: isDark ? '#0f1419' : '#f8fafc' }}>
+        <div style={{
+          padding: '8px 16px',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: 12,
+          color: isDark ? '#94a3b8' : '#64748b',
+          background: isDark ? 'rgba(15,23,42,0.8)' : '#ffffff',
+          flexShrink: 0,
+        }}>
+          <span style={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>Video Preview</span>
+          {displayTaskId && displayTaskId !== '20260302_999999' && !isPreviewReady && (
+            <button
+              type="button"
+              onClick={async () => {
+                setStartPreviewError(null)
+                setStartPreviewLoading(true)
+                try {
+                  await http.post<{ task_id: string; url: string; status: string }>(
+                    '/video/start-preview',
+                    { task_id: displayTaskId, session_id: sessionId ?? undefined },
+                    { timeout: 120000 }
+                  )
+                  // 轮询会继续，无需额外操作
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e)
+                  setStartPreviewError(msg || '启动预览失败')
+                } finally {
+                  setStartPreviewLoading(false)
+                }
+              }}
+              disabled={startPreviewLoading}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 500,
+                background: isDark ? '#334155' : '#e2e8f0',
+                color: isDark ? '#e2e8f0' : '#475569',
+                border: `1px solid ${isDark ? '#475569' : '#cbd5e1'}`,
+                borderRadius: 6,
+                cursor: startPreviewLoading ? 'wait' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              {startPreviewLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              {startPreviewLoading ? '启动中…' : '启动预览容器'}
+            </button>
+          )}
+          {(!isPreviewReady || isCheckingPreview) && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: isDark ? '#94a3b8' : '#64748b' }}>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Waiting for preview…
+            </span>
+          )}
+          {isPreviewReady && (
+            <a
+              href={effectivePreviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: isDark ? '#818cf8' : '#4f46e5', textDecoration: 'none', fontSize: 11 }}
+            >
+              Open in new tab ↗
+            </a>
+          )}
+        </div>
+        {startPreviewError && (
+          <div style={{
+            padding: '8px 16px',
+            fontSize: 12,
+            color: isDark ? '#f87171' : '#dc2626',
+            background: isDark ? 'rgba(248,113,113,0.1)' : 'rgba(220,38,38,0.08)',
+            borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          }}>
+            {startPreviewError}
+          </div>
+        )}
+        {!isPreviewReady ? (
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+            background: isDark ? '#0f1419' : '#f8fafc',
+            color: isDark ? '#e2e8f0' : '#1e293b',
+          }}>
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            <p className="text-sm text-slate-500">Starting preview container…</p>
+            <p className="text-xs text-slate-400 max-w-[260px] text-center">
+              This usually takes 15–30 seconds. The panel will show the video when ready.
+            </p>
+            <p className="text-xs text-slate-400 max-w-[300px] text-center mt-2" style={{ marginTop: 8 }}>
+              若超过 1 分钟仍不出现，请先构建镜像：<br />
+              <code style={{ fontSize: 10 }}>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code>
+            </p>
+          </div>
+        ) : (
+          <iframe
+            src={effectivePreviewUrl}
+            style={{ flex: 1, border: 'none', width: '100%' }}
+            title="Video Preview"
+            allow="autoplay"
+          />
+        )}
+      </div>
+    )
   }
 
-  // When video is being generated and run is still in progress, show progress view; once finished, show player (below)
-  const runInProgress = runStatus === 'running' || runStatus === null
+  // 2) Generating: progress (steps + logs)
   if (sessionId && videoProgress.visible && runInProgress) {
     return (
       <div style={{
@@ -461,13 +421,11 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
               </div>
             ))}
           </div>
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 16,
-              borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-            }}
-          >
+          <div style={{
+            marginTop: 16,
+            paddingTop: 16,
+            borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          }}>
             <div
               ref={videoProgressLogsRef}
               style={{
@@ -484,8 +442,31 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
               }}
             >
               {videoProgress.logs.length === 0 ? (
-                <div style={{ color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
-                  Waiting for progress…
+                <div style={{ padding: '8px 0' }}>
+                  {(videoProgress.step > 0 || videoProgress.percent > 0) && STEP_MESSAGES[videoProgress.step] ? (
+                    <>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 12,
+                          padding: '4px 0',
+                          color: isDark ? '#818cf8' : '#4f46e5',
+                          fontSize: 12,
+                          fontFamily: "'JetBrains Mono', 'Consolas', monospace",
+                        }}
+                      >
+                        <span style={{ color: isDark ? '#94a3b8' : '#64748b', minWidth: 80 }}>—</span>
+                        <span>{STEP_MESSAGES[videoProgress.step]}</span>
+                      </div>
+                      <div style={{ color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic', fontSize: 11, marginTop: 12, textAlign: 'center' }}>
+                        Live log lines will appear here when the backend sends progress.
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
+                      Progress will appear here (workflow live output).
+                    </div>
+                  )}
                 </div>
               ) : (
                 videoProgress.logs.slice(-50).map((log, idx, arr) => {
@@ -535,258 +516,122 @@ export function VideoPreviewPanel({ configPath, taskId, sessionId }: VideoPrevie
     )
   }
 
-  if (loading) {
-    return (
-      <div style={{ 
-        padding: '20px', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        height: '100%',
-        color: 'var(--main-text-muted, #6b7280)',
-        background: 'var(--panel-bg, #ffffff)'
-      }}>
-        Loading video configuration...
+  // 3) Empty state: no preview URL — show hint and paste Task ID
+  return (
+    <div style={{
+      width: '100%',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 16,
+      padding: 24,
+      background: isDark ? '#0f1419' : '#f8fafc',
+      color: isDark ? '#94a3b8' : '#64748b',
+      textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 32 }}>🎬</div>
+      <div style={{ fontWeight: 600, fontSize: 15, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+        Video Preview
       </div>
-    )
-  }
-
-  // 显示手动输入界面
-  if (showManualInput && !loading) {
-    return (
-      <div style={{ 
-        padding: '20px', 
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        background: 'var(--panel-bg, #ffffff)',
-        height: '100%'
-      }}>
-        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'var(--main-text, #111827)' }}>
-          Video Preview
-        </div>
-        <div style={{ fontSize: '14px', color: 'var(--main-text-muted, #6b7280)' }}>
-          No video configuration found. Please enter a task ID to load the video.
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '500', color: 'var(--main-text, #111827)' }}>
-            Task ID (format: YYYYMMDD_HHMMSS)
-          </label>
-          <input
-            type="text"
-            value={manualTaskId}
-            onChange={(e) => setManualTaskId(e.target.value)}
-            placeholder="e.g., 20260114_134845"
-            style={{
-              padding: '8px 12px',
-              border: '1px solid var(--panel-border, #e5e7eb)',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontFamily: 'monospace',
-              background: 'var(--panel-bg, #ffffff)',
-              color: 'var(--main-text, #111827)'
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleManualLoad()
-              }
-            }}
-          />
-          <div style={{ fontSize: '12px', color: 'var(--main-text-muted, #6b7280)', marginTop: '4px' }}>
-            💡 You can find the task ID in the workflow output, e.g., "20260114_134845"
-          </div>
-        </div>
+      <div style={{ fontSize: 13, maxWidth: 320 }}>
+        If the preview did not load automatically, paste the <strong>Task ID</strong> from the chat (e.g. 20260302_121928) and open the preview.
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 320 }}>
         <button
-          onClick={handleManualLoad}
-          disabled={!manualTaskId.trim() || loading}
+          type="button"
+          onClick={async () => {
+            setTestError(null)
+            setTestStarting(true)
+            try {
+              const res = await http.post<{ task_id: string; url: string; status: string }>(
+                '/test/start-video-preview',
+                undefined,
+                { timeout: 120000 }
+              )
+              setPastedTaskId(res.task_id)
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : String(e)
+              setTestError(msg || 'Failed to start test preview')
+            } finally {
+              setTestStarting(false)
+            }
+          }}
+          disabled={testStarting}
           style={{
             padding: '10px 16px',
-            background: manualTaskId.trim() && !loading ? 'var(--accent, #3b82f6)' : 'var(--panel-border, #e5e7eb)',
-            color: manualTaskId.trim() && !loading ? '#ffffff' : 'var(--main-text-muted, #6b7280)',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: manualTaskId.trim() && !loading ? 'pointer' : 'not-allowed',
-            transition: 'all 0.2s'
+            background: isDark ? '#334155' : '#e2e8f0',
+            color: isDark ? '#e2e8f0' : '#475569',
+            border: `1px solid ${isDark ? '#475569' : '#cbd5e1'}`,
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: testStarting ? 'wait' : 'pointer',
           }}
         >
-          {loading ? 'Loading...' : 'Load Video'}
+          {testStarting ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Starting test container (about 30s)…
+            </span>
+          ) : (
+            '🧪 Test preview (no cost) — verify nginx → container'
+          )}
         </button>
-        {error && (
-          <div style={{ 
-            padding: '12px',
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            color: '#dc2626',
-            fontSize: '14px'
-          }}>
-            {error}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div style={{ 
-        padding: '20px', 
-        color: '#ef4444',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        background: 'var(--panel-bg, #ffffff)'
-      }}>
-        <div style={{ fontWeight: 'bold' }}>Error loading video</div>
-        <div style={{ fontSize: '14px' }}>{error}</div>
-        {(effectiveConfigPath || effectiveTaskId) && (
-          <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '10px' }}>
-            {effectiveTaskId && `Task ID: ${effectiveTaskId}`}
-            {effectiveConfigPath && `Path: ${effectiveConfigPath}`}
-          </div>
-        )}
-        <button
-          onClick={() => {
-            setError(null)
-            setShowManualInput(true)
-          }}
+        <input
+          type="text"
+          value={pastedTaskId}
+          onChange={(e) => { setPastedTaskId(e.target.value); setTestError(null) }}
+          placeholder="e.g. 20260302_121928"
           style={{
-            marginTop: '12px',
-            padding: '8px 16px',
-            background: 'var(--accent, #3b82f6)',
-            color: '#ffffff',
+            padding: '10px 12px',
+            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+            borderRadius: 8,
+            fontSize: 14,
+            fontFamily: 'monospace',
+            background: isDark ? 'rgba(30,41,59,0.8)' : '#fff',
+            color: isDark ? '#e2e8f0' : '#1e293b',
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && pastedNormalized) {
+              setPastedTaskId(pastedNormalized)
+            }
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => pastedNormalized && setPastedTaskId(pastedNormalized)}
+          disabled={!pastedNormalized}
+          style={{
+            padding: '10px 16px',
+            background: pastedNormalized ? (isDark ? '#4f46e5' : '#6366f1') : (isDark ? '#334155' : '#e2e8f0'),
+            color: '#fff',
             border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            cursor: 'pointer'
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: pastedNormalized ? 'pointer' : 'not-allowed',
           }}
         >
-          Enter Task ID Manually
+          Open preview
         </button>
       </div>
-    )
-  }
-
-  if (!config) {
-    return (
-      <div style={{ 
-        padding: '20px', 
-        color: 'var(--main-text-muted, #6b7280)',
-        textAlign: 'center',
-        background: 'var(--panel-bg, #ffffff)'
-      }}>
-        No video configuration available
-      </div>
-    )
-  }
-
-  const componentPrefixForPanel = extractComponentPrefix(config)
-  const isDynamicTask = effectiveTaskId && !KNOWN_PREFIXES.includes(componentPrefixForPanel)
-  if (isDynamicTask && registerLoading) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center', background: 'var(--panel-bg, #ffffff)' }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 8 }}>正在加载视频组件…</div>
-        <div style={{ fontSize: 12, color: 'var(--main-text-muted)' }}>根据 task id 从后端拉取并注册</div>
-      </div>
-    )
-  }
-  if (isDynamicTask && registerError && !registeredSceneComponents) {
-    return (
-      <div style={{ padding: '20px', color: '#ef4444', background: 'var(--panel-bg, #ffffff)' }}>
-        <div style={{ fontWeight: 'bold' }}>加载视频组件失败</div>
-        <div style={{ fontSize: 14, marginTop: 8 }}>{registerError}</div>
-      </div>
-    )
-  }
-
-  // 安全地获取配置值，提供默认值
-  const { fps = 30, width = 1280, height = 720, video_duration } = config.meta || {}
-  
-  // 如果没有 video_duration，尝试从 scenes 计算
-  let calculatedDuration = video_duration
-  if (!calculatedDuration && config.scenes && config.scenes.length > 0) {
-    // 从最后一个场景的 time_range 获取结束时间
-    const lastScene = config.scenes[config.scenes.length - 1]
-    if (lastScene.time_range && Array.isArray(lastScene.time_range) && lastScene.time_range.length >= 2) {
-      calculatedDuration = lastScene.time_range[1]
-    }
-  }
-  
-  // 如果还是没有，使用默认值
-  const finalDuration = calculatedDuration || 10.0
-  const totalFrames = Math.floor(finalDuration * fps)
-
-  return (
-    <div style={{ 
-      width: '100%', 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      background: 'var(--panel-bg, #ffffff)'
-    }}>
-      {/* 视频信息栏 */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: '1px solid var(--panel-border, #e5e7eb)',
-        background: 'var(--panel-bg, #ffffff)',
-        fontSize: '12px',
-        color: 'var(--main-text-muted, #6b7280)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <span style={{ fontWeight: 'bold', color: 'var(--main-text, #111827)' }}>{config.meta?.title || 'Video Preview'}</span>
-          <span style={{ marginLeft: '12px' }}>
-            {config.scenes?.length || 0} scenes • {finalDuration.toFixed(1)}s • {width}×{height}
-          </span>
+      {testError && (
+        <div style={{ maxWidth: 360, textAlign: 'left' }}>
+          <p style={{ fontSize: 12, color: isDark ? '#f87171' : '#dc2626', marginBottom: 8 }}>
+            {testError}
+          </p>
+          <p style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', marginBottom: 4 }}>
+            <strong>排查步骤：</strong>
+          </p>
+          <ol style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
+            <li>先构建预览镜像：<code style={{ fontSize: 10 }}>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code></li>
+            <li>确认容器在跑：<code style={{ fontSize: 10 }}>docker ps | grep deepeye-video</code></li>
+            <li>确认网关能访问：<code style={{ fontSize: 10 }}>curl -I http://localhost:8080/video-previews/deepeye-video-20260302_999999/</code> 应为 200</li>
+          </ol>
         </div>
-        {effectiveTaskId && (
-          <div style={{ fontSize: '11px', opacity: 0.7 }}>
-            Task: {effectiveTaskId}
-          </div>
-        )}
-      </div>
-
-      {/* 视频播放器区域 */}
-      <div style={{ 
-        flex: 1, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        padding: '20px',
-        overflow: 'auto',
-        background: 'var(--panel-bg, #ffffff)'
-      }}>
-        {/* 使用 Remotion Player 渲染视频 */}
-        {/* 注意：这里使用简化组件，完整版本需要集成 SceneBasedVideo */}
-        <div style={{ 
-          width: '100%', 
-          maxWidth: `${width}px`,
-          aspectRatio: `${width} / ${height}`,
-          background: '#ffffff',
-          borderRadius: '8px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
-        }}>
-          <Player
-            component={VideoPreviewComponent}
-            durationInFrames={totalFrames}
-            compositionWidth={width}
-            compositionHeight={height}
-            fps={fps}
-            controls
-            style={{ width: '100%', borderRadius: '8px' }}
-            inputProps={{
-              config,
-              taskId: effectiveTaskId,
-              sessionId,
-              registeredSceneComponents: registeredSceneComponents ?? undefined,
-            }}
-          />
-        </div>
-      </div>
+      )}
     </div>
   )
 }

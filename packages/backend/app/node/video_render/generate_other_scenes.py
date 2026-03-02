@@ -15,8 +15,9 @@ import os
 import sys
 import argparse
 import time
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Tuple
+from typing import Tuple, Optional
 
 # 导入项目现有的 LLM 客户端
 backend_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -25,6 +26,7 @@ if backend_path not in sys.path:
 
 from app.core.config import settings
 from app.node.video_config.generator import LLMClient
+from app.node.video_render.tsx_sanitize import sanitize_tsx_for_browser, validate_component_syntax
 
 # 从环境变量或 settings 获取配置
 API_BASE = settings.LLM_BASE_URL or os.getenv("LLM_BASE_URL", "https://newapi.deepwisdom.ai")
@@ -38,6 +40,28 @@ DEFAULT_COMPONENTS_OUTPUT_DIR = os.getenv(
 
 if not API_KEY:
     raise ValueError("LLM_API_KEY is required. Please set it in .env file or environment variable.")
+
+
+def should_retry_on_error(error_msg: str, attempt: int, elapsed_time: float, max_general_retries: int = 10) -> Tuple[bool, str]:
+    err = str(error_msg).lower()
+    if any(k in err for k in ["余额不足", "insufficient", "quota exceeded", "no credit"]):
+        return False, "余额不足（永久性错误）"
+    if any(k in err for k in ["401", "403", "unauthorized", "forbidden"]):
+        return False, "认证失败（永久性错误）"
+    if "429" in err or "rate limit" in err or "throttling" in err or "too many requests" in err:
+        if elapsed_time < 30 * 60:
+            return True, "Rate Limit（允许重试至30分钟）"
+        return False, "Rate Limit 超过最大时间限制"
+    if attempt < max_general_retries:
+        return True, f"临时性错误（最多{max_general_retries}次）"
+    return False, f"已达到最大重试次数（{max_general_retries}次）"
+
+
+def calculate_retry_wait_time(error_msg: str, attempt: int) -> int:
+    err = str(error_msg).lower()
+    if "429" in err or "rate limit" in err:
+        return min(2 ** attempt, 60)
+    return 2
 
 
 def extract_dataset_name(video_meta):
@@ -640,6 +664,7 @@ def generate_tsx_component(scene_data, video_meta, llm_client, output_file, verb
         # 查找 export const XXX: React.FC 并替换为正确的组件名
         import re
         tsx_code = re.sub(r'export const \w+:', f'export const {component_name}:', tsx_code)
+        tsx_code = sanitize_tsx_for_browser(tsx_code)
         
         # 保存文件
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -648,6 +673,15 @@ def generate_tsx_component(scene_data, video_meta, llm_client, output_file, verb
         if verbose:
             print(f"   ✅ 成功生成: {output_file}")
         
+        if verbose:
+            print(f"   🔍 验证语法...")
+        is_valid, error_msg = validate_component_syntax(Path(output_file))
+        if not is_valid:
+            if verbose:
+                print(f"   ❌ 语法验证失败: {error_msg}")
+            return False
+        if verbose:
+            print(f"   ✅ 语法验证通过")
         return True
     
     except Exception as e:
@@ -660,46 +694,49 @@ def generate_tsx_component(scene_data, video_meta, llm_client, output_file, verb
         return False
 
 
-def generate_single_scene_wrapper(scene, idx, total_scenes, video_meta, llm_client, output_dir, task_id=None):
-    """包装函数用于并行执行"""
+def generate_single_scene_wrapper(scene, idx, total_scenes, video_meta, llm_client, output_dir, task_id=None, max_retries: int = 5):
+    """包装函数用于并行执行，支持校验+重试"""
     scene_id = scene.get('id', f'scene_{idx}')
     scene_type = scene.get('type', 'unknown')
     content = scene.get('content', {})
     title = content.get('title', 'Scene')
-    
-    # 生成组件名称和文件名（包含数据集名字）
     dataset_name = extract_dataset_name(video_meta)
     scene_id_camel = ''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())
-    
-    # 如果提供了 task_id，文件名包含任务ID
     if task_id:
         component_name = f"{dataset_name}_{scene_id_camel}_{task_id}Component"
     else:
         component_name = f"{dataset_name}_{scene_id_camel}Component"
-    
     output_file = os.path.join(output_dir, f"{component_name}.tsx")
     
-    try:
-        success = generate_tsx_component(
-            scene, 
-            video_meta, 
-            llm_client, 
-            output_file, 
-            verbose=False,
-            scene_index=idx,
-            total_scenes=total_scenes
-        )
-        
-        if success:
-            return (idx, scene_id, True, f"✅ {scene_type}: {title}")
+    last_error = None
+    start_time = time.time()
+    attempt = 0
+    while True:
+        attempt += 1
+        elapsed = time.time() - start_time
+        try:
+            success = generate_tsx_component(
+                scene, video_meta, llm_client, output_file,
+                verbose=(attempt > 1), scene_index=idx, total_scenes=total_scenes
+            )
+            if success:
+                retry_info = f" (重试 {attempt}次)" if attempt > 1 else ""
+                return (idx, scene_id, True, f"✅ {scene_type}: {title}{retry_info}")
+            last_error = "生成失败（返回 False）"
+        except Exception as e:
+            last_error = str(e)
+        if attempt >= max_retries:
+            should_retry, reason = False, f"已达到最大重试次数（{max_retries}次）"
         else:
-            return (idx, scene_id, False, f"❌ {scene_type}: {title} - 生成失败")
-    
-    except Exception as e:
-        import traceback
-        error_detail = traceback.format_exc()
-        print(f"\n❌ 详细错误 ({scene_id}):\n{error_detail}")
-        return (idx, scene_id, False, f"❌ {scene_type}: {title} - {str(e)}")
+            should_retry, reason = should_retry_on_error(last_error, attempt, elapsed, max_general_retries=max_retries)
+        if should_retry:
+            wait_time = calculate_retry_wait_time(last_error, attempt)
+            print(f"   ⚠️  [{idx}/{total_scenes}] {scene_type}: {title} - 第 {attempt} 次失败，{wait_time}秒后重试...")
+            time.sleep(wait_time)
+            continue
+        print(f"   ❌ [{idx}/{total_scenes}] {scene_type}: {title} - 停止重试: {reason}")
+        break
+    return (idx, scene_id, False, f"❌ {scene_type}: {title} - {last_error} (尝试 {attempt} 次后失败)")
 
 
 def main():

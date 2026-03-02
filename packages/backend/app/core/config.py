@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str
     LLM_MODEL: str
     LLM_TEMPERATURE: float = 0.7
-    LLM_MAX_TOKENS: int = 16000  # max tokens for completion (video TSX, config, etc.)
+    LLM_MAX_TOKENS: int = 32000  # max tokens for completion (video TSX, config, etc.)
     
     # Azure Speech TTS (optional, for data video narration)
     AZURE_SPEECH_KEY: str | None = None
@@ -106,6 +106,9 @@ class Settings(BaseSettings):
 
     # Video workspace: config and TSX output dirs. Default: /workspace (Docker); locally use VIDEO_WORKSPACE_DIR or auto fallback.
     VIDEO_WORKSPACE_DIR: str | None = None
+
+    # Docker image used by VideoDeployService to spin up per-task video preview containers.
+    VIDEO_PREVIEW_IMAGE: str = "deepeye-video-preview:latest"
 
     # JWT Authentication
     JWT_SECRET_KEY: str = "your-secret-key-change-this-in-production"  # ⚠️ 生产环境必须修改

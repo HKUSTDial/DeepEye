@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -610,6 +611,65 @@ class VideoGeneratorHandler:
         if publish_progress:
             publish_progress(f"\n🎉 Video generation completed! Task ID: {task_id}")
 
+        # Step 5: Deploy to independent preview container (production-safe iframe preview)
+        video_url: str | None = None
+        if video_status == "success" and session_id:
+            try:
+                from app.services.video_deploy_service import video_deployer
+                import threading
+
+                def _do_deploy():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        result = new_loop.run_until_complete(
+                            video_deployer.deploy(task_id=task_id, session_id=session_id)
+                        )
+                        deploy_url = result.get("url")
+                        logger.info(f"[VideoGenerator] Preview container ready: {deploy_url}")
+                        if publish_progress:
+                            publish_progress(f"🌐 Preview ready: {deploy_url}")
+                        # Publish video_url via workflow event so frontend can show iframe
+                        if deploy_url:
+                            try:
+                                from app.infra import RedisEventBus
+                                from app.schemas import AgentEvent, AgentEventType
+                                from app.core.config import settings as _s
+
+                                async def _emit():
+                                    bus = RedisEventBus(_s.REDIS_URL)
+                                    event = AgentEvent(
+                                        type=AgentEventType.WORKFLOW_EVENT,
+                                        source="workflow",
+                                        data={
+                                            "phase": "video_preview_ready",
+                                            "payload": {
+                                                "task_id": task_id,
+                                                "session_id": session_id,
+                                                "video_url": deploy_url,
+                                            },
+                                        },
+                                    )
+                                    await bus.publish(f"session:{session_id}", event.model_dump_json())
+                                    await bus.close()
+
+                                new_loop.run_until_complete(_emit())
+                            except Exception as ee:
+                                logger.warning(f"[VideoGenerator] Failed to emit preview_ready event: {ee}")
+                    except Exception as de:
+                        logger.error(f"[VideoGenerator] Background deploy failed: {de}")
+                    finally:
+                        new_loop.close()
+
+                t = threading.Thread(target=_do_deploy, daemon=True)
+                t.start()
+                # Pre-calculate the URL to return immediately (container naming is deterministic)
+                video_url = f"/video-previews/deepeye-video-{task_id}/"
+                if publish_progress:
+                    publish_progress(f"🚀 Starting preview container (deepeye-video-{task_id})...")
+            except Exception as deploy_err:
+                logger.warning(f"[VideoGenerator] Failed to start deploy: {deploy_err}")
+
         # 返回结果（包含配置和视频信息）
         return {
             "video_path": video_result.get("video_path"),
@@ -618,6 +678,7 @@ class VideoGeneratorHandler:
             "config_path": str(config_path),
             "task_id": task_id,  # 显式返回 task_id，方便前端使用
             "session_id": session_id,
+            "video_url": video_url,  # iframe URL，容器就绪后可直接嵌入
         }
 
 
@@ -659,6 +720,11 @@ class VideoGeneratorNode(BaseNode):
                 "config_path": Port(
                     schema="string",
                     description="Path to saved configuration file",
+                ),
+                "video_url": Port(
+                    schema="string",
+                    required=False,
+                    description="URL of the deployed preview container (iframe-embeddable)",
                 ),
             },
             params_schema={

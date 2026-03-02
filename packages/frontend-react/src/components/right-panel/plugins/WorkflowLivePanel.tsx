@@ -177,6 +177,7 @@ export function WorkflowLivePanel({
   const setVideoProgressVisible = useWorkflowSessionsStore((state) => state.setVideoProgressVisible)
   const appendVideoProgressLog = useWorkflowSessionsStore((state) => state.appendVideoProgressLog)
   const setVideoProgressStep = useWorkflowSessionsStore((state) => state.setVideoProgressStep)
+  const setVideoProgressPercent = useWorkflowSessionsStore((state) => state.setVideoProgressPercent)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
@@ -284,6 +285,9 @@ export function WorkflowLivePanel({
               setVideoProgressVisible(sessionId, true)
               const stepIndex = parseInt(stepMatch[1], 10) - 1
               if (stepIndex >= 0 && stepIndex <= 3) setVideoProgressStep(sessionId, stepIndex)
+            }
+            if (/Step\s*4\s*\/\s*4\s*Done|Video generation completed|🎉/.test(data.content)) {
+              setVideoProgressPercent(sessionId, 100)
             }
           }
           return
@@ -432,6 +436,7 @@ export function WorkflowLivePanel({
     setVideoProgressVisible,
     appendVideoProgressLog,
     setVideoProgressStep,
+    setVideoProgressPercent,
     clearWorkflow,
     clearValidated,
     setActiveFilePath,

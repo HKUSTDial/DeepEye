@@ -20,6 +20,7 @@ if backend_path not in sys.path:
 
 from app.core.config import settings
 from app.node.video_config.generator import LLMClient
+from app.node.video_render.tsx_sanitize import sanitize_tsx_for_browser, validate_component_syntax
 
 # 从环境变量或 settings 获取配置
 API_BASE = settings.LLM_BASE_URL or os.getenv("LLM_BASE_URL", "https://newapi.deepwisdom.ai")
@@ -37,6 +38,28 @@ DEFAULT_ANIMATED_OUTPUT_DIR = os.getenv(
 
 if not API_KEY:
     raise ValueError("LLM_API_KEY is required. Please set it in .env file or environment variable.")
+
+
+def should_retry_on_error(error_msg: str, attempt: int, elapsed_time: float, max_general_retries: int = 10) -> Tuple[bool, str]:
+    err = str(error_msg).lower()
+    if any(k in err for k in ["余额不足", "insufficient", "quota exceeded", "no credit"]):
+        return False, "余额不足（永久性错误）"
+    if any(k in err for k in ["401", "403", "unauthorized", "forbidden"]):
+        return False, "认证失败（永久性错误）"
+    if "429" in err or "rate limit" in err or "throttling" in err or "too many requests" in err:
+        if elapsed_time < 30 * 60:
+            return True, "Rate Limit（允许重试至30分钟）"
+        return False, "Rate Limit 超过最大时间限制"
+    if attempt < max_general_retries:
+        return True, f"临时性错误（最多{max_general_retries}次）"
+    return False, f"已达到最大重试次数（{max_general_retries}次）"
+
+
+def calculate_retry_wait_time(error_msg: str, attempt: int) -> int:
+    err = str(error_msg).lower()
+    if "429" in err or "rate limit" in err:
+        return min(2 ** attempt, 60)
+    return 2
 
 
 def extract_dataset_name(video_meta):
@@ -673,6 +696,7 @@ def add_animation_to_component(static_file, scene_data, llm_client, output_file,
             animated_tsx_code = animated_tsx_code.split('```typescript')[1].split('```')[0].strip()
         elif '```' in animated_tsx_code:
             animated_tsx_code = animated_tsx_code.split('```')[1].split('```')[0].strip()
+        animated_tsx_code = sanitize_tsx_for_browser(animated_tsx_code)
         
         # 保存文件
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -681,6 +705,16 @@ def add_animation_to_component(static_file, scene_data, llm_client, output_file,
         if verbose:
             print(f"   ✅ 成功生成: {output_file}")
         
+        # 语法校验
+        if verbose:
+            print(f"   🔍 验证语法...")
+        is_valid, error_msg = validate_component_syntax(Path(output_file))
+        if not is_valid:
+            if verbose:
+                print(f"   ❌ 语法验证失败: {error_msg}")
+            return False
+        if verbose:
+            print(f"   ✅ 语法验证通过")
         return True
     
     except Exception as e:
@@ -689,44 +723,53 @@ def add_animation_to_component(static_file, scene_data, llm_client, output_file,
         return False
 
 
-def add_animation_wrapper(scene_data, static_dir, animated_dir, llm_client, idx, total_scenes, video_meta, task_id=None):
-    """包装函数用于并行执行"""
+def add_animation_wrapper(scene_data, static_dir, animated_dir, llm_client, idx, total_scenes, video_meta, task_id=None, max_retries: int = 5):
+    """包装函数用于并行执行，支持校验+重试"""
     scene_id = scene_data.get('id', f'scene_{idx}')
     scene_type = scene_data.get('type', 'unknown')
-
-    # 构建文件名（包含数据集名字）
     dataset_name = extract_dataset_name(video_meta)
     scene_id_camel = ''.join(word.capitalize() for word in scene_id.replace('_', ' ').split())
-    
-    # 如果提供了 task_id，文件名包含任务ID
     if task_id:
         component_name = f"{dataset_name}_{scene_id_camel}_{task_id}Component"
     else:
         component_name = f"{dataset_name}_{scene_id_camel}Component"
-    
     static_file = os.path.join(static_dir, f"{component_name}.tsx")
     animated_file = os.path.join(animated_dir, f"{component_name}Animated.tsx")
-    
-    # 检查静态文件是否存在
     if not os.path.exists(static_file):
         return (idx, scene_id, False, f"❌ {scene_type}: {scene_id} - 静态文件不存在")
     
-    try:
-        success = add_animation_to_component(
-            static_file,
-            scene_data,
-            llm_client,
-            animated_file,
-            verbose=False
-        )
-        
-        if success:
-            return (idx, scene_id, True, f"✅ {scene_type}: {scene_id}")
-        else:
-            return (idx, scene_id, False, f"❌ {scene_type}: {scene_id} - 添加动画失败")
+    last_error = None
+    start_time = time.time()
+    attempt = 0
+    while True:
+        attempt += 1
+        elapsed = time.time() - start_time
+        try:
+            success = add_animation_to_component(
+                static_file, scene_data, llm_client, animated_file, verbose=(attempt > 1)
+            )
+            if success:
+                retry_info = f" (重试 {attempt}次)" if attempt > 1 else ""
+                return (idx, scene_id, True, f"✅ {scene_type}: {scene_id}{retry_info}")
+            last_error = "添加动画失败（返回 False）"
+        except Exception as e:
+            last_error = str(e)
+        should_retry, reason = should_retry_on_error(last_error, attempt, elapsed, max_retries)
+        if should_retry:
+            wait_time = calculate_retry_wait_time(last_error, attempt)
+            print(f"   ⚠️  [{idx}/{total_scenes}] {scene_type}: {scene_id} - 第 {attempt} 次失败，{wait_time}秒后重试...")
+            time.sleep(wait_time)
+            continue
+        print(f"   ❌ [{idx}/{total_scenes}] {scene_type}: {scene_id} - 停止重试: {reason}")
+        break
     
+    # 重试用尽：复制静态组件作为后备
+    try:
+        import shutil
+        shutil.copy2(static_file, animated_file)
+        return (idx, scene_id, True, f"⚠️  {scene_type}: {scene_id} - 已用静态组件作为后备")
     except Exception as e:
-        return (idx, scene_id, False, f"❌ {scene_type}: {scene_id} - {str(e)}")
+        return (idx, scene_id, False, f"❌ {scene_type}: {scene_id} - {last_error} (后备复制失败: {e})")
 
 
 def main():

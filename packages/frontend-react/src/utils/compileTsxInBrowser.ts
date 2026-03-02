@@ -56,6 +56,36 @@ function injectImports(source: string): string {
     .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\s*\n?/g, '')
 }
 
+/** 移除 declare module '...' { ... } 块（支持嵌套 {}），避免在 sourceType: 'script' 下 Babel 报错 */
+function stripDeclareModuleBlocks(source: string): string {
+  const declModuleRegex = /declare\s+module\s+['"][^'"]+['"]\s*\{/g
+  let out = source
+  let match: RegExpExecArray | null
+  while ((match = declModuleRegex.exec(source)) !== null) {
+    const braceStart = match.index + match[0].length
+    let depth = 1
+    let i = braceStart
+    while (i < source.length && depth > 0) {
+      const c = source[i]
+      if (c === '{') depth++
+      else if (c === '}') depth--
+      i++
+    }
+    const end = depth === 0 ? i : source.length
+    const block = source.slice(match.index, end)
+    out = out.replace(block, '/* declare module block removed for browser compile */\n')
+  }
+  return out
+}
+
+/** 修复后端生成 TSX 时可能被截断的 .style('filter', 'drop-shadow(...rgba(NNN' 未闭合字符串（整行替换为合法值） */
+function repairUnterminatedFilterStrings(source: string): string {
+  return source.replace(
+    /\.style\s*\(\s*['"]filter['"]\s*,\s*['"]drop-shadow\s*\(\s*0\s+0\s+15px\s+rgba\s*\(\s*(\d+)[^\n]*$/gm,
+    ".style('filter', 'drop-shadow(0 0 15px rgba($1, 107, 107, 0.8))');",
+  )
+}
+
 /** 把 export const X = ... 或 export const X: Type = ... 转为 const X = ... 并收集导出名 */
 function wrapExports(source: string): string {
   const exportNames: string[] = []
@@ -88,7 +118,9 @@ export async function compileTsxAndGetComponent(
 ): Promise<React.FC<any> | null> {
   try {
     const Babel = await loadBabel()
-    let source = injectImports(tsxSource)
+    let source = stripDeclareModuleBlocks(tsxSource)
+    source = repairUnterminatedFilterStrings(source)
+    source = injectImports(source)
     source = wrapExports(source)
     const result = Babel.transform(source, {
       filename,
@@ -120,7 +152,9 @@ export function compileTsxAndGetComponentSync(
   Babel: BabelStandalone
 ): React.FC<any> | null {
   try {
-    let source = injectImports(tsxSource)
+    let source = stripDeclareModuleBlocks(tsxSource)
+    source = repairUnterminatedFilterStrings(source)
+    source = injectImports(source)
     source = wrapExports(source)
     const result = Babel.transform(source, {
       filename,

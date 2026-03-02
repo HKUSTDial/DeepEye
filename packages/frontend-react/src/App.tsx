@@ -96,16 +96,20 @@ function App() {
         }`}
         style={{ background: 'var(--sidebar-bg)' }}
       >
-        <div className="flex-1 overflow-visible flex flex-col">
-          <Sidebar
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={toggleSidebar}
-          />
-          <DataSourceManager
-            selectedIds={selectedDataSourceIds}
-            onToggle={handleDataSourceToggle}
-            collapsed={sidebarCollapsed}
-          />
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <Sidebar
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+            />
+          </div>
+          <div className="flex-shrink-0 border-t border-[var(--sidebar-border)]">
+            <DataSourceManager
+              selectedIds={selectedDataSourceIds}
+              onToggle={handleDataSourceToggle}
+              collapsed={sidebarCollapsed}
+            />
+          </div>
         </div>
       </aside>
 

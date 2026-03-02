@@ -272,6 +272,15 @@ export function useChat() {
             setViewState(sessionId, 'error')
             return
           }
+          if (phase === 'video_preview_ready') {
+            const videoUrl = typeof payload?.video_url === 'string' ? payload.video_url : null
+            if (videoUrl) {
+              console.log('🎬 Video preview container ready:', videoUrl)
+              useWorkflowSessionsStore.getState().setVideoPreviewUrl(sessionId, videoUrl)
+              openOrFocusTab('video-preview', {})
+            }
+            return
+          }
           if (phase === 'refresh') {
             console.log('🔄 Triggering dashboard refresh as requested by agent...')
             triggerDashboardRefresh(sessionId)
@@ -301,6 +310,10 @@ export function useChat() {
               store.setVideoProgressVisible(sessionId, true)
               const stepIndex = parseInt(stepMatch[1], 10) - 1
               if (stepIndex >= 0 && stepIndex <= 3) store.setVideoProgressStep(sessionId, stepIndex)
+            }
+            // 仅在完成时把进度设为 100%，避免 Step 4 一开始就显示 100%
+            if (/Step\s*4\s*\/\s*4\s*Done|Video generation completed|🎉/.test(data.content)) {
+              store.setVideoProgressPercent(sessionId, 100)
             }
           }
         }
