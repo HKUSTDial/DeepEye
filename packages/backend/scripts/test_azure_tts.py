@@ -30,7 +30,7 @@ def main():
         return 1
 
     try:
-        from app.node.video_config.audio_engine.tts_generator import TTSGenerator
+        from app.node.video.config.audio_engine.tts_generator import TTSGenerator
     except ImportError as e:
         print("导入 TTSGenerator 失败:", e)
         return 1
