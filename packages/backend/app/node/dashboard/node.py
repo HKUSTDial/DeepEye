@@ -8,10 +8,8 @@ import io
 import tarfile
 import shutil
 import asyncio
-import time
-from concurrent.futures import ThreadPoolExecutor
         
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session
 
@@ -238,7 +236,7 @@ class NL2DashboardHandler:
                         if isinstance(parsed, (dict, list)):
                             data_input = parsed
                             print(f"[DEBUG] Successfully parsed string input as {data_input}")
-                    except Exception as e:
+                    except Exception:
                         # If parsing fails, treat as normal string path
                         pass
 
@@ -330,7 +328,6 @@ class NL2DashboardHandler:
 
         # 4. Run core logic (completed in backend container)
         try:
-            msg = f"Analyzing data for question: {question}"
             print(f"[DEBUG] Analyzing data | Question: {question}")
             # self._emit_log(msg)
             
@@ -429,12 +426,10 @@ class NL2DashboardHandler:
             
             # URL preset, must match container naming rules in DashboardDeployService
             full_url = f"/dashboards/deepeye-nl2dashboard-{safe_id}/"
-            deployment_info = {"url": full_url}
             
             if os.path.exists(va_source_path):
                 try:
                     # 1. Local import to cut cyclic dependency
-                    from app.services.dashboard_deploy_service import dashboard_deployer
                     
                     print(f"[*] Starting independent dashboard service container (ID: {safe_id})...")
                     

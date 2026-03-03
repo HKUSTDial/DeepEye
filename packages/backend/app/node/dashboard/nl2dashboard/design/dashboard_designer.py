@@ -238,7 +238,7 @@ class DashboardDesigner:
         
         # Save to file
         try:
-            design_file = self._save_design()
+            self._save_design()
             # print(f"  - Design file saved to: {design_file}")
         except Exception as e:
             print(f"  ⚠️  Failed to save design file: {e}")
@@ -1226,7 +1226,7 @@ class DashboardDesigner:
                 config = json.loads(json_str)
                 # print(f"     [DEBUG] Successfully parsed JSON: {len(config.get('blocks', []))} blocks, {len(config.get('interactionEdges', []))} edges")
                 return config
-            except json.JSONDecodeError as e:
+            except json.JSONDecodeError:
                 # print(f"     [DEBUG] JSON decode error, attempting to clean: {str(e)}")
                 # Clean common issues
                 json_str = re.sub(r'\s*#.*$', '', json_str, flags=re.MULTILINE)

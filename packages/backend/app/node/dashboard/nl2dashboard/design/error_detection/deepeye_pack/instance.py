@@ -10,7 +10,6 @@ implemented in getScore_learning_to_rank and getScore.
 
 import os
 import time
-from .features import Type
 
 class ViewPosition(object):
     """

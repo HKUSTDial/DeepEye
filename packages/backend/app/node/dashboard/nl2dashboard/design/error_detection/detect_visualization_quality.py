@@ -11,7 +11,6 @@ import re
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import traceback
 
 # Add current directory to path for local deepeye_pack import
 script_dir = Path(__file__).parent
@@ -103,7 +102,7 @@ class VisualizationDetector:
                 code_content = f.read()
 
             import pyecharts.options as opts
-            from pyecharts.charts import Bar, Line, Scatter, Pie, HeatMap, Grid, Page
+            from pyecharts.charts import Bar, Line, Scatter, Pie, HeatMap
             
             local_scope = {
                 'pd': pd, 'np': np, 'opts': opts,

@@ -90,7 +90,7 @@ class View(object):
         # linear
         try:
             result = abs(corrcoef(data1, data2)[0][1])
-        except Exception as e:
+        except Exception:
             result = 0
         else:
             pass
@@ -101,7 +101,7 @@ class View(object):
                 r = abs(corrcoef(data1, log_data2)[0][1])
                 if r > result:
                     result = r
-            except Exception as e:
+            except Exception:
                 result = 0
             else:
                 pass
@@ -112,7 +112,7 @@ class View(object):
                 r = abs(corrcoef(log_data1, data2)[0][1])
                 if r > result:
                     result = r
-            except Exception as e:
+            except Exception:
                 result = 0
             else:
                 pass
@@ -123,7 +123,7 @@ class View(object):
                 r = abs(corrcoef(log_data1, log_data2)[0][1])
                 if r > result:
                     result = r
-            except Exception as e:
+            except Exception:
                 result = 0
             else:
                 pass
@@ -197,7 +197,7 @@ class View(object):
         # linear
         try:
             result = abs(corrcoef(data1, data2)[0][1])
-        except Exception as e:
+        except Exception:
             result = 0
         # else:
         #     pass
@@ -209,7 +209,7 @@ class View(object):
                 r = abs(corrcoef(data1, log_data2)[0][1])
                 if r > result:
                     result = r
-            except Exception as e:
+            except Exception:
                 pass
                 # print("2 ", e)
                 # result = 0
@@ -223,7 +223,7 @@ class View(object):
                 r = abs(corrcoef(log_data1, data2)[0][1])
                 if r > result:
                     result = r
-            except Exception as e:
+            except Exception:
                 pass
                 # print("3 ", e)
                 # result = 0
@@ -237,7 +237,7 @@ class View(object):
                 r = abs(corrcoef(log_data1, log_data2)[0][1])
                 if r > result:
                     result = r
-            except Exception as e:
+            except Exception:
                 pass
                 # print("4 ", e)
                 # result = 0

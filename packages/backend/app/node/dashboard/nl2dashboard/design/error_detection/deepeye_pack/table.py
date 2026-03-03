@@ -8,8 +8,6 @@ and ranking.
 """
 
 import datetime
-import sys
-import traceback
 from .features import Features, Type
 from .view import View, Chart
 month = ['','Jan','Feb','Mar','Apr','May','June','July','Aug','Sept','Oct','Nov','Dec']

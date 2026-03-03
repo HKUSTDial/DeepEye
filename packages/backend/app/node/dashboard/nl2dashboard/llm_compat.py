@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import List, Optional, Any
+from typing import List, Optional
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 class Message:
     def __init__(self, role: str, content: str):

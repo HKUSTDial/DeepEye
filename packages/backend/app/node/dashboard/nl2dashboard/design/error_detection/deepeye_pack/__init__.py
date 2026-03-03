@@ -14,7 +14,6 @@ import os
 import sys
 import traceback
 
-import numpy as np
 import pandas as pd
 import datetime
 from pprint import *
@@ -44,8 +43,6 @@ except ImportError:
             pass
         HTML = str
 
-import numpy as np          
-
 methods_of_import = ['none','mysql','csv']
 methods_of_ranking = ['none','learn_to_rank','partial_order','diversified_ranking']
 
@@ -54,7 +51,7 @@ def is_vaild_datetime(old_date):
             datetime.datetime.strptime(old_date, '%Y-%m-%d %H:%M:%S')
             pd.to_datetime(old_date)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
 class default(object):
@@ -726,7 +723,6 @@ class deepeye(object):
             path2 = os.getcwd() + '/html/'
             if not os.path.exists(path2):
                 os.mkdir(path2)
-            page = Page()
             if output_method == 'single_html':
                 self.page = Page()
                 for item in result:
@@ -758,13 +754,12 @@ class deepeye(object):
         """
         instance = self.instance
         export_list = []
-        order1 = order2 = 1
+        order1 = 1
         old_view = ''
         if output_method == 'list':
             for i in range(instance.view_num):
                 view = instance.tables[instance.views[i].table_pos].views[instance.views[i].view_pos]
                 if old_view:
-                    order2 = 1
                     order1 += 1
                 export_list.append(view.output(order1))
                 old_view = view
@@ -773,7 +768,6 @@ class deepeye(object):
             for i in range(instance.view_num):
                 view = instance.tables[instance.views[i].table_pos].views[instance.views[i].view_pos]
                 if old_view:
-                    order2 = 1
                     order1 += 1
                 pprint (view.output(order1))
                 old_view = view
@@ -787,7 +781,6 @@ class deepeye(object):
                 for i in range(instance.view_num):
                     view = instance.tables[instance.views[i].table_pos].views[instance.views[i].view_pos]
                     if old_view:
-                        order2 = 1
                         order1 += 1
                     f.write(view.output(order1) + '\n')
                     old_view = view
@@ -796,7 +789,6 @@ class deepeye(object):
                 for i in range(instance.view_num):
                     view = instance.tables[instance.views[i].table_pos].views[instance.views[i].view_pos]
                     if old_view:
-                        order2 = 1
                         order1 += 1
                     f = open(path2 + self.table_name + str(order1) + '.json','w')
                     f.write(view.output(order1))
@@ -807,13 +799,11 @@ class deepeye(object):
             path2 = os.getcwd() + '/html/'
             if not os.path.exists(path2):
                 os.mkdir(path2)
-            page = Page()
             if output_method == 'single_html':
                 self.page = Page()
                 for i in range(instance.view_num):
                     view = instance.tables[instance.views[i].table_pos].views[instance.views[i].view_pos]
                     if old_view:
-                        order2 = 1
                         order1 += 1
                     old_view = view
                     self.html_output(order1, view, 'single')
@@ -825,7 +815,6 @@ class deepeye(object):
                 for i in range(instance.view_num):
                     view = instance.tables[instance.views[i].table_pos].views[instance.views[i].view_pos]
                     if old_view:
-                        order2 = 1
                         order1 += 1
                     old_view = view
                     self.html_output(order1, view, 'multiple')

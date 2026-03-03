@@ -9,12 +9,10 @@ import os
 import re
 import shutil
 import glob
-from typing import Dict, Any, Optional, List, Tuple
-from pathlib import Path
+from typing import Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..llm_compat import LLMClient, Message
-from .prompt import LAYOUT_POSITION_GENERATION_PROMPT
 
 
 class DashboardEngineer:
@@ -374,7 +372,6 @@ class DashboardEngineer:
             if dataset_path and os.path.exists(dataset_path):
                 try:
                     import pandas as pd
-                    import numpy as np
                     df = pd.read_csv(dataset_path)
                     
                     if 'blocks' in config:
@@ -564,7 +561,7 @@ class DashboardEngineer:
                                         "pageTemplate": "public/templates/page_default.html"
                                     }
                 
-                except Exception as e:
+                except Exception:
                     if attempt >= max_retries:
                         # Use default configuration
                         updated_config = config
@@ -608,7 +605,7 @@ class DashboardEngineer:
             with open(config_file_path, 'w', encoding='utf-8') as f:
                 json.dump(updated_config, f, ensure_ascii=False, indent=2)
         
-        except Exception as e:
+        except Exception:
             # Continue execution even if processing fails
             pass
     
@@ -988,21 +985,13 @@ class DashboardEngineer:
                 template_content
             )
             
-            # 3. Replace highlight titles (if highlights exist in the template)
-            if highlight_titles:
-                # Match highlight title patterns (adjust based on actual template structure)
-                highlight_pattern = r'(<div[^>]*class="[^"]*highlight[^"]*"[^>]*>.*?<[^>]*>)([^<]+)(</[^>]*>)'
-                # Or a more generic pattern: look for text containing "highlight" keyword
-                # This needs adjustment based on actual template structure
-            
-            # 4. Replace chart titles (find and replace all chart titles)
+            # 3. Replace chart titles (find and replace all chart titles)
             chart_title_pattern = r'(<h3 class="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wide flex items-center gap-2">\s*<span class="w-1 h-4 bg-\[#[^\]]+\] rounded-full"></span>\s*)([^<]+)(</h3>)'
             
             title_index = 0
             def replace_chart_title(match):
                 nonlocal title_index
                 prefix = match.group(1)
-                current_title = match.group(2).strip()
                 suffix = match.group(3)
                 
                 # Use available chart title if available; otherwise keep unchanged
@@ -1014,7 +1003,7 @@ class DashboardEngineer:
             
             template_content = re.sub(chart_title_pattern, replace_chart_title, template_content)
             
-            # 5. Replace chart IDs (replace intent_X_goal_0_chart0 in template with actual IDs from config)
+            # 4. Replace chart IDs (replace intent_X_goal_0_chart0 in template with actual IDs from config)
             if chart_ids:
                 # Find all chart ID patterns: intent_DIGIT_goal_DIGIT_chartDIGIT
                 chart_id_pattern = r'id="(intent_\d+_goal_\d+_chart\d+)"'
@@ -1022,7 +1011,6 @@ class DashboardEngineer:
                 chart_id_index = 0
                 def replace_chart_id(match):
                     nonlocal chart_id_index
-                    old_id = match.group(1)
                     
                     # Use available chart ID if available; otherwise keep unchanged
                     if chart_id_index < len(chart_ids):
@@ -1033,7 +1021,7 @@ class DashboardEngineer:
                 
                 template_content = re.sub(chart_id_pattern, replace_chart_id, template_content)
             
-            # 6. Inject configuration data for JavaScript if using the universal template
+            # 5. Inject configuration data for JavaScript if using the universal template
             if template_name == 'template_universal.html' and config_file and os.path.exists(config_file):
                 try:
                     with open(config_file, 'r', encoding='utf-8') as f:
@@ -1424,7 +1412,6 @@ for var_name in dir():
                 print(f"⚠️  Charts directory not found: {charts_dir}")
                 return
             
-            available_files = set(os.listdir(charts_dir))
             updated_count = 0
             
             # Traverse all blocks
@@ -1487,4 +1474,3 @@ for var_name in dir():
             print("✓ Reprocessed charts after beautify (labels hidden, data trimmed)")
         except Exception as e:
             print(f"❌ Error in _reprocess_charts_after_beautify: {e}")
-
