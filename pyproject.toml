@@ -4,13 +4,18 @@ version = "0.1.0"
 description = "DeepEye Monorepo Workspace"
 requires-python = ">=3.11"
 dependencies = [
-    "deepeye",
-    "langchain-openai",
-    "python-dotenv",
+    "deepeye-backend",
 ]
 
 [tool.uv.sources]
 deepeye = { workspace = true }
+deepeye-backend = { workspace = true }
 
 [tool.uv.workspace]
-members = ["packages/core", "packages/plugins/*", "apps/*"]
+members = ["packages/core", "packages/backend"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.15.4",
+]

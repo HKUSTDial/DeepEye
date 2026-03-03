@@ -23,8 +23,7 @@ dependencies = [
 
 然后运行：
 ```bash
-cd packages/backend
-uv sync  # 或 pip install -e .
+uv sync --all-packages --group dev
 ```
 
 ### 2. 配置环境变量

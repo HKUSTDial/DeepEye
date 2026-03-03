@@ -33,9 +33,6 @@ dependencies = [
     "azure-cognitiveservices-speech>=1.40.0",
 ]
 
-[tool.uv.sources]
-deepeye = { path = "../core", editable = true }
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

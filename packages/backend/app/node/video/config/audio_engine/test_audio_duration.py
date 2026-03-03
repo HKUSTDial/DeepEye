@@ -9,8 +9,7 @@
 4. 可选：真实 TTS 生成后时长是否正确
 
 运行方式：
-  cd packages/backend
-  python -m app.node.video.config.audio_engine.test_audio_duration
+  uv run --package deepeye-backend python -m app.node.video.config.audio_engine.test_audio_duration
 
 或在 Docker 内：
   docker compose exec backend-api python -m app.node.video.config.audio_engine.test_audio_duration
