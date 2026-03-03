@@ -114,6 +114,8 @@ class Settings(BaseSettings):
 
     # Docker image used by VideoDeployService to spin up per-task video preview containers.
     VIDEO_PREVIEW_IMAGE: str = "deepeye-video-preview:latest"
+    VIDEO_PREVIEW_DOCKERFILE: str = "docker/Dockerfile.video-preview"
+    VIDEO_PREVIEW_AUTO_BUILD: bool = True
 
     # JWT Authentication
     JWT_SECRET_KEY: str = "your-secret-key-change-this-in-production"  # ⚠️ 生产环境必须修改

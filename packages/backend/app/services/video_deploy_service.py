@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Dict
 
 import docker
-from docker.errors import NotFound
+from docker.errors import ImageNotFound, NotFound
 
 from app.core.config import get_video_session_root, settings
 from deepeye.utils.logger import logger
@@ -118,7 +118,39 @@ class VideoDeployService:
             self.docker_client = None
 
     def _get_image_name(self) -> str:
-        return os.environ.get(self.IMAGE_NAME_ENV, settings.VIDEO_PREVIEW_IMAGE if hasattr(settings, "VIDEO_PREVIEW_IMAGE") else "deepeye-video-preview:latest")
+        return os.environ.get(self.IMAGE_NAME_ENV, settings.VIDEO_PREVIEW_IMAGE)
+
+    def _ensure_preview_image(self, image_name: str) -> None:
+        try:
+            self.docker_client.images.get(image_name)
+            logger.info("[VideoDeployService] Using image: %s", image_name)
+            return
+        except ImageNotFound:
+            if not settings.VIDEO_PREVIEW_AUTO_BUILD:
+                raise RuntimeError(
+                    f"Video preview image '{image_name}' not found and VIDEO_PREVIEW_AUTO_BUILD is disabled"
+                )
+        except Exception as e:
+            raise RuntimeError(f"Failed to inspect video preview image '{image_name}': {e}")
+
+        self._build_preview_image(image_name)
+
+    def _build_preview_image(self, image_name: str) -> None:
+        logger.info(
+            "[VideoDeployService] Building image %s from %s",
+            image_name,
+            settings.VIDEO_PREVIEW_DOCKERFILE,
+        )
+        try:
+            self.docker_client.images.build(
+                path=settings.SANDBOX_BUILD_CONTEXT,
+                dockerfile=settings.VIDEO_PREVIEW_DOCKERFILE,
+                tag=image_name,
+                rm=True,
+            )
+            logger.info("[VideoDeployService] Built image: %s", image_name)
+        except Exception as e:
+            raise RuntimeError(f"Failed to build video preview image '{image_name}': {e}")
 
     def _detect_network(self) -> str:
         default = "deepeye_default"
@@ -170,6 +202,9 @@ class VideoDeployService:
         container_name = f"deepeye-video-{task_id}"
         network_name = self._detect_network()
 
+        image = self._get_image_name()
+        self._ensure_preview_image(image)
+
         # Remove old container if it exists
         try:
             old = self.docker_client.containers.get(container_name)
@@ -178,7 +213,6 @@ class VideoDeployService:
         except NotFound:
             pass
 
-        image = self._get_image_name()
         logger.info(f"[VideoDeployService] Starting container {container_name} from {image}")
 
         video_url_prefix = f"/video-previews/{container_name}/"
@@ -221,7 +255,7 @@ class VideoDeployService:
 
             logger.info(f"[VideoDeployService] Uploading {len(tsx_files)} TSX files + config to {container_name}")
             container.put_archive("/app/src", tar_stream)
-            logger.info(f"[VideoDeployService] Upload complete")
+            logger.info("[VideoDeployService] Upload complete")
 
             # Wait for Vite port 5173
             video_url = video_url_prefix
@@ -273,13 +307,14 @@ class VideoDeployService:
         task_id = "20260302_999999"
         container_name = f"deepeye-video-{task_id}"
         network_name = self._detect_network()
+        image = self._get_image_name()
+        self._ensure_preview_image(image)
         try:
             old = self.docker_client.containers.get(container_name)
             old.remove(force=True)
             logger.info(f"[VideoDeployService] Removed old test container: {container_name}")
         except NotFound:
             pass
-        image = self._get_image_name()
         video_url_prefix = f"/video-previews/{container_name}/"
         logger.info(f"[VideoDeployService] Starting TEST preview container {container_name} from {image}")
         container = self.docker_client.containers.run(
