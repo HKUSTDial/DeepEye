@@ -24,6 +24,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const createDraftSession = useChatStore((state) => state.createDraftSession)
   
   const [animatingTitles, setAnimatingTitles] = useState<Map<string, string>>(new Map())
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
   const previousSessionsRef = useRef<Array<{ id: string; title: string }>>([])
 
   const isActive = (path: string) => {
@@ -33,6 +34,17 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   useEffect(() => {
     fetchSessions()
   }, [fetchSessions])
+
+  useEffect(() => {
+    if (!deleteTarget) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDeleteTarget(null)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [deleteTarget])
 
   // Watch for title changes and animate
   useEffect(() => {
@@ -96,11 +108,19 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     await selectSession(id)
   }
 
-  const handleDeleteSession = (id: string, event: React.MouseEvent) => {
+  const handleDeleteSession = (id: string, title: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    if (confirm('Delete this conversation?')) {
-      deleteSession(id)
-    }
+    setDeleteTarget({ id, title: title || 'New conversation' })
+  }
+
+  const cancelDeleteSession = () => {
+    setDeleteTarget(null)
+  }
+
+  const confirmDeleteSession = async () => {
+    if (!deleteTarget) return
+    await deleteSession(deleteTarget.id)
+    setDeleteTarget(null)
   }
 
   return (
@@ -206,7 +226,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                       {isAnimating(session.id) && <span className="typing-cursor">|</span>}
                     </span>
                     <button
-                      onClick={(e) => handleDeleteSession(session.id, e)}
+                      onClick={(e) => handleDeleteSession(session.id, session.title, e)}
                       className="session-delete-btn"
                       title="Delete"
                     >
@@ -231,7 +251,44 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           </div>
         </div>
       </nav>
+
+      {deleteTarget && (
+        <div className="sidebar-delete-overlay" onClick={cancelDeleteSession}>
+          <div className="sidebar-delete-dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="sidebar-delete-header">
+              <div className="sidebar-delete-icon" aria-hidden="true">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <div className="sidebar-delete-header-text">
+                <div className="sidebar-delete-title">Delete conversation?</div>
+                <div className="sidebar-delete-message">This action cannot be undone.</div>
+              </div>
+            </div>
+            <div className="sidebar-delete-target">
+              <div className="sidebar-delete-target-label">Conversation</div>
+              <span className="sidebar-delete-name">"{deleteTarget.title}"</span>
+            </div>
+            <div className="sidebar-delete-actions">
+              <button
+                type="button"
+                className="sidebar-delete-btn sidebar-delete-btn-cancel"
+                onClick={cancelDeleteSession}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="sidebar-delete-btn sidebar-delete-btn-confirm"
+                onClick={confirmDeleteSession}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-

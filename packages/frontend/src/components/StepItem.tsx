@@ -9,36 +9,54 @@ interface StepItemProps {
 export default function StepItem({ step }: StepItemProps) {
   const [expanded, setExpanded] = useState(false)
   const isRunning = useMemo(() => step.status === 'running', [step.status])
+  const hasDetails = useMemo(
+    () => Boolean(step.input || step.output || (step.subSteps && step.subSteps.length > 0)),
+    [step.input, step.output, step.subSteps],
+  )
   const nodeStateClass = useMemo(() => {
     if (step.status === 'completed') return 'done'
     if (step.status === 'error') return 'error'
     return 'running'
   }, [step.status])
+  const statusLabel = useMemo(() => {
+    if (step.status === 'completed') return 'Done'
+    if (step.status === 'error') return 'Error'
+    return 'Running'
+  }, [step.status])
+  const sourceLabel = useMemo(() => step.source?.trim() || 'tool', [step.source])
 
   // Thought Step
   if (step.type === 'thought') {
     return (
-      <div className="tool-thought">
-        {isRunning ? (
-          <span className="thinking-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
-        ) : (
-          <span className="tool-thought-dot">·</span>
-        )}
-        <span className="tool-thought-text">{step.thought}</span>
+      <div className={`tool-thought ${isRunning ? 'running' : ''}`}>
+        <span className="tool-thought-mark">
+          {isRunning ? (
+            <span className="thinking-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          ) : (
+            <span className="tool-thought-dot">·</span>
+          )}
+        </span>
+        <span className="tool-thought-body">
+          <span className="tool-thought-label">{isRunning ? 'Thinking' : 'Thought'}</span>
+          <span className="tool-thought-text">{step.thought}</span>
+        </span>
       </div>
     )
   }
 
-  // Tool Step
-  return (
-    <div className="tool-tree-item">
-      <button onClick={() => setExpanded(!expanded)} className="tool-header">
-        <span className={`tool-node ${nodeStateClass}`}></span>
+  const headerContent = (
+    <>
+      <span className={`tool-node ${nodeStateClass}`}></span>
+      <span className="tool-main">
         <span className="tool-name">{step.name}</span>
+        <span className="tool-source">{sourceLabel}</span>
+      </span>
+      <span className={`tool-status ${nodeStateClass}`}>{statusLabel}</span>
+      {hasDetails && (
         <svg
           xmlns="http://www.w3.org/2000/svg"
           className={`tool-chevron ${expanded ? 'expanded' : ''}`}
@@ -49,10 +67,28 @@ export default function StepItem({ step }: StepItemProps) {
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
-      </button>
+      )}
+    </>
+  )
+
+  // Tool Step
+  return (
+    <div className="tool-tree-item">
+      {hasDetails ? (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="tool-header"
+          aria-expanded={expanded}
+          type="button"
+        >
+          {headerContent}
+        </button>
+      ) : (
+        <div className="tool-header static">{headerContent}</div>
+      )}
 
       {/* Details */}
-      {expanded && (
+      {hasDetails && expanded && (
         <div className="tool-details">
           {step.input && (
             <div className="tool-block">
@@ -80,4 +116,3 @@ export default function StepItem({ step }: StepItemProps) {
     </div>
   )
 }
-

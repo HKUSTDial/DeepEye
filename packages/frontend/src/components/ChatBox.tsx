@@ -25,6 +25,8 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const [mentionQuery, setMentionQuery] = useState('')
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const composingRef = useRef(false)
+  const compositionEndedAtRef = useRef(0)
 
   useEffect(() => {
     loadBases()
@@ -67,14 +69,35 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
       }
     }, 0)
   }
+  const lastMessageContent = messages.length > 0 ? messages[messages.length - 1]?.content ?? '' : ''
 
   // Auto-scroll when messages change
   useEffect(() => {
     scrollToBottom()
-  }, [messages.length, messages[messages.length - 1]?.content])
+  }, [messages.length, lastMessageContent])
+
+  const handleCompositionStart = () => {
+    composingRef.current = true
+  }
+
+  const handleCompositionEnd = () => {
+    composingRef.current = false
+    compositionEndedAtRef.current = Date.now()
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      const native = e.nativeEvent
+      const keyCode = native.keyCode || native.which || 0
+      const composingOrSelecting =
+        composingRef.current ||
+        native.isComposing ||
+        keyCode === 229 ||
+        Date.now() - compositionEndedAtRef.current < 30
+      // IME composing state: do not send message on Enter while user is selecting candidates.
+      if (composingOrSelecting) {
+        return
+      }
       e.preventDefault()
       handleSend()
     }
@@ -94,6 +117,15 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     }
   }
 
+  const renderStreamingIndicator = () => (
+    <span className="streaming-indicator" aria-hidden="true">
+      <span className="streaming-indicator-dot"></span>
+      <span className="streaming-indicator-dot"></span>
+      <span className="streaming-indicator-dot"></span>
+    </span>
+  )
+  const hasText = (value?: string) => Boolean(value && value.trim().length > 0)
+
   const renderAssistantMessage = (msg: Message) => {
     const timeline = msg.timeline && msg.timeline.length > 0 ? msg.timeline : null
 
@@ -109,7 +141,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {item.content || ''}
                 </ReactMarkdown>
-                {item.isStreaming && <span className="typing-cursor">|</span>}
+                {item.isStreaming && hasText(item.content) && renderStreamingIndicator()}
               </div>
             )
           })}
@@ -131,7 +163,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {msg.content || ''}
             </ReactMarkdown>
-            {msg.isStreaming && <span className="typing-cursor">|</span>}
+            {msg.isStreaming && hasText(msg.content) && renderStreamingIndicator()}
           </div>
         )}
       </>
@@ -157,23 +189,45 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
 
         {/* Messages */}
         {messages.length > 0 && (
-          <div className="max-w-4xl mx-auto">
+          <div className="chat-thread">
             {messages.map((msg, index) => (
-              <div key={`msg-${index}`} className={`message-bubble ${msg.role}`}>
-                {msg.role === 'user' ? (
-                  <div className="message-content">
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+              <div key={`msg-${index}`} className={`chat-message-row ${msg.role}`}>
+                {msg.role === 'assistant' && (
+                  <div className="message-avatar assistant" aria-hidden="true">
+                    AI
                   </div>
-                ) : (
-                  renderAssistantMessage(msg)
                 )}
 
-                {/* Thinking indicator */}
-                {msg.role === 'assistant' && msg.isStreaming && !msg.content && (!msg.steps || msg.steps.length === 0) && (
-                  <div className="thinking-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+                <div className="chat-message-main">
+                  <div className="message-role-label">
+                    {msg.role === 'user' ? 'You' : 'DeepEye'}
+                  </div>
+                  <div className={`message-bubble ${msg.role}`}>
+                    {msg.role === 'user' ? (
+                      <div className="message-content">
+                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                      </div>
+                    ) : (
+                      renderAssistantMessage(msg)
+                    )}
+
+                    {/* Thinking indicator */}
+                    {msg.role === 'assistant' &&
+                      msg.isStreaming &&
+                      !hasText(msg.content) &&
+                      (!msg.steps || msg.steps.length === 0) && (
+                        <div className="thinking-dots">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      )}
+                  </div>
+                </div>
+
+                {msg.role === 'user' && (
+                  <div className="message-avatar user" aria-hidden="true">
+                    You
                   </div>
                 )}
               </div>
@@ -181,7 +235,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
 
             {/* Error */}
             {error && (
-              <div className="text-center text-red-400 text-sm py-2">
+              <div className="chat-error">
                 {error}
               </div>
             )}
@@ -191,7 +245,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
 
       {/* Input Area */}
       <div className="chat-input-container">
-        <div className="max-w-3xl mx-auto px-4 py-4">
+        <div className="chat-input-shell">
           <div className="chat-input-wrapper">
             <textarea
               ref={textareaRef}
@@ -210,6 +264,8 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
                 }
               }}
               onKeyDown={handleKeyDown}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               rows={1}
               className="chat-input"
               style={{ maxHeight: '200px' }}
@@ -253,7 +309,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               </svg>
             </button>
           </div>
-          <p className="text-xs text-[var(--main-text-muted)] text-center mt-2 opacity-60">
+          <p className="chat-input-hint">
             DeepEye can make mistakes. Consider checking important information.
           </p>
         </div>
