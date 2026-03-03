@@ -1,13 +1,16 @@
-import os
-import io
-import tarfile
-import time
 import asyncio
+import io
+import os
+import socket
+import tarfile
+from typing import Dict
+
 import docker
-from typing import Dict, Optional
-from app.sandbox.docker_sandbox import DockerSandbox
+from docker.errors import ImageNotFound, NotFound
+
 from app.core.config import settings
 from deepeye.utils.logger import logger
+
 
 class DashboardDeployService:
     def __init__(self):
@@ -20,14 +23,14 @@ class DashboardDeployService:
     async def deploy(self, task_id: str, local_va_app_path: str) -> Dict:
         """
         Deploy a Dashboard to an independent container.
-        
+
         Args:
             task_id: Task ID (or node_id)
-            local_va_app_path: Backend local directory containing va_app source code.
-            
+            local_va_app_path: Local directory containing generated va_app source code.
+
         Returns:
             {
-                "status": "running",
+                "status": "running"|"error",
                 "container_name": str,
                 "url": str
             }
@@ -35,134 +38,163 @@ class DashboardDeployService:
         if not self.docker_client:
             raise RuntimeError("Docker not available")
 
-        # 1. Construct container name - using deepeye-nl2dashboard- prefix
+        if not os.path.isdir(local_va_app_path):
+            raise FileNotFoundError(f"Dashboard source path not found: {local_va_app_path}")
+
+        self._ensure_dashboard_image()
+
         container_name = f"deepeye-nl2dashboard-{task_id}"
-        
-        # Automatically detect the network the current container is in
-        network_name = "deepeye_nl2dashboard_default_1"
-        try:
-            # Get current worker container info
-            import socket
-            hostname = socket.gethostname()
-            this_container = self.docker_client.containers.get(hostname)
-            # Get its networks, filter out default 'bridge', prioritize business networks
-            networks = this_container.attrs['NetworkSettings']['Networks']
-            if networks:
-                # Prioritize non-bridge networks (e.g., created by docker-compose)
-                biz_networks = [n for n in networks.keys() if n != "bridge"]
-                if biz_networks:
-                    network_name = biz_networks[0]
-                else:
-                    network_name = list(networks.keys())[0]
-                print(f"[DEBUG] Automatically selected container network: {network_name}")
-        except Exception as ne:
-            print(f"[WARN] Automatic network detection failed, using default: {ne}")
+        network_name = self._detect_network_name()
 
-        # 2. Cleanup old container with the same name
-        try:
-            old = self.docker_client.containers.get(container_name)
-            old.remove(force=True)
-        except:
-            pass
+        self._remove_container_if_exists(container_name)
 
-        # 3. Start new container
-        # Strategy: Ensure all required libraries are installed (uvicorn, fastapi, pandas, pyecharts)
-        # Note: These are already installed in Dockerfile.sandbox, this is a final fallback.
-        # If already present, pip install will finish immediately (Already satisfied).
-        # Increased timeout and optimized startup script for unstable network environments.
         start_cmd = (
-            "bash -c '"
-            "echo [SYSTEM] Waiting for code upload...; "
-            "while [ ! -f /app/app.py ]; do sleep 0.5; done; "
-            "echo [SYSTEM] Code detected. Checking environment...; "
-            "python3 -m pip install --no-cache-dir uvicorn fastapi pandas pyecharts -i https://pypi.tuna.tsinghua.edu.cn/simple --timeout 5 || echo [WARN] Pip check skipped or failed, continuing...; "
-            "echo [SYSTEM] Starting Uvicorn...; "
+            "bash -lc '"
+            "echo [SYSTEM] Waiting for dashboard code upload...; "
+            "while [ ! -f /app/app.py ]; do sleep 0.2; done; "
+            "echo [SYSTEM] Starting Dashboard Uvicorn...; "
             "cd /app && "
-            "export PYTHONPATH=$PYTHONPATH:/app && "
-            "python3 -m uvicorn app:app --host 0.0.0.0 --port 8000"
+            "export PYTHONPATH=/app:$PYTHONPATH && "
+            "exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8000"
             "'"
         )
 
+        logger.info(
+            "[DashboardDeployService] Starting container %s from %s on network %s",
+            container_name,
+            settings.DASHBOARD_IMAGE,
+            network_name,
+        )
+
         container = self.docker_client.containers.run(
-            image=settings.SANDBOX_IMAGE,
+            image=settings.DASHBOARD_IMAGE,
             name=container_name,
             detach=True,
             working_dir="/app",
             command=start_cmd,
             labels={"type": "dashboard-instance", "task_id": task_id},
-            network=network_name
+            network=network_name,
         )
 
         try:
-            # 4. Prepare code package and upload
-            print(f"[*] Uploading Dashboard code to container {container_name}...")
-            tar_stream = io.BytesIO()
-            with tarfile.open(fileobj=tar_stream, mode='w') as tar:
-                for item in os.listdir(local_va_app_path):
-                    item_path = os.path.join(local_va_app_path, item)
-                    tar.add(item_path, arcname=item)
-            
-            tar_stream.seek(0)
-            container.put_archive("/app", tar_stream)
-            print(f"[✓] Code upload completed.")
+            self._upload_dashboard_source(container, local_va_app_path)
 
-            # Wait a moment to ensure container status is stable
             await asyncio.sleep(1)
             container.reload()
             if container.status != "running":
-                print(f"[ERROR] Container stopped after upload. Status: {container.status}")
-                print(f"Container logs: {container.logs().decode('utf-8')}")
-                raise RuntimeError(f"Container stopped after upload: {container.status}")
+                logs = container.logs().decode("utf-8", errors="replace")
+                raise RuntimeError(
+                    f"Container stopped after upload: {container.status}\n{logs}"
+                )
 
-            # Print container file structure for verification
-            print(f"[*] Checking container internal file structure...")
-            ls_res = container.exec_run("ls -R /app")
-            if ls_res.exit_code == 0:
-                print("\n--- Container /app Directory Tree ---")
-                print(ls_res.output.decode('utf-8'))
-                print("-----------------------\n")
-
-            # 7. Return access URL
             dashboard_url = f"/dashboards/{container_name}/"
-
-            # 6. Wait for service to be ready (timeout 60s)
-            print(f"[*] Confirming Dashboard port status...")
-            is_ready = False
-            for i in range(60):
-                container.reload()
-                if container.status != "running":
-                    print(f"[ERROR] Container stopped unexpectedly, status: {container.status}")
-                    break
-
-                # Use python inside container to probe port 8000
-                check_cmd = "python3 -c 'import socket; s = socket.socket(); s.settimeout(0.5); s.connect((\"127.0.0.1\", 8000))'"
-                res = container.exec_run(check_cmd)
-                if res.exit_code == 0:
-                    print(f"[✓] Dashboard port is ready: {dashboard_url}")
-                    is_ready = True
-                    break
-                
-                # Print progress every 5 seconds
-                if i % 5 == 0 and i > 0:
-                    print(f"[*] Still configuring... ({i}s/60s)")
-                    
-                await asyncio.sleep(1)
-            
+            is_ready = await self._wait_for_port_ready(container, timeout_seconds=60)
             if not is_ready:
-                print(f"[ERROR] Deployment timed out.")
-                print("\n" + "="*20 + " Container Real-time Logs " + "="*20)
-                print(container.logs().decode('utf-8'))
-                print("="*54 + "\n")
-            
-            return {
-                "status": "running" if is_ready else "error", 
-                "container_name": container_name,
-                "url": dashboard_url
-            }
+                logs = container.logs().decode("utf-8", errors="replace")
+                logger.error("[DashboardDeployService] Deployment timeout. Logs:\n%s", logs)
 
+            return {
+                "status": "running" if is_ready else "error",
+                "container_name": container_name,
+                "url": dashboard_url,
+            }
+        except Exception:
+            logger.exception("[DashboardDeployService] Deployment failed for task_id=%s", task_id)
+            raise
+
+    def _remove_container_if_exists(self, container_name: str) -> None:
+        try:
+            old = self.docker_client.containers.get(container_name)
+            old.remove(force=True)
+            logger.info("[DashboardDeployService] Removed old container: %s", container_name)
+        except NotFound:
+            pass
+
+    def _detect_network_name(self) -> str:
+        """Try to keep dashboard containers on the same network as current backend container."""
+        fallback_network = "bridge"
+        try:
+            hostname = socket.gethostname()
+            this_container = self.docker_client.containers.get(hostname)
+            networks = this_container.attrs.get("NetworkSettings", {}).get("Networks", {})
+            biz_networks = [name for name in networks.keys() if name != "bridge"]
+            if biz_networks:
+                return biz_networks[0]
+            if networks:
+                return next(iter(networks.keys()))
         except Exception as e:
-            print(f"[ERROR] Deployment failed for {task_id}: {e}")
-            raise e
+            logger.warning("[DashboardDeployService] Auto network detection failed: %s", e)
+
+        return fallback_network
+
+    def _ensure_dashboard_image(self) -> None:
+        try:
+            self.docker_client.images.get(settings.DASHBOARD_IMAGE)
+            logger.info("[DashboardDeployService] Using image: %s", settings.DASHBOARD_IMAGE)
+            return
+        except ImageNotFound:
+            if not settings.DASHBOARD_AUTO_BUILD:
+                raise RuntimeError(
+                    f"Dashboard image '{settings.DASHBOARD_IMAGE}' not found and DASHBOARD_AUTO_BUILD is disabled"
+                )
+        except Exception as e:
+            raise RuntimeError(f"Failed to inspect dashboard image '{settings.DASHBOARD_IMAGE}': {e}")
+
+        self._build_dashboard_image()
+
+    def _build_dashboard_image(self) -> None:
+        logger.info(
+            "[DashboardDeployService] Building image %s from %s",
+            settings.DASHBOARD_IMAGE,
+            settings.DASHBOARD_DOCKERFILE,
+        )
+        try:
+            self.docker_client.images.build(
+                path=settings.SANDBOX_BUILD_CONTEXT,
+                dockerfile=settings.DASHBOARD_DOCKERFILE,
+                tag=settings.DASHBOARD_IMAGE,
+                rm=True,
+            )
+            logger.info("[DashboardDeployService] Built image: %s", settings.DASHBOARD_IMAGE)
+        except Exception as e:
+            raise RuntimeError(f"Failed to build dashboard image: {e}")
+
+    def _upload_dashboard_source(self, container, local_va_app_path: str) -> None:
+        logger.info("[DashboardDeployService] Uploading dashboard code from %s", local_va_app_path)
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            for item in os.listdir(local_va_app_path):
+                item_path = os.path.join(local_va_app_path, item)
+                tar.add(item_path, arcname=item)
+
+        tar_stream.seek(0)
+        container.put_archive("/app", tar_stream)
+
+    async def _wait_for_port_ready(self, container, timeout_seconds: int) -> bool:
+        for elapsed in range(timeout_seconds):
+            container.reload()
+            if container.status != "running":
+                logger.error(
+                    "[DashboardDeployService] Container exited while waiting, status=%s",
+                    container.status,
+                )
+                return False
+
+            check_cmd = (
+                "python3 -c 'import socket; s = socket.socket(); "
+                "s.settimeout(0.5); s.connect((\"127.0.0.1\", 8000))'"
+            )
+            res = container.exec_run(check_cmd)
+            if res.exit_code == 0:
+                return True
+
+            if elapsed > 0 and elapsed % 5 == 0:
+                logger.info("[DashboardDeployService] Still starting... (%ss/%ss)", elapsed, timeout_seconds)
+
+            await asyncio.sleep(1)
+
+        return False
+
 
 # Singleton
 dashboard_deployer = DashboardDeployService()

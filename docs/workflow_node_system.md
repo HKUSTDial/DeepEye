@@ -23,6 +23,7 @@ Workflow Node 系统负责：
 - 领域内代码内聚：
   - Dashboard 节点入口：`packages/backend/app/node/dashboard/node.py`
   - Dashboard 内部实现：`packages/backend/app/node/dashboard/nl2dashboard/*`
+  - Dashboard 部署服务：`packages/backend/app/services/dashboard_deploy_service.py`（按任务拉起独立容器，镜像来自 `docker/Dockerfile.dashboard`）
   - Video 节点入口：`packages/backend/app/node/video/node.py`
   - Video 内部实现：`packages/backend/app/node/video/config/*` 与 `packages/backend/app/node/video/render/*`
 
