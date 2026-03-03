@@ -11,7 +11,6 @@ TTS Generator - 支持 Word-Level Timestamps 的 TTS 音频生成器
 参考：Data Player 论文 Section 4.3 - Narration-Animation Interplay
 """
 
-import os
 import json
 import subprocess
 import time
@@ -281,7 +280,7 @@ class TTSGenerator:
                         # 其他错误（永久性错误），直接抛出
                         raise RuntimeError(error_msg)
             
-            except RuntimeError as e:
+            except RuntimeError:
                 # RuntimeError 已经在上面处理过（429/超时已重试或抛出，其他直接抛出）
                 raise
             except Exception as e:

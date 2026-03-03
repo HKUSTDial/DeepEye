@@ -81,7 +81,6 @@ class VideoGeneratorHandler:
             添加了默认 time_range 的配置
         """
         from copy import deepcopy
-        import math
         
         config_with_times = deepcopy(config)
         current_time = 0.0

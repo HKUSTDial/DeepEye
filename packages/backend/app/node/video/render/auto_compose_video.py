@@ -11,7 +11,7 @@ import os
 import re
 import argparse
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Tuple
 
 VIDEO_RUNTIME_BASE = Path(os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runtime"))
 DEFAULT_ANIMATED_OUTPUT_DIR = Path(
@@ -1188,8 +1188,8 @@ import {VideoComposer} from './components/CustomInfographic/VideoComposer';"""
                     # 提供更详细的调试信息
                     if end_pos == -1:
                         print(f"⚠️  无法找到 Composition '{composition_id}' 的结束位置（既不是 </Composition> 也不是 />）")
-                    elif end_pos <= start_pos:
-                        print(f"⚠️  结束位置 ({end_pos}) 不晚于开始位置 ({start_pos})")
+                    elif end_pos <= comment_start:
+                        print(f"⚠️  结束位置 ({end_pos}) 不晚于开始位置 ({comment_start})")
                     elif end_pos > len(content):
                         print(f"⚠️  结束位置 ({end_pos}) 超出文件长度 ({len(content)})")
                     else:

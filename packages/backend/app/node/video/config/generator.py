@@ -194,7 +194,6 @@ class LLMClient:
         
         # 智能重试配置
         max_general_retries = 10  # 普通错误最多重试10次
-        last_exception = None
         start_time = time.time()
         attempt = 0
         
@@ -614,9 +613,7 @@ class LLMClient:
                             
                             # Find the last unclosed quote before error position
                             # Look backwards from error_pos to find the opening quote
-                            start_pos = error_pos
                             quote_pos = -1
-                            in_string = False
                             
                             # Scan backwards to find the opening quote
                             for i in range(error_pos - 1, max(0, error_pos - 200), -1):
@@ -1248,6 +1245,12 @@ class SimpleConfigGenerator:
             print("\n" + "="*60)
             print("🎬 Starting video config generation")
             print("="*60)
+
+        total_token_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
         
         # Phase 0: Query Decomposition
         if verbose:
@@ -1889,7 +1892,6 @@ class SimpleConfigGenerator:
                                     print(f"         字段样本: {sample_values[:3]}")
                             
                             # 先尝试精确匹配
-                            initial_count = len(df)
                             df_exact = df[df[field] == condition_cleaned]
                             
                             # 如果精确匹配成功（有数据），使用精确匹配结果
@@ -2840,7 +2842,6 @@ class SimpleConfigGenerator:
         
         for scene in scenes:
             scene_type = scene.get('type', 'unknown')
-            original_id = scene.get('id', '')
             
             if scene_type == 'opening':
                 scene['id'] = 'scene_opening'
@@ -3023,11 +3024,9 @@ class SimpleConfigGenerator:
             
             # Get background color from first chart scene
             ref_bg = "#0f1419"
-            ref_container = "#0f1419"
             if chart_scenes:
                 ref_style = chart_scenes[0].get('content', {}).get('style', {})
                 ref_bg = ref_style.get('background_color', ref_bg)
-                ref_container = ref_style.get('container_background', ref_bg)
             
             # Create simple opening scene
             opening_scene = {

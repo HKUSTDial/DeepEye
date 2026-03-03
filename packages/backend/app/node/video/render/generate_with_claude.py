@@ -20,7 +20,7 @@ import time
 import traceback
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Tuple, Optional
+from typing import Tuple
 
 # 导入项目现有的 LLM 客户端
 backend_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

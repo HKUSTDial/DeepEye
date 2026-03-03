@@ -40,5 +40,10 @@ deepeye = { path = "../core", editable = true }
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = [
+    "ruff>=0.15.4",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

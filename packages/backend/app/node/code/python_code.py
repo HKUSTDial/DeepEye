@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import json
-import json5
 from typing import Any
 
 from app.node.core.base import BaseNode

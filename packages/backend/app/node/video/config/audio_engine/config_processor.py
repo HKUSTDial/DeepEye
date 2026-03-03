@@ -13,7 +13,7 @@ Config Processor - 配置文件处理器
 
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from copy import deepcopy
 
 

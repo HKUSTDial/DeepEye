@@ -31,7 +31,6 @@ def strip_declare_module_blocks(source: str) -> str:
                 depth -= 1
             i += 1
         end = i if depth == 0 else len(out)
-        block = out[start:end]
         replacement = "/* declare module block removed */\n"
         out = out[:start] + replacement + out[end:]
         pos = start + len(replacement)
@@ -131,7 +130,7 @@ def validate_component_syntax(tsx_file: Path) -> Tuple[bool, Optional[str]]:
         return False, "esbuild 验证超时"
     except FileNotFoundError:
         pass
-    except Exception as e:
+    except Exception:
         pass
 
     # 2) Python 兜底：括号平衡 + 必须有 return ( 和 };

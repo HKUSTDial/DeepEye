@@ -13,7 +13,7 @@ Time Aligner - 自动时间对齐模块
 
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from copy import deepcopy
 

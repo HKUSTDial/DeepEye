@@ -12,7 +12,7 @@ import os
 import shutil
 import json
 import re
-from typing import List, Dict, Any
+from typing import List, Dict
 
 
 VIDEO_RUNTIME_BASE = os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runtime")
