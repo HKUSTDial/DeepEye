@@ -17,10 +17,14 @@ Workflow Node 系统负责：
 ### 2) Node 实现与注册
 路径：`packages/backend/app/node/*`  
 关键点：
-- `BaseNode` 在 `packages/backend/app/node/base.py`  
+- `BaseNode` 在 `packages/backend/app/node/core/base.py`  
 - `register_node_specs` 与 `register_node_handlers` 在 `packages/backend/app/node/__init__.py`  
-- 通过扫描 `BaseNode` 子类自动注册  
-- `_DISABLED_NODE_TYPES` 控制哪些节点会从系统中排除
+- 通过 `NODE_MODULES` 显式加载节点模块并收集 `BaseNode` 子类
+- 领域内代码内聚：
+  - Dashboard 节点入口：`packages/backend/app/node/dashboard/node.py`
+  - Dashboard 内部实现：`packages/backend/app/node/dashboard/nl2dashboard/*`
+  - Video 节点入口：`packages/backend/app/node/video/node.py`
+  - Video 内部实现：`packages/backend/app/node/video/config/*` 与 `packages/backend/app/node/video/render/*`
 
 ### 3) Engine 与校验
 路径：`packages/backend/app/services/workflow_engine.py`  
@@ -54,9 +58,9 @@ Workflow Node 系统负责：
 
 1) 编写节点类
 ```python
-# packages/backend/app/node/data_export_csv.py
+# packages/backend/app/node/data/data_export_csv.py
 from deepeye.workflows.registry import NodeSpec
-from app.node.base import BaseNode
+from app.node.core.base import BaseNode
 from deepeye.workflows.engine import NodeHandler
 
 class DataExportCsv(BaseNode):
@@ -84,9 +88,8 @@ class DataExportCsv(BaseNode):
 ```
 
 2) 注册节点  
-无需手动注册，`register_node_specs` 会扫描 `BaseNode` 子类。  
-若有特殊排除，请确认 `_DISABLED_NODE_TYPES`。
+在 `packages/backend/app/node/__init__.py` 的 `NODE_MODULES` 增加新模块路径。  
+`register_node_specs` 会自动收集并注册对应 `BaseNode` 子类。
 
 3) 前端可见  
 `/api/v1/workflow-nodes` 会自动返回新节点定义。
-

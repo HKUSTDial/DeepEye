@@ -14,18 +14,30 @@ The workflow system has two distinct layers:
 - Implements how a node runs at runtime.
 - Registered in the ExecutionEngine by node type.
 
-The system automatically discovers all nodes under `packages/backend/app/node/`.
+The system loads standard node modules from an explicit list in `packages/backend/app/node/__init__.py`.
 
 ## Directory Layout
 
 ```
 packages/backend/app/node/
-  base.py                # BaseNode abstract class
+  core/
+    base.py              # BaseNode abstract class
+    db_utils.py          # shared DB helpers
+  data/
+    datasource_read.py   # datasource.read node
+    sql_execute.py       # sql.execute node
+  knowledge/
+    knowledge_search.py  # knowledge.search node
+  code/
+    python_code.py       # python.code node
+  dashboard/
+    node.py              # data.generate_dashboard node
+    nl2dashboard/        # dashboard generation internals
+  video/
+    node.py              # video.generator node
+    config/              # video configuration generation internals
+    render/              # TSX rendering pipeline internals
   __init__.py            # auto-discovery + registry
-  utils.py               # shared helpers
-  datasource_read.py     # node implementation
-  sql_execute.py         # node implementation
-  data_filter_rows.py    # node implementation
   ...
 ```
 
@@ -40,7 +52,7 @@ Every node is a class that inherits `BaseNode` and defines:
 Example skeleton:
 
 ```python
-from app.node.base import BaseNode
+from app.node.core.base import BaseNode
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.models import Port
 
@@ -73,7 +85,7 @@ return `None` from `build_handler`. The registry will still include its NodeSpec
 
 `packages/backend/app/node/__init__.py`:
 
-- Imports all modules under `app.node`
+- Imports an explicit list of node modules
 - Collects all subclasses of `BaseNode`
 - Registers specs via `node_cls.spec()`
 - Registers handlers via `node_cls.build_handler(...)` when present
@@ -100,7 +112,7 @@ This ensures any new node automatically appears in the AI prompt.
 ## Naming Conventions
 
 - Node type strings are namespaced: `data.*`, `stats.*`, `datasource.*`
-- Node file names mirror node type (snake_case)
+- Domain packages use `node.py` as the node entrypoint, and keep internals under subpackages
 - Handlers are small and single-purpose
 
 ## Current Core Nodes

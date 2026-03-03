@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.node.base import BaseNode
+from app.node.core.base import BaseNode
 from app.sandbox.docker_sandbox import DockerSandbox
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec

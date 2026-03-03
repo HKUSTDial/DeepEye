@@ -14,18 +14,30 @@
 - 节点运行时逻辑实现
 - 通过 node type 注册到 ExecutionEngine
 
-系统会自动发现 `packages/backend/app/node/` 目录下的节点。
+系统会通过 `packages/backend/app/node/__init__.py` 中的显式模块列表加载标准节点。
 
 ## 目录结构
 
 ```
 packages/backend/app/node/
-  base.py                # BaseNode 抽象
+  core/
+    base.py              # BaseNode 抽象
+    db_utils.py          # 数据库通用工具
+  data/
+    datasource_read.py   # datasource.read 节点
+    sql_execute.py       # sql.execute 节点
+  knowledge/
+    knowledge_search.py  # knowledge.search 节点
+  code/
+    python_code.py       # python.code 节点
+  dashboard/
+    node.py              # data.generate_dashboard 节点
+    nl2dashboard/        # dashboard 生成内部实现
+  video/
+    node.py              # video.generator 节点
+    config/              # 视频配置生成内部实现
+    render/              # TSX 渲染流水线内部实现
   __init__.py            # 自动发现与注册
-  utils.py               # 通用工具
-  datasource_read.py     # 节点实现
-  sql_execute.py         # 节点实现
-  data_filter_rows.py    # 节点实现
   ...
 ```
 
@@ -40,7 +52,7 @@ packages/backend/app/node/
 示例：
 
 ```python
-from app.node.base import BaseNode
+from app.node.core.base import BaseNode
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.models import Port
 
@@ -73,7 +85,7 @@ class MyNode(BaseNode):
 
 `packages/backend/app/node/__init__.py`：
 
-- 自动导入 `app.node` 下所有模块
+- 按显式配置导入节点模块
 - 收集所有 `BaseNode` 子类
 - 调用 `spec()` 注册 NodeSpec
 - 调用 `build_handler(...)` 注册执行逻辑（如存在）
@@ -98,7 +110,7 @@ workflow agent 的提示词由 NodeSpec 自动生成，确保 AI 只使用已注
 ## 命名规范
 
 - node type 用命名空间：`data.*` / `stats.*` / `datasource.*`
-- 节点文件名与 type 对齐（snake_case）
+- 领域包统一使用 `node.py` 作为节点入口，内部实现放在子目录
 - handler 逻辑单一、可测试
 
 ## 现有核心节点

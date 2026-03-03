@@ -23,7 +23,7 @@
 
 关键文件：
 - `packages/backend/app/node/nl2sql_generate.py`
-- `packages/backend/app/node/sql_execute.py`
+- `packages/backend/app/node/data/sql_execute.py`
 - `packages/backend/app/node/__init__.py`
 - `packages/backend/app/models/datasource.py`
 
@@ -190,5 +190,4 @@ python packages/core/tests/nl2sql_smoke.py
 
 **Backend**
 - `packages/backend/app/node/nl2sql_generate.py`
-- `packages/backend/app/node/sql_execute.py`
-
+- `packages/backend/app/node/data/sql_execute.py`

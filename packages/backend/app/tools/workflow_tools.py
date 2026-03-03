@@ -154,6 +154,16 @@ def create_update_workflow_tool(session_id: str) -> callable:
     return update_workflow
 
 
+def _infer_language_from_query(query: str) -> str:
+    """Infer narration language from query text: if contains CJK use Chinese, else English."""
+    if not (query and query.strip()):
+        return "English"
+    for c in query:
+        if "\u4e00" <= c <= "\u9fff" or "\u3040" <= c <= "\u30ff":
+            return "Chinese"
+    return "English"
+
+
 def _build_data_video_workflow(datasource: dict, query: str) -> dict:
     """Build a 2-node workflow (data source → video.generator) for generate_data_video tool."""
     ds_id = datasource.get("id", "")
@@ -193,7 +203,10 @@ def _build_data_video_workflow(datasource: dict, query: str) -> dict:
             "config": {"schema": "dict"},
             "config_path": {"schema": "string"},
         },
-        "params": {"query": query or "分析数据并生成中文数据视频", "language": "Chinese"},
+        "params": {
+            "query": query or "Analyze the data and generate a data video",
+            "language": _infer_language_from_query(query or ""),
+        },
         "metadata": {"position": {"x": 320, "y": 100}},
     }
 
@@ -221,9 +234,10 @@ def create_generate_data_video_tool(
     """
 
     @tool
-    async def generate_data_video(query: str = "分析数据并生成中文数据视频") -> str:
+    async def generate_data_video(query: str = "Analyze the data and generate a data video") -> str:
         """
-        Generate a data video from the currently selected data source. Call this when the user asks to generate a data video (生成数据视频). Uses the first selected datasource; pass the user's goal as query.
+        Generate a data video from the currently selected data source. Call this when the user asks to generate a data video (生成数据视频 / generate data video). Uses the first selected datasource.
+        Pass the user's goal in their own words and language: if they ask in English, use an English query; if in Chinese, use Chinese. Do not translate or rewrite into another language.
         """
         if not datasources_info:
             return "未选择数据源，请先在左侧选择或上传数据后再生成数据视频。"

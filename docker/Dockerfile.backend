@@ -18,27 +18,22 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 # Use tuna mirrors for pip
 RUN pip install uv -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# Copy project definition files
-COPY packages/core/pyproject.toml packages/core/README.md /app/packages/core/
-COPY packages/backend/pyproject.toml packages/backend/README.md /app/packages/backend/
-
-# Install dependencies
-# We use --system flag to install into system python (no venv needed in container)
-# Use tuna mirrors for uv pip
+# Use tuna mirrors for uv
 ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-WORKDIR /app/packages/backend
-RUN uv pip install --system -e ../core
-RUN uv pip install --system -e .
 
-# Copy packages/backend/app/main.py
+# Copy workspace metadata and source
+COPY pyproject.toml uv.lock uv.toml /app/
 COPY packages/core /app/packages/core
 COPY packages/backend /app/packages/backend
 
+# Install backend runtime dependencies from the workspace lock
+RUN uv sync --frozen --no-dev --package deepeye-backend --project /app
+
 # Set environment variables
 # Include both backend and core in PYTHONPATH to ensure modules are found
+ENV PATH=/app/.venv/bin:$PATH
 ENV PYTHONPATH=/app/packages/backend:/app/packages/core
 ENV PYTHONUNBUFFERED=1
 
 # Default command (will be overridden in docker-compose)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
