@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     SANDBOX_IDLE_TIMEOUT: int = 30 * 60        # 30 minutes - stop container
     SANDBOX_CLEANUP_INTERVAL: int = 5 * 60      # 5 minutes - check interval
     SANDBOX_DESTROY_TIMEOUT: int = 6 * 60 * 60  # 6 hours - destroy container (preserve volume)
+
+    # Dashboard deployment runtime
+    DASHBOARD_IMAGE: str = "deepeye-dashboard:latest"
+    DASHBOARD_DOCKERFILE: str = "docker/Dockerfile.dashboard"
+    DASHBOARD_AUTO_BUILD: bool = True
     
     # MinIO Configuration
     MINIO_ENDPOINT: str = "minio:9000"

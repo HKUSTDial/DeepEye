@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    fastapi \
+    uvicorn \
+    pandas \
+    pyecharts \
+    python-multipart
+
+WORKDIR /app
+
+# DashboardDeployService uploads generated dashboard app code into /app at runtime.
+CMD ["bash", "-lc", "while [ ! -f /app/app.py ]; do sleep 0.2; done; export PYTHONPATH=/app:$PYTHONPATH; exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8000"]
