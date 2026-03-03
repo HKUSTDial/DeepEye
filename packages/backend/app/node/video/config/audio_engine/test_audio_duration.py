@@ -10,10 +10,10 @@
 
 运行方式：
   cd packages/backend
-  python -m app.node.video_config.audio_engine.test_audio_duration
+  python -m app.node.video.config.audio_engine.test_audio_duration
 
 或在 Docker 内：
-  docker compose exec backend-api python -m app.node.video_config.audio_engine.test_audio_duration
+  docker compose exec backend-api python -m app.node.video.config.audio_engine.test_audio_duration
 """
 
 import sys
@@ -41,7 +41,7 @@ def test_wave_module():
     print("1. 测试 wave 模块读取 WAV 时长")
     print("=" * 60)
     
-    from app.node.video_config.audio_engine.tts_generator import TTSGenerator
+    from app.node.video.config.audio_engine.tts_generator import TTSGenerator
     
     all_ok = True
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -121,7 +121,7 @@ def test_real_tts_if_configured():
         print(f"   跳过: 无法加载 settings ({ex})")
         return True
     
-    from app.node.video_config.audio_engine import TTSGenerator
+    from app.node.video.config.audio_engine import TTSGenerator
     
     with tempfile.TemporaryDirectory() as tmpdir:
         gen = TTSGenerator(

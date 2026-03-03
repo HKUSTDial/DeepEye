@@ -20,13 +20,13 @@ try:
 except ImportError:
     pd = None
 
-from app.node.base import BaseNode
+from app.node.core.base import BaseNode
 from app.repositories import DataSourceRepository
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.models import Port
-from .nl2dashboard.design import DashboardDesigner
-from .nl2dashboard.engineering import DashboardEngineer
-from .nl2dashboard.llm_compat import LLMClient
+from app.node.dashboard.nl2dashboard.design import DashboardDesigner
+from app.node.dashboard.nl2dashboard.engineering import DashboardEngineer
+from app.node.dashboard.nl2dashboard.llm_compat import LLMClient
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

@@ -626,12 +626,13 @@ def copy_components_to_frontend(
     try:
         # 确定前端目录路径
         # 从当前文件位置推断项目根目录
-        # __file__ 是 packages/backend/app/node/video_render/auto_compose_video.py
+        # __file__ 是 packages/backend/app/node/video/render/auto_compose_video.py
         # 需要找到 packages/frontend-react/src/components/video/
         current_file = Path(__file__)
-        # 从 packages/backend/app/node/video_render/ 回到项目根目录
-        # packages/backend/app/node/video_render/ -> packages/backend/app/node/ -> packages/backend/app/ -> packages/backend/ -> packages/ -> 项目根目录
-        project_root = current_file.parent.parent.parent.parent.parent.parent
+        # 从 packages/backend/app/node/video/render/ 回到项目根目录
+        # packages/backend/app/node/video/render/ -> packages/backend/app/node/video/ -> packages/backend/app/node/
+        # -> packages/backend/app/ -> packages/backend/ -> packages/ -> 项目根目录
+        project_root = current_file.parent.parent.parent.parent.parent.parent.parent
         frontend_video_dir = project_root / 'packages' / 'frontend-react' / 'src' / 'components' / 'video'
         target_dir = frontend_video_dir / component_prefix / task_id
         
@@ -766,7 +767,7 @@ def update_frontend_video_composer(
     try:
         # 方法1: 尝试更新后端容器中的前端代码目录（用于版本控制）
         current_file = Path(__file__)
-        project_root = current_file.parent.parent.parent.parent.parent.parent
+        project_root = current_file.parent.parent.parent.parent.parent.parent.parent
         backend_frontend_path = project_root / 'packages' / 'frontend-react' / 'src' / 'components' / 'video' / 'VideoComposer.tsx'
         
         if backend_frontend_path.exists():
@@ -873,7 +874,7 @@ def update_frontend_video_composer(
 def add_video_composer_to_root(config_path, video_id, total_frames, scene_counts, component_prefix=None):
     """在Root.tsx中添加VideoComposer的注册代码"""
     
-    root_path = Path(__file__).parent.parent / 'src' / 'Root.tsx'
+    root_path = Path(__file__).parent.parent.parent / 'src' / 'Root.tsx'
     
     if not root_path.exists():
         # 在 Docker 环境中，Remotion 项目可能不存在，这是正常的
@@ -1279,7 +1280,7 @@ def main():
     if args.task_id:
         # 从当前文件位置推断动画组件目录
         script_dir = Path(__file__).parent
-        animated_components_dir = script_dir.parent / 'infographic_generation_modularity' / 'output' / 'claude_tsx_animated' / args.task_id
+        animated_components_dir = script_dir.parent.parent / 'infographic_generation_modularity' / 'output' / 'claude_tsx_animated' / args.task_id
     
     # 复制组件到前端目录（如果提供了 task_id 和 component_prefix）
     if component_prefix and args.task_id and animated_components_dir:
@@ -1302,7 +1303,7 @@ def main():
     # 自动更新后端 VideoComposer.tsx（如果提供了 component_prefix，用于 Remotion 项目）
     if component_prefix:
         print(f"\n🔧 正在更新后端 VideoComposer.tsx（Remotion 项目）...")
-        video_composer_path = Path(__file__).parent.parent / 'src' / 'components' / 'CustomInfographic' / 'VideoComposer.tsx'
+        video_composer_path = Path(__file__).parent.parent.parent / 'src' / 'components' / 'CustomInfographic' / 'VideoComposer.tsx'
         try:
             update_video_composer_with_mapping(component_prefix, config_data, video_composer_path, args.task_id)
         except Exception as e:
@@ -1331,4 +1332,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

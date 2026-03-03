@@ -24,7 +24,7 @@ sys.path.insert(0, str(core_dir))
 
 try:
     from deepeye.workflows.models import Node
-    from app.node.video_generator import VideoGeneratorHandler
+    from app.node.video.node import VideoGeneratorHandler
 except ModuleNotFoundError as e:
     print("❌ 导入失败：当前 Python 环境没有安装项目依赖。")
     print(f"   错误: {e}")

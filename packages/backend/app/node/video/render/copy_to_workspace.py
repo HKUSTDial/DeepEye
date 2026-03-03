@@ -29,7 +29,7 @@ def copy_video_to_workspace(
     # 自动推断后端输出目录
     if backend_output_dir is None:
         script_dir = Path(__file__).parent
-        backend_output_dir = script_dir.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
+        backend_output_dir = script_dir.parent.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
     
     source_dir = backend_output_dir / task_id
     if not source_dir.exists():
@@ -79,7 +79,7 @@ def find_and_copy_config(task_id: str, workspace_base: Path = Path("/workspace")
     
     # 如果 workspace 中没有，尝试从后端代码目录查找
     script_dir = Path(__file__).parent
-    backend_config_dir = script_dir.parent.parent.parent / "video_config"
+    backend_config_dir = script_dir.parent / "config"
     if backend_config_dir.exists():
         possible_config_paths.append(
             backend_config_dir / f"generated_{task_id}_aligned.json"
@@ -125,7 +125,7 @@ def copy_all_previous_videos(
     # 自动扫描所有任务
     if task_ids is None:
         script_dir = Path(__file__).parent
-        backend_output_dir = script_dir.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
+        backend_output_dir = script_dir.parent.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
         
         if not backend_output_dir.exists():
             print(f"❌ 后端输出目录不存在: {backend_output_dir}")
@@ -190,7 +190,7 @@ def main():
         print("💡 提示: 使用 --all 复制所有任务，或使用 --task-id <id> 复制指定任务")
         print("\n📦 复制最新的 3 个任务...\n")
         script_dir = Path(__file__).parent
-        backend_output_dir = script_dir.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
+        backend_output_dir = script_dir.parent.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
         
         if backend_output_dir.exists():
             task_ids = []

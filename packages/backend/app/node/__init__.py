@@ -3,24 +3,36 @@
 from __future__ import annotations
 
 import importlib
-import pkgutil
 import inspect
 from typing import Iterable
 
-from app.node.base import BaseNode
+from app.node.core.base import BaseNode
 from deepeye.workflows.engine import ExecutionEngine
 from deepeye.workflows.registry import NodeRegistry
 
+# Keep registry discovery explicit so folder reorganization does not change
+# node loading behavior implicitly.
+NODE_MODULES: tuple[str, ...] = (
+    "app.node.data.datasource_read",
+    "app.node.data.sql_execute",
+    "app.node.knowledge.knowledge_search",
+    "app.node.code.python_code",
+    "app.node.dashboard.node",
+    "app.node.video.node",
+)
+
 
 def _iter_modules() -> Iterable[object]:
-    for module_info in pkgutil.iter_modules(__path__, __name__ + "."):
-        yield importlib.import_module(module_info.name)
+    for module_name in NODE_MODULES:
+        yield importlib.import_module(module_name)
 
 
 def _iter_nodes() -> Iterable[type[BaseNode]]:
     seen: set[type[BaseNode]] = set()
     for _ in _iter_modules():
         for node_cls in BaseNode.__subclasses__():
+            if not node_cls.__module__.startswith("app.node."):
+                continue
             if node_cls in seen:
                 continue
             seen.add(node_cls)

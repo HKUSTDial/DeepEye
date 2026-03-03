@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import get_video_session_root, settings
-from app.node.base import BaseNode
-from app.node.video_config.generator import create_generator
+from app.node.core.base import BaseNode
+from app.node.video.config.generator import create_generator
 from app.services.workflow_file_service import (
     get_progress_publisher_by_workflow_id,
     get_session_id_by_workflow_id,
@@ -146,7 +146,7 @@ class VideoGeneratorHandler:
                 return self._add_default_time_ranges(config)
 
             # 导入音频引擎
-            from app.node.video_config.audio_engine import TTSGenerator, TimeAligner
+            from app.node.video.config.audio_engine import TTSGenerator, TimeAligner
 
             # 使用固定输出目录（/tmp/video_config_audio）
             audio_output_dir = Path("/tmp/video_config_audio")
@@ -312,7 +312,8 @@ class VideoGeneratorHandler:
             
             # 调用 pipeline_full_video 脚本
             # 注意：这个脚本可能需要 Remotion 环境，如果不可用会失败
-            script_dir = Path(__file__).parent / "video_render"
+            node_root = Path(__file__).resolve().parent
+            script_dir = node_root / "render"
             pipeline_script = script_dir / "pipeline_full_video.py"
             
             if not pipeline_script.exists():
@@ -353,7 +354,7 @@ class VideoGeneratorHandler:
                 text=True,
                 bufsize=1,  # 行缓冲，实时输出
                 universal_newlines=True,
-                cwd=str(script_dir.parent),  # 工作目录：app/node/
+                cwd=str(node_root),  # 工作目录：app/node/video/
                 env=env,
             )
             

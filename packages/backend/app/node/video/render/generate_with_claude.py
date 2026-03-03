@@ -28,8 +28,8 @@ if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
 from app.core.config import settings
-from app.node.video_config.generator import LLMClient
-from app.node.video_render.tsx_sanitize import sanitize_tsx_for_browser, validate_component_syntax
+from app.node.video.config.generator import LLMClient
+from app.node.video.render.tsx_sanitize import sanitize_tsx_for_browser, validate_component_syntax
 
 # 从环境变量或 settings 获取配置
 API_BASE = settings.LLM_BASE_URL or os.getenv("LLM_BASE_URL", "https://newapi.deepwisdom.ai")

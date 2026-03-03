@@ -141,7 +141,7 @@ video.generator
 ### 方式 2: 直接调用（用于测试）
 
 ```python
-from app.node.video_generator import VideoGeneratorHandler
+from app.node.video.node import VideoGeneratorHandler
 
 # 创建 handler
 handler = VideoGeneratorHandler(db=db, user_id=user_id)

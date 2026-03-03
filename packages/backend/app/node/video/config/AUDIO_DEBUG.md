@@ -68,7 +68,7 @@ docker logs deepeye-backend-api-1 2>&1 | grep -i "error\|warning\|failed" | tail
 ### 2. 测试音频生成
 ```bash
 docker exec deepeye-backend-api-1 python -c "
-from app.node.video_config.audio_engine import TTSGenerator
+from app.node.video.config.audio_engine import TTSGenerator
 from app.core.config import settings
 
 try:
