@@ -13,6 +13,11 @@ import argparse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+VIDEO_RUNTIME_BASE = Path(os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runtime"))
+DEFAULT_ANIMATED_OUTPUT_DIR = Path(
+    os.getenv("VIDEO_ANIMATED_OUTPUT_BASE", str(VIDEO_RUNTIME_BASE / "claude_tsx_animated"))
+)
+
 
 def calculate_total_duration(config_data):
     """从JSON配置计算视频总时长（帧数）"""
@@ -1278,9 +1283,8 @@ def main():
     # 确定动画组件目录
     animated_components_dir = None
     if args.task_id:
-        # 从当前文件位置推断动画组件目录
-        script_dir = Path(__file__).parent
-        animated_components_dir = script_dir.parent.parent / 'infographic_generation_modularity' / 'output' / 'claude_tsx_animated' / args.task_id
+        # 优先使用统一运行时目录（可由 VIDEO_ANIMATED_OUTPUT_BASE 覆盖）
+        animated_components_dir = DEFAULT_ANIMATED_OUTPUT_DIR / args.task_id
     
     # 复制组件到前端目录（如果提供了 task_id 和 component_prefix）
     if component_prefix and args.task_id and animated_components_dir:

@@ -6,8 +6,14 @@
 
 import shutil
 import json
+import os
 from pathlib import Path
 from typing import Optional
+
+VIDEO_RUNTIME_BASE = Path(os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runtime"))
+DEFAULT_ANIMATED_OUTPUT_DIR = Path(
+    os.getenv("VIDEO_ANIMATED_OUTPUT_BASE", str(VIDEO_RUNTIME_BASE / "claude_tsx_animated"))
+)
 
 
 def copy_video_to_workspace(
@@ -28,8 +34,7 @@ def copy_video_to_workspace(
     """
     # 自动推断后端输出目录
     if backend_output_dir is None:
-        script_dir = Path(__file__).parent
-        backend_output_dir = script_dir.parent.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
+        backend_output_dir = DEFAULT_ANIMATED_OUTPUT_DIR
     
     source_dir = backend_output_dir / task_id
     if not source_dir.exists():
@@ -124,8 +129,7 @@ def copy_all_previous_videos(
     
     # 自动扫描所有任务
     if task_ids is None:
-        script_dir = Path(__file__).parent
-        backend_output_dir = script_dir.parent.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
+        backend_output_dir = DEFAULT_ANIMATED_OUTPUT_DIR
         
         if not backend_output_dir.exists():
             print(f"❌ 后端输出目录不存在: {backend_output_dir}")
@@ -189,8 +193,7 @@ def main():
         # 默认复制最新的几个任务
         print("💡 提示: 使用 --all 复制所有任务，或使用 --task-id <id> 复制指定任务")
         print("\n📦 复制最新的 3 个任务...\n")
-        script_dir = Path(__file__).parent
-        backend_output_dir = script_dir.parent.parent / "infographic_generation_modularity" / "output" / "claude_tsx_animated"
+        backend_output_dir = DEFAULT_ANIMATED_OUTPUT_DIR
         
         if backend_output_dir.exists():
             task_ids = []
