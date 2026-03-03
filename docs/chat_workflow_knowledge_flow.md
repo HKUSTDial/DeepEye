@@ -5,17 +5,17 @@
 ## 1. 前端：用户发送消息
 
 **入口组件**
-- `packages/frontend-react/src/components/ChatBox.tsx`
+- `packages/frontend/src/components/ChatBox.tsx`
   - `handleSend()` 调用 `useChat.sendMessage(...)`
   - 如果输入包含 `@知识库名称`，会提取对应 `kb_ids`
 
 **请求发送**
-- `packages/frontend-react/src/hooks/useChat.ts`
+- `packages/frontend/src/hooks/useChat.ts`
   - `sendMessage(text, datasourceId, kbIds)`
   - 调用 `chatApi.start(...)`
 
 **API 调用**
-- `packages/frontend-react/src/api/chat.ts`
+- `packages/frontend/src/api/chat.ts`
   - `POST /api/v1/chat`  
   - 请求体包含：`message / session_id / datasource_id / kb_ids`
 
@@ -131,9 +131,9 @@
 
 **前端消费**
 - Chat SSE  
-  - `packages/frontend-react/src/hooks/useChat.ts`
+  - `packages/frontend/src/hooks/useChat.ts`
 - LivePanel SSE  
-  - `packages/frontend-react/src/components/right-panel/plugins/WorkflowLivePanel.tsx`
+  - `packages/frontend/src/components/right-panel/plugins/WorkflowLivePanel.tsx`
 
 **渲染流程**
 - `workflow_event(create/update)` → 渲染节点/连线  

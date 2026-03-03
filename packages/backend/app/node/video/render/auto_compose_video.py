@@ -389,14 +389,14 @@ def update_video_composer_with_mapping(
     # 如果提供了 task_id，扫描任务目录；否则扫描根目录（兼容旧逻辑）
     if task_id:
         if is_frontend:
-            # 前端路径：packages/frontend-react/src/components/video/{component_prefix}/{task_id}/
+            # 前端路径：packages/frontend/src/components/video/{component_prefix}/{task_id}/
             components_dir = str(video_composer_path.parent / component_prefix / task_id)
         else:
             # 后端路径：src/components/CustomInfographic/{task_id}/
             components_dir = str(video_composer_path.parent / task_id)
     else:
         if is_frontend:
-            # 前端路径：packages/frontend-react/src/components/video/{component_prefix}/
+            # 前端路径：packages/frontend/src/components/video/{component_prefix}/
             components_dir = str(video_composer_path.parent / component_prefix)
         else:
             # 后端路径：src/components/CustomInfographic/
@@ -632,13 +632,13 @@ def copy_components_to_frontend(
         # 确定前端目录路径
         # 从当前文件位置推断项目根目录
         # __file__ 是 packages/backend/app/node/video/render/auto_compose_video.py
-        # 需要找到 packages/frontend-react/src/components/video/
+        # 需要找到 packages/frontend/src/components/video/
         current_file = Path(__file__)
         # 从 packages/backend/app/node/video/render/ 回到项目根目录
         # packages/backend/app/node/video/render/ -> packages/backend/app/node/video/ -> packages/backend/app/node/
         # -> packages/backend/app/ -> packages/backend/ -> packages/ -> 项目根目录
         project_root = current_file.parent.parent.parent.parent.parent.parent.parent
-        frontend_video_dir = project_root / 'packages' / 'frontend-react' / 'src' / 'components' / 'video'
+        frontend_video_dir = project_root / 'packages' / 'frontend' / 'src' / 'components' / 'video'
         target_dir = frontend_video_dir / component_prefix / task_id
         
         if not animated_components_dir.exists():
@@ -773,7 +773,7 @@ def update_frontend_video_composer(
         # 方法1: 尝试更新后端容器中的前端代码目录（用于版本控制）
         current_file = Path(__file__)
         project_root = current_file.parent.parent.parent.parent.parent.parent.parent
-        backend_frontend_path = project_root / 'packages' / 'frontend-react' / 'src' / 'components' / 'video' / 'VideoComposer.tsx'
+        backend_frontend_path = project_root / 'packages' / 'frontend' / 'src' / 'components' / 'video' / 'VideoComposer.tsx'
         
         if backend_frontend_path.exists():
             print(f"📝 更新后端容器中的前端代码: {backend_frontend_path}")

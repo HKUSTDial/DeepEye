@@ -7,16 +7,22 @@
 3. 文件是否保存到正确位置
 """
 
-import json
 import sys
 from pathlib import Path
 
 # 必须在本项目的后端环境中运行（依赖 deepeye、app、langchain 等）
 # 方式一（推荐）：在项目根目录用 uv 运行后端环境
-#   uv run --project packages/backend python test_backend_video_generation.py
+#   uv run --package deepeye-backend python packages/backend/scripts/test_backend_video_generation.py
 # 方式二：先进入 backend 再运行
-#   cd packages/backend && uv run python ../../test_backend_video_generation.py
-project_root = Path(__file__).parent
+#   cd packages/backend && uv run python scripts/test_backend_video_generation.py
+def _find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (candidate / "packages" / "backend").exists() and (candidate / "packages" / "core").exists():
+            return candidate
+    raise RuntimeError(f"无法从脚本路径定位项目根目录: {start}")
+
+
+project_root = _find_repo_root(Path(__file__).resolve())
 backend_dir = project_root / "packages" / "backend"
 core_dir = project_root / "packages" / "core"
 sys.path.insert(0, str(backend_dir))
@@ -32,11 +38,11 @@ except ModuleNotFoundError as e:
     print("请使用「后端环境」运行本脚本，任选一种方式：")
     print()
     print("  1) 在项目根目录执行（需已安装 uv）：")
-    print("     uv run --project packages/backend python test_backend_video_generation.py")
+    print("     uv run --package deepeye-backend python packages/backend/scripts/test_backend_video_generation.py")
     print()
     print("  2) 进入 backend 目录后执行：")
     print("     cd packages/backend")
-    print("     uv run python ../../test_backend_video_generation.py")
+    print("     uv run python scripts/test_backend_video_generation.py")
     print()
     sys.exit(1)
 

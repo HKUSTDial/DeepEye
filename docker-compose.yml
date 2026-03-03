@@ -125,7 +125,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: docker/Dockerfile.frontend-react
+      dockerfile: docker/Dockerfile.frontend
     # Removed direct port mapping to host
     environment:
       # Automatically derive VITE_API_URL from the host gateway port
@@ -133,7 +133,7 @@ services:
       - VITE_AUTH_URL=/api/auth
       - VITE_API_TIMEOUT=30000
     volumes:
-      - ./packages/frontend-react/src:/app/src
+      - ./packages/frontend/src:/app/src
       - /app/node_modules
     depends_on:
       - backend-api
