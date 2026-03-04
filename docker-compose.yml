@@ -79,7 +79,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
-    # Removed direct port mapping to host
     env_file:
       - .env
     depends_on:
@@ -89,15 +88,24 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --limit-concurrency 1000 --timeout-keep-alive 300
+    ports:
+      - "8000:8000"
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
+      - ./report_module:/app/report_module
       - .:/app/project
       - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   backend-worker:
     build:
@@ -116,6 +124,7 @@ services:
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
+      - ./report_module:/app/report_module
       - .:/app/project
       - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers
@@ -146,8 +155,10 @@ services:
     volumes:
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - frontend
-      - backend-api
+      frontend:
+        condition: service_started
+      backend-api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

@@ -23,10 +23,12 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const [input, setInput] = useState('')
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
+  const [csvFiles, setCsvFiles] = useState<File[]>([])
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
   const compositionEndedAtRef = useRef(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadBases()
@@ -43,14 +45,17 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   }
 
   const handleSend = () => {
-    if (input.trim() && !isStreaming) {
-      const kbIds = extractKbIds(input)
-      sendMessage(input.trim(), dataSourceIds, kbIds)
-      setInput('')
-      setShowMentions(false)
-      setMentionQuery('')
-      if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    }
+    const canSend = (input.trim() || csvFiles.length > 0) && !isStreaming
+    if (!canSend) return
+    const query = input.trim() || 'Generate a comprehensive report.'
+    const kbIds = extractKbIds(query)
+    sendMessage(query, dataSourceIds, kbIds, csvFiles.length > 0 ? csvFiles : undefined)
+    setInput('')
+    setCsvFiles([])
+    setShowMentions(false)
+    setMentionQuery('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const autoResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -135,6 +140,14 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
           {timeline.map((item, idx) => {
             if (item.kind === 'step') {
               return <StepItem key={`timeline-step-${idx}`} step={item.step} />
+            }
+            if (item.kind === 'report_step') {
+              return (
+                <div key={`timeline-report-${idx}`} className="report-step-line">
+                  <span className="report-step-badge">Step {item.stepIndex}/{item.totalSteps}</span>
+                  <span className="report-step-label">{item.label}</span>
+                </div>
+              )
             }
             return (
               <div key={`timeline-text-${idx}`} className="message-content">
@@ -246,7 +259,47 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
       {/* Input Area */}
       <div className="chat-input-container">
         <div className="chat-input-shell">
+          {csvFiles.length > 0 && (
+            <div className="chat-attachments">
+              <span className="chat-attachments-label">CSV for report:</span>
+              {csvFiles.map((f, i) => (
+                <span key={i} className="chat-attachment-chip">
+                  {f.name}
+                  <button
+                    type="button"
+                    onClick={() => setCsvFiles((prev) => prev.filter((_, j) => j !== i))}
+                    className="chat-attachment-remove"
+                    aria-label="Remove file"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="chat-input-wrapper">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const list = e.target.files ? Array.from(e.target.files) : []
+                setCsvFiles((prev) => [...prev, ...list].filter((f) => f.name.toLowerCase().endsWith('.csv')))
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="chat-upload-btn"
+              title="Upload CSV for report"
+              disabled={isStreaming}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+            </button>
             <textarea
               ref={textareaRef}
               value={input}
@@ -269,7 +322,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               rows={1}
               className="chat-input"
               style={{ maxHeight: '200px' }}
-              placeholder="Message DeepEye..."
+              placeholder={csvFiles.length > 0 ? 'Describe what report you want (or send as-is)...' : 'Message DeepEye...'}
               disabled={isStreaming}
             />
             {showMentions && mentionMatches.length > 0 && (
@@ -291,7 +344,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             )}
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isStreaming}
+              disabled={(!input.trim() && csvFiles.length === 0) || isStreaming}
               className="chat-send-btn"
             >
               <svg

@@ -29,6 +29,11 @@ dependencies = [
     "pandas",
     "openpyxl",
     "pyarrow",
+    "pymysql>=1.1.0",
+    "jinja2",
+    "plotly",
+    "openai",
+    "statsmodels",
     "pyecharts",
     "azure-cognitiveservices-speech>=1.40.0",
 ]

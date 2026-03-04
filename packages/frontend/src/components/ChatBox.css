@@ -177,6 +177,27 @@
   gap: 10px;
 }
 
+.report-step-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 8px;
+  font-size: var(--chat-font-sm);
+}
+
+.report-step-badge {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.report-step-label {
+  color: var(--main-text);
+}
+
 .chat-container .thinking-dots {
   padding: 6px 0 0;
 }
@@ -333,6 +354,44 @@
   margin: 0 auto;
 }
 
+.chat-attachments {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chat-attachments-label {
+  font-size: var(--chat-font-xs);
+  color: var(--main-text-muted);
+}
+
+.chat-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--main-bg-alt);
+  font-size: var(--chat-font-sm);
+  color: var(--main-text);
+}
+
+.chat-attachment-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.chat-attachment-remove:hover {
+  opacity: 1;
+}
+
 .chat-input-wrapper {
   position: relative;
   display: flex;
@@ -349,6 +408,31 @@
   box-shadow:
     var(--chat-ui-focus-ring),
     0 14px 34px rgba(59, 130, 246, 0.2);
+}
+
+.chat-upload-btn {
+  margin: 0 0 8px 8px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--chat-ui-radius);
+  background: transparent;
+  color: var(--main-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.chat-upload-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--main-text);
+}
+
+.chat-upload-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .chat-input {

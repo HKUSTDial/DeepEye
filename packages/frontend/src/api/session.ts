@@ -13,6 +13,8 @@ export type AgentEventType =
   | 'agent_end'
   | 'error'
   | 'workflow_event'
+  | 'report_step'
+  | 'report_done'
 
 /**
  * Sandbox event types
@@ -26,7 +28,7 @@ export interface AgentEvent {
   type: AgentEventType | SandboxEventType
   source: string
   content?: string
-  data?: Record<string, unknown>
+  data?: Record<string, unknown> & { report_html?: string; steps?: string[] }
 }
 
 /**

@@ -87,7 +87,7 @@ async def service_run_workflow_from_file(
         # 注册 workflow_id -> session_id 映射
         _workflow_to_session[core_workflow.id] = session_id
 
-        engine = build_engine(db, user_id, sandbox=sandbox)
+        engine = build_engine(db, user_id, sandbox=sandbox, session_id=session_id)
         loop = asyncio.get_running_loop()
         result_holder: list = []  # [ExecutionContext] or [Exception]
 

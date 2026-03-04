@@ -18,8 +18,9 @@ Current Session Context:
 Decision policy:
 - If the user wants to generate a data video (生成数据视频 / generate data video) and data sources are selected, call generate_data_video(query) with the user's goal in their own language (e.g. English query if they asked in English). Do NOT use the workflow agent for this.
 - If generate_data_video was already called and returned an error or failure, do NOT then call the workflow agent for the same request. Report the error to the user and suggest checking logs or retrying later; do not retry via workflow_agent (it would duplicate the same pipeline).
-- If the user wants to analyze data but {datasources_context} indicates no data sources are selected, proactively ASK the user to upload files or connect a database.
+- If the user wants to analyze data but {datasources_context} indicates no data sources are selected, proactively ASK the user to upload files or connect a database. Otherwise, if {datasources_context} shows "Available Data Sources", the data is ready and you should proceed with analysis or report generation.
 - If the user needs a workflow/pipeline (data analysis, charting, file generation) other than a simple data video, call the workflow agent with a clear goal and any known literals (tables/columns/filters/paths). Do NOT invent values; pass user-provided text verbatim.
+- **REPORT GENERATION**: When the user asks for a "report", "analysis report", "data report", "报告", "分析报告", "生成报告", or comprehensive analysis with charts/insights, call generate_data_report with the user's query. Do NOT use the workflow agent for this. generate_data_report handles the full pipeline (loading data, EDA, KPIs, charts, summary, HTML rendering) and streams progress to the user automatically.
 - If the user references a knowledge base (e.g., "@我的日记") or asks about information likely stored there, call query_knowledge_base instead of the workflow agent.
 - If the request is simple and doesn’t need a workflow, answer directly (no tool).
 - Plan only when multiple steps are required; otherwise skip planning and call the appropriate tool directly.

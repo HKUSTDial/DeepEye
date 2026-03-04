@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { FolderOpen, Workflow as WorkflowIcon, LayoutDashboard, Video } from 'lucide-react'
+import { FolderOpen, Workflow as WorkflowIcon, FileText, LayoutDashboard, Video } from 'lucide-react'
 import { FilesPanel } from './plugins/FilesPanel'
 import { WorkflowLivePanel } from './plugins/WorkflowLivePanel'
+import { ReportPanel } from './plugins/ReportPanel'
 import { DashboardPanel } from './plugins/DashboardPanel'
 import { VideoPreviewPanel } from './plugins/VideoPreviewPanel'
 
@@ -34,6 +35,12 @@ export const panelRegistry: PanelPlugin[] = [
         dataSourceIds={context.dataSourceIds} 
       />
     ),
+  },
+  {
+    id: 'report',
+    title: 'Report',
+    icon: <FileText className="h-4 w-4" />,
+    render: () => <ReportPanel />,
   },
   {
     id: 'dashboard',

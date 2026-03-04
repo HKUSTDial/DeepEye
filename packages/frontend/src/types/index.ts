@@ -16,6 +16,7 @@ export interface ToolStep {
 export type MessageTimelineItem =
   | { kind: 'step'; step: ToolStep }
   | { kind: 'text'; content: string; isStreaming?: boolean }
+  | { kind: 'report_step'; stepIndex: number; totalSteps: number; label: string }
 
 export interface Message {
   role: 'user' | 'assistant'
@@ -47,6 +48,12 @@ export interface DataSource {
 export interface DataSourceCreate {
   name: string
   type: string
+  connection_string?: string | null
+}
+
+export interface DataSourceUpdate {
+  name?: string
+  type?: string
   connection_string?: string | null
 }
 

@@ -19,6 +19,7 @@ NODE_MODULES: tuple[str, ...] = (
     "app.node.code.python_code",
     "app.node.dashboard.node",
     "app.node.video.node",
+    "app.node.report_generate",
 )
 
 
@@ -44,16 +45,18 @@ def register_node_specs(registry: NodeRegistry) -> None:
         registry.register(node_cls.spec())
 
 
-def register_node_handlers(engine: ExecutionEngine, db, user_id, sandbox=None) -> None:
+def register_node_handlers(engine: ExecutionEngine, db, user_id, sandbox=None, session_id: str | None = None) -> None:
     for node_cls in _iter_nodes():
         build_handler = node_cls.build_handler
         handler = None
         try:
             sig = inspect.signature(build_handler)
+            kwargs = {}
             if "sandbox" in sig.parameters:
-                handler = build_handler(db, user_id, sandbox=sandbox)
-            else:
-                handler = build_handler(db, user_id)
+                kwargs["sandbox"] = sandbox
+            if "session_id" in sig.parameters:
+                kwargs["session_id"] = session_id
+            handler = build_handler(db, user_id, **kwargs)
         except TypeError:
             handler = build_handler(db, user_id)
         if handler is not None:

@@ -136,6 +136,28 @@ export class SessionChat {
       if (!message.timeline) message.timeline = []
       message.timeline.push({ kind: 'step', step })
     }
+    const REPORT_STAGE_LABELS: Record<number, string> = {
+      0: 'Load and parse data files',
+      1: 'Generate dataset context',
+      2: 'Perform deep exploratory analysis (EDA)',
+      3: 'Calculate key business indicators (KPI)',
+      4: 'Plan and generate visual charts',
+      5: 'Write analysis summary and conclusions',
+      6: 'Render final HTML report',
+    }
+    let lastReportStage = -1
+    const appendReportStepToTimeline = (message: Message, stageIndex: number) => {
+      if (stageIndex <= lastReportStage) return
+      lastReportStage = stageIndex
+      const label = REPORT_STAGE_LABELS[stageIndex] ?? `Step ${stageIndex + 1}`
+      if (!message.timeline) message.timeline = []
+      message.timeline.push({
+        kind: 'report_step',
+        stepIndex: stageIndex + 1,
+        totalSteps: 7,
+        label,
+      })
+    }
     const markLastTextStreaming = (message: Message, streaming: boolean) => {
       const last = message.timeline?.[message.timeline.length - 1]
       if (last && last.kind === 'text') {
@@ -260,6 +282,19 @@ export class SessionChat {
             }
           }
         }
+      }
+      else if (type === 'report_step' && current) {
+        const line = (content || '').trim()
+        if (line) {
+          const stageMatch = line.match(/\[(\d+)\/7\]/)
+          if (stageMatch) {
+            const stageIndex = Math.min(parseInt(stageMatch[1], 10), 6)
+            appendReportStepToTimeline(current, stageIndex)
+          }
+        }
+      }
+      else if (type === 'report_done' && current) {
+        // Tool output already shows completion message; avoid duplicate
       }
       else if (type === 'agent_end' || type === 'error') {
         if (current) {
