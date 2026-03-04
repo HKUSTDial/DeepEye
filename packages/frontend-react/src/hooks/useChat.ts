@@ -43,6 +43,10 @@ export function useChat() {
   const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
   const isStreaming = useChatStore((state) => state.isStreaming)
   const setReportResult = useReportStore((state) => state.setReportResult)
+  const addReportStep = useReportStore((state) => state.addReportStep)
+  const startReportGeneration = useReportStore((state) => state.startGeneration)
+  const stopReportGeneration = useReportStore((state) => state.stopGeneration)
+  const isReportGenerating = useReportStore((state) => state.isGenerating)
 
   const [error, setError] = useState<string | null>(null)
   const esRef = useRef<EventSource | null>(null)
@@ -299,6 +303,31 @@ export function useChat() {
           }
         }
 
+        // Real-time report step: update panel progress immediately
+        if (agentEvent.type === 'report_step') {
+          const stepContent = agentEvent.content ?? ''
+          if (stepContent) {
+            // Read latest store state here to avoid stale closure resetting progress steps.
+            const currentlyGenerating = useReportStore.getState().isGenerating
+            if (!currentlyGenerating) {
+              startReportGeneration()
+              openOrFocusTab('report')
+              setRightPanelRatio(50)
+            }
+            addReportStep(stepContent)
+          }
+        }
+
+        if (agentEvent.type === 'agent_start' && agentEvent.source === 'report') {
+          startReportGeneration()
+          openOrFocusTab('report')
+          setRightPanelRatio(50)
+        }
+
+        if (agentEvent.type === 'agent_end' && agentEvent.source === 'report') {
+          stopReportGeneration()
+        }
+
         if (agentEvent.type === 'report_done') {
           const data = agentEvent.data as { report_html?: string; steps?: string[]; report_filename?: string; error?: string } | undefined
           setReportResult(data?.report_html ?? null, data?.steps ?? [], data?.report_filename ?? null, data?.error ?? null)
@@ -367,6 +396,10 @@ export function useChat() {
     notifyFilesChanged,
     openOrFocusTab,
     setReportResult,
+    addReportStep,
+    startReportGeneration,
+    stopReportGeneration,
+    isReportGenerating,
     setWorkflowError,
     addWorkflowNode,
     addWorkflowEdge,
