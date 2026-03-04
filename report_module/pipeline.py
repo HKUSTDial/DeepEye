@@ -51,7 +51,7 @@ class AutoReportPipeline:
 
     # --- Step 1: Generate Data Context (Multi-Table Support) ---
     def generate_multi_table_context(self, dfs: Dict[str, pd.DataFrame]) -> str:
-        print("🚀 [1/5] Analyzing multi-table context...")
+        print("🔍 [1/7] Generating dataset context...")
         full_context_str = ""
 
         for name, df in dfs.items():
@@ -78,7 +78,7 @@ class AutoReportPipeline:
     # --- Step 2: Deep Mining (EDA) ---
         # --- Step 2: Deep Mining (EDA) ---
     def perform_deep_analysis(self, dfs: Dict[str, pd.DataFrame], context_str: str,query: str) -> str:
-        print(f"🕵️ [2/5] Performing Python Deep Mining guided by query...")
+        print(f"🕵️ [2/7] Performing deep exploratory analysis (EDA)...")
 
         # 1. 构建更清晰的 Prompt，强制要求遍历和打印
         # 新增：加入 User Query 上下文
@@ -142,7 +142,7 @@ class AutoReportPipeline:
         # --- Step 3: Dynamic KPIs (Fixing "All arrays must be of the same length" error) ---
         # --- Step 3: Dynamic KPIs (Fixing "All arrays must be of the same length" error) ---
     def generate_kpis(self, dfs: Dict[str, pd.DataFrame], context_str: str,query: str) -> List[Dict]:
-        print("🔍 [3/5] Identifying business scenarios and calculating KPIs...")
+        print("📊 [3/7] Calculating key business indicators (KPI)...")
         #print(context_str)
         #print(list(dfs.keys()))
         prompt = f"""
@@ -211,7 +211,7 @@ class AutoReportPipeline:
 
         # --- Step 4: Plan and Plot ---
     def analyze_and_plot(self, dfs: Dict[str, pd.DataFrame], query: str, context_str: str) -> List[Dict]:
-        print("📊 [4/5] Planning and generating charts...")
+        print("📈 [4/7] Planning and generating visual charts...")
 
         # 1. Planning Phase
         plan_prompt = f"""
@@ -315,7 +315,7 @@ class AutoReportPipeline:
     def render_html(self, kpis: List[Dict], analysis_results: List[Dict],
                     summary: str, conclusion: str, title: str,
                     output_file: str, template_name: str):
-        print(f"🎨 [5/5] Rendering final HTML report using {template_name}...")
+        print(f"🎨 [6/7] Rendering final HTML report using {template_name}...")
 
         template_path = os.path.join("templates", template_name)
         if not os.path.exists(template_path):
@@ -341,13 +341,13 @@ class AutoReportPipeline:
 
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_out)
-        print(f"✅ Success! Report saved to: {output_file}")
+        print(f"✅ [7/7] Report saved to: {output_file}")
 
     # --- Main Entry ---
     def run(self, csv_paths: List[str], user_query: str, template_name: str, output_file="final_report.html"):
         # 0. Load Data into Dictionary
         dfs = {}
-        print("📂 [0/5] Loading data...")
+        print("📂 [0/7] Loading and parsing data files...")
 
         for path in csv_paths:
             if os.path.exists(path):
@@ -390,6 +390,7 @@ class AutoReportPipeline:
         [Data Source]:
         {mining_text}
                 """
+        print("✍️ [5/7] Writing analysis summary and conclusions...")
         summary = self._call_llm(summary_prompt)
 
         conclusion_prompt = f"""

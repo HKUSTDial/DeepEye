@@ -109,6 +109,14 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             if (item.kind === 'step') {
               return <StepItem key={`timeline-step-${idx}`} step={item.step} />
             }
+            if (item.kind === 'report_step') {
+              return (
+                <div key={`timeline-report-${idx}`} className="report-step-line">
+                  <span className="report-step-badge">Step {item.stepIndex}/{item.totalSteps}</span>
+                  <span className="report-step-label">{item.label}</span>
+                </div>
+              )
+            }
             return (
               <div key={`timeline-text-${idx}`} className="message-content">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>

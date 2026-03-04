@@ -330,6 +330,97 @@ def create_workflow_and_run_tool(session_id: str) -> callable:
     return create_workflow_and_run
 
 
+def create_generate_data_report_tool(session_id: str, datasources_info: list[dict]) -> callable:
+    """
+    One-shot tool for report generation: discovers CSV files from the sandbox,
+    runs the report pipeline, and streams progress steps via Redis.
+    Similar pattern to generate_data_video – one call, no sub-agent multi-step.
+    """
+
+    @tool
+    async def generate_data_report(
+        query: str = "Generate a comprehensive data analysis report.",
+    ) -> str:
+        """
+        Generate a comprehensive data analysis report from the selected data sources.
+        Call this when the user asks for a report, analysis report, 报告, 分析报告, or 数据报告.
+        Pass the user's analysis goal as the query in their own language.
+        Do NOT use the workflow agent for report generation – call this tool directly.
+        """
+        import asyncio
+        import shutil
+        import tempfile
+
+        from app.sandbox.manager import SandboxManager
+        from app.services.report_service import run_report_pipeline
+
+        # Collect sandbox CSV paths from selected datasources
+        csv_sandbox_paths: list[str] = []
+        for ds in datasources_info:
+            if ds.get("category") == "file":
+                lp = ds.get("local_path", "")
+                if lp:
+                    csv_sandbox_paths.append(lp)
+
+        # Fallback: scan /workspace/data in the sandbox
+        sandbox = await SandboxManager().get_or_create_sandbox(session_id)
+        if not csv_sandbox_paths and sandbox:
+            res = await sandbox.exec_command(
+                "find /workspace/data -name '*.csv' 2>/dev/null"
+            )
+            if res.exit_code == 0 and res.stdout.strip():
+                csv_sandbox_paths = [
+                    p.strip() for p in res.stdout.strip().split("\n") if p.strip()
+                ]
+
+        if not csv_sandbox_paths:
+            return "未找到 CSV 数据文件，请先在左侧上传数据文件后再生成报告。"
+
+        if not sandbox or not getattr(sandbox, "container", None):
+            return "无法访问沙箱容器，报告生成失败。"
+
+        # Download files from sandbox to a host-side temp directory
+        tmp_dir = tempfile.mkdtemp(prefix="deepeye_report_")
+        csv_host_paths: list[str] = []
+        try:
+            for sp in csv_sandbox_paths:
+                exit_code, output = sandbox.container.exec_run(
+                    cmd=["cat", sp], demux=True, workdir="/workspace"
+                )
+                if exit_code != 0:
+                    logger.warning("[generate_data_report] skip %s (exit %s)", sp, exit_code)
+                    continue
+                content: bytes = output[0] if output[0] else b""
+                filename = os.path.basename(sp)
+                local_path = os.path.join(tmp_dir, filename)
+                with open(local_path, "wb") as f:
+                    f.write(content)
+                csv_host_paths.append(local_path)
+                logger.info("[generate_data_report] downloaded %s → %s", sp, local_path)
+        except Exception as exc:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return f"读取数据文件失败：{exc}"
+
+        if not csv_host_paths:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return "无法从沙箱读取 CSV 文件，请检查数据是否已正确上传。"
+
+        try:
+            loop = asyncio.get_event_loop()
+            _html, error = await loop.run_in_executor(
+                None,
+                lambda: run_report_pipeline(session_id, query, csv_host_paths),
+            )
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        if error:
+            return f"Report generation failed: {error}"
+        return "Report generation complete. View or download the HTML report in the right panel."
+
+    return generate_data_report
+
+
 def create_design_workflow_tool(model, session_id: str, system_prompt: str, callbacks: list | None = None) -> callable:
     @tool
     async def workflow_agent(goal: str) -> str:

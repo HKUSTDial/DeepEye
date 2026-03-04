@@ -23,6 +23,7 @@ from app.tools.workflow_tools import (
     create_run_workflow_from_file_tool,
     create_design_workflow_tool,
     create_generate_data_video_tool,
+    create_generate_data_report_tool,
 )
 from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
@@ -199,6 +200,9 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
 
     # One-shot data video tool (like query_knowledge_base): no sub-agent, one call does create+run
     tools.append(create_generate_data_video_tool(session_id, datasources_info))
+
+    # One-shot report tool: discovers CSVs from sandbox, runs report pipeline directly
+    tools.append(create_generate_data_report_tool(session_id, datasources_info))
 
     workflow_prompt = build_workflow_prompt(
         build_registry(),

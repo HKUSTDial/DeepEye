@@ -18,8 +18,8 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 # Use tuna mirrors for pip
 RUN pip install uv -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# Use tuna mirrors for uv
-ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+# Use default PyPI (Tsinghua mirror may return 403 for some packages like jsonpatch)
+ENV UV_INDEX_URL=https://pypi.org/simple
 
 # Copy workspace metadata and source
 COPY pyproject.toml uv.lock uv.toml /app/
@@ -28,6 +28,9 @@ COPY packages/backend /app/packages/backend
 
 # Install backend runtime dependencies from the workspace lock
 RUN uv sync --frozen --no-dev --package deepeye-backend --project /app
+
+# Report generation requires plotly for interactive charts (ensure it's installed)
+RUN uv pip install plotly --python .venv/bin/python
 
 # Set environment variables
 # Include both backend and core in PYTHONPATH to ensure modules are found
