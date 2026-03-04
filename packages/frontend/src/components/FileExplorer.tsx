@@ -73,8 +73,11 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
       })) as FileNode[])
       
       setSandboxNotCreated(false)
-    } catch (e: any) {
-      if (e?.status === 404) {
+    } catch (e: unknown) {
+      const status = typeof e === 'object' && e !== null && 'status' in e
+        ? (e as { status?: number }).status
+        : undefined
+      if (status === 404) {
         setSandboxNotCreated(true)
         setError(null)
         setRootFiles([])
@@ -260,6 +263,8 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
       setSandboxNotCreated(Boolean(sessionId))
       setError(null)
     }
+    // We intentionally react only to session/stream flags; `loadRootFiles` is stable enough for this lifecycle hook.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, sandboxReadySessionId, isSwitchingSession])
 
   // Auto-refresh when streaming completes
@@ -272,6 +277,8 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
         loadRootFiles()
       }, 500)
     }
+    // Triggered by streaming/session changes only; do not re-run for internal helper identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, sessionId, sandboxReadySessionId])
 
   // Refresh when files change (via event from backend)
@@ -279,6 +286,8 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
     if (sessionId && sandboxReadySessionId === sessionId && filesChangedTrigger > 0) {
       refreshWithExpandedState()
     }
+    // This effect is keyed by backend file-change signals and active session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filesChangedTrigger, sessionId, sandboxReadySessionId])
 
   return (
@@ -397,4 +406,3 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
     </div>
   )
 }
-

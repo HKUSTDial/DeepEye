@@ -1,18 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { createHighlighter, type Highlighter, type BundledLanguage } from 'shiki'
 
 let highlighterInstance: Highlighter | null = null
 let initPromise: Promise<Highlighter> | null = null
 
 export function useCodeHighlight() {
-  const [isReady, setIsReady] = useState(false)
+  const [isReady, setIsReady] = useState(Boolean(highlighterInstance))
   const [isInitializing, setIsInitializing] = useState(false)
-
-  useEffect(() => {
-    if (highlighterInstance) {
-      setIsReady(true)
-    }
-  }, [])
 
   const initHighlighter = useCallback(async () => {
     if (highlighterInstance) return highlighterInstance
@@ -114,4 +108,3 @@ export function useCodeHighlight() {
     isInitializing,
   }
 }
-

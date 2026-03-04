@@ -9,6 +9,8 @@ import * as Remotion from 'remotion'
 import * as d3 from 'd3'
 
 type BabelStandalone = { transform: (source: string, options: object) => { code: string | null } }
+type DynamicSceneProps = Record<string, unknown>
+type SceneComponent = React.FC<DynamicSceneProps>
 
 let babelPromise: Promise<BabelStandalone> | null = null
 
@@ -115,7 +117,7 @@ function wrapExports(source: string): string {
 export async function compileTsxAndGetComponent(
   tsxSource: string,
   filename: string = 'Scene.tsx'
-): Promise<React.FC<any> | null> {
+): Promise<SceneComponent | null> {
   try {
     const Babel = await loadBabel()
     let source = stripDeclareModuleBlocks(tsxSource)
@@ -133,12 +135,12 @@ export async function compileTsxAndGetComponent(
     const code = result.code
     if (!code) return null
 
-    const __EXPORTS__: { default?: React.FC<any>; named?: Record<string, React.FC<any>> } = {}
+    const __EXPORTS__: { default?: SceneComponent; named?: Record<string, SceneComponent> } = {}
     const fn = new Function(REACT_NAMESPACE, REMOTION_NAMESPACE, D3_NAMESPACE, '__EXPORTS__', code)
     fn(React, Remotion, d3, __EXPORTS__)
 
     const comp = __EXPORTS__.default ?? (__EXPORTS__.named && Object.values(__EXPORTS__.named).find((v) => typeof v === 'function'))
-    return (comp as React.FC<any>) ?? null
+    return (comp as SceneComponent) ?? null
   } catch (e) {
     console.warn('[compileTsxInBrowser]', filename, e)
     return null
@@ -150,7 +152,7 @@ export function compileTsxAndGetComponentSync(
   tsxSource: string,
   filename: string,
   Babel: BabelStandalone
-): React.FC<any> | null {
+): SceneComponent | null {
   try {
     let source = stripDeclareModuleBlocks(tsxSource)
     source = repairUnterminatedFilterStrings(source)
@@ -166,11 +168,11 @@ export function compileTsxAndGetComponentSync(
     })
     const code = result.code
     if (!code) return null
-    const __EXPORTS__: { default?: React.FC<any>; named?: Record<string, React.FC<any>> } = {}
+    const __EXPORTS__: { default?: SceneComponent; named?: Record<string, SceneComponent> } = {}
     const fn = new Function(REACT_NAMESPACE, REMOTION_NAMESPACE, D3_NAMESPACE, '__EXPORTS__', code)
     fn(React, Remotion, d3, __EXPORTS__)
     const comp = __EXPORTS__.default ?? (__EXPORTS__.named && Object.values(__EXPORTS__.named).find((v) => typeof v === 'function'))
-    return (comp as React.FC<any>) ?? null
+    return (comp as SceneComponent) ?? null
   } catch (e) {
     console.warn('[compileTsxInBrowser]', filename, e)
     return null

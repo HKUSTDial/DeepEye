@@ -81,10 +81,8 @@ export function DashboardPanel({
     setIsReady(false)
     checkReady()
 
-    // Start polling if not ready
-    if (!isReady) {
-      checkIntervalRef.current = window.setInterval(checkReady, 2000)
-    }
+    // Start polling and stop automatically once ready.
+    checkIntervalRef.current = window.setInterval(checkReady, 2000)
 
     return () => {
       if (checkIntervalRef.current) {

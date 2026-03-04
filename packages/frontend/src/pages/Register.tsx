@@ -41,8 +41,8 @@ export default function Register() {
     try {
       await register(email, username, password)
       navigate('/')  // 注册成功，跳转到主页
-    } catch (err: any) {
-      setError(err.message || 'Registration failed')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
       setIsLoading(false)
     }
@@ -158,4 +158,3 @@ export default function Register() {
     </div>
   )
 }
-

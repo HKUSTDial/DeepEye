@@ -20,14 +20,28 @@ interface RequestOptions {
 
 export class ApiError extends Error {
   public status: number
-  public response?: any
+  public response?: unknown
 
-  constructor(status: number, message: string, response?: any) {
+  constructor(status: number, message: string, response?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.response = response
   }
+}
+
+function extractErrorMessage(errorData: unknown, fallback: string): string {
+  if (!errorData || typeof errorData !== 'object') {
+    return fallback
+  }
+  const record = errorData as Record<string, unknown>
+  if (typeof record.detail === 'string') {
+    return record.detail
+  }
+  if (typeof record.message === 'string') {
+    return record.message
+  }
+  return fallback
 }
 
 /**
@@ -111,11 +125,11 @@ async function request<T>(
     // 6. 处理响应
     if (!res.ok) {
       let errorMessage = `Request failed: ${res.statusText}`
-      let errorData: any = undefined
+      let errorData: unknown = undefined
       
       try {
         errorData = await res.json()
-        errorMessage = errorData.detail || errorData.message || errorMessage
+        errorMessage = extractErrorMessage(errorData, errorMessage)
       } catch {
         // 无法解析 JSON，使用默认错误消息
       }
@@ -200,11 +214,11 @@ async function requestResponse(
     // 6. Handle non-OK
     if (!res.ok) {
       let errorMessage = `Request failed: ${res.statusText}`
-      let errorData: any = undefined
+      let errorData: unknown = undefined
 
       try {
         errorData = await res.json()
-        errorMessage = errorData.detail || errorData.message || errorMessage
+        errorMessage = extractErrorMessage(errorData, errorMessage)
       } catch {
         // ignore
       }
@@ -239,11 +253,11 @@ async function authRequest<T>(
 
     if (!res.ok) {
       let errorMessage = `Request failed: ${res.statusText}`
-      let errorData: any = undefined
+      let errorData: unknown = undefined
       
       try {
         errorData = await res.json()
-        errorMessage = errorData.detail || errorData.message || errorMessage
+        errorMessage = extractErrorMessage(errorData, errorMessage)
       } catch {
         // 无法解析 JSON
       }
@@ -278,4 +292,3 @@ export const authHttp = {
   patch: <T>(path: string, body?: unknown) => authRequest<T>('PATCH', path, { body }),
   delete: <T>(path: string) => authRequest<T>('DELETE', path),
 }
-

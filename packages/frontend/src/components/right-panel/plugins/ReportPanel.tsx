@@ -76,7 +76,9 @@ export function ReportPanel() {
 
   // Snap to 100% when done
   useEffect(() => {
-    if (isDone) setDisplayPercent(100)
+    if (!isDone) return
+    const timeoutId = window.setTimeout(() => setDisplayPercent(100), 0)
+    return () => window.clearTimeout(timeoutId)
   }, [isDone])
 
   // Tween – fires every 150 ms, identical logic to index.html's startTween()
@@ -110,10 +112,10 @@ export function ReportPanel() {
 
   // Full reset when a new generation starts (showProgress goes false → true)
   useEffect(() => {
-    if (!showProgress) {
-      committedStageRef.current = -1
-      setDisplayPercent(0)
-    }
+    if (showProgress) return
+    committedStageRef.current = -1
+    const timeoutId = window.setTimeout(() => setDisplayPercent(0), 0)
+    return () => window.clearTimeout(timeoutId)
   }, [showProgress])
 
   const handleDownload = () => {

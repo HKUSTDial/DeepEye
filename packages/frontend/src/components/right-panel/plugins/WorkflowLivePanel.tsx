@@ -1,17 +1,17 @@
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
-import { BackgroundVariant } from 'reactflow'
+import { BackgroundVariant, type Edge, type Node } from 'reactflow'
 import { Workflow as WorkflowIcon } from 'lucide-react'
 import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { chatApi } from '../../../api'
-import { saveVideoConfig, extractVideoOutputParams } from '../../../api/video'
+import { saveVideoConfig, extractVideoOutputParams, type VideoConfig } from '../../../api/video'
 import { workflowFilesApi } from '../../../api/workflowFiles'
 import { workflowsApi } from '../../../api/workflows'
 import { sandboxApi } from '../../../api/sandbox'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { useChatStore } from '../../../stores/chat'
-import { useWorkflowNodesStore } from '../../../stores/workflowNodes'
+import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNodes'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
@@ -33,6 +33,19 @@ type DefinitionEdge = {
   target: { node_id: string; port_id?: string }
 }
 
+type WorkflowNodeData = {
+  type: string
+  label: string
+  inputs: Array<{ id: string; label: string }>
+  outputs: Array<{ id: string; label: string }>
+  params?: Record<string, unknown>
+  runStatus?: string
+  isNew?: boolean
+}
+
+type WorkflowFlowNode = Node<WorkflowNodeData>
+type WorkflowFlowEdge = Edge
+
 function typeToLabel(type: string) {
   return type
     .replace(/[._]/g, ' ')
@@ -45,7 +58,7 @@ function typeToLabel(type: string) {
 function validateGraph(
   nodesMap: Record<string, DefinitionNode>,
   edgesMap: Record<string, DefinitionEdge>,
-  nodeDefs: Record<string, any>,
+  nodeDefs: Record<string, NodeDef>,
 ) {
   if (Object.keys(nodeDefs).length === 0) {
     return null
@@ -69,7 +82,7 @@ function validateGraph(
   return null
 }
 
-function toFlow(definition: Record<string, unknown>, nodeDefs: Record<string, any>) {
+function toFlow(definition: Record<string, unknown>, nodeDefs: Record<string, NodeDef>) {
   const root = (definition.root as Record<string, unknown>) || definition
   const nodesMap = (root.nodes as Record<string, DefinitionNode>) || {}
   const edgesMap = (root.edges as Record<string, DefinitionEdge>) || {}
@@ -112,8 +125,12 @@ function toFlow(definition: Record<string, unknown>, nodeDefs: Record<string, an
   return { nodes, edges }
 }
 
-function toDefinition(nodes: any[], edges: any[], nodeDefs: Record<string, any>) {
-  const nodeMap: Record<string, any> = {}
+function toDefinition(
+  nodes: WorkflowFlowNode[],
+  edges: WorkflowFlowEdge[],
+  nodeDefs: Record<string, NodeDef>,
+) {
+  const nodeMap: Record<string, Record<string, unknown>> = {}
   nodes.forEach((node) => {
     const def = nodeDefs[node.data.type]
     if (!def) return
@@ -121,15 +138,15 @@ function toDefinition(nodes: any[], edges: any[], nodeDefs: Record<string, any>)
       id: node.id,
       type: node.data.type,
       inputs: Object.fromEntries(
-        def.inputs.map((p: any) => [p.id, { schema: p.schema, required: !!p.required, multiple: p.multiple }]),
+        def.inputs.map((p) => [p.id, { schema: p.schema, required: !!p.required, multiple: p.multiple }]),
       ),
-      outputs: Object.fromEntries(def.outputs.map((p: any) => [p.id, { schema: p.schema }])),
+      outputs: Object.fromEntries(def.outputs.map((p) => [p.id, { schema: p.schema }])),
       params: node.data.params || {},
       metadata: { position: node.position },
     }
   })
 
-  const edgeMap: Record<string, any> = {}
+  const edgeMap: Record<string, Record<string, unknown>> = {}
   edges.forEach((edge) => {
     const id = edge.id || `${edge.source}-${edge.sourceHandle}-${edge.target}-${edge.targetHandle}`
     edgeMap[id] = {
@@ -208,9 +225,18 @@ export function WorkflowLivePanel({
   const prevEdgeIdsRef = useRef<Set<string>>(new Set())
 
   const definition = sessionState?.definition ?? null
-  const validatedNodes = sessionState?.validatedNodes ?? {}
-  const validatedEdges = sessionState?.validatedEdges ?? {}
-  const nodeStatus = sessionState?.nodeStatus ?? {}
+  const validatedNodes = useMemo(
+    () => (sessionState?.validatedNodes ?? {}) as Record<string, DefinitionNode>,
+    [sessionState?.validatedNodes],
+  )
+  const validatedEdges = useMemo(
+    () => (sessionState?.validatedEdges ?? {}) as Record<string, DefinitionEdge>,
+    [sessionState?.validatedEdges],
+  )
+  const nodeStatus = useMemo(
+    () => sessionState?.nodeStatus ?? {},
+    [sessionState?.nodeStatus],
+  )
   const runStatus = sessionState?.runStatus ?? null
   const runError = sessionState?.runError ?? null
   const error = sessionState?.error ?? null
@@ -218,8 +244,14 @@ export function WorkflowLivePanel({
   const activeRun = sessionState?.activeRun ?? null
   const runOutput = sessionState?.runOutput ?? ''
 
-  const activeDraftNodes = activeSessionState?.draftNodes ?? {}
-  const activeDraftEdges = activeSessionState?.draftEdges ?? {}
+  const activeDraftNodes = useMemo(
+    () => (activeSessionState?.draftNodes ?? {}) as Record<string, DefinitionNode>,
+    [activeSessionState?.draftNodes],
+  )
+  const activeDraftEdges = useMemo(
+    () => (activeSessionState?.draftEdges ?? {}) as Record<string, DefinitionEdge>,
+    [activeSessionState?.draftEdges],
+  )
   const activeFiles = activeSessionState?.files ?? []
   const activeFilePathForControls = activeSessionState?.activeFilePath ?? null
   const activeViewState = activeSessionState?.viewState ?? 'idle'
@@ -375,16 +407,18 @@ export function WorkflowLivePanel({
             finished_at: new Date().toISOString(),
           })
           if (payload?.outputs && typeof payload.outputs === 'object') {
+            const outputs = payload.outputs as Record<string, unknown>
             setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
             console.log('🎬 WorkflowLivePanel: run_end phase, checking for video output...')
             console.log('📊 WorkflowLivePanel: Full outputs object:', JSON.stringify(payload.outputs, null, 2))
             console.log('📊 WorkflowLivePanel: Output keys:', Object.keys(payload.outputs))
-            const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
+            const videoParams = extractVideoOutputParams(outputs)
             console.log('🎬 WorkflowLivePanel: Extracted video params:', videoParams)
             if (!videoParams.taskId && !videoParams.configPath) {
+              const firstOutputKey = Object.keys(outputs)[0]
               console.warn('⚠️ WorkflowLivePanel: No video output detected. Output structure:', {
-                nodeIds: Object.keys(payload.outputs),
-                firstNodeOutput: payload.outputs[Object.keys(payload.outputs)[0]],
+                nodeIds: Object.keys(outputs),
+                firstNodeOutput: firstOutputKey ? outputs[firstOutputKey] : undefined,
               })
             }
             if (videoParams.taskId || videoParams.configPath) {
@@ -395,7 +429,7 @@ export function WorkflowLivePanel({
               })
               if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
                 console.log('🎬 WorkflowLivePanel: Saving video config first...')
-                saveVideoConfig(videoParams.taskId, videoParams.config as any)
+                saveVideoConfig(videoParams.taskId, videoParams.config as unknown as VideoConfig)
                   .then(() => {
                     console.log('✅ WorkflowLivePanel: Config saved, opening preview panel')
                     openOrFocusTab('video-preview', videoParams)
@@ -463,8 +497,8 @@ export function WorkflowLivePanel({
         const response = await sandboxApi.getFileContent(sessionId, path)
         const parsed = JSON.parse(response.content) as Record<string, unknown>
         const root = (parsed.root as Record<string, unknown>) || parsed
-        const nodes = (root.nodes as Record<string, any>) || {}
-        const edges = (root.edges as Record<string, any>) || {}
+        const nodes = (root.nodes as Record<string, DefinitionNode>) || {}
+        const edges = (root.edges as Record<string, DefinitionEdge>) || {}
         clearWorkflow(sessionId)
         Object.values(nodes).forEach((node) => addWorkflowNode(sessionId, node))
         Object.values(edges).forEach((edge) => addWorkflowEdge(sessionId, edge))
@@ -497,6 +531,7 @@ export function WorkflowLivePanel({
       setWorkflowError,
       setValidatedGraph,
       setViewState,
+      setFileError,
       nodeDefs,
     ],
   )
@@ -624,7 +659,15 @@ export function WorkflowLivePanel({
       return
     }
     refreshFiles(true)
-  }, [sessionId, sandboxReadySessionId, activeFiles.length, activeViewState, refreshFiles])
+  }, [
+    sessionId,
+    sandboxReadySessionId,
+    activeFiles.length,
+    activeViewState,
+    refreshFiles,
+    clearValidated,
+    setWorkflowDefinition,
+  ])
 
   useEffect(() => {
     if (!sessionId) return
@@ -863,7 +906,7 @@ export function WorkflowLivePanel({
                 const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
                 const filename = activeFilePathForControls.split('/').pop() || 'workflow.json'
                 const name = filename.replace(/\.json$/i, '') || 'Untitled workflow'
-                await workflowsApi.create({ name, description: '', definition } as any)
+                await workflowsApi.create({ name, description: '', definition })
                 setWorkflowError(sessionId, null)
               } catch (err) {
                 setWorkflowError(sessionId, err instanceof Error ? err.message : 'Failed to upload workflow.')
@@ -972,7 +1015,7 @@ export function WorkflowLivePanel({
                       if (videoParams.taskId || videoParams.configPath) {
                         if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
                           try {
-                            await saveVideoConfig(videoParams.taskId!, videoParams.config as any)
+                            await saveVideoConfig(videoParams.taskId, videoParams.config as unknown as VideoConfig)
                           } catch (e) {
                             console.error('saveVideoConfig failed', e)
                           }

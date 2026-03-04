@@ -41,7 +41,7 @@ export interface DataSource {
   category: 'database' | 'file'
   connection_string?: string | null
   storage_path?: string | null
-  file_metadata?: any
+  file_metadata?: Record<string, unknown> | null
   created_at: string
 }
 

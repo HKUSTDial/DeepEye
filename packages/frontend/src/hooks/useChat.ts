@@ -1,10 +1,10 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../stores/chat'
 import { useRightPanelStore } from '../stores/rightPanel'
 import { useReportStore } from '../stores/report'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { chatApi, reportApi, type AgentEvent } from '../api'
-import { saveVideoConfig, extractVideoOutputParams } from '../api/video'
+import { saveVideoConfig, extractVideoOutputParams, type VideoConfig } from '../api/video'
 
 /**
  * Chat hook - handles SSE connection and message sending.
@@ -45,7 +45,6 @@ export function useChat() {
   const addReportStep = useReportStore((state) => state.addReportStep)
   const startReportGeneration = useReportStore((state) => state.startGeneration)
   const stopReportGeneration = useReportStore((state) => state.stopGeneration)
-  const isReportGenerating = useReportStore((state) => state.isGenerating)
 
   const [error, setError] = useState<string | null>(null)
   const esRef = useRef<EventSource | null>(null)
@@ -61,7 +60,7 @@ export function useChat() {
     }
   }, [])
 
-  const connectToSSE = useCallback((sessionId: string) => {
+  const connectToSSE = (sessionId: string) => {
     closedNormallyRef.current = false
     if (esRef.current) {
       esRef.current.close()
@@ -225,7 +224,7 @@ export function useChat() {
                 const openVideoPanel = () => openOrFocusTab('video-preview', taskIdToOpen ? { taskId: taskIdToOpen } : {})
                 if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
                   console.log('🎬 useChat: Saving video config first...')
-                  saveVideoConfig(videoParams.taskId, videoParams.config as any, sessionId)
+                  saveVideoConfig(videoParams.taskId, videoParams.config as unknown as VideoConfig, sessionId)
                     .then(() => {
                       console.log('✅ useChat: Config saved, focusing video panel')
                       openVideoPanel()
@@ -390,91 +389,54 @@ export function useChat() {
       stopStreaming()
       setError('Connection lost')
     }
-  }, [
-    setSandboxReady,
-    notifyFilesChanged,
-    openOrFocusTab,
-    setReportResult,
-    addReportStep,
-    startReportGeneration,
-    stopReportGeneration,
-    isReportGenerating,
-    setWorkflowError,
-    addWorkflowNode,
-    addWorkflowEdge,
-    clearWorkflow,
-    clearValidated,
-    setWorkflowDefinition,
-    setNodeStatus,
-    setRunStatus,
-    setActiveRun,
-    setRunOutput,
-    setViewState,
-    triggerDashboardRefresh,
-    pushEvent,
-    stopStreaming,
-  ])
+  }
 
-  const sendMessage = useCallback(
-    async (text: string, datasourceIds?: string[], kbIds?: string[], csvFiles?: File[]) => {
-      if (!text.trim() && (!csvFiles || csvFiles.length === 0)) return
+  const sendMessage = async (text: string, datasourceIds?: string[], kbIds?: string[], csvFiles?: File[]) => {
+    if (!text.trim() && (!csvFiles || csvFiles.length === 0)) return
 
-      setError(null)
+    setError(null)
 
-      // Ensure we have a session (create if needed)
-      let session_id = sessionId
-      if (!currentSession || currentSession.isDraft || !session_id) {
-        const created = await createSession()
-        if (!created) {
-          setError('Failed to create session')
-          return
-        }
-        session_id = created.id
+    // Ensure we have a session (create if needed)
+    let session_id = sessionId
+    if (!currentSession || currentSession.isDraft || !session_id) {
+      const created = await createSession()
+      if (!created) {
+        setError('Failed to create session')
+        return
+      }
+      session_id = created.id
+    }
+
+    const isFirstMessage = messages.length === 0
+    const query = text.trim() || 'Generate a comprehensive report.'
+    startStreaming()
+    addUserMessage(query)
+
+    try {
+      if (csvFiles && csvFiles.length > 0) {
+        connectToSSE(session_id)
+        await reportApi.generate(session_id, query, csvFiles)
+      } else {
+        await chatApi.start({
+          message: query,
+          session_id: session_id,
+          datasource_ids: datasourceIds,
+          kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
+        })
+        connectToSSE(session_id)
       }
 
-      const isFirstMessage = messages.length === 0
-      const query = text.trim() || 'Generate a comprehensive report.'
-      startStreaming()
-      addUserMessage(query)
-
-      try {
-        if (csvFiles && csvFiles.length > 0) {
-          connectToSSE(session_id)
-          await reportApi.generate(session_id, query, csvFiles)
-        } else {
-          await chatApi.start({
-            message: query,
-            session_id: session_id,
-            datasource_ids: datasourceIds,
-            kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
-          })
-          connectToSSE(session_id)
-        }
-
-        if (isFirstMessage) {
-          const title = query.length > 50 ? query.substring(0, 47) + '...' : query
-          await updateSessionTitle(session_id, title)
-        }
-
-        fetchSessions()
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Failed to send')
-        stopStreaming()
+      if (isFirstMessage) {
+        const title = query.length > 50 ? query.substring(0, 47) + '...' : query
+        await updateSessionTitle(session_id, title)
       }
-    },
-    [
-      currentSession,
-      sessionId,
-      messages.length,
-      createSession,
-      startStreaming,
-      addUserMessage,
-      updateSessionTitle,
-      fetchSessions,
-      stopStreaming,
-      connectToSSE,
-    ],
-  )
+
+      fetchSessions()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to send')
+      stopStreaming()
+    }
+  }
 
   return { sendMessage, error }
 }

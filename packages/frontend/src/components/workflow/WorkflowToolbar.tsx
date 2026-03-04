@@ -13,6 +13,13 @@ interface WorkflowToolbarProps {
   onRedo: () => void
 }
 
+type WorkflowCanvasNodeData = {
+  type: string
+  params?: Record<string, unknown>
+}
+
+type WorkflowCanvasNode = Node<WorkflowCanvasNodeData>
+
 const MotionDiv = motion.div as React.ComponentType<HTMLMotionProps<'div'>>
 const MotionButton = motion.button as React.ComponentType<HTMLMotionProps<'button'>>
 const MotionSpan = motion.span as React.ComponentType<HTMLMotionProps<'span'>>
@@ -175,8 +182,8 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
   )
 }
 
-function toDefinition(nodes: Node[], edges: Edge[], nodeDefs: Record<string, NodeDef>) {
-  const nodeMap: Record<string, any> = {}
+function toDefinition(nodes: WorkflowCanvasNode[], edges: Edge[], nodeDefs: Record<string, NodeDef>) {
+  const nodeMap: Record<string, Record<string, unknown>> = {}
   nodes.forEach((node) => {
     const def = nodeDefs[node.data.type]
     if (!def) return
@@ -192,7 +199,7 @@ function toDefinition(nodes: Node[], edges: Edge[], nodeDefs: Record<string, Nod
     }
   })
 
-  const edgeMap: Record<string, any> = {}
+  const edgeMap: Record<string, Record<string, unknown>> = {}
   edges.forEach((edge) => {
     const id = edge.id || `${edge.source}-${edge.sourceHandle}-${edge.target}-${edge.targetHandle}`
     edgeMap[id] = {

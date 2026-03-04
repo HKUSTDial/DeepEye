@@ -2,17 +2,22 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Settings, AlertCircle, PlayCircle, CheckCircle2 } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflow'
+import type { NodeDef } from '../../stores/workflowNodes'
 import { useShallow } from 'zustand/react/shallow'
 import type { Node } from 'reactflow'
 import type { WorkflowRun } from '../../types'
 
 interface WorkflowInspectorProps {
   selectedNodeId: string | null
-  nodeDefs: Record<string, any>
+  nodeDefs: Record<string, NodeDef>
   onUpdateParam: (nodeId: string, key: string, value: string) => void
   nodes?: Node[]
   activeRun?: WorkflowRun | null
   runOutput?: string
+}
+
+function stringifyParams(params: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
 }
 
 export function WorkflowInspector({
@@ -44,14 +49,17 @@ export function WorkflowInspector({
 
   // 当选中的节点改变时，重置本地参数状态
   useEffect(() => {
-    if (resolvedSelectedNode) {
-      const params = resolvedSelectedNode.data.params || {}
-      setLocalParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])))
-    } else {
-      setLocalParams({})
-    }
-    setEditingParam(null)
-  }, [selectedNodeId, resolvedSelectedNode?.id])
+    const timeoutId = window.setTimeout(() => {
+      if (resolvedSelectedNode) {
+        const params = (resolvedSelectedNode.data.params as Record<string, unknown> | undefined) || {}
+        setLocalParams(stringifyParams(params))
+      } else {
+        setLocalParams({})
+      }
+      setEditingParam(null)
+    }, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [resolvedSelectedNode])
 
   // 处理参数更新
   const handleParamChange = useCallback((key: string, value: string) => {
@@ -99,13 +107,14 @@ export function WorkflowInspector({
             {/* Parameters */}
             <div className="workflow-inspector-section">
               <h4 className="workflow-inspector-section-title">Parameters</h4>
-              {Object.keys(resolvedSelectedNode.data.params || {}).length === 0 ? (
+              {Object.keys((resolvedSelectedNode.data.params as Record<string, unknown>) || {}).length === 0 ? (
                 <div className="workflow-inspector-empty">No parameters</div>
               ) : (
-                Object.keys(resolvedSelectedNode.data.params || {}).map((key) => {
+                Object.keys((resolvedSelectedNode.data.params as Record<string, unknown>) || {}).map((key) => {
                   const paramDef = nodeDef?.params?.[key]
                   const required = paramDef?.required
-                  const displayValue = editingParam === key ? localParams[key] : String(resolvedSelectedNode.data.params[key] || '')
+                  const selectedParams = (resolvedSelectedNode.data.params as Record<string, unknown>) || {}
+                  const displayValue = editingParam === key ? localParams[key] : String(selectedParams[key] || '')
 
                   return (
                     <div key={`${resolvedSelectedNode.id}-${key}`} className="workflow-inspector-field">
@@ -128,7 +137,7 @@ export function WorkflowInspector({
                           setEditingParam(key)
                           setLocalParams((prev) => ({
                             ...prev,
-                            [key]: String(resolvedSelectedNode.data.params[key] || ''),
+                            [key]: String(selectedParams[key] || ''),
                           }))
                         }}
                         onChange={(e) => handleParamChange(key, e.target.value)}
@@ -220,4 +229,3 @@ function getStatusClass(status: string): string {
       return ''
   }
 }
-

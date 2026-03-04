@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { X, FileCode, FileText as FileTextIcon, Download } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -160,7 +160,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
     return colorMap[ext || ''] || '#75beff'
   }, [fileExtension])
 
-  const loadFile = async (sessionId: string, path: string) => {
+  const loadFile = useCallback(async (sessionId: string, path: string) => {
     setIsLoading(true)
     setError(null)
     setHighlightedCode('')
@@ -183,7 +183,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [highlight])
 
   useEffect(() => {
     if (sessionId && filePath) {
@@ -192,7 +192,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
       setFileContent(null)
       setHighlightedCode('')
     }
-  }, [sessionId, filePath])
+  }, [sessionId, filePath, loadFile])
 
   useEffect(() => {
     if (!fileContent || viewerType !== 'code') return
@@ -425,4 +425,3 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
     </div>
   )
 }
-

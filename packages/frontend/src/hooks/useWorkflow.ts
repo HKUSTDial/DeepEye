@@ -7,6 +7,38 @@ import { API_BASE } from '../api/client'
 import type { Workflow, WorkflowRun } from '../types'
 import { useWorkflowNodesStore, type NodeDef } from '../stores/workflowNodes'
 
+type WorkflowCanvasNodeData = {
+  type: string
+  params?: Record<string, unknown>
+}
+
+type WorkflowCanvasNode = Node<WorkflowCanvasNodeData>
+
+type WorkflowDefinitionNode = {
+  id: string
+  type: string
+  metadata?: {
+    position?: {
+      x?: number
+      y?: number
+    }
+  }
+  params?: Record<string, unknown>
+}
+
+type WorkflowDefinitionEdge = {
+  id: string
+  source: { node_id: string; port_id?: string }
+  target: { node_id: string; port_id?: string }
+  condition?: unknown
+  transform?: unknown
+}
+
+type WorkflowDefinitionGraph = {
+  nodes?: Record<string, WorkflowDefinitionNode>
+  edges?: Record<string, WorkflowDefinitionEdge>
+}
+
 function typeToLabel(type: string) {
   return type
     .replace(/[._]/g, ' ')
@@ -16,8 +48,8 @@ function typeToLabel(type: string) {
     .join(' ')
 }
 
-function toDefinition(nodes: Node[], edges: Edge[], nodeDefs: Record<string, NodeDef>) {
-  const nodeMap: Record<string, any> = {}
+function toDefinition(nodes: WorkflowCanvasNode[], edges: Edge[], nodeDefs: Record<string, NodeDef>) {
+  const nodeMap: Record<string, Record<string, unknown>> = {}
   nodes.forEach((node) => {
     const def = nodeDefs[node.data.type]
     if (!def) return
@@ -33,29 +65,37 @@ function toDefinition(nodes: Node[], edges: Edge[], nodeDefs: Record<string, Nod
     }
   })
 
-  const edgeMap: Record<string, any> = {}
+  const edgeMap: Record<string, Record<string, unknown>> = {}
   edges.forEach((edge) => {
     const id = edge.id || `${edge.source}-${edge.sourceHandle}-${edge.target}-${edge.targetHandle}`
+    const edgeData = (edge.data as { condition?: unknown; transform?: unknown } | undefined) ?? {}
     edgeMap[id] = {
       id,
       source: { node_id: edge.source, port_id: edge.sourceHandle || 'rows' },
       target: { node_id: edge.target, port_id: edge.targetHandle || 'rows' },
-      condition: edge.data?.condition || undefined,
-      transform: edge.data?.transform || undefined,
+      condition: edgeData.condition,
+      transform: edgeData.transform,
     }
   })
 
   return { nodes: nodeMap, edges: edgeMap }
 }
 
-function fromDefinition(definition: any, nodeDefs: Record<string, NodeDef>) {
-  const graph = definition.root || definition
-  const nodes: Node[] = Object.values(graph.nodes || {}).map((node: any) => {
+function fromDefinition(definition: Record<string, unknown>, nodeDefs: Record<string, NodeDef>) {
+  const graph = ((definition.root as WorkflowDefinitionGraph | undefined) || definition) as WorkflowDefinitionGraph
+  const nodes: Node[] = Object.values(graph.nodes || {}).map((node) => {
     const def = nodeDefs[node.type]
+    const xRaw = node.metadata?.position?.x
+    const yRaw = node.metadata?.position?.y
+    const x = typeof xRaw === 'number' ? xRaw : Number(xRaw)
+    const y = typeof yRaw === 'number' ? yRaw : Number(yRaw)
     return {
       id: node.id,
       type: 'workflowNode',
-      position: node.metadata?.position || { x: 80, y: 80 },
+      position: {
+        x: Number.isFinite(x) ? x : 80,
+        y: Number.isFinite(y) ? y : 80,
+      },
       data: {
         type: node.type,
         label: typeToLabel(node.type),
@@ -66,7 +106,7 @@ function fromDefinition(definition: any, nodeDefs: Record<string, NodeDef>) {
     }
   })
 
-  const edges: Edge[] = Object.values(graph.edges || {}).map((edge: any) => ({
+  const edges: Edge[] = Object.values(graph.edges || {}).map((edge) => ({
     id: edge.id,
     source: edge.source.node_id,
     target: edge.target.node_id,
@@ -113,7 +153,11 @@ export function useWorkflow() {
   const saveWorkflow = useCallback(async (): Promise<Workflow | null> => {
     const state = useWorkflowStore.getState()
     const definition = { root: toDefinition(state.nodes, state.edges, nodeDefs) }
-    const payload = { name: state.workflowName, description: state.description, definition }
+    const payload: Omit<Workflow, 'id' | 'created_at' | 'updated_at'> = {
+      name: state.workflowName,
+      description: state.description,
+      definition,
+    }
     try {
       if (state.workflowId) {
         const updated = await workflowsApi.update(state.workflowId, payload)
@@ -122,7 +166,7 @@ export function useWorkflow() {
         state.setIsDirty(false)
         return updated
       } else {
-        const created = await workflowsApi.create(payload as any)
+        const created = await workflowsApi.create(payload)
         state.setWorkflowId(created.id)
         state.setStatus('Created')
         state.setWorkflows([...state.workflows, created])
@@ -180,21 +224,26 @@ export function useWorkflow() {
 
     es.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as any
-        if (payload.type === 'node') {
+        const payload = JSON.parse(event.data) as Record<string, unknown>
+        const payloadType = typeof payload.type === 'string' ? payload.type : ''
+        if (payloadType === 'node') {
+          const nodeId = typeof payload.node_id === 'string' ? payload.node_id : null
+          const status = typeof payload.status === 'string' ? payload.status : undefined
+          if (!nodeId) return
           useWorkflowStore.getState().setNodes((nodes) =>
             nodes.map((node) =>
-              node.id === payload.node_id ? { ...node, data: { ...node.data, runStatus: payload.status } } : node,
+              node.id === nodeId ? { ...node, data: { ...node.data, runStatus: status } } : node,
             ),
           )
           return
         }
-        if (payload.type === 'run') {
+        if (payloadType === 'run') {
+          const status = typeof payload.status === 'string' ? payload.status : undefined
           const runState = useWorkflowStore.getState()
-          runState.setActiveRun(payload as WorkflowRun)
-          if (payload.status && payload.status !== 'running' && payload.status !== 'pending') {
-            runState.setStatus(`Run ${payload.status}`)
-            runState.setRunOutput(JSON.stringify(payload.result, null, 2))
+          runState.setActiveRun(payload as unknown as WorkflowRun)
+          if (status && status !== 'running' && status !== 'pending') {
+            runState.setStatus(`Run ${status}`)
+            runState.setRunOutput(JSON.stringify(payload.result ?? null, null, 2))
             es.close()
           }
         }
@@ -297,4 +346,3 @@ export function useWorkflow() {
     nodeDefs,
   }
 }
-

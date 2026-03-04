@@ -1,6 +1,14 @@
 import type { Message, ToolStep } from '../types'
 import type { AgentEvent } from '../api'
 
+interface SerializedSessionChat {
+  id: string
+  title: string
+  messages?: Message[]
+  createdAt: string
+  updatedAt: string
+}
+
 /**
  * SessionChat - Represents a single chat window/session
  * 
@@ -326,7 +334,7 @@ export class SessionChat {
   /**
    * Create from plain object
    */
-  static fromJSON(data: any): SessionChat {
+  static fromJSON(data: SerializedSessionChat): SessionChat {
     const session = new SessionChat(data.id, data.title)
     session.messages = data.messages || []
     session.createdAt = new Date(data.createdAt)

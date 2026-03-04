@@ -6,9 +6,11 @@ import type React from 'react'
 import { getVideoFull, type VideoConfig } from './video'
 import { compileTsxAndGetComponent } from '../utils/compileTsxInBrowser'
 
+type SceneComponent = React.FC<Record<string, unknown>>
+
 export interface RegisteredVideo {
   config: VideoConfig
-  components: Record<string, React.FC<any>>
+  components: Record<string, SceneComponent>
 }
 
 const cache = new Map<string, RegisteredVideo>()
@@ -36,7 +38,7 @@ export async function registerVideoByTaskId(
   const promise = (async (): Promise<RegisteredVideo | null> => {
     try {
       const res = await getVideoFull(taskId, sessionId)
-      const components: Record<string, React.FC<any>> = {}
+      const components: Record<string, SceneComponent> = {}
       for (const [sceneId, filename] of Object.entries(res.registry || {})) {
         const tsx = res.files?.[filename]
         if (!tsx) continue

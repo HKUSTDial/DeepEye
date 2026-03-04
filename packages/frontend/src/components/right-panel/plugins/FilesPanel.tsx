@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import FileExplorer from '../../FileExplorer'
 import FileViewer from '../../FileViewer'
 import { useChatStore } from '../../../stores/chat'
@@ -39,14 +39,14 @@ export function FilesPanel({ sessionId }: FilesPanelProps) {
     document.body.style.userSelect = 'none'
   }
 
-  const onExplorerDrag = (e: MouseEvent) => {
+  const onExplorerDrag = useCallback((e: MouseEvent) => {
     if (!isDraggingExplorer || !panelRef.current) return
     const panelRect = panelRef.current.getBoundingClientRect()
     const panelWidth = panelRect.width
     const relativeX = e.clientX - panelRect.left
     const newRatio = (relativeX / panelWidth) * 100
     setExplorerRatio(Math.max(MIN_EXPLORER_RATIO, Math.min(MAX_EXPLORER_RATIO, newRatio)))
-  }
+  }, [isDraggingExplorer])
 
   const stopExplorerDrag = () => {
     setIsDraggingExplorer(false)
@@ -63,7 +63,7 @@ export function FilesPanel({ sessionId }: FilesPanelProps) {
         document.removeEventListener('mouseup', stopExplorerDrag)
       }
     }
-  }, [isDraggingExplorer])
+  }, [isDraggingExplorer, onExplorerDrag])
 
   const explorerStyle = useMemo(
     () => ({

@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import type { LucideIcon } from 'lucide-react'
 import {
   Database,
   Code2,
@@ -15,7 +16,7 @@ import type { Workflow } from '../../types'
 import { useWorkflowStore } from '../../stores/workflow'
 import { Modal } from '../ui/Modal'
 
-const nodeIcons: Record<string, any> = {
+const nodeIcons: Record<string, LucideIcon> = {
   'datasource.read': Database,
   'sql.execute': Code2,
   'stats.summary': FileText,
@@ -181,4 +182,3 @@ export function WorkflowSidebar({
     </motion.aside>
   )
 }
-

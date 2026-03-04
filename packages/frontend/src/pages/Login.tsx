@@ -22,8 +22,8 @@ export default function Login() {
     try {
       await login(email, password)
       navigate('/')  // 登录成功，跳转到主页
-    } catch (err: any) {
-      setError(err.message || 'Login failed')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
       setIsLoading(false)
     }
@@ -102,4 +102,3 @@ export default function Login() {
     </div>
   )
 }
-
