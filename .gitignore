@@ -35,7 +35,6 @@ bak/
 packages/deepeye-core
 packages/deepeye-backend
 packages/deepeye-frontend
-packages/frontend
 
 AGENTS.md
 
@@ -47,3 +46,11 @@ AGENTS.md
 packages/backend/app/node/infographic_generation_modularity/output/
 packages/backend/app/node/video_render/infographic_generation_modularity/output/
 packages/backend/app/node/src/components/CustomInfographic/
+
+# Runtime/generated artifacts
+/deepeye_dataset.sql
+/packages/backend/.workflow_scripts/
+/packages/backend/.video_workspace/
+/packages/backend/app/services/report_workspace/reports/
+/report_module/final_report*.html
+/packages/frontend/src/components/video/*/

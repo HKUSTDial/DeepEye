@@ -53,14 +53,13 @@ interface WorkflowCanvasProps {
 }
 
 export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
-  const { nodes, edges, setEdges, addToHistory, setSelectedNodeId, setSelectedNodeIds, setNodes } = useWorkflowStore(
+  const { nodes, edges, setEdges, addToHistory, setSelectedNodeId, setNodes } = useWorkflowStore(
     useShallow((state) => ({
       nodes: state.nodes,
       edges: state.edges,
       setEdges: state.setEdges,
       addToHistory: state.addToHistory,
       setSelectedNodeId: state.setSelectedNodeId,
-      setSelectedNodeIds: state.setSelectedNodeIds,
       setNodes: state.setNodes,
     })),
   )

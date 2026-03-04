@@ -41,7 +41,6 @@ export function useChat() {
   const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
   const triggerDashboardRefresh = useWorkflowSessionsStore((state) => state.triggerDashboardRefresh)
   const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
-  const isStreaming = useChatStore((state) => state.isStreaming)
   const setReportResult = useReportStore((state) => state.setReportResult)
   const addReportStep = useReportStore((state) => state.addReportStep)
   const startReportGeneration = useReportStore((state) => state.startGeneration)

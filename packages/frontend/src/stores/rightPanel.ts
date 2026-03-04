@@ -41,7 +41,7 @@ const normalizeParams = (params?: Record<string, unknown>) => {
 
 export const useRightPanelStore = create<RightPanelState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       collapsed: true,
       panelRatio: 40,
       panes: [],

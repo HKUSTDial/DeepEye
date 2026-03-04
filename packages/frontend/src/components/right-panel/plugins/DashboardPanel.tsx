@@ -71,7 +71,7 @@ export function DashboardPanel({
             checkIntervalRef.current = null
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore errors
       } finally {
         setIsChecking(false)

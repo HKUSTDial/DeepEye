@@ -79,11 +79,6 @@ export default function KnowledgeBaseDetail() {
     return filteredFiles.filter((file) => file.status === statusFilter)
   }, [filteredFiles, statusFilter])
 
-  const getFileExtension = (filename: string) => {
-    const parts = filename.split('.')
-    return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE'
-  }
-
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase()
     switch (ext) {
