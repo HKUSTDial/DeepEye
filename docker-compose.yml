@@ -94,7 +94,6 @@ services:
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
-      - ./report_module:/app/report_module
       - .:/app/project
       - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers
@@ -124,7 +123,6 @@ services:
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
-      - ./report_module:/app/report_module
       - .:/app/project
       - workspace_data:/workspace
       # Mount Docker socket to manage sandbox containers

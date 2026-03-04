@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 _THIS_DIR = Path(__file__).resolve().parent
 _SHIM_DIR = _THIS_DIR / "report_compat_shim"
 _WORKSPACE_DIR = _THIS_DIR / "report_workspace"
-# Project root (DeepEye-1) containing report_module: services->app->backend->packages->root
-_PROJECT_ROOT = _THIS_DIR.resolve().parents[3]
-_REPORT_MODULE_DIR = _PROJECT_ROOT / "report_module"
+# report_module now lives inside backend services to match repository layering.
+_REPORT_MODULE_PARENT = _THIS_DIR
+_REPORT_MODULE_DIR = _THIS_DIR / "report_module"
 
 
 def _publish_sync(channel: str, payload: dict) -> None:
@@ -74,7 +74,7 @@ def run_report_pipeline(
     try:
         # Resolve report_module imports: utils (shim), report_module package, config/DatasetContextGenerator (report_module dir)
         sys.path.insert(0, str(_SHIM_DIR))
-        sys.path.insert(0, str(_PROJECT_ROOT))
+        sys.path.insert(0, str(_REPORT_MODULE_PARENT))
         if _REPORT_MODULE_DIR.is_dir():
             sys.path.insert(0, str(_REPORT_MODULE_DIR))
         sys.stdout = StdoutForward(old_stdout)  # type: ignore[assignment]
@@ -109,7 +109,7 @@ def run_report_pipeline(
         sys.stdout = old_stdout
         os.chdir(old_cwd)
         # Remove our path entries to avoid affecting other code
-        for path_entry in (str(_REPORT_MODULE_DIR), str(_PROJECT_ROOT), str(_SHIM_DIR)):
+        for path_entry in (str(_REPORT_MODULE_DIR), str(_REPORT_MODULE_PARENT), str(_SHIM_DIR)):
             try:
                 sys.path.remove(path_entry)
             except ValueError:
