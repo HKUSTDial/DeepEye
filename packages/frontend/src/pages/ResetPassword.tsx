@@ -4,7 +4,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import AuthShell from '../components/auth/AuthShell'
 import { authApi } from '../api/auth'
+
+const INPUT_CLASS =
+  'w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-[var(--main-text)] placeholder-[var(--main-text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -63,86 +67,81 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--main-bg)] px-4">
-      <div className="w-full max-w-md p-8 space-y-6 bg-[var(--main-bg-alt)] rounded-2xl border border-[var(--input-border)]">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-[var(--main-text)]">DeepEye</h1>
-          <p className="text-[var(--main-text-muted)] mt-2">Set a new password</p>
+    <AuthShell
+      title="Set a new password"
+      subtitle="Use the one-time token from your reset email."
+      leftTitle="Secure password reset"
+      leftDescription="Reset is isolated as an explicit one-time operation with strict token checks."
+    >
+      {!token && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          Invalid reset link. Please request a new one.
         </div>
+      )}
 
-        {!token && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            Invalid reset link. Please request a new one.
-          </div>
-        )}
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
 
-        {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            {error}
-          </div>
-        )}
+      {message && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          {message}
+        </div>
+      )}
 
-        {message && (
-          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm">
-            {message}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="newPassword" className="block text-sm font-medium text-[var(--main-text)] mb-2">
-              New Password
-            </label>
-            <input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={8}
-              maxLength={64}
-              className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--main-text)] placeholder-[var(--main-text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
-              placeholder="8-64 chars with mixed complexity"
-              disabled={isLoading || !token}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-[var(--main-text)] mb-2">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={8}
-              maxLength={64}
-              className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--main-text)] placeholder-[var(--main-text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
-              placeholder="Re-enter password"
-              disabled={isLoading || !token}
-            />
-          </div>
-
-          <button
-            type="submit"
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="newPassword" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+            New password
+          </label>
+          <input
+            id="newPassword"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+            minLength={8}
+            maxLength={64}
+            className={INPUT_CLASS}
+            placeholder="8-64 chars with mixed complexity"
             disabled={isLoading || !token}
-            className="w-full py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Resetting...' : 'Reset password'}
-          </button>
-        </form>
-
-        <div className="text-center text-sm text-[var(--main-text-muted)]">
-          <button
-            onClick={() => navigate('/login')}
-            className="text-[var(--accent)] hover:underline"
-          >
-            Back to login
-          </button>
+          />
         </div>
+
+        <div>
+          <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+            Confirm password
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            minLength={8}
+            maxLength={64}
+            className={INPUT_CLASS}
+            placeholder="Re-enter password"
+            disabled={isLoading || !token}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading || !token}
+          className="w-full rounded-xl bg-[var(--accent)] py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {isLoading ? 'Resetting...' : 'Reset password'}
+        </button>
+      </form>
+
+      <div className="text-sm text-[var(--main-text-muted)]">
+        <button onClick={() => navigate('/auth')} className="text-[var(--accent)] hover:underline">
+          Back to login
+        </button>
       </div>
-    </div>
+    </AuthShell>
   )
 }

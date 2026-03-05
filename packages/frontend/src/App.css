@@ -119,6 +119,41 @@
   gap: 8px;
 }
 
+.chat-user-pill {
+  max-width: 180px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: var(--chat-surface-border);
+  background: color-mix(in srgb, var(--card-bg) 84%, var(--main-bg));
+  color: var(--main-text);
+  font-size: var(--ui-font-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-logout-btn {
+  border: var(--chat-surface-border);
+  background: color-mix(in srgb, var(--card-bg) 86%, var(--main-bg-alt));
+  color: var(--main-text);
+  height: 36px;
+  border-radius: var(--chat-surface-radius);
+  padding: 0 10px;
+  font-size: var(--ui-font-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--chat-surface-shadow-soft);
+}
+
+.chat-logout-btn:hover {
+  border-color: color-mix(in srgb, #dc2626 40%, var(--border-hover));
+  background: color-mix(in srgb, #dc2626 10%, var(--main-bg-alt));
+  color: color-mix(in srgb, #dc2626 80%, var(--main-text));
+  box-shadow: var(--chat-surface-shadow-hover);
+}
+
 .chat-panel-toggle {
   position: relative;
   border: var(--chat-surface-border);
@@ -188,5 +223,14 @@
   .chat-panel-toggle {
     width: 34px;
     height: 34px;
+  }
+
+  .chat-user-pill {
+    display: none;
+  }
+
+  .chat-logout-btn {
+    height: 34px;
+    padding: 0 8px;
   }
 }

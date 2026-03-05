@@ -6,6 +6,7 @@ import './styles/light-theme.css'
 import './styles/dark-theme.css'
 import App from './App'
 import {
+  Auth,
   ForgotPassword,
   KnowledgeBaseDetail,
   KnowledgeBases,
@@ -24,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
+        <Route path="/auth" element={<Auth />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -2,6 +2,7 @@
 
 from email.message import EmailMessage
 import smtplib
+from urllib.parse import urlencode
 
 from app.core.config import settings
 from deepeye.utils.logger import logger
@@ -35,7 +36,9 @@ def _send_email(to_email: str, subject: str, body: str) -> bool:
 
 def send_verification_email(to_email: str, token: str) -> bool:
     """Send email verification message."""
-    verify_url = f"{settings.AUTH_FRONTEND_BASE_URL.rstrip('/')}/verify-email?token={token}"
+    base_url = settings.AUTH_FRONTEND_BASE_URL.rstrip("/")
+    verify_query = urlencode({"token": token, "email": to_email})
+    verify_url = f"{base_url}/verify-email?{verify_query}"
     body = (
         "Please verify your DeepEye account email.\n\n"
         f"Verification link: {verify_url}\n\n"
@@ -49,7 +52,9 @@ def send_verification_email(to_email: str, token: str) -> bool:
 
 def send_password_reset_email(to_email: str, token: str) -> bool:
     """Send password reset message."""
-    reset_url = f"{settings.AUTH_FRONTEND_BASE_URL.rstrip('/')}/reset-password?token={token}"
+    base_url = settings.AUTH_FRONTEND_BASE_URL.rstrip("/")
+    reset_query = urlencode({"token": token, "email": to_email})
+    reset_url = f"{base_url}/reset-password?{reset_query}"
     body = (
         "We received a request to reset your DeepEye password.\n\n"
         f"Reset link: {reset_url}\n\n"

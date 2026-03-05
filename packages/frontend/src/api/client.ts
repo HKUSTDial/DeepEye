@@ -117,7 +117,8 @@ async function request<T>(
         
         // 如果在浏览器环境，跳转到登录页
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          const next = `${window.location.pathname}${window.location.search}`
+          window.location.href = `/auth?next=${encodeURIComponent(next)}`
         }
         
         throw new ApiError(401, 'Session expired, please login again')
@@ -209,7 +210,8 @@ async function requestResponse(
         console.error('[HTTP Client] Token refresh failed:', refreshError)
         useAuthStore.getState().logout()
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          const next = `${window.location.pathname}${window.location.search}`
+          window.location.href = `/auth?next=${encodeURIComponent(next)}`
         }
         throw new ApiError(401, 'Session expired, please login again')
       }

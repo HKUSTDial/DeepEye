@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useChatStore } from './stores/chat'
+import { useAuthStore } from './stores/auth'
 import { useRightPanelStore } from './stores/rightPanel'
 import Sidebar from './components/Sidebar'
 import DataSourceManager from './components/DataSourceManager'
@@ -8,6 +10,7 @@ import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
 import './App.css'
 
 function App() {
+  const navigate = useNavigate()
   const [selectedDataSourceIds, setSelectedDataSourceIds] = useState<string[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -22,6 +25,8 @@ function App() {
   // 每个属性单独订阅 - 最简单可靠的方式
   const sessionId = useChatStore((state) => state.sessionId)
   const currentSession = useChatStore((state) => state.currentSession)
+  const currentUser = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
   const rightPanelCollapsed = useRightPanelStore((state) => state.collapsed)
   const setRightPanelCollapsed = useRightPanelStore((state) => state.setCollapsed)
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
@@ -44,6 +49,11 @@ function App() {
 
   const toggleRightPanel = () => {
     setRightPanelCollapsed(!rightPanelCollapsed)
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/auth')
   }
 
   // Panel resize handlers
@@ -131,6 +141,20 @@ function App() {
               </span>
             </div>
             <div className="chat-topbar-actions">
+              {currentUser && (
+                <span className="chat-user-pill" title={currentUser.email}>
+                  {currentUser.username}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="chat-logout-btn"
+                title="Sign out"
+                aria-label="Sign out"
+              >
+                Sign out
+              </button>
               {sessionId && (
                 <button
                   onClick={toggleRightPanel}
