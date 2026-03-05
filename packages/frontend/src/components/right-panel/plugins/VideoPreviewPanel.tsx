@@ -1,7 +1,6 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useTheme } from '../../../hooks/useTheme'
-import { useAuthStore } from '../../../stores/auth'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { config } from '../../../config'
 
@@ -87,7 +86,6 @@ function withQueryParam(url: string, key: string, value?: string | null): string
  */
 export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps) {
   const { theme } = useTheme()
-  const accessToken = useAuthStore((state) => state.accessToken)
   const isDark = theme === 'dark'
   const videoProgressLogsRef = useRef<HTMLDivElement | null>(null)
   const [pastedTaskId, setPastedTaskId] = useState('')
@@ -136,17 +134,16 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   // 统一预览 URL 优先级：事件 > 节点输出 > 约定 URL（与仪表盘逻辑一致）
   const effectivePreviewUrl =
     videoPreviewUrl || fullPreviewUrlFromNode || constructedPreviewUrl || null
-  const effectivePreviewUrlWithAuth = useMemo(() => {
+  const effectivePreviewUrlWithSession = useMemo(() => {
     if (!effectivePreviewUrl) return null
     let next = effectivePreviewUrl
     next = withQueryParam(next, 'session_id', sessionId ?? undefined)
-    next = withQueryParam(next, 'token', accessToken ?? undefined)
     return next
-  }, [effectivePreviewUrl, sessionId, accessToken])
+  }, [effectivePreviewUrl, sessionId])
 
   // 与仪表盘一致：有预览 URL 时轮询就绪，就绪后再显示 iframe。用 GET 避免 Vite 对 HEAD 返回异常导致 502
   useEffect(() => {
-    if (!effectivePreviewUrlWithAuth) {
+    if (!effectivePreviewUrlWithSession) {
       setIsPreviewReady(false)
       return
     }
@@ -156,7 +153,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
       setIsCheckingPreview(true)
       try {
         // GET 更可靠：Vite 对 HEAD 可能未正确响应，nginx 易报 502
-        const res = await fetch(effectivePreviewUrlWithAuth, { method: 'GET', cache: 'no-store' })
+        const res = await fetch(effectivePreviewUrlWithSession, { method: 'GET', cache: 'no-store' })
         // 仅当来自「预览路由」且 200 时才视为就绪，避免误把主站首页当预览（若被错误转发到前端会缺 X-Video-Preview）
         const fromPreviewRoute = res.headers.get('X-Video-Preview') === '1'
         if (res.ok && fromPreviewRoute) {
@@ -186,15 +183,15 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         previewCheckIntervalRef.current = null
       }
     }
-  }, [effectivePreviewUrlWithAuth])
+  }, [effectivePreviewUrlWithSession])
 
   // 控制台调试信息，便于排查预览不加载
   useEffect(() => {
     const prefix = '[VideoPreview]'
-    if (effectivePreviewUrlWithAuth) {
+    if (effectivePreviewUrlWithSession) {
       console.info(prefix, 'Preview URL (will poll until ready):', {
         source: videoPreviewUrl ? 'event' : fullPreviewUrlFromNode ? 'node output' : 'constructed',
-        url: effectivePreviewUrlWithAuth,
+        url: effectivePreviewUrlWithSession,
       })
       return
     }
@@ -207,7 +204,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         runOutputLength: runOutput?.length ?? 0,
       })
     }
-  }, [effectivePreviewUrlWithAuth, videoPreviewUrl, fullPreviewUrlFromNode, sessionId, taskId, pastedNormalized, pastedTaskId, runOutput])
+  }, [effectivePreviewUrlWithSession, videoPreviewUrl, fullPreviewUrlFromNode, sessionId, taskId, pastedNormalized, pastedTaskId, runOutput])
 
   useEffect(() => {
     if (videoProgress.visible && videoProgress.logs.length > 0 && videoProgressLogsRef.current) {
@@ -219,7 +216,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const runFailed = runStatus === 'failed'
 
   // 1) 有预览 URL：轮询就绪后显示 iframe（与仪表盘一致，避免 502/主应用）
-  if (effectivePreviewUrlWithAuth) {
+  if (effectivePreviewUrlWithSession) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: isDark ? '#0f1419' : '#f8fafc' }}>
         <div style={{
@@ -242,7 +239,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
           )}
           {isPreviewReady && (
             <a
-              href={effectivePreviewUrlWithAuth}
+              href={effectivePreviewUrlWithSession}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: isDark ? '#818cf8' : '#4f46e5', textDecoration: 'none', fontSize: 11 }}
@@ -274,7 +271,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
           </div>
         ) : (
           <iframe
-            src={effectivePreviewUrlWithAuth}
+            src={effectivePreviewUrlWithSession}
             style={{ flex: 1, border: 'none', width: '100%' }}
             title="Video Preview"
             allow="autoplay"
@@ -498,14 +495,14 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         Video Preview
       </div>
       <div style={{ fontSize: 13, maxWidth: 320 }}>
-        If the preview did not load automatically, paste the <strong>Task ID</strong> from the chat (e.g. 20260302_121928) and open the preview.
+        If the preview did not load automatically, paste the <strong>Task ID</strong> from the chat (e.g. YYYYMMDD_HHMMSS) and open the preview.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 320 }}>
         <input
           type="text"
           value={pastedTaskId}
           onChange={(e) => setPastedTaskId(e.target.value)}
-          placeholder="e.g. 20260302_121928"
+          placeholder="e.g. YYYYMMDD_HHMMSS"
           style={{
             padding: '10px 12px',
             border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,

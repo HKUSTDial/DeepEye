@@ -24,7 +24,7 @@ def copy_video_to_workspace(
     将指定 task_id 的视频文件复制到 workspace
     
     Args:
-        task_id: 任务ID，例如 "20260114_130447"
+        task_id: 任务ID，例如 "<YYYYMMDD_HHMMSS>"
         backend_output_dir: 后端输出目录，如果为 None 则自动推断
         workspace_base: workspace 根目录，默认为 /workspace
         

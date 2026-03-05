@@ -149,9 +149,9 @@ def scene_id_to_filename(
     - 其他场景: {dataset_name}_{scene_id转换为驼峰命名}_{task_id}ComponentAnimated.tsx
     
     例如:
-    - scene_opening -> Analyzeflightdelayst_SceneOpening_20260110_040654ComponentAnimated.tsx
-    - analysis_carrier_delay_performance -> Analyzeflightdelayst_AnalysisCarrierDelayPerformance_20260110_040654Animated.tsx
-    - summary_flight_statistics -> Analyzeflightdelayst_SummaryFlightStatistics_20260110_040654ComponentAnimated.tsx
+    - scene_opening -> DatasetName_SceneOpening_<task_id>ComponentAnimated.tsx
+    - analysis_carrier_delay_performance -> DatasetName_AnalysisCarrierDelayPerformance_<task_id>Animated.tsx
+    - summary_flight_statistics -> DatasetName_SummaryFlightStatistics_<task_id>ComponentAnimated.tsx
     
     Args:
         scene_id: 场景ID

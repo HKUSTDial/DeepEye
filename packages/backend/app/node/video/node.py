@@ -40,7 +40,7 @@ def _extract_task_id_from_config_path(config_path: Path) -> str:
     """从配置文件路径提取 task_id"""
     import re
     filename = config_path.name
-    # 匹配 generated_20260109_141432_aligned.json 或类似格式
+    # 匹配 generated_<task_id>_aligned.json 或类似格式
     match = re.search(r'generated_(\d{8}_\d{6})', filename)
     if match:
         return match.group(1)

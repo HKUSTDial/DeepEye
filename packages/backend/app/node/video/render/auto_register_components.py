@@ -247,12 +247,16 @@ def update_root_tsx(components: List[Dict[str, str]], root_tsx_path: str, config
 
 def main():
     import argparse
+    default_config_path = os.getenv(
+        "VIDEO_DEFAULT_CONFIG_PATH",
+        "infographic_generation/generated_config_aligned.json",
+    )
     
     # 命令行参数
     parser = argparse.ArgumentParser(description='自动注册 TSX 组件到 Remotion 项目')
     parser.add_argument('--animated', action='store_true', help='注册带动画的组件（默认注册静态组件）')
     parser.add_argument('--config', type=str,
-                       default='infographic_generation/generated_20251216_045823_aligned_flight.json',
+                       default=default_config_path,
                        help='配置文件路径')
     parser.add_argument('--task-id', type=str, default=None,
                        help='任务ID（用于扫描子目录）')
