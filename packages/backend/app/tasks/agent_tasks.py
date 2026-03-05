@@ -22,8 +22,6 @@ from deepeye.agents import AgentFactory
 from app.tools.workflow_tools import (
     create_run_workflow_from_file_tool,
     create_design_workflow_tool,
-    create_generate_data_video_tool,
-    create_generate_data_report_tool,
 )
 from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
@@ -195,8 +193,8 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     datasources_info = _get_datasources_info(datasource_ids, user_id)
     datasources_schema = _get_datasources_schema(datasource_ids, user_id)
     
-    # Prepare datasources context for Supervisor. Include id (UUID) so the agent
-    # passes it to generate_report instead of the name (e.g. "insurance.csv").
+    # Prepare datasource context for Supervisor. Include id/path so workflow
+    # node params (e.g. datasource.read, report.generate file_paths) can be filled precisely.
     ds_context_lines = []
     for ds in datasources_info:
         line = f"- id: {ds['id']}, name: {ds['name']} ({ds['category']})"
@@ -205,12 +203,6 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         ds_context_lines.append(line)
     header = "Available Data Sources (use the file paths for workflow nodes like report.generate):\n"
     datasources_context = header + "\n".join(ds_context_lines) if ds_context_lines else "No data sources selected."
-
-    # One-shot data video tool (like query_knowledge_base): no sub-agent, one call does create+run
-    tools.append(create_generate_data_video_tool(session_id, datasources_info))
-
-    # One-shot report tool: discovers CSVs from sandbox, runs report pipeline directly
-    tools.append(create_generate_data_report_tool(session_id, datasources_info))
 
     workflow_prompt = build_workflow_prompt(
         build_registry(),

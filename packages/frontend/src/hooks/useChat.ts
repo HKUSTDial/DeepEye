@@ -3,8 +3,8 @@ import { useChatStore } from '../stores/chat'
 import { useRightPanelStore } from '../stores/rightPanel'
 import { useReportStore } from '../stores/report'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
-import { chatApi, reportApi, type AgentEvent } from '../api'
-import { saveVideoConfig, extractVideoOutputParams, type VideoConfig } from '../api/video'
+import { chatApi, datasourceApi, type AgentEvent } from '../api'
+import { extractVideoOutputParams } from '../api/video'
 
 /**
  * Chat hook - handles SSE connection and message sending.
@@ -215,33 +215,13 @@ export function useChat() {
               const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
               console.log('🎬 useChat: Extracted video params:', videoParams)
               const taskIdToOpen = videoParams.taskId ?? null
-              if (taskIdToOpen || videoParams.configPath) {
+              if (taskIdToOpen) {
                 console.log('🎬 useChat: Video output detected, opening preview panel...', {
                   taskId: taskIdToOpen,
-                  configPath: videoParams.configPath,
-                  hasConfig: !!videoParams.config,
                 })
                 const openVideoPanel = () => openOrFocusTab('video-preview', taskIdToOpen ? { taskId: taskIdToOpen } : {})
-                if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
-                  console.log('🎬 useChat: Saving video config first...')
-                  saveVideoConfig(videoParams.taskId, videoParams.config as unknown as VideoConfig, sessionId)
-                    .then(() => {
-                      console.log('✅ useChat: Config saved, focusing video panel')
-                      openVideoPanel()
-                    })
-                    .catch((e: unknown) => {
-                      const isAbort = e instanceof Error && e.name === 'AbortError'
-                      if (isAbort) {
-                        console.warn('🎬 useChat: saveVideoConfig cancelled or timed out, focusing video panel anyway.')
-                      } else {
-                        console.error('❌ useChat: saveVideoConfig failed', e)
-                      }
-                      openVideoPanel()
-                    })
-                } else {
-                  console.log('🎬 useChat: Focusing video panel (runOutput already set)')
-                  openVideoPanel()
-                }
+                console.log('🎬 useChat: Focusing video panel (task_id from workflow outputs)')
+                openVideoPanel()
               } else {
                 console.log('⚠️ useChat: No video output detected in payload.outputs, trying to extract from messages...')
                 // 如果 outputs 中没有找到，尝试从消息文本中提取 taskId
@@ -413,18 +393,28 @@ export function useChat() {
     addUserMessage(query)
 
     try {
+      const uploadedDatasourceIds: string[] = []
       if (csvFiles && csvFiles.length > 0) {
-        connectToSSE(session_id)
-        await reportApi.generate(session_id, query, csvFiles)
-      } else {
-        await chatApi.start({
-          message: query,
-          session_id: session_id,
-          datasource_ids: datasourceIds,
-          kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
-        })
-        connectToSSE(session_id)
+        for (const file of csvFiles) {
+          const created = await datasourceApi.upload(file, session_id)
+          uploadedDatasourceIds.push(created.id)
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('datasources:updated'))
+        }
       }
+
+      const mergedDatasourceIds = Array.from(
+        new Set([...(datasourceIds ?? []), ...uploadedDatasourceIds]),
+      )
+
+      connectToSSE(session_id)
+      await chatApi.start({
+        message: query,
+        session_id: session_id,
+        datasource_ids: mergedDatasourceIds.length > 0 ? mergedDatasourceIds : undefined,
+        kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
+      })
 
       if (isFirstMessage) {
         const title = query.length > 50 ? query.substring(0, 47) + '...' : query
@@ -433,6 +423,10 @@ export function useChat() {
 
       fetchSessions()
     } catch (e: unknown) {
+      if (esRef.current) {
+        esRef.current.close()
+        esRef.current = null
+      }
       setError(e instanceof Error ? e.message : 'Failed to send')
       stopStreaming()
     }

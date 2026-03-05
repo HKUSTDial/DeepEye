@@ -5,7 +5,7 @@ import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { chatApi } from '../../../api'
-import { saveVideoConfig, extractVideoOutputParams, type VideoConfig } from '../../../api/video'
+import { extractVideoOutputParams } from '../../../api/video'
 import { workflowFilesApi } from '../../../api/workflowFiles'
 import { workflowsApi } from '../../../api/workflows'
 import { sandboxApi } from '../../../api/sandbox'
@@ -414,35 +414,18 @@ export function WorkflowLivePanel({
             console.log('📊 WorkflowLivePanel: Output keys:', Object.keys(payload.outputs))
             const videoParams = extractVideoOutputParams(outputs)
             console.log('🎬 WorkflowLivePanel: Extracted video params:', videoParams)
-            if (!videoParams.taskId && !videoParams.configPath) {
+            if (!videoParams.taskId) {
               const firstOutputKey = Object.keys(outputs)[0]
               console.warn('⚠️ WorkflowLivePanel: No video output detected. Output structure:', {
                 nodeIds: Object.keys(outputs),
                 firstNodeOutput: firstOutputKey ? outputs[firstOutputKey] : undefined,
               })
             }
-            if (videoParams.taskId || videoParams.configPath) {
+            if (videoParams.taskId) {
               console.log('🎬 WorkflowLivePanel: Video output detected, opening preview panel...', {
                 taskId: videoParams.taskId,
-                configPath: videoParams.configPath,
-                hasConfig: !!videoParams.config,
               })
-              if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
-                console.log('🎬 WorkflowLivePanel: Saving video config first...')
-                saveVideoConfig(videoParams.taskId, videoParams.config as unknown as VideoConfig)
-                  .then(() => {
-                    console.log('✅ WorkflowLivePanel: Config saved, opening preview panel')
-                    openOrFocusTab('video-preview', videoParams)
-                  })
-                  .catch((e) => {
-                    console.error('❌ WorkflowLivePanel: saveVideoConfig failed', e)
-                    console.log('🎬 WorkflowLivePanel: Opening preview panel anyway...')
-                    openOrFocusTab('video-preview', videoParams)
-                  })
-              } else {
-                console.log('🎬 WorkflowLivePanel: Opening preview panel directly (no config to save)')
-                openOrFocusTab('video-preview', videoParams)
-              }
+              openOrFocusTab('video-preview', { taskId: videoParams.taskId })
             } else {
               console.log('⚠️ WorkflowLivePanel: No video output detected in payload.outputs')
             }
@@ -1012,15 +995,8 @@ export function WorkflowLivePanel({
                     if (response.outputs) {
                       setRunOutput(sessionId, JSON.stringify(response.outputs, null, 2))
                       const videoParams = extractVideoOutputParams(response.outputs as Record<string, unknown>)
-                      if (videoParams.taskId || videoParams.configPath) {
-                        if (videoParams.taskId && videoParams.config && Object.keys(videoParams.config).length > 0) {
-                          try {
-                            await saveVideoConfig(videoParams.taskId, videoParams.config as unknown as VideoConfig)
-                          } catch (e) {
-                            console.error('saveVideoConfig failed', e)
-                          }
-                        }
-                        openOrFocusTab('video-preview', videoParams)
+                      if (videoParams.taskId) {
+                        openOrFocusTab('video-preview', { taskId: videoParams.taskId })
                       }
                     } else if (response.status && response.status !== 'queued') {
                       setRunOutput(sessionId, '')

@@ -102,7 +102,7 @@ def _rewrite_audio_urls(config: dict, session_id: str) -> dict:
             if af and not af.startswith("http") and not af.startswith("/api"):
                 filename = Path(af).name
                 narr["audio_file"] = (
-                    f"/api/public/video/audio/{filename}?session_id={session_id}"
+                    f"/api/v1/video/audio/{filename}?session_id={session_id}"
                 )
     return cfg
 

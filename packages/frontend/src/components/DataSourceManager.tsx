@@ -177,6 +177,14 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
   }, [])
 
   useEffect(() => {
+    const onUpdated = () => {
+      loadDataSources()
+    }
+    window.addEventListener('datasources:updated', onUpdated)
+    return () => window.removeEventListener('datasources:updated', onUpdated)
+  }, [])
+
+  useEffect(() => {
     if (!collapsed) {
       setShowCollapsedPanel(false)
     }
@@ -491,4 +499,3 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
     </div>
   )
 }
-

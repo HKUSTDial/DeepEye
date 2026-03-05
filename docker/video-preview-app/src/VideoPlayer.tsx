@@ -34,6 +34,27 @@ export interface VideoPlayerProps {
   sceneComponents: Record<string, React.FC<any>>
 }
 
+function withPreviewAuthQuery(src: string): string {
+  if (typeof window === 'undefined') return src
+  try {
+    const page = new URL(window.location.href)
+    const token = page.searchParams.get('token')
+    const sessionId = page.searchParams.get('session_id')
+    if (!token && !sessionId) return src
+
+    const target = new URL(src, window.location.origin)
+    if (token && !target.searchParams.get('token')) {
+      target.searchParams.set('token', token)
+    }
+    if (sessionId && !target.searchParams.get('session_id')) {
+      target.searchParams.set('session_id', sessionId)
+    }
+    return target.toString()
+  } catch {
+    return src
+  }
+}
+
 function MissingSceneComponent({ scene }: { scene: any }) {
   const id = String(scene?.id ?? 'unknown')
   const title = String(scene?.content?.title ?? scene?.content?.headline ?? id)
@@ -72,7 +93,7 @@ export function VideoPlayer({ config, sceneComponents }: VideoPlayerProps) {
       (scene.narration ?? [])
         .filter((n) => !!n.audio_file)
         .map((n) => ({
-          src: n.audio_file!,
+          src: withPreviewAuthQuery(n.audio_file!),
           startTime: n.time_start ?? 0,
           endTime: n.time_end ?? (n.time_start ?? 0) + 3.0,
         })),

@@ -56,7 +56,6 @@ export const panelRegistry: PanelPlugin[] = [
       <VideoPreviewPanel
         sessionId={context.sessionId}
         taskId={params?.taskId as string | undefined}
-        configPath={params?.configPath as string | undefined}
       />
     ),
   },

@@ -266,7 +266,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
         <div className="chat-input-shell">
           {csvFiles.length > 0 && (
             <div className="chat-attachments">
-              <span className="chat-attachments-label">Files for report:</span>
+              <span className="chat-attachments-label">Files for workflow:</span>
               {csvFiles.map((f, i) => (
                 <span key={i} className="chat-attachment-chip">
                   {f.name}
@@ -298,7 +298,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="chat-upload-btn"
-              title="Upload data files for report"
+              title="Upload data files"
               disabled={isStreaming}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

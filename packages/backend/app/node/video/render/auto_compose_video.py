@@ -1301,7 +1301,7 @@ def main():
     # 组件会通过 API 获取并在浏览器中编译，所以跳过前端 VideoComposer 的自动更新
     if component_prefix and args.task_id:
         print(f"\n🔧 跳过前端 VideoComposer.tsx 自动更新（使用动态加载机制）...")
-        print(f"   组件将通过 API 动态加载: /api/public/video/components/{args.task_id}/")
+        print(f"   组件将通过 API 动态加载: /api/v1/video/components/{args.task_id}/")
         # update_frontend_video_composer(component_prefix, config_data, args.task_id)  # 已禁用
     
     # 自动更新后端 VideoComposer.tsx（如果提供了 component_prefix，用于 Remotion 项目）
