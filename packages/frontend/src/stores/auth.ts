@@ -6,23 +6,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authHttp } from '../api/client'
 
-const ACCESS_TOKEN_COOKIE_KEY = 'deepeye_access_token'
-
-function setAccessTokenCookie(token: string | null) {
-  if (typeof document === 'undefined') return
-  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
-  if (!token) {
-    document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=; Max-Age=0; Path=/; SameSite=Lax${secure}`
-    return
-  }
-  document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`
-}
-
 interface User {
   id: string
   email: string
   username: string
   is_superuser: boolean
+  is_email_verified?: boolean
 }
 
 interface AuthState {
@@ -61,7 +50,6 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true
           })
-          setAccessTokenCookie(response.access_token)
         } catch (error) {
           console.error('[Auth] Login failed:', error)
           throw error
@@ -81,7 +69,6 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true
           })
-          setAccessTokenCookie(response.access_token)
         } catch (error) {
           console.error('[Auth] Register failed:', error)
           throw error
@@ -90,12 +77,15 @@ export const useAuthStore = create<AuthState>()(
       
       // 登出
       logout: () => {
+        void authHttp.post<void>('/logout').catch((error) => {
+          console.warn('[Auth] Logout request failed:', error)
+        })
+
         set({
           accessToken: null,
           user: null,
           isAuthenticated: false
         })
-        setAccessTokenCookie(null)
         
         // 清除持久化数据
         localStorage.removeItem('auth-storage')
@@ -104,18 +94,12 @@ export const useAuthStore = create<AuthState>()(
       // 刷新 token
       refreshToken: async () => {
         try {
-          const currentToken = get().accessToken
-          if (!currentToken) {
-            throw new Error('No token to refresh')
-          }
-          
-          // 使用当前 token 刷新（后端会验证并返回新 token）
+          // 通过 HttpOnly refresh cookie 刷新
           const response = await authHttp.post<{
             access_token: string
           }>('/refresh')
           
-          set({ accessToken: response.access_token })
-          setAccessTokenCookie(response.access_token)
+          set({ accessToken: response.access_token, isAuthenticated: true })
         } catch (error) {
           console.error('[Auth] Token refresh failed:', error)
           // 刷新失败，清除状态
@@ -127,7 +111,6 @@ export const useAuthStore = create<AuthState>()(
       // 设置 token
       setAccessToken: (token: string) => {
         set({ accessToken: token })
-        setAccessTokenCookie(token)
       },
       
       // 设置用户信息
@@ -137,15 +120,20 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // 持久化用户信息和 access token，避免刷新后退回登录页
+      // 仅持久化身份态，不持久化 access token
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
         isAuthenticated: state.isAuthenticated
       }),
-      onRehydrateStorage: () => (state) => {
-        setAccessTokenCookie(state?.accessToken ?? null)
-      },
     }
   )
 )
+
+if (typeof window !== 'undefined') {
+  const state = useAuthStore.getState()
+  if (state.isAuthenticated) {
+    void state.refreshToken().catch(() => {
+      // ignore: refreshToken 内部会执行 logout
+    })
+  }
+}

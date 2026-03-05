@@ -1,8 +1,7 @@
-"""
-认证 API
-"""
+"""Auth API."""
+
 from fastapi import APIRouter
-from . import login, register, refresh
+from . import login, logout, password_reset, refresh, register, verify_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -10,6 +9,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 router.include_router(login.router)
 router.include_router(register.router)
 router.include_router(refresh.router)
+router.include_router(logout.router)
+router.include_router(verify_email.router)
+router.include_router(password_reset.router)
 
 __all__ = ["router"]
-

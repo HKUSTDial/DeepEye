@@ -22,7 +22,30 @@ export interface AuthResponse {
     email: string
     username: string
     is_superuser: boolean
+    is_email_verified: boolean
   }
+}
+
+export interface GenericMessageResponse {
+  message: string
+  debug_token?: string | null
+}
+
+export interface VerifyEmailRequest {
+  email: string
+}
+
+export interface VerifyEmailConfirmRequest {
+  token: string
+}
+
+export interface PasswordResetRequest {
+  email: string
+}
+
+export interface PasswordResetConfirmRequest {
+  token: string
+  new_password: string
 }
 
 export const authApi = {
@@ -45,6 +68,25 @@ export const authApi = {
    */
   refresh: () => {
     return authHttp.post<{ access_token: string; token_type: string }>('/refresh')
+  },
+
+  logout: () => {
+    return authHttp.post<void>('/logout')
+  },
+
+  requestEmailVerification: (data: VerifyEmailRequest) => {
+    return authHttp.post<GenericMessageResponse>('/verify-email/request', data)
+  },
+
+  confirmEmailVerification: (data: VerifyEmailConfirmRequest) => {
+    return authHttp.post<GenericMessageResponse>('/verify-email/confirm', data)
+  },
+
+  requestPasswordReset: (data: PasswordResetRequest) => {
+    return authHttp.post<GenericMessageResponse>('/password-reset/request', data)
+  },
+
+  confirmPasswordReset: (data: PasswordResetConfirmRequest) => {
+    return authHttp.post<GenericMessageResponse>('/password-reset/confirm', data)
   }
 }
-

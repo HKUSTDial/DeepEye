@@ -44,6 +44,12 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="DeepEye API", version="0.1.0", lifespan=lifespan)
 
+_cors_origins = [str(origin).rstrip("/") for origin in settings.BACKEND_CORS_ORIGINS]
+_cors_origins = [origin for origin in _cors_origins if origin != "*"]
+if not _cors_origins:
+    _cors_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    logger.warning("BACKEND_CORS_ORIGINS contains wildcard or is empty. Falling back to localhost origins.")
+
 # ⭐ 全局鉴权中间件
 # 注意：在 FastAPI 中，后添加的中间件会包裹在先添加的中间件“外面”。
 # 我们希望 CORS 在最外层，所以先添加业务中间件，后添加 CORS 中间件。
@@ -52,7 +58,7 @@ app.middleware("http")(auth_middleware)
 # CORS 中间件 (最外层)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,10 +72,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "detail": "Internal server error",
-            "error": str(exc)
-        }
+        content={"detail": "Internal server error"},
     )
 
 
@@ -101,4 +104,3 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
-

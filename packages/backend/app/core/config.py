@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Literal, Union
 from pathlib import Path
 from pydantic import AnyHttpUrl, computed_field, PostgresDsn, RedisDsn, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[Union[str, AnyHttpUrl]] = ["*"]
+    BACKEND_CORS_ORIGINS: List[Union[str, AnyHttpUrl]] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     # --- Internal Service Defaults (Not typically user-configurable) ---
     
@@ -125,6 +128,23 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Access token 有效期（分钟）
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7      # Refresh token 有效期（天）
+    AUTH_LOGIN_MAX_ATTEMPTS: int = 8
+    AUTH_LOGIN_WINDOW_SECONDS: int = 300
+    ACCESS_TOKEN_COOKIE_NAME: str = "deepeye_access_token"
+    REFRESH_TOKEN_COOKIE_NAME: str = "deepeye_refresh_token"
+    AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
+    AUTH_COOKIE_SECURE: bool = False
+    EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = 24 * 60
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+    REQUIRE_EMAIL_VERIFICATION: bool = False
+    AUTH_FRONTEND_BASE_URL: str = "http://localhost:5173"
+    AUTH_DEBUG_RETURN_ACTION_TOKEN: bool = False
+    AUTH_SMTP_HOST: str | None = None
+    AUTH_SMTP_PORT: int = 587
+    AUTH_SMTP_USERNAME: str | None = None
+    AUTH_SMTP_PASSWORD: str | None = None
+    AUTH_SMTP_USE_TLS: bool = True
+    AUTH_EMAIL_FROM: str | None = None
     # Escape hatch for local development only.
     ALLOW_INSECURE_DEFAULTS: bool = False
     # Backward-compatibility escape hatch for legacy SSE clients using `?token=`.
@@ -186,6 +206,12 @@ class Settings(BaseSettings):
         ) or len(jwt_secret) < 32:
             raise ValueError(
                 "Insecure JWT_SECRET_KEY. Use at least 32 random characters "
+                "or set ALLOW_INSECURE_DEFAULTS=true for local development."
+            )
+
+        if self.AUTH_COOKIE_SAMESITE == "none" and not self.AUTH_COOKIE_SECURE:
+            raise ValueError(
+                "AUTH_COOKIE_SAMESITE=none requires AUTH_COOKIE_SECURE=true "
                 "or set ALLOW_INSECURE_DEFAULTS=true for local development."
             )
 

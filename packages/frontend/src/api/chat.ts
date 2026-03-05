@@ -11,6 +11,6 @@ export const chatApi = {
       window.location.origin
     )
     // Auth uses cookie/header; avoid leaking token via URL query.
-    return new EventSource(url)
+    return new EventSource(url, { withCredentials: true })
   },
 }

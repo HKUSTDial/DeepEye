@@ -24,9 +24,6 @@ PUBLIC_EXACT_PATHS = [
     "/",
     "/health",
 ]
-COOKIE_ACCESS_TOKEN_KEY = "deepeye_access_token"
-
-
 def is_public_path(path: str) -> bool:
     """
     判断是否为公开路径
@@ -95,7 +92,7 @@ async def auth_middleware(request: Request, call_next):
     # 2. 验证 Authorization header / cookie
     auth_header = request.headers.get("Authorization")
     if not auth_header:
-        token_cookie = request.cookies.get(COOKIE_ACCESS_TOKEN_KEY)
+        token_cookie = request.cookies.get(settings.ACCESS_TOKEN_COOKIE_NAME)
         if token_cookie:
             auth_header = f"Bearer {token_cookie}"
     if (

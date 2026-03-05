@@ -85,6 +85,7 @@ async function request<T>(
       method,
       headers,
       body,
+      credentials: 'include',
       signal: controller.signal,
     })
 
@@ -105,6 +106,7 @@ async function request<T>(
             method,
             headers,
             body,
+            credentials: 'include',
             signal: controller.signal,
           })
         }
@@ -183,6 +185,7 @@ async function requestResponse(
       method,
       headers,
       body,
+      credentials: 'include',
       signal: controller.signal,
     })
 
@@ -198,6 +201,7 @@ async function requestResponse(
             method,
             headers,
             body,
+            credentials: 'include',
             signal: controller.signal,
           })
         }
@@ -244,10 +248,18 @@ async function authRequest<T>(
   const timeoutId = setTimeout(() => controller.abort(), config.api.timeout)
 
   try {
+    const headers: Record<string, string> = { ...options.headers }
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json'
+    }
+
     const res = await fetch(`${AUTH_BASE}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      headers,
+      body: options.body instanceof FormData
+        ? options.body
+        : (options.body ? JSON.stringify(options.body) : undefined),
+      credentials: 'include',
       signal: controller.signal,
     })
 

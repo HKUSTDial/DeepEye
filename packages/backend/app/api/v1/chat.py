@@ -2,15 +2,18 @@
 
 import json
 import asyncio
+import uuid
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.deps import CurrentUserId
 from app.db.session import get_db
+from app.repositories import SessionRepository
 from app.schemas import ChatRequest, SSEMessage
 from app.services import get_or_create_session, start_agent_workflow
 
@@ -18,14 +21,23 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 @router.post("")
-async def start_chat(request: ChatRequest, db: Session = Depends(get_db)):
+async def start_chat(
+    request: ChatRequest,
+    user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+):
     """Start chat in an existing session."""
-    # Session should be created via POST /api/sessions before sending messages
-    # For backwards compatibility, still call get_or_create_session
-    if request.session_id == "current":
-        from deepeye.utils.logger import logger
-        logger.warning("[chat] Received session_id='current' in ChatRequest")
-    _, session_id = get_or_create_session(db, request.session_id, request.message)
+    session_id_value = request.session_id
+    if session_id_value == "current":
+        session_id_value = None
+
+    try:
+        _, session_id = get_or_create_session(db, user_id, session_id_value, request.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
     # user_message is persisted in agent_tasks.py before agent runs
     task_id = start_agent_workflow(
         session_id, 
@@ -79,8 +91,20 @@ async def _event_generator(session_id: str) -> AsyncGenerator[str, None]:
 
 
 @router.get("/{session_id}/stream")
-async def stream_chat(session_id: str):
+async def stream_chat(
+    session_id: str,
+    user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+):
     """SSE endpoint for real-time agent events."""
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid session_id") from exc
+
+    if not SessionRepository(db).get_by_id_and_user(session_uuid, user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
     return StreamingResponse(
         _event_generator(session_id),
         media_type="text/event-stream",

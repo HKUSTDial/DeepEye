@@ -19,7 +19,7 @@ type KnowledgeBaseSearchResult = {
   content: string
 }
 
-const authHeaders = () => {
+const authHeaders = (): Record<string, string> => {
   const token = useAuthStore.getState().accessToken
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
@@ -28,6 +28,7 @@ export const knowledgeBasesApi = {
   list: async (): Promise<KnowledgeBase[]> => {
     const res = await fetch(`${API_BASE}/knowledge-bases`, {
       headers: { ...authHeaders() },
+      credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, 'Failed to load knowledge bases')
     return res.json()
@@ -35,6 +36,7 @@ export const knowledgeBasesApi = {
   get: async (id: string): Promise<KnowledgeBase> => {
     const res = await fetch(`${API_BASE}/knowledge-bases/${id}`, {
       headers: { ...authHeaders() },
+      credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, 'Failed to load knowledge base')
     return res.json()
@@ -44,6 +46,7 @@ export const knowledgeBasesApi = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(payload),
+      credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, 'Failed to create knowledge base')
     return res.json()
@@ -53,6 +56,7 @@ export const knowledgeBasesApi = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(payload),
+      credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, 'Failed to update knowledge base')
     return res.json()
@@ -61,6 +65,7 @@ export const knowledgeBasesApi = {
     const res = await fetch(`${API_BASE}/knowledge-bases/${id}`, {
       method: 'DELETE',
       headers: { ...authHeaders() },
+      credentials: 'include',
     })
     if (!res.ok && res.status !== 204) {
       throw new ApiError(res.status, 'Failed to delete knowledge base')
@@ -69,6 +74,7 @@ export const knowledgeBasesApi = {
   listFiles: async (kbId: string): Promise<KnowledgeBaseFile[]> => {
     const res = await fetch(`${API_BASE}/knowledge-bases/${kbId}/files`, {
       headers: { ...authHeaders() },
+      credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, 'Failed to load files')
     return res.json()
@@ -80,6 +86,7 @@ export const knowledgeBasesApi = {
       method: 'POST',
       headers: { ...authHeaders() },
       body: form,
+      credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, 'Failed to upload file')
     return res.json()
@@ -88,6 +95,7 @@ export const knowledgeBasesApi = {
     const res = await fetch(`${API_BASE}/knowledge-bases/${kbId}/files/${fileId}`, {
       method: 'DELETE',
       headers: { ...authHeaders() },
+      credentials: 'include',
     })
     if (!res.ok && res.status !== 204) {
       throw new ApiError(res.status, 'Failed to delete file')
@@ -98,6 +106,7 @@ export const knowledgeBasesApi = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ query, top_k: topK }),
+      credentials: 'include',
     })
     if (!res.ok) throw new ApiError(res.status, 'Search failed')
     return res.json()

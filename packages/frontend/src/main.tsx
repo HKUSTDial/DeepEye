@@ -5,7 +5,16 @@ import './index.css'
 import './styles/light-theme.css'
 import './styles/dark-theme.css'
 import App from './App'
-import { Login, Register, WorkflowsNew, KnowledgeBases, KnowledgeBaseDetail } from './pages'
+import {
+  ForgotPassword,
+  KnowledgeBaseDetail,
+  KnowledgeBases,
+  Login,
+  Register,
+  ResetPassword,
+  VerifyEmail,
+  WorkflowsNew,
+} from './pages'
 import ProtectedRoute from './components/ProtectedRoute'
 import { initTheme } from './hooks/useTheme'
 
@@ -17,6 +26,9 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route
           path="/workflows"
           element={

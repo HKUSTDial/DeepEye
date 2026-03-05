@@ -26,8 +26,8 @@ export default function Register() {
       return
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
       return
     }
 
@@ -36,11 +36,16 @@ export default function Register() {
       return
     }
 
+    if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setError('Password must include uppercase, lowercase, digit, and special character')
+      return
+    }
+
     setIsLoading(true)
 
     try {
       await register(email, username, password)
-      navigate('/')  // 注册成功，跳转到主页
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -109,10 +114,10 @@ export default function Register() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
               maxLength={64}
               className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--main-text)] placeholder-[var(--main-text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
-              placeholder="At least 6 characters"
+              placeholder="8-64 chars with mixed complexity"
               disabled={isLoading}
             />
           </div>
@@ -127,7 +132,7 @@ export default function Register() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
               maxLength={64}
               className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-[var(--main-text)] placeholder-[var(--main-text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors"
               placeholder="Re-enter your password"
