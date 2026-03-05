@@ -1,9 +1,12 @@
 import pandas as pd
 import numpy as np
 import json
+import logging
 import re
 from typing import Any, Dict, List, Union
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 
 # 自定义JSON编码器以处理pandas的Timestamp对象
@@ -73,16 +76,16 @@ class DatasetContextGenerator:
                 # 首先尝试 UTF-8 编码，保持原始列名
                 df = pd.read_csv(data)
                 # 输出读取到的列名，用于调试
-                print(f"读取到的CSV列名: {df.columns.tolist()}")
+                logger.info("CSV columns read with utf-8: %s", df.columns.tolist())
             except UnicodeDecodeError:
                 # 如果 UTF-8 失败，尝试 latin1 编码
-                print(f"UTF-8 编码失败，尝试使用 latin1 编码读取文件: {data}")
+                logger.warning("UTF-8 decode failed, retry with latin1: %s", data)
                 df = pd.read_csv(data, encoding='latin1')
-                print(f"使用latin1编码读取到的CSV列名: {df.columns.tolist()}")
+                logger.info("CSV columns read with latin1: %s", df.columns.tolist())
             
             # 打印实际行数和列数
-            print(f"数据集 {file_name} 实际行数: {len(df)}, 列数: {len(df.columns)}")
-            print(f"数据集列名: {df.columns.tolist()}")
+            logger.info("Dataset %s rows=%d cols=%d", file_name, len(df), len(df.columns))
+            logger.debug("Dataset columns: %s", df.columns.tolist())
             
         else:
             df = data
@@ -205,10 +208,10 @@ class DatasetContextGenerator:
                 try:
                     # 尝试转换为datetime，保留原始列名
                     df[col] = pd.to_datetime(df[col])
-                    print(f"列 {col} 已成功转换为日期类型")
+                    logger.info("Column %s converted to datetime", col)
                 except Exception as e:
                     # 转换失败就保持原样
-                    print(f"列 {col} 无法转换为日期类型: {str(e)}")
+                    logger.debug("Column %s failed datetime conversion: %s", col, str(e))
                     pass
         
         return df
@@ -311,19 +314,19 @@ class DatasetContextGenerator:
                 elif isinstance(response, dict):
                     return response.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 else:
-                    print(f"未知的响应类型: {type(response)}")
-                    print(f"响应内容: {response}")
+                    logger.warning("Unknown OpenAI response type: %s", type(response))
+                    logger.debug("OpenAI response payload: %s", response)
                     return str(response)
                 
             except Exception as api_error:
-                print(f"API 调用错误: {str(api_error)}")
+                logger.error("OpenAI API call error: %s", str(api_error))
                 if hasattr(api_error, 'response'):
-                    print(f"响应状态码: {api_error.response.status_code}")
-                    print(f"响应内容: {api_error.response.text}")
+                    logger.error("OpenAI response status=%s", api_error.response.status_code)
+                    logger.error("OpenAI response body=%s", api_error.response.text)
                 raise
             
-        except Exception as e:
-            print(f"API 调用完全失败: {str(e)}")
+        except Exception:
+            logger.exception("OpenAI API call failed")
             raise
 
     def _parse_json(self, text: str, default: dict) -> dict:
@@ -362,7 +365,7 @@ class DatasetContextGenerator:
                     }
                     continue  # 如果是日期类型，跳过后续的分析
                 except Exception as e:
-                    print(f"处理日期列 {col} 时出错: {str(e)}")
+                    logger.debug("Failed processing datetime column %s: %s", col, str(e))
                     # 如果转换失败，则当作普通列处理
                     pass
             

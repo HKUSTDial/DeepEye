@@ -1,10 +1,12 @@
 # pipeline.py
 import json
+import logging
 import re
 import os
 import io
 from pathlib import Path
 from typing import Any
+from collections.abc import Callable
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -13,6 +15,8 @@ from jinja2 import Template
 from openai import OpenAI
 from .utils import execute_python_code
 
+logger = logging.getLogger(__name__)
+
 # --- Dependency Check (Storyteller) ---
 try:
     from .DatasetContextGenerator import DatasetContextGenerator
@@ -20,7 +24,7 @@ try:
     HAS_CONTEXT_GEN = True
 except ImportError:
     HAS_CONTEXT_GEN = False
-    print("⚠️ Storyteller library not found. Using simple metadata generation mode.")
+    logger.warning("Storyteller library not found. Using simple metadata generation mode.")
 
 
 class AutoReportPipeline:
@@ -31,11 +35,13 @@ class AutoReportPipeline:
         model_name: str = "gpt-4o",
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        progress_callback: Callable[[str], None] | None = None,
     ):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.progress_callback = progress_callback
 
         if HAS_CONTEXT_GEN:
             self.ds_generator = DatasetContextGenerator(
@@ -45,6 +51,14 @@ class AutoReportPipeline:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
+
+    def _emit(self, message: str) -> None:
+        text = str(message).strip()
+        if not text:
+            return
+        logger.info(text)
+        if self.progress_callback:
+            self.progress_callback(text)
 
     # --- Helper: LLM Call Wrapper ---
     def _call_llm(self, prompt: str, json_mode=False) -> str:
@@ -70,11 +84,11 @@ class AutoReportPipeline:
 
     # --- Step 1: Generate Data Context (Multi-Table Support) ---
     def generate_multi_table_context(self, dfs: Dict[str, pd.DataFrame]) -> str:
-        print("🔍 [1/7] Generating dataset context...")
+        self._emit("🔍 [1/7] Generating dataset context...")
         full_context_str = ""
 
         for name, df in dfs.items():
-            print(f"   -> Analyzing table: {name}")
+            self._emit(f"   -> Analyzing table: {name}")
             if HAS_CONTEXT_GEN:
                 ctx = self.ds_generator.generate_context(
                     data=df,
@@ -97,7 +111,7 @@ class AutoReportPipeline:
     # --- Step 2: Deep Mining (EDA) ---
         # --- Step 2: Deep Mining (EDA) ---
     def perform_deep_analysis(self, dfs: Dict[str, pd.DataFrame], context_str: str,query: str) -> str:
-        print("🕵️ [2/7] Performing deep exploratory analysis (EDA)...")
+        self._emit("🕵️ [2/7] Performing deep exploratory analysis (EDA)...")
 
         # 1. 构建更清晰的 Prompt，强制要求遍历和打印
         # 新增：加入 User Query 上下文
@@ -143,14 +157,14 @@ class AutoReportPipeline:
         # 4. 结果处理与调试信息
         if result['success']:
             if not result['text'].strip():
-                print("   ⚠️ Mining executed but produced NO OUTPUT. Check Prompt Logic.")
+                self._emit("   ⚠️ Mining executed but produced NO OUTPUT. Check Prompt Logic.")
                 return "No analysis output generated."
 
             #print("   ✅ Mining successful. Output preview:")
             #print(result['text'][:300] + "...\n(Truncated)")
             return result['text']
         else:
-            print(f"   ⚠️ Mining failed: {result['error']}")
+            self._emit(f"   ⚠️ Mining failed: {result['error']}")
             # 兜底返回基础信息
             fallback = []
             for k, v in dfs.items():
@@ -161,7 +175,7 @@ class AutoReportPipeline:
         # --- Step 3: Dynamic KPIs (Fixing "All arrays must be of the same length" error) ---
         # --- Step 3: Dynamic KPIs (Fixing "All arrays must be of the same length" error) ---
     def generate_kpis(self, dfs: Dict[str, pd.DataFrame], context_str: str,query: str) -> List[Dict]:
-        print("📊 [3/7] Calculating key business indicators (KPI)...")
+        self._emit("📊 [3/7] Calculating key business indicators (KPI)...")
         #print(context_str)
         #print(list(dfs.keys()))
         prompt = f"""
@@ -225,12 +239,12 @@ class AutoReportPipeline:
                 raise ValueError("No kpi_results variable found")
             return results
         except Exception as e:
-            print(f"   ❌ KPI Calculation Error: {e}, using default values")
+            self._emit(f"   ❌ KPI Calculation Error: {e}, using default values")
             return [{"label": "Tables Loaded", "value": str(len(dfs)), "trend_color": "blue"}]
 
         # --- Step 4: Plan and Plot ---
     def analyze_and_plot(self, dfs: Dict[str, pd.DataFrame], query: str, context_str: str) -> List[Dict]:
-        print("📈 [4/7] Planning and generating visual charts...")
+        self._emit("📈 [4/7] Planning and generating visual charts...")
 
         # 1. Planning Phase
         plan_prompt = f"""
@@ -248,7 +262,7 @@ class AutoReportPipeline:
         try:
             plan_json = json.loads(self._call_llm(plan_prompt, json_mode=True))
         except Exception:
-            print("   ⚠️ Plan parsing failed")
+            self._emit("   ⚠️ Plan parsing failed")
             return []
 
         # === 关键修复：预先提取所有表的列名 ===
@@ -259,7 +273,7 @@ class AutoReportPipeline:
 
         results = []
         for section in plan_json.get('sections', []):
-            print(f"   -> Processing Section: {section['title']}")
+            self._emit(f"   -> Processing Section: {section['title']}")
 
             # 2. Plotting Phase
             code_prompt = f"""
@@ -306,13 +320,13 @@ class AutoReportPipeline:
                     try:
                         chart_html = exec_res['fig'].to_html(full_html=False, include_plotlyjs='cdn')
                     except TypeError as e:
-                        print(f"      ❌ Serialization Error (Period/Type issue): {e}")
+                        self._emit(f"      ❌ Serialization Error (Period/Type issue): {e}")
                         chart_html = f"<div class='alert alert-danger'>Chart Rendering Error: Data contains non-serializable types.<br>{e}</div>"
 
                 if exec_res['text']:
                     stats_data = exec_res['text'].strip()
             else:
-                print(f"      ⚠️ Code Execution Failed: {exec_res.get('error')}")
+                self._emit(f"      ⚠️ Code Execution Failed: {exec_res.get('error')}")
 
             # 3. Insight Generation Phase
             insight_prompt = f"""
@@ -334,7 +348,7 @@ class AutoReportPipeline:
     def render_html(self, kpis: List[Dict], analysis_results: List[Dict],
                     summary: str, conclusion: str, title: str,
                     output_file: str, template_name: str):
-        print(f"🎨 [6/7] Rendering final HTML report using {template_name}...")
+        self._emit(f"🎨 [6/7] Rendering final HTML report using {template_name}...")
 
         template_path = Path(__file__).resolve().parent / "templates" / template_name
         if not template_path.exists():
@@ -360,13 +374,13 @@ class AutoReportPipeline:
 
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_out)
-        print(f"✅ [7/7] Report saved to: {output_file}")
+        self._emit(f"✅ [7/7] Report saved to: {output_file}")
 
     # --- Main Entry ---
     def run(self, csv_paths: List[str], user_query: str, template_name: str, output_file="final_report.html"):
         # 0. Load Data into Dictionary
         dfs = {}
-        print("📂 [0/7] Loading and parsing data files...")
+        self._emit("📂 [0/7] Loading and parsing data files...")
 
         for path in csv_paths:
             if os.path.exists(path):
@@ -374,14 +388,14 @@ class AutoReportPipeline:
                 try:
                     df_temp = pd.read_csv(path)
                     dfs[file_name] = df_temp
-                    print(f"   - Loaded table: '{file_name}' ({len(df_temp)} rows)")
+                    self._emit(f"   - Loaded table: '{file_name}' ({len(df_temp)} rows)")
                 except Exception as e:
-                    print(f"   ❌ Error loading {path}: {e}")
+                    self._emit(f"   ❌ Error loading {path}: {e}")
             else:
-                print(f"   ❌ File not found: {path}")
+                self._emit(f"   ❌ File not found: {path}")
 
         if not dfs:
-            print("❌ No valid data loaded.")
+            self._emit("❌ No valid data loaded.")
             return
 
         # 1. Generate Context
@@ -409,7 +423,7 @@ class AutoReportPipeline:
         [Data Source]:
         {mining_text}
                 """
-        print("✍️ [5/7] Writing analysis summary and conclusions...")
+        self._emit("✍️ [5/7] Writing analysis summary and conclusions...")
         summary = self._call_llm(summary_prompt)
 
         conclusion_prompt = f"""

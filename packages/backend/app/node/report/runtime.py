@@ -10,10 +10,8 @@ import tempfile
 import threading
 import traceback
 from collections.abc import Coroutine
-from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 from app.core.config import get_report_session_root, settings
 from app.sandbox.manager import SandboxManager
@@ -23,32 +21,6 @@ from .report_module.pipeline import AutoReportPipeline
 logger = logging.getLogger(__name__)
 
 _ALLOWED_TEMPLATES = frozenset({"template_0.html", "template_1.html"})
-_PIPELINE_EXEC_LOCK = threading.Lock()
-
-
-class _LineForwarder:
-    """Forward non-empty stdout lines to a callback."""
-
-    def __init__(self, on_line: Callable[[str], None]) -> None:
-        self._on_line = on_line
-        self._buffer = ""
-
-    def write(self, text: str) -> int:
-        if not text:
-            return 0
-        self._buffer += text
-        while "\n" in self._buffer:
-            line, self._buffer = self._buffer.split("\n", 1)
-            line = line.rstrip("\r")
-            if line.strip():
-                self._on_line(line)
-        return len(text)
-
-    def flush(self) -> None:
-        line = self._buffer.rstrip("\r")
-        if line.strip():
-            self._on_line(line)
-        self._buffer = ""
 
 
 def create_report_temp_dir(session_id: str | None, prefix: str = "deepeye_report_") -> str:
@@ -134,24 +106,20 @@ def run_report_pipeline(
 
     logger.info("[ReportRuntime] Starting report generation, output path: %s", out_path)
     try:
-        # Pipeline uses stdout for progress; lock avoids cross-session stdout conflicts.
-        with _PIPELINE_EXEC_LOCK:
-            forwarder = _LineForwarder(_push_step)
-            with redirect_stdout(forwarder):
-                pipeline = AutoReportPipeline(
-                    api_key=settings.LLM_API_KEY,
-                    base_url=settings.LLM_BASE_URL,
-                    model_name=settings.LLM_MODEL,
-                    temperature=settings.LLM_TEMPERATURE,
-                    max_tokens=settings.LLM_MAX_TOKENS,
-                )
-                pipeline.run(
-                    csv_paths=csv_paths,
-                    user_query=user_query,
-                    template_name=selected_template,
-                    output_file=out_path,
-                )
-            forwarder.flush()
+        pipeline = AutoReportPipeline(
+            api_key=settings.LLM_API_KEY,
+            base_url=settings.LLM_BASE_URL,
+            model_name=settings.LLM_MODEL,
+            temperature=settings.LLM_TEMPERATURE,
+            max_tokens=settings.LLM_MAX_TOKENS,
+            progress_callback=_push_step,
+        )
+        pipeline.run(
+            csv_paths=csv_paths,
+            user_query=user_query,
+            template_name=selected_template,
+            output_file=out_path,
+        )
 
         logger.info("[ReportRuntime] Pipeline completed, checking output file: %s", out_path)
     except Exception as exc:
