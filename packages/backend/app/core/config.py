@@ -1,6 +1,6 @@
 from typing import List, Union
 from pathlib import Path
-from pydantic import AnyHttpUrl, computed_field, PostgresDsn, RedisDsn
+from pydantic import AnyHttpUrl, computed_field, PostgresDsn, RedisDsn, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 import re
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # Database (System)
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_PASSWORD: str = "change-me-postgres-password"
     POSTGRES_HOST: str = "postgres"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "deepeye"
@@ -85,8 +85,8 @@ class Settings(BaseSettings):
     
     # MinIO Configuration
     MINIO_ENDPOINT: str = "minio:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
+    MINIO_ACCESS_KEY: str = "change-me-minio-access-key"
+    MINIO_SECRET_KEY: str = "change-me-minio-secret-key"
     MINIO_SECURE: bool = False
     MINIO_SANDBOX_BUCKET: str = "deepeye-sandboxes"  # Auto-build image if not exists
     MINIO_KB_BUCKET: str = "deepeye-knowledge"
@@ -121,10 +121,14 @@ class Settings(BaseSettings):
     VIDEO_PREVIEW_AUTO_BUILD: bool = True
 
     # JWT Authentication
-    JWT_SECRET_KEY: str = "your-secret-key-change-this-in-production"  # ⚠️ 生产环境必须修改
+    JWT_SECRET_KEY: str = "change-me-jwt-secret-key-at-least-32-chars"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Access token 有效期（分钟）
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7      # Refresh token 有效期（天）
+    # Escape hatch for local development only.
+    ALLOW_INSECURE_DEFAULTS: bool = False
+    # Backward-compatibility escape hatch for legacy SSE clients using `?token=`.
+    ALLOW_QUERY_TOKEN_FOR_STREAM: bool = False
     
     model_config = SettingsConfigDict(
         env_file=".env", 
@@ -132,6 +136,60 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def validate_sensitive_settings(self):
+        if self.ALLOW_INSECURE_DEFAULTS:
+            return self
+
+        def _looks_insecure(value: str, blocked_tokens: set[str]) -> bool:
+            normalized = (value or "").strip().lower()
+            if not normalized:
+                return True
+            if normalized in blocked_tokens:
+                return True
+            if "change-me" in normalized or "replace-with" in normalized:
+                return True
+            return False
+
+        if _looks_insecure(
+            self.POSTGRES_PASSWORD,
+            {"postgres", "password", "123456", "postgres123"},
+        ):
+            raise ValueError(
+                "Insecure POSTGRES_PASSWORD. Set a strong value in .env "
+                "or use ALLOW_INSECURE_DEFAULTS=true for local development."
+            )
+
+        if _looks_insecure(
+            self.MINIO_ACCESS_KEY,
+            {"minioadmin", "admin", "minio"},
+        ):
+            raise ValueError(
+                "Insecure MINIO_ACCESS_KEY. Set a strong value in .env "
+                "or use ALLOW_INSECURE_DEFAULTS=true for local development."
+            )
+
+        if _looks_insecure(
+            self.MINIO_SECRET_KEY,
+            {"minioadmin", "password", "123456"},
+        ):
+            raise ValueError(
+                "Insecure MINIO_SECRET_KEY. Set a strong value in .env "
+                "or use ALLOW_INSECURE_DEFAULTS=true for local development."
+            )
+
+        jwt_secret = (self.JWT_SECRET_KEY or "").strip()
+        if _looks_insecure(
+            jwt_secret,
+            {"your-secret-key-change-this-in-production", "secret", "jwt-secret"},
+        ) or len(jwt_secret) < 32:
+            raise ValueError(
+                "Insecure JWT_SECRET_KEY. Use at least 32 random characters "
+                "or set ALLOW_INSECURE_DEFAULTS=true for local development."
+            )
+
+        return self
 
 settings = Settings()
 

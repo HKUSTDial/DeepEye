@@ -38,14 +38,10 @@ function withPreviewAuthQuery(src: string): string {
   if (typeof window === 'undefined') return src
   try {
     const page = new URL(window.location.href)
-    const token = page.searchParams.get('token')
     const sessionId = page.searchParams.get('session_id')
-    if (!token && !sessionId) return src
+    if (!sessionId) return src
 
     const target = new URL(src, window.location.origin)
-    if (token && !target.searchParams.get('token')) {
-      target.searchParams.set('token', token)
-    }
     if (sessionId && !target.searchParams.get('session_id')) {
       target.searchParams.set('session_id', sessionId)
     }

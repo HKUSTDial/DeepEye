@@ -3,7 +3,6 @@
  */
 
 import { http } from './client'
-import { useAuthStore } from '../stores/auth'
 
 export interface VideoConfig {
   meta: {
@@ -33,13 +32,6 @@ function withSessionQuery(url: string, sessionId?: string | null): string {
   if (!sessionId) return url
   const sep = url.includes('?') ? '&' : '?'
   return `${url}${sep}session_id=${encodeURIComponent(sessionId)}`
-}
-
-function withTokenQuery(url: string): string {
-  const token = useAuthStore.getState().accessToken
-  if (!token) return url
-  const sep = url.includes('?') ? '&' : '?'
-  return `${url}${sep}token=${encodeURIComponent(token)}`
 }
 
 function requireSessionId(sessionId?: string | null): string {
@@ -103,11 +95,9 @@ export function extractVideoOutputParams(outputs: Record<string, unknown>): {
   return {}
 }
 
-/** Authenticated video audio URL for <Audio src>, carries token via query for browser media requests. */
+/** Authenticated video audio URL for <Audio src>, session-scoped. */
 export function getAudioFileUrl(filename: string, sessionId?: string | null): string {
-  const path = withTokenQuery(
-    withSessionQuery(`/api/v1/video/audio/${encodeURIComponent(filename)}`, sessionId),
-  )
+  const path = withSessionQuery(`/api/v1/video/audio/${encodeURIComponent(filename)}`, sessionId)
   if (typeof window !== 'undefined' && path.startsWith('/')) {
     return `${window.location.origin}${path}`
   }
@@ -133,13 +123,11 @@ export async function getVideoComponentRegistry(
   }
 }
 
-/** 获取动态组件 TSX 源码的 URL（鉴权：token query + session scope） */
+/** 获取动态组件 TSX 源码的 URL（鉴权：cookie/header + session scope） */
 export function getVideoComponentFileUrl(taskId: string, filename: string, sessionId?: string | null): string {
-  return withTokenQuery(
-    withSessionQuery(
-      `/api/v1/video/components/${encodeURIComponent(taskId)}/${encodeURIComponent(filename)}`,
-      sessionId,
-    ),
+  return withSessionQuery(
+    `/api/v1/video/components/${encodeURIComponent(taskId)}/${encodeURIComponent(filename)}`,
+    sessionId,
   )
 }
 

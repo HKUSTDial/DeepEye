@@ -11,8 +11,8 @@ services:
       - .env
     environment:
       # Internal credentials
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       # This variable is read by our custom init script
       - POSTGRES_MULTIPLE_DATABASES=deepeye,deepeye_state
     volumes:
@@ -20,7 +20,7 @@ services:
       # Mount init script to auto-create databases
       - ./docker/scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,8 +29,8 @@ services:
   minio:
     image: minio/minio:latest
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -45,14 +45,14 @@ services:
   school-db:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=school
-      - POSTGRES_PASSWORD=school123
-      - POSTGRES_DB=school_db
+      - POSTGRES_USER=${SCHOOL_DB_USER}
+      - POSTGRES_PASSWORD=${SCHOOL_DB_PASSWORD}
+      - POSTGRES_DB=${SCHOOL_DB_NAME}
     volumes:
       - school_db_data:/var/lib/postgresql/data
       - ./docker/test-db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U school -d school_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${SCHOOL_DB_USER} -d ${SCHOOL_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -62,14 +62,14 @@ services:
   deepeye-db:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=deepeye
-      - POSTGRES_PASSWORD=deepeye123
-      - POSTGRES_DB=deepeye_demo
+      - POSTGRES_USER=${DEEPEYE_DEMO_DB_USER}
+      - POSTGRES_PASSWORD=${DEEPEYE_DEMO_DB_PASSWORD}
+      - POSTGRES_DB=${DEEPEYE_DEMO_DB_NAME}
     volumes:
       - deepeye_db_data:/var/lib/postgresql/data
       - ./docker/test-db/deepeye_dataset_pg.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U deepeye -d deepeye_demo"]
+      test: ["CMD-SHELL", "pg_isready -U ${DEEPEYE_DEMO_DB_USER} -d ${DEEPEYE_DEMO_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5

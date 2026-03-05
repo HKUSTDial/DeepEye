@@ -6,6 +6,18 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authHttp } from '../api/client'
 
+const ACCESS_TOKEN_COOKIE_KEY = 'deepeye_access_token'
+
+function setAccessTokenCookie(token: string | null) {
+  if (typeof document === 'undefined') return
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
+  if (!token) {
+    document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=; Max-Age=0; Path=/; SameSite=Lax${secure}`
+    return
+  }
+  document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`
+}
+
 interface User {
   id: string
   email: string
@@ -49,6 +61,7 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true
           })
+          setAccessTokenCookie(response.access_token)
         } catch (error) {
           console.error('[Auth] Login failed:', error)
           throw error
@@ -68,6 +81,7 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true
           })
+          setAccessTokenCookie(response.access_token)
         } catch (error) {
           console.error('[Auth] Register failed:', error)
           throw error
@@ -81,6 +95,7 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           isAuthenticated: false
         })
+        setAccessTokenCookie(null)
         
         // 清除持久化数据
         localStorage.removeItem('auth-storage')
@@ -100,6 +115,7 @@ export const useAuthStore = create<AuthState>()(
           }>('/refresh')
           
           set({ accessToken: response.access_token })
+          setAccessTokenCookie(response.access_token)
         } catch (error) {
           console.error('[Auth] Token refresh failed:', error)
           // 刷新失败，清除状态
@@ -111,6 +127,7 @@ export const useAuthStore = create<AuthState>()(
       // 设置 token
       setAccessToken: (token: string) => {
         set({ accessToken: token })
+        setAccessTokenCookie(token)
       },
       
       // 设置用户信息
@@ -125,8 +142,10 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         accessToken: state.accessToken,
         isAuthenticated: state.isAuthenticated
-      })
+      }),
+      onRehydrateStorage: () => (state) => {
+        setAccessTokenCookie(state?.accessToken ?? null)
+      },
     }
   )
 )
-

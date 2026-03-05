@@ -2,7 +2,6 @@ import { useCallback, useRef } from 'react'
 import type { Node, Edge } from 'reactflow'
 import { workflowsApi } from '../api'
 import { useWorkflowStore } from '../stores/workflow'
-import { useAuthStore } from '../stores/auth'
 import { API_BASE } from '../api/client'
 import type { Workflow, WorkflowRun } from '../types'
 import { useWorkflowNodesStore, type NodeDef } from '../stores/workflowNodes'
@@ -209,15 +208,11 @@ export function useWorkflow() {
     state.setActiveRun(run)
     
     eventSourceRef.current?.close()
-    const token = useAuthStore.getState().accessToken
     // Support relative paths (e.g. /api/v1) for VITE_API_URL
     const url = new URL(
       `${API_BASE}/workflows/runs/${run.id}/stream`,
       window.location.origin
     )
-    if (token) {
-      url.searchParams.set('token', token)
-    }
     
     const es = new EventSource(url)
     eventSourceRef.current = es

@@ -4,6 +4,7 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 from app.core.auth import verify_token
+from app.core.config import settings
 import uuid
 import logging
 
@@ -23,6 +24,7 @@ PUBLIC_EXACT_PATHS = [
     "/",
     "/health",
 ]
+COOKIE_ACCESS_TOKEN_KEY = "deepeye_access_token"
 
 
 def is_public_path(path: str) -> bool:
@@ -45,6 +47,13 @@ def is_public_path(path: str) -> bool:
             return True
     
     return False
+
+
+def is_stream_path(path: str) -> bool:
+    return (
+        (path.startswith("/api/v1/chat/") and path.endswith("/stream"))
+        or (path.startswith("/api/v1/workflows/runs/") and path.endswith("/stream"))
+    )
 
 
 async def auth_middleware(request: Request, call_next):
@@ -83,10 +92,18 @@ async def auth_middleware(request: Request, call_next):
         logger.debug(f"Public path accessed: {path}")
         return await call_next(request)
     
-    # 2. 验证 Authorization header
+    # 2. 验证 Authorization header / cookie
     auth_header = request.headers.get("Authorization")
     if not auth_header:
-        # EventSource cannot set headers; allow token via query string for stream endpoints.
+        token_cookie = request.cookies.get(COOKIE_ACCESS_TOKEN_KEY)
+        if token_cookie:
+            auth_header = f"Bearer {token_cookie}"
+    if (
+        not auth_header
+        and settings.ALLOW_QUERY_TOKEN_FOR_STREAM
+        and is_stream_path(path)
+    ):
+        # Legacy fallback: EventSource with query token.
         token_param = request.query_params.get("token")
         if token_param:
             auth_header = f"Bearer {token_param}"
