@@ -19,7 +19,7 @@ NODE_MODULES: tuple[str, ...] = (
     "app.node.code.python_code",
     "app.node.dashboard.node",
     "app.node.video.node",
-    "app.node.report_generate",
+    "app.node.report.node",
 )
 
 

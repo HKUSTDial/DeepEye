@@ -2,11 +2,8 @@ import pandas as pd
 import numpy as np
 import json
 import re
-import openai
-import os
-from typing import Dict, Union, List, Optional
+from typing import Any, Dict, List, Union
 from openai import OpenAI
-from datetime import datetime
 
 
 # 自定义JSON编码器以处理pandas的Timestamp对象
@@ -27,7 +24,14 @@ class CustomJSONEncoder(json.JSONEncoder):
 class DatasetContextGenerator:
     """数据集上下文信息生成器"""
     
-    def __init__(self, api_key: str, base_url: str = None):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str | None = None,
+        model_name: str = "gpt-4o",
+        temperature: float = 0.0,
+        max_tokens: int | None = None,
+    ):
         """
         初始化数据集上下文生成器
         参数：
@@ -36,9 +40,13 @@ class DatasetContextGenerator:
         """
         self.api_key = api_key
         self.base_url = base_url
-        openai.api_key = api_key  # 设置 OpenAI API Key
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        client_kwargs: dict[str, Any] = {"api_key": api_key}
         if base_url:
-            openai.api_base = base_url  # 设置 OpenAI API 基础 URL
+            client_kwargs["base_url"] = base_url
+        self.client = OpenAI(**client_kwargs)
 
     def generate_context(
             self,
@@ -280,29 +288,26 @@ class DatasetContextGenerator:
     def _call_openai_api(self, prompt: str) -> str:
         """调用 OpenAI API（兼容新版 API）"""
         try:
-            # 尝试使用新版 API
-            from openai import OpenAI
-            client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url if self.base_url else "https://svip.yi-zhan.top/v1"  # 添加 /v1
-            )
-            
             try:
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
+                request_params: dict[str, Any] = {
+                    "model": self.model_name,
+                    "messages": [
                         {"role": "system", "content": "You are a data analysis expert responsible for generating descriptive summaries of datasets."},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0,
-                    #max_tokens=1000
-                )
+                    "temperature": self.temperature,
+                }
+                if self.max_tokens and self.max_tokens > 0:
+                    request_params["max_tokens"] = self.max_tokens
+
+                response = self.client.chat.completions.create(**request_params)
                 
                 # 处理响应
                 if isinstance(response, str):
                     return response.strip()
                 elif hasattr(response, 'choices'):
-                    return response.choices[0].message.content.strip()
+                    content = response.choices[0].message.content
+                    return content.strip() if content else ""
                 elif isinstance(response, dict):
                     return response.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 else:

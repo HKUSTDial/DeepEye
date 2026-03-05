@@ -18,7 +18,6 @@ from app.services.workflow_file_service import service_run_workflow_from_file
 from app.sandbox import sandbox_manager
 from deepeye.agents import WorkflowAgent
 from deepeye.utils.logger import logger
-from deepeye.workflows.models import Graph
 
 WORKFLOW_DIR = "/workspace/workflow"
 
@@ -349,10 +348,9 @@ def create_generate_data_report_tool(session_id: str, datasources_info: list[dic
         """
         import asyncio
         import shutil
-        import tempfile
 
+        from app.node.report.runtime import create_report_temp_dir, run_report_pipeline
         from app.sandbox.manager import SandboxManager
-        from app.services.report_service import run_report_pipeline
 
         # Collect sandbox CSV paths from selected datasources
         csv_sandbox_paths: list[str] = []
@@ -380,7 +378,7 @@ def create_generate_data_report_tool(session_id: str, datasources_info: list[dic
             return "无法访问沙箱容器，报告生成失败。"
 
         # Download files from sandbox to a host-side temp directory
-        tmp_dir = tempfile.mkdtemp(prefix="deepeye_report_")
+        tmp_dir = create_report_temp_dir(session_id, prefix="deepeye_report_")
         csv_host_paths: list[str] = []
         try:
             for sp in csv_sandbox_paths:

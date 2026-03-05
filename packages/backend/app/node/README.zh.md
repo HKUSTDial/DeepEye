@@ -33,6 +33,10 @@ packages/backend/app/node/
   dashboard/
     node.py              # data.generate_dashboard 节点
     nl2dashboard/        # dashboard 生成内部实现
+  report/
+    node.py              # report.generate 节点
+    runtime.py           # report 运行时编排
+    report_module/       # report 生成内部实现
   video/
     node.py              # video.generator 节点
     config/              # 视频配置生成内部实现
@@ -118,6 +122,7 @@ workflow agent 的提示词由 NodeSpec 自动生成，确保 AI 只使用已注
 Data:
 - `datasource.read`
 - `sql.execute`
+- `report.generate`
 - `data.select_columns`
 - `data.filter_rows`
 - `data.sort_rows`

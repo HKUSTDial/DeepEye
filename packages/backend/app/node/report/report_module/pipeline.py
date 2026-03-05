@@ -3,18 +3,19 @@ import json
 import re
 import os
 import io
+from pathlib import Path
+from typing import Any
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from typing import List, Dict, Union
+from typing import List, Dict
 from jinja2 import Template
 from openai import OpenAI
-from utils import execute_python_code, clean_html
-import config
+from .utils import execute_python_code
 
 # --- Dependency Check (Storyteller) ---
 try:
-    from DatasetContextGenerator import DatasetContextGenerator
+    from .DatasetContextGenerator import DatasetContextGenerator
 
     HAS_CONTEXT_GEN = True
 except ImportError:
@@ -23,24 +24,42 @@ except ImportError:
 
 
 class AutoReportPipeline:
-    def __init__(self, api_key: str, base_url: str):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        model_name: str = "gpt-4o",
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
-        self.model_name = "gpt-4o"
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
 
         if HAS_CONTEXT_GEN:
-            self.ds_generator = DatasetContextGenerator(api_key=api_key, base_url=base_url)
+            self.ds_generator = DatasetContextGenerator(
+                api_key=api_key,
+                base_url=base_url,
+                model_name=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
 
     # --- Helper: LLM Call Wrapper ---
     def _call_llm(self, prompt: str, json_mode=False) -> str:
         messages = [{"role": "system",
                      "content": "You are a Senior Data Analyst expert in Python and Plotly. You must output everything in English."},
                     {"role": "user", "content": prompt}]
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            response_format={"type": "json_object"} if json_mode else None,
-            temperature=0.7
-        )
+        request_params: dict[str, Any] = {
+            "model": self.model_name,
+            "messages": messages,
+            "response_format": {"type": "json_object"} if json_mode else None,
+            "temperature": self.temperature,
+        }
+        if self.max_tokens and self.max_tokens > 0:
+            request_params["max_tokens"] = self.max_tokens
+        response = self.client.chat.completions.create(**request_params)
         return response.choices[0].message.content
 
     def _extract_code(self, text: str) -> str:
@@ -78,7 +97,7 @@ class AutoReportPipeline:
     # --- Step 2: Deep Mining (EDA) ---
         # --- Step 2: Deep Mining (EDA) ---
     def perform_deep_analysis(self, dfs: Dict[str, pd.DataFrame], context_str: str,query: str) -> str:
-        print(f"🕵️ [2/7] Performing deep exploratory analysis (EDA)...")
+        print("🕵️ [2/7] Performing deep exploratory analysis (EDA)...")
 
         # 1. 构建更清晰的 Prompt，强制要求遍历和打印
         # 新增：加入 User Query 上下文
@@ -228,7 +247,7 @@ class AutoReportPipeline:
                 """
         try:
             plan_json = json.loads(self._call_llm(plan_prompt, json_mode=True))
-        except:
+        except Exception:
             print("   ⚠️ Plan parsing failed")
             return []
 
@@ -317,11 +336,11 @@ class AutoReportPipeline:
                     output_file: str, template_name: str):
         print(f"🎨 [6/7] Rendering final HTML report using {template_name}...")
 
-        template_path = os.path.join("templates", template_name)
-        if not os.path.exists(template_path):
+        template_path = Path(__file__).resolve().parent / "templates" / template_name
+        if not template_path.exists():
             raise FileNotFoundError(f"❌ Template file not found: {template_path}")
 
-        with open(template_path, "r", encoding="utf-8") as f:
+        with template_path.open("r", encoding="utf-8") as f:
             template_str = f.read()
 
         template = Template(template_str)

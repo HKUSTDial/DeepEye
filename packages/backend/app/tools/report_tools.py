@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import logging
-import tempfile
-import uuid
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-from app.db.session import SessionLocal
+from app.node.report.runtime import create_report_temp_dir, run_report_pipeline
 from app.repositories import DataSourceRepository
-from app.services.report_service import run_report_pipeline
 from app.services.minio_service import download_bytes
 from deepeye.tools.base import tool
 
@@ -97,7 +94,7 @@ def create_generate_report_tool(session_id: str):
         if not datasource_ids:
             return "Error: At least one datasource is required to generate a report."
         
-        tmp_dir = tempfile.mkdtemp(prefix="deepeye_report_datasource_")
+        tmp_dir = create_report_temp_dir(session_id, prefix="deepeye_report_datasource_")
         csv_paths = []
         
         try:
@@ -123,7 +120,8 @@ def create_generate_report_tool(session_id: str):
             logger.exception("Report generation failed")
             return f"Report generation error: {str(e)}"
         finally:
-            # Cleanup handled by report_service
-            pass
+            import shutil
+
+            shutil.rmtree(tmp_dir, ignore_errors=True)
     
     return generate_report

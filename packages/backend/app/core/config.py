@@ -111,6 +111,9 @@ class Settings(BaseSettings):
 
     # Video workspace: config and TSX output dirs. Default: /workspace (Docker); locally use VIDEO_WORKSPACE_DIR or auto fallback.
     VIDEO_WORKSPACE_DIR: str | None = None
+    # Report workspace: temp CSV and intermediate report artifacts.
+    # Default: /workspace (Docker); locally fallback to .report_workspace.
+    REPORT_WORKSPACE_DIR: str | None = None
 
     # Docker image used by VideoDeployService to spin up per-task video preview containers.
     VIDEO_PREVIEW_IMAGE: str = "deepeye-video-preview:latest"
@@ -179,3 +182,38 @@ def get_video_session_root(session_id: str | None) -> Path:
     session_root = root / "sessions" / normalized
     session_root.mkdir(parents=True, exist_ok=True)
     return session_root
+
+
+def get_report_workspace_root() -> Path:
+    """Return writable root path for report temporary artifacts."""
+    if settings.REPORT_WORKSPACE_DIR:
+        root = Path(settings.REPORT_WORKSPACE_DIR)
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+    p = Path("/workspace")
+    if p.exists():
+        try:
+            (p / ".write_test").write_text("")
+            (p / ".write_test").unlink(missing_ok=True)
+            return p
+        except OSError:
+            pass
+    root = Path.cwd() / ".report_workspace"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def get_report_session_root(session_id: str | None) -> Path:
+    """
+    Return per-session report runtime root.
+    - session_id is set: {root}/sessions/{session_id}/report_runtime
+    - session_id is empty: {root}/report_runtime
+    """
+    root = get_report_workspace_root()
+    normalized = normalize_session_id(session_id)
+    if not normalized:
+        runtime_root = root / "report_runtime"
+    else:
+        runtime_root = root / "sessions" / normalized / "report_runtime"
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    return runtime_root

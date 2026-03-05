@@ -33,6 +33,10 @@ packages/backend/app/node/
   dashboard/
     node.py              # data.generate_dashboard node
     nl2dashboard/        # dashboard generation internals
+  report/
+    node.py              # report.generate node
+    runtime.py           # report runtime pipeline orchestration
+    report_module/       # report generation internals
   video/
     node.py              # video.generator node
     config/              # video configuration generation internals
@@ -120,6 +124,7 @@ This ensures any new node automatically appears in the AI prompt.
 Data:
 - `datasource.read`
 - `sql.execute`
+- `report.generate`
 - `data.select_columns`
 - `data.filter_rows`
 - `data.sort_rows`
