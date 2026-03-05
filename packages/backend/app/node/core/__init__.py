@@ -5,6 +5,7 @@ from app.node.core.db_utils import (
     create_engine,
     fetch_rows,
     json_safe_row,
+    normalize_connection_string,
     validate_datasource_type,
     validate_table_name,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "create_engine",
     "fetch_rows",
     "json_safe_row",
+    "normalize_connection_string",
     "validate_datasource_type",
     "validate_table_name",
 ]

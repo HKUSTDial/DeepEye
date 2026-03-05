@@ -30,6 +30,11 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const compositionEndedAtRef = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const isSupportedReportFile = (name: string) => {
+    const n = name.toLowerCase()
+    return n.endsWith('.csv') || n.endsWith('.json') || n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.parquet')
+  }
+
   useEffect(() => {
     loadBases()
   }, [loadBases])
@@ -261,7 +266,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
         <div className="chat-input-shell">
           {csvFiles.length > 0 && (
             <div className="chat-attachments">
-              <span className="chat-attachments-label">CSV for report:</span>
+              <span className="chat-attachments-label">Files for report:</span>
               {csvFiles.map((f, i) => (
                 <span key={i} className="chat-attachment-chip">
                   {f.name}
@@ -281,19 +286,19 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept=".csv,.json,.xlsx,.xls,.parquet"
               multiple
               className="hidden"
               onChange={(e) => {
                 const list = e.target.files ? Array.from(e.target.files) : []
-                setCsvFiles((prev) => [...prev, ...list].filter((f) => f.name.toLowerCase().endsWith('.csv')))
+                setCsvFiles((prev) => [...prev, ...list].filter((f) => isSupportedReportFile(f.name)))
               }}
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="chat-upload-btn"
-              title="Upload CSV for report"
+              title="Upload data files for report"
               disabled={isStreaming}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

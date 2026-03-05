@@ -164,33 +164,19 @@ def _infer_language_from_query(query: str) -> str:
 
 
 def _build_data_video_workflow(datasource: dict, query: str) -> dict:
-    """Build a 2-node workflow (data source → video.generator) for generate_data_video tool."""
+    """Build a 2-node workflow (datasource.read → video.generator)."""
     ds_id = datasource.get("id", "")
-    category = datasource.get("category", "database")
-    local_path = datasource.get("local_path", "")
+    if not ds_id:
+        raise ValueError("Selected datasource is missing id")
 
-    if category == "file" and local_path:
-        # File: python.code reads CSV and outputs rows
-        data_node = {
-            "id": "n1",
-            "type": "python.code",
-            "inputs": {},
-            "outputs": {"stdout": {"schema": "string"}, "rows": {"schema": "list[dict]"}},
-            "params": {
-                "code": f"import pandas as pd\ndf = pd.read_csv('{local_path}')\nprint(df.to_json(orient='records'))"
-            },
-            "metadata": {"position": {"x": 100, "y": 100}},
-        }
-    else:
-        # Database: datasource.read
-        data_node = {
-            "id": "n1",
-            "type": "datasource.read",
-            "inputs": {},
-            "outputs": {"rows": {"schema": "list[dict]"}},
-            "params": {"datasource_id": ds_id},
-            "metadata": {"position": {"x": 100, "y": 100}},
-        }
+    data_node = {
+        "id": "n1",
+        "type": "datasource.read",
+        "inputs": {},
+        "outputs": {"rows": {"schema": "list[dict]"}},
+        "params": {"datasource_id": ds_id},
+        "metadata": {"position": {"x": 100, "y": 100}},
+    }
 
     video_node = {
         "id": "n2",
@@ -241,6 +227,8 @@ def create_generate_data_video_tool(
         if not datasources_info:
             return "未选择数据源，请先在左侧选择或上传数据后再生成数据视频。"
         ds = datasources_info[0]
+        if not ds.get("id"):
+            return "当前数据源缺少可用的 datasource_id，无法生成数据视频。请重新选择数据源后重试。"
         workflow = _build_data_video_workflow(ds, query)
         path = f"{WORKFLOW_DIR}/data_video.json"
         await _write_workflow_path(session_id, path, workflow)

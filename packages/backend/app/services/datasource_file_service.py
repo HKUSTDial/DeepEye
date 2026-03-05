@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime, timezone
-import os
 import io
 import pandas as pd
 import json
@@ -8,14 +7,19 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.datasource import DataSource
 from app.services.minio_service import upload_bytes
+from app.services.datasource_specs import (
+    ensure_supported_filename,
+    infer_file_type,
+    sanitize_filename,
+)
 
 def _storage_object_name(user_id: uuid.UUID, datasource_id: uuid.UUID, filename: str) -> str:
-    safe_name = filename.replace("\\", "_").replace("/", "_")
+    safe_name = sanitize_filename(filename)
     return f"datasource-files/{user_id}/{datasource_id}/{safe_name}"
 
 def parse_file_schema(filename: str, data: bytes) -> dict:
     """Parse file to extract schema information (column names, types, first 5 rows)."""
-    ext = os.path.splitext(filename.lower())[1]
+    ext = f".{infer_file_type(filename)}"
     df = None
     try:
         if ext == '.csv':
@@ -63,11 +67,14 @@ def create_file_datasource(
     data: bytes,
     content_type: str | None = None
 ) -> DataSource:
+    file_type = ensure_supported_filename(filename)
+    safe_filename = sanitize_filename(filename, fallback=f"upload.{file_type}")
+
     # 1. Create record
     ds = DataSource(
         user_id=user_id,
-        name=filename,
-        type=os.path.splitext(filename.lower())[1].lstrip('.'),
+        name=safe_filename,
+        type=file_type,
         category="file",
         storage_path="pending",
         created_at=datetime.now(timezone.utc)
@@ -77,11 +84,11 @@ def create_file_datasource(
     db.refresh(ds)
     
     # 2. Parse schema
-    metadata = parse_file_schema(filename, data)
+    metadata = parse_file_schema(safe_filename, data)
     ds.file_metadata = metadata
     
     # 3. Upload to MinIO
-    object_name = _storage_object_name(user_id, ds.id, filename)
+    object_name = _storage_object_name(user_id, ds.id, safe_filename)
     upload_bytes(settings.MINIO_DATA_BUCKET, object_name, data, content_type)
     
     ds.storage_path = object_name

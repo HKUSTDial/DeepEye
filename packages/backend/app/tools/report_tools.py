@@ -4,26 +4,48 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import uuid
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.node.report.runtime import create_report_temp_dir, run_report_pipeline
-from app.repositories import DataSourceRepository
+from app.repositories import DataSourceRepository, SessionRepository
 from app.services.minio_service import download_bytes
 from deepeye.tools.base import tool
 
 logger = logging.getLogger(__name__)
 
 
-def _export_datasource_to_csv(datasource_id: str, output_path: str) -> bool:
+def _get_session_user_id(session_id: str) -> uuid.UUID | None:
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except (TypeError, ValueError):
+        return None
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    with Session() as db:
+        session = SessionRepository(db).get(session_uuid)
+        return session.user_id if session else None
+
+
+def _export_datasource_to_csv(datasource_id: str, output_path: str, user_id: uuid.UUID | None = None) -> bool:
     """Export a datasource to CSV file. Returns True if successful."""
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
     Session = sessionmaker(bind=engine)
     
     with Session() as db:
-        ds = DataSourceRepository(db).get(datasource_id)
+        try:
+            ds_uuid = uuid.UUID(datasource_id)
+        except (TypeError, ValueError):
+            logger.warning(f"Invalid DataSource id: {datasource_id}")
+            return False
+        ds = (
+            DataSourceRepository(db).get_by_id_and_user(ds_uuid, user_id)
+            if user_id
+            else DataSourceRepository(db).get(ds_uuid)
+        )
         if not ds:
             logger.warning(f"DataSource not found: {datasource_id}")
             return False
@@ -55,7 +77,7 @@ def _export_datasource_to_csv(datasource_id: str, output_path: str) -> bool:
                 return False
             
             try:
-                from app.node.utils import normalize_connection_string
+                from app.node.core.db_utils import normalize_connection_string
                 data_engine = sa_create_engine(normalize_connection_string(connection_string))
                 inspector = inspect(data_engine)
                 tables = inspector.get_table_names()
@@ -96,11 +118,12 @@ def create_generate_report_tool(session_id: str):
         
         tmp_dir = create_report_temp_dir(session_id, prefix="deepeye_report_datasource_")
         csv_paths = []
+        user_id = _get_session_user_id(session_id)
         
         try:
             for ds_id in datasource_ids:
                 csv_path = Path(tmp_dir) / f"datasource_{ds_id}.csv"
-                if _export_datasource_to_csv(ds_id, str(csv_path)):
+                if _export_datasource_to_csv(ds_id, str(csv_path), user_id=user_id):
                     csv_paths.append(str(csv_path))
                 else:
                     logger.warning(f"Failed to export datasource {ds_id}")

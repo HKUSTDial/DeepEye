@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -12,9 +13,40 @@ from app.node.core.db_utils import (
     validate_datasource_type,
     validate_table_name,
 )
+from app.services.datasource_specs import (
+    infer_file_type,
+    normalize_datasource_type,
+    validate_file_type,
+    workspace_data_path,
+)
 from app.sandbox.docker_sandbox import DockerSandbox
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
+
+_READ_FILE_SCRIPT = """
+import sys
+import pandas as pd
+
+path = sys.argv[1]
+limit = int(sys.argv[2])
+file_type = sys.argv[3].lower()
+
+if file_type == "csv":
+    df = pd.read_csv(path)
+elif file_type in ("xlsx", "xls"):
+    df = pd.read_excel(path)
+elif file_type == "json":
+    try:
+        df = pd.read_json(path, lines=True)
+    except ValueError:
+        df = pd.read_json(path)
+elif file_type == "parquet":
+    df = pd.read_parquet(path)
+else:
+    raise ValueError(f"Unsupported file type: {file_type}")
+
+print(df.head(limit).to_json(orient="records"))
+"""
 
 
 class DataSourceReadHandler:
@@ -47,30 +79,35 @@ class DataSourceReadHandler:
                 # Use consistent filename extraction
                 from app.sandbox.manager import _get_datasource_filename
                 original_filename = _get_datasource_filename(ds)
-                local_path = f"/workspace/data/{original_filename}"
-                # Use pandas in sandbox to read file
-                read_cmd = ""
-                ext = ds.name.split('.')[-1].lower()
-                if ext == 'csv':
-                    read_cmd = f"import pandas as pd; df = pd.read_csv('{local_path}'); print(df.head({limit}).to_json(orient='records'))"
-                elif ext in ['xlsx', 'xls']:
-                    read_cmd = f"import pandas as pd; df = pd.read_excel('{local_path}'); print(df.head({limit}).to_json(orient='records'))"
-                elif ext == 'json':
-                    read_cmd = f"import pandas as pd; df = pd.read_json('{local_path}'); print(df.head({limit}).to_json(orient='records'))"
-                elif ext == 'parquet':
-                    read_cmd = f"import pandas as pd; df = pd.read_parquet('{local_path}'); print(df.head({limit}).to_json(orient='records'))"
-                else:
-                    raise ValueError(f"Unsupported file type: {ext}")
-                
-                import json
+                local_path = workspace_data_path(original_filename)
+                ext_candidates = [
+                    getattr(ds, "type", ""),
+                    infer_file_type(getattr(ds, "name", "")),
+                    infer_file_type(original_filename),
+                ]
+                ext = ""
+                for candidate in ext_candidates:
+                    try:
+                        validate_file_type(candidate)
+                        ext = normalize_datasource_type(candidate)
+                        break
+                    except ValueError:
+                        continue
+                if not ext:
+                    raise ValueError("Unsupported file type")
+
                 result = self.sandbox.container.exec_run(
-                    cmd=["python3", "-c", read_cmd],
+                    cmd=["python3", "-c", _READ_FILE_SCRIPT, local_path, str(limit), ext],
                     workdir="/workspace"
                 )
                 if result.exit_code != 0:
-                    raise RuntimeError(f"Failed to read file in sandbox: {result.output.decode()}")
-                
-                rows = json.loads(result.output.decode())
+                    err = (result.output or b"").decode("utf-8", errors="replace")
+                    raise RuntimeError(f"Failed to read file in sandbox: {err}")
+
+                payload = (result.output or b"[]").decode("utf-8", errors="replace")
+                rows = json.loads(payload)
+                if not isinstance(rows, list):
+                    raise RuntimeError("Failed to parse file rows: expected JSON array")
                 return {"rows": rows}
 
             connection_string = ds.connection_string

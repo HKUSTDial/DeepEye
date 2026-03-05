@@ -1,5 +1,6 @@
 """DataSource API endpoints."""
 
+import shlex
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
@@ -11,6 +12,15 @@ from app.models import DataSource
 from app.repositories import DataSourceRepository
 from app.schemas import DataSourceCreate, DataSourceResponse, DataSourceUpdate, SandboxEvent, SandboxEventType
 from app.services.datasource_file_service import create_file_datasource
+from app.services.datasource_specs import (
+    DataSourceCategory,
+    get_datasource_filename,
+    normalize_datasource_category,
+    normalize_datasource_type,
+    validate_database_datasource_type,
+    validate_file_type,
+    workspace_data_path,
+)
 from app.infra.event_bus import RedisEventBus
 from app.core.config import settings
 
@@ -36,10 +46,15 @@ def create_datasource(
     conn = (data.connection_string or "").strip()
     if not conn:
         raise HTTPException(status_code=400, detail="connection_string is required for database datasource")
+    ds_type = normalize_datasource_type(data.type or "mysql")
+    try:
+        validate_database_datasource_type(ds_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     entity = DataSource(
         user_id=user_id,
-        name=(data.name or "").strip() or data.type,
-        type=(data.type or "mysql").strip().lower(),
+        name=(data.name or "").strip() or ds_type,
+        type=ds_type,
         category="database",
         connection_string=conn,
     )
@@ -53,25 +68,28 @@ async def upload_datasource_file(
     session_id: str | None = None,
     db: Session = Depends(get_db)
 ):
-    """Upload a data file (csv, json, xlsx) as a datasource."""
+    """Upload a data file (csv, json, xlsx, xls, parquet) as a datasource."""
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
-    
-    ds = create_file_datasource(
-        db=db,
-        user_id=user_id,
-        filename=file.filename,
-        data=data,
-        content_type=file.content_type
-    )
+    try:
+        ds = create_file_datasource(
+            db=db,
+            user_id=user_id,
+            filename=file.filename,
+            data=data,
+            content_type=file.content_type
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     # Proactive Sync: Push to sandbox if session_id is provided
     if session_id:
         from app.sandbox.manager import sandbox_manager
         try:
             sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-            dest_path = f"/workspace/data/{file.filename}"
+            filename = get_datasource_filename(getattr(ds, "name", None), getattr(ds, "storage_path", None))
+            dest_path = workspace_data_path(filename)
             await sandbox.write_file(dest_path, data)
             
             # Notify frontend about file change via event bus
@@ -115,8 +133,23 @@ def update_datasource(
         raise HTTPException(status_code=404, detail="DataSource not found")
     if data.name is not None:
         entity.name = data.name.strip() or entity.name
+    if data.category is not None:
+        try:
+            next_category = normalize_datasource_category(data.category)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if next_category != entity.category:
+            raise HTTPException(status_code=400, detail="Changing datasource category is not supported")
     if data.type is not None:
-        entity.type = data.type.strip().lower()
+        next_type = normalize_datasource_type(data.type)
+        try:
+            if entity.category == DataSourceCategory.DATABASE.value:
+                validate_database_datasource_type(next_type)
+            else:
+                validate_file_type(next_type)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        entity.type = next_type
     if data.connection_string is not None:
         conn = data.connection_string.strip()
         if not conn and getattr(entity, "category", None) == "database":
@@ -144,7 +177,7 @@ def list_datasource_tables(
         raise HTTPException(status_code=400, detail="Datasource has no connection_string")
     try:
         from sqlalchemy import create_engine, inspect
-        from app.node.utils import normalize_connection_string
+        from app.node.core.db_utils import normalize_connection_string
         engine = create_engine(normalize_connection_string(ds.connection_string))
         inspector = inspect(engine)
         tables = inspector.get_table_names()
@@ -180,7 +213,7 @@ async def delete_datasource(
         
         # 1. Delete from MinIO
         try:
-            delete_object(settings.MINIO_DATASOURCE_BUCKET, ds.storage_path)
+            delete_object(settings.MINIO_DATA_BUCKET, ds.storage_path)
         except Exception as e:
             logger.error(f"Failed to delete file from MinIO: {e}")
 
@@ -189,10 +222,9 @@ async def delete_datasource(
             from app.sandbox.manager import sandbox_manager
             try:
                 sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-                from app.sandbox.manager import _get_datasource_filename
-                original_filename = _get_datasource_filename(ds)
-                dest_path = f"/workspace/data/{original_filename}"
-                await sandbox.exec_command(f"rm {dest_path}")
+                original_filename = get_datasource_filename(getattr(ds, "name", None), getattr(ds, "storage_path", None))
+                dest_path = workspace_data_path(original_filename)
+                await sandbox.exec_command(f"rm -f -- {shlex.quote(dest_path)}")
                 
                 # Notify frontend about file change
                 event_bus = RedisEventBus(settings.REDIS_URL)
@@ -206,4 +238,3 @@ async def delete_datasource(
 
     repo.delete(datasource_id)
     return {"status": "ok"}
-

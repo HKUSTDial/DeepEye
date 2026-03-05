@@ -66,9 +66,9 @@ def _render_datasource_context(datasource: dict[str, str] | list[dict[str, str]]
         lines.append(f"  category: {category}")
         if category == "file":
             lines.append(f"  local_path: {ds.get('local_path', '')}")
-            lines.append(f"  note: This file is already in the sandbox. Use python.code to read it.")
+            lines.append("  note: This file is already in the sandbox. Use this id in params.datasource_id for datasource.read.")
         else:
-            lines.append(f"  note: Use this id in params.datasource_id for datasource.read or sql.execute.")
+            lines.append("  note: Use this id in params.datasource_id for datasource.read or sql.execute.")
     
     return "\n".join(lines).strip()
 
@@ -121,9 +121,9 @@ You currently have a lean toolbox (primarily python.code) and should compose log
 
 CRITICAL - For "生成数据视频" / "generate data video" goals use exactly 2 tool calls then reply:
 1. create_plan  (steps e.g. ["Read CSV", "Generate video"])
-2. create_workflow_and_run  (file_path e.g. "video.json", workflow with root.nodes and root.edges - python.code node + video.generator node + edge n1.rows→n2.rows)
+2. create_workflow_and_run  (file_path e.g. "video.json", workflow with root.nodes and root.edges - datasource.read node + video.generator node + edge n1.rows→n2.rows)
 3. Reply to user (only after create_workflow_and_run has returned)
-Do NOT reply after only create_plan. You MUST call create_workflow_and_run with the full workflow JSON (two nodes + one edge for file datasource). create_workflow_and_run creates the file and runs it in one step.
+Do NOT reply after only create_plan. You MUST call create_workflow_and_run with the full workflow JSON (two nodes + one edge). create_workflow_and_run creates the file and runs it in one step.
 
 Rules (strict, structured JSON only):
 0) Follow the CRITICAL order above. For data video: create_plan then create_workflow_and_run then reply. Use update_plan if the plan changes.
@@ -138,8 +138,7 @@ Rules (strict, structured JSON only):
    - Only use python.code when no specialized node exists for the task
 5) VIDEO GENERATION WORKFLOW PATTERN (required when user asks for "data video" / "生成数据视频"):
    - You MUST create exactly TWO nodes and ONE edge. Never create only the data node without the video node.
-   - For database/selected datasource: Node 1 = `datasource.read` (params.datasource_id), Node 2 = `video.generator` (inputs.rows from n1, params.query from user goal). Edge: n1.rows → n2.rows.
-   - For file datasource (e.g. CSV): Node 1 = `python.code` that reads the file and prints JSON array of records (e.g. pandas read_csv then print(df.to_json(orient='records'))). Node 2 = `video.generator` (inputs.rows from n1, params.query from user goal). Edge: n1.rows → n2.rows. python.code exposes "rows" when stdout is a JSON array.
+   - For selected datasource (database OR file): Node 1 = `datasource.read` (params.datasource_id), Node 2 = `video.generator` (inputs.rows from n1, params.query from user goal). Edge: n1.rows → n2.rows.
 6) python.code inputs: the runner pipes ALL inputs as a JSON dict to stdin. Always read: `import sys, json; data = json.load(sys.stdin)` then access inputs as `data['input']`, `data['code']`, etc. Do not expect env vars. Code source: prefer params.code_path; code_b64 is allowed but avoid unless necessary; small snippets can use params.code. IMPORTANT: For outputs, prefer returning Python objects (e.g., list/dict) instead of printing JSON strings; downstream nodes receive structured data directly. Only parse with json.loads if the upstream output is explicitly a JSON string. For multi-line text output, use triple quotes (like '''...''') or f-strings to avoid JSON escape issues. Never write `print("` followed by a newline; Python will raise an unterminated string error. Use `\\n` or triple quotes instead.
 7) Layout: include positions ONLY under node.metadata.position (x, y). Do NOT use a top-level "position" field.
 8) Tool calls MUST be structured JSON frames. For data video call create_workflow_and_run once with full workflow:
@@ -220,7 +219,7 @@ Example 1 - Video Generation (SIMPLEST pattern):
 }}
 Note: For video.generator, set params.query from the user's goal (e.g. "分析航班延误数据并生成中文数据视频"). Always 2 nodes + 1 edge.
 
-Example 2 - File datasource + video (CSV → video):
+Example 2 - File datasource + video:
 {{
   "file_path": "flight_video.json",
   "workflow": {{
@@ -228,12 +227,10 @@ Example 2 - File datasource + video (CSV → video):
       "nodes": {{
         "n1": {{
           "id": "n1",
-          "type": "python.code",
+          "type": "datasource.read",
           "inputs": {{}},
-          "outputs": {{ "stdout": {{ "schema": "string" }}, "rows": {{ "schema": "list[dict]" }} }},
-          "params": {{
-            "code": "import pandas as pd\\ndf = pd.read_csv('/workspace/data/<filename>.csv')\\nprint(df.to_json(orient='records'))"
-          }},
+          "outputs": {{ "rows": {{ "schema": "list[dict]" }} }},
+          "params": {{ "datasource_id": "<file_datasource_id>" }},
           "metadata": {{ "position": {{ "x": 100, "y": 100 }} }}
         }},
         "n2": {{
@@ -251,7 +248,7 @@ Example 2 - File datasource + video (CSV → video):
     }}
   }}
 }}
-Use the actual file path from datasource context (e.g. /workspace/data/flight_delay_statistics2015.csv). video.generator needs BOTH rows (from edge) and query (in params).
+Use datasource_id from datasource context. video.generator needs BOTH rows (from edge) and query (in params).
 
 Example 3 - SQL Query:
 {{

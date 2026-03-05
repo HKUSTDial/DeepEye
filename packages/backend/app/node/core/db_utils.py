@@ -6,6 +6,8 @@ from datetime import date, datetime
 
 from sqlalchemy import text
 
+from app.services.datasource_specs import validate_database_datasource_type
+
 
 def normalize_connection_string(connection_string: str) -> str:
     """Use PyMySQL driver for mysql:// URLs so MySQL works without mysqlclient (MySQLdb)."""
@@ -23,11 +25,7 @@ def create_engine(connection_string: str):
 
 
 def validate_datasource_type(datasource_type: str | None) -> None:
-    if not datasource_type:
-        return
-    allowed = {"postgres", "mysql", "sqlite"}
-    if datasource_type not in allowed:
-        raise ValueError(f"Unsupported datasource_type: {datasource_type}")
+    validate_database_datasource_type(datasource_type)
 
 
 def validate_table_name(table: str) -> None:

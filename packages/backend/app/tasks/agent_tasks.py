@@ -80,7 +80,7 @@ def _get_datasources_schema(datasource_ids: list[str] | None, user_id: uuid.UUID
                     continue
                 try:
                     from sqlalchemy import create_engine as sa_create_engine, inspect
-                    from app.node.utils import normalize_connection_string
+                    from app.node.core.db_utils import normalize_connection_string
                     data_engine = sa_create_engine(normalize_connection_string(connection_string))
                     inspector = inspect(data_engine)
                     tables = inspector.get_table_names()[:max_tables]
@@ -153,15 +153,17 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     # Get existing sandbox or create new one (reuse within session)
     channel = f"session:{session_id}"
     logger.info(f"[AgentTask] Getting or creating sandbox for session: {session_id}")
-    sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
+    await sandbox_manager.get_or_create_sandbox(session_id)
     
     # Notify frontend that sandbox is ready (to open files panel)
-    logger.info(f"[AgentTask] Sandbox ready, publishing STARTED event")
+    logger.info("[AgentTask] Sandbox ready, publishing STARTED event")
     await event_bus.publish(
         channel, 
         SandboxEvent(type=SandboxEventType.STARTED, source="sandbox").model_dump_json()
     )
     
+    user_id = _get_user_id(session_id)
+
     # Build tool - handle data sources
     datasource_ids = agent_input.datasource_ids or []
     
@@ -171,7 +173,15 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     file_datasources = []
     with Session() as db:
         for ds_id in datasource_ids:
-            ds = DataSourceRepository(db).get(ds_id)
+            try:
+                ds_uuid = uuid.UUID(ds_id)
+            except (TypeError, ValueError):
+                continue
+            ds = (
+                DataSourceRepository(db).get_by_id_and_user(ds_uuid, user_id)
+                if user_id
+                else DataSourceRepository(db).get(ds_uuid)
+            )
             if ds and getattr(ds, "category", "database") == "file":
                 file_datasources.append(ds)
     
@@ -179,10 +189,8 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         logger.info(f"[AgentTask] Syncing {len(file_datasources)} file datasources to sandbox")
         await sandbox_manager.sync_datasource_files(session_id, file_datasources)
 
-    user_id = _get_user_id(session_id)
-
     # Build tools - all agents share the same sandbox
-    logger.info(f"[AgentTask] Building tools...")
+    logger.info("[AgentTask] Building tools...")
     tools = []
     datasources_info = _get_datasources_info(datasource_ids, user_id)
     datasources_schema = _get_datasources_schema(datasource_ids, user_id)
@@ -226,16 +234,16 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
             )
         )
 
-    logger.info(f"[AgentTask] Setting up LangGraph checkpointer...")
+    logger.info("[AgentTask] Setting up LangGraph checkpointer...")
     async with AsyncPostgresSaver.from_conn_string(settings.POSTGRES_STATE_URL) as checkpointer:
         await checkpointer.setup()
 
-        logger.info(f"[AgentTask] Creating supervisor agent...")
+        logger.info("[AgentTask] Creating supervisor agent...")
         factory = AgentFactory(model, checkpointer)
         supervisor = factory.create_supervisor(tools)
 
         try:
-            logger.info(f"[AgentTask] Starting agent execution...")
+            logger.info("[AgentTask] Starting agent execution...")
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_START))
             await supervisor.ainvoke(
                 user_input,
@@ -247,7 +255,7 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
                     }
                 },
             )
-            logger.info(f"[AgentTask] Agent execution finished successfully")
+            logger.info("[AgentTask] Agent execution finished successfully")
             # Build and persist the complete assistant message
             assistant_message = collector.build()
             persist_message(session_id, assistant_message)

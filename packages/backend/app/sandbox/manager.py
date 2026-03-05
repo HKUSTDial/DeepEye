@@ -13,24 +13,12 @@ from app.sandbox.docker_sandbox import DockerSandbox
 from app.sandbox.factory import create_sandbox
 from app.sandbox.activity import ActivityTracker
 from app.core.config import settings
+from app.services.datasource_specs import get_datasource_filename, workspace_data_path
 from app.services.minio_service import download_bytes
 
 
 def _get_datasource_filename(ds) -> str:
-    """
-    Extract the original filename from a datasource object.
-    Tries storage_path first (which contains the original filename),
-    falls back to ds.name if needed.
-    """
-    import os
-    if ds.storage_path:
-        # storage_path format: datasource-files/{user_id}/{datasource_id}/{filename}
-        original_filename = os.path.basename(ds.storage_path)
-        # Only use if it's different from the full path (i.e., extraction succeeded)
-        if original_filename and original_filename != ds.storage_path:
-            return original_filename
-    # Fallback to ds.name
-    return ds.name
+    return get_datasource_filename(getattr(ds, "name", None), getattr(ds, "storage_path", None))
 
 
 class SandboxManager:
@@ -169,7 +157,7 @@ class SandboxManager:
                 
                 # Use consistent filename extraction
                 original_filename = _get_datasource_filename(ds)
-                dest_path = f"/workspace/data/{original_filename}"
+                dest_path = workspace_data_path(original_filename)
                 logger.info(f"[SandboxManager] Writing to sandbox path: {dest_path} (from name: {ds.name}, storage_path: {ds.storage_path})")
                 await sandbox.write_file(dest_path, data)
                 
