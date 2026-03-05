@@ -4,12 +4,13 @@ import pandas as pd
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 import re
+from app.core.config import settings
 
 @dataclass
 class TextGenerationConfig:
     n: int = 1
     temperature: float = 0
-    model: str = "gpt-4o"
+    model: str | None = None
     use_cache: bool = False
 
 class Goal:
@@ -27,6 +28,19 @@ class Manager:
     def __init__(self, text_gen: str = "openai", llm_client: Any = None):
         self.llm_client = llm_client
         self.text_gen = text_gen
+
+    @staticmethod
+    def _resolve_model(textgen_config: Optional[TextGenerationConfig]) -> str:
+        model = (
+            (textgen_config.model if textgen_config else None)
+            or settings.LLM_MODEL
+            or os.getenv("DEEPEYE_LLM_MODEL")
+            or os.getenv("LLM_MODEL")
+            or ""
+        ).strip()
+        if not model:
+            raise ValueError("LLM model is required for dashboard generation")
+        return model
 
     def summarize(self, dataset_path: str, summary_method: str = "default") -> Dict[str, Any]:
         """Generate a more comprehensive summary of the dataset."""
@@ -110,7 +124,7 @@ class Manager:
         messages = [Message(role="user", content=prompt)]
         response = self.llm_client.generate(
             messages=messages,
-            model=textgen_config.model if textgen_config else "gpt-4o",
+            model=self._resolve_model(textgen_config),
             temperature=textgen_config.temperature if textgen_config else 0.7
         )
         
@@ -130,7 +144,7 @@ class Manager:
         messages = [Message(role="user", content=prompt)]
         response = self.llm_client.generate(
             messages=messages,
-            model=textgen_config.model if textgen_config else "gpt-4o",
+            model=self._resolve_model(textgen_config),
             temperature=textgen_config.temperature if textgen_config else 0.7
         )
         
@@ -151,7 +165,7 @@ class Manager:
         messages = [Message(role="user", content=prompt)]
         response = self.llm_client.generate(
             messages=messages,
-            model=textgen_config.model if textgen_config else "gpt-4o",
+            model=self._resolve_model(textgen_config),
             temperature=textgen_config.temperature if textgen_config else 0
         )
         

@@ -32,17 +32,21 @@ from app.node.video.config.generator import LLMClient
 from app.node.video.render.tsx_sanitize import sanitize_tsx_for_browser, validate_component_syntax
 
 # 从环境变量或 settings 获取配置
-API_BASE = settings.LLM_BASE_URL or os.getenv("LLM_BASE_URL", "https://newapi.deepwisdom.ai")
-API_KEY = settings.LLM_API_KEY or os.getenv("LLM_API_KEY", "")
-DEFAULT_MODEL = settings.LLM_MODEL or os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
+API_BASE = settings.LLM_BASE_URL or os.getenv("LLM_BASE_URL")
+API_KEY = settings.LLM_API_KEY or os.getenv("LLM_API_KEY")
+DEFAULT_MODEL = settings.LLM_MODEL or os.getenv("LLM_MODEL")
 VIDEO_RUNTIME_BASE = os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runtime")
 DEFAULT_COMPONENTS_OUTPUT_DIR = os.getenv(
     "VIDEO_COMPONENTS_OUTPUT_BASE",
     os.path.join(VIDEO_RUNTIME_BASE, "claude_tsx_components"),
 )
 
+if not API_BASE:
+    raise ValueError("LLM_BASE_URL is required. Please set it in .env file or environment variable.")
 if not API_KEY:
     raise ValueError("LLM_API_KEY is required. Please set it in .env file or environment variable.")
+if not DEFAULT_MODEL:
+    raise ValueError("LLM_MODEL is required. Please set it in .env file or environment variable.")
 
 
 def should_retry_on_error(error_msg: str, attempt: int, elapsed_time: float, max_general_retries: int = 10) -> Tuple[bool, str]:
@@ -944,12 +948,16 @@ def generate_single_scene_wrapper(
 
 
 def main():
+    default_config_path = os.getenv(
+        "VIDEO_DEFAULT_CONFIG_PATH",
+        "infographic_generation/generated_config_aligned.json",
+    )
     # 命令行参数解析
     parser = argparse.ArgumentParser(description='生成 TSX 信息图组件（默认并行模式）')
     parser.add_argument('--serial', action='store_true', help='使用串行模式（默认是并行）')
     parser.add_argument('-w', '--workers', type=int, default=4, help='并行线程数（默认4）')
     parser.add_argument('--config', type=str, 
-                       default='infographic_generation/generated_20251216_045823_aligned_flight.json',
+                       default=default_config_path,
                        help='配置文件路径')
     parser.add_argument('--output', type=str,
                        default=DEFAULT_COMPONENTS_OUTPUT_DIR,
@@ -1085,4 +1093,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

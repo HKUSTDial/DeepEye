@@ -16,7 +16,6 @@ TEMPLATES = [
                 "key": "datasource_url",
                 "required": True,
                 "placeholder": "postgresql://user:pass@host:port/db",
-                "default": "postgresql://school:school123@school-db:5432/school_db",
             },
             {"key": "datasource_type", "required": True, "default": "postgres"},
             {"key": "table", "required": True, "placeholder": "table name"},

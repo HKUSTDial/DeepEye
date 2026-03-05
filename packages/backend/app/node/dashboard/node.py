@@ -338,12 +338,10 @@ class NL2DashboardHandler:
             api_key = settings.LLM_API_KEY
             base_url = settings.LLM_BASE_URL
             
-            # Priority: node params > config model > default gpt-4o
+            # Priority: node params > system config model
             model = params.get("model")
             if not model or model == "default":
                 model = settings.LLM_MODEL
-            if not model or model == "default":
-                model = "gpt-4o"
                 
             print(f"[DEBUG] Using model: {model}")
             
@@ -497,7 +495,7 @@ class NL2DashboardNode(BaseNode):
                 "dashboard_url": Port(schema="string", description="The URL to access the generated dashboard"),
             },
             params_schema={
-                "model": {"type": "string", "default": "gpt-4o", "required": False},
+                "model": {"type": "string", "default": settings.LLM_MODEL, "required": False},
                 "data": {"type": "any", "required": False},
                 "datasource_id": {"type": "string", "required": False},
                 "data_schema": {"type": "any", "required": False},

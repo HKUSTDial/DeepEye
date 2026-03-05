@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import List, Dict
 from jinja2 import Template
 from openai import OpenAI
+from app.core.config import settings
 from .utils import execute_python_code
 
 logger = logging.getLogger(__name__)
@@ -32,13 +33,16 @@ class AutoReportPipeline:
         self,
         api_key: str,
         base_url: str,
-        model_name: str = "gpt-4o",
+        model_name: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
         progress_callback: Callable[[str], None] | None = None,
     ):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
-        self.model_name = model_name
+        resolved_model = (model_name or settings.LLM_MODEL or "").strip()
+        if not resolved_model:
+            raise ValueError("LLM_MODEL is required for report generation")
+        self.model_name = resolved_model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.progress_callback = progress_callback
@@ -47,7 +51,7 @@ class AutoReportPipeline:
             self.ds_generator = DatasetContextGenerator(
                 api_key=api_key,
                 base_url=base_url,
-                model_name=model_name,
+                model_name=resolved_model,
                 temperature=temperature,
                 max_tokens=max_tokens,
             )

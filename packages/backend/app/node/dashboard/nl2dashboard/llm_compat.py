@@ -1,7 +1,9 @@
 from __future__ import annotations
+import os
 from typing import List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from app.core.config import settings
 
 class Message:
     def __init__(self, role: str, content: str):
@@ -20,14 +22,24 @@ class LLMClient:
     def generate(
         self, 
         messages: List[Message], 
-        model: str = "gpt-4o", 
+        model: str | None = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None
     ) -> LLMResponse:
+        resolved_model = (
+            model
+            or settings.LLM_MODEL
+            or os.getenv("DEEPEYE_LLM_MODEL")
+            or os.getenv("LLM_MODEL")
+            or ""
+        ).strip()
+        if not resolved_model:
+            raise ValueError("LLM model is required for dashboard generation")
+
         chat = ChatOpenAI(
             openai_api_key=self.api_key,
             openai_api_base=self.base_url,
-            model_name=model,
+            model_name=resolved_model,
             temperature=temperature,
             max_tokens=max_tokens
         )
@@ -45,4 +57,3 @@ class LLMClient:
         
         response = chat.invoke(langchain_messages)
         return LLMResponse(content=str(response.content))
-

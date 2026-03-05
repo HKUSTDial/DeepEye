@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..llm_compat import LLMClient, Message
+from app.core.config import settings
 
 
 class DashboardEngineer:
@@ -32,7 +33,7 @@ class DashboardEngineer:
         >>> engineer.implement(design_result, output_path, info_doc)
     """
     
-    def __init__(self, llm_client: Optional[LLMClient] = None, model: str = "gpt-4o"):
+    def __init__(self, llm_client: Optional[LLMClient] = None, model: str | None = None):
         """Initialize the Dashboard Engineer
         
         Args:
@@ -46,12 +47,13 @@ class DashboardEngineer:
         # Load template mapping configuration
         self.template_mapping = self._load_template_mapping()
         
+        resolved_model = model or settings.LLM_MODEL
+
         # Initialize LLM client
         if llm_client is None:
-            import os
-            api_key = os.getenv("DEEPEYE_LLM_API_KEY")
-            base_url = os.getenv("DEEPEYE_LLM_BASE_URL", "https://api.openai.com/v1")
-            env_model = os.getenv("DEEPEYE_LLM_MODEL", model)
+            api_key = os.getenv("DEEPEYE_LLM_API_KEY") or settings.LLM_API_KEY
+            base_url = os.getenv("DEEPEYE_LLM_BASE_URL") or settings.LLM_BASE_URL
+            env_model = os.getenv("DEEPEYE_LLM_MODEL", resolved_model)
             
             if api_key:
                 self.llm_client = LLMClient(api_key=api_key, base_url=base_url)
@@ -61,7 +63,7 @@ class DashboardEngineer:
                 self.llm_model = env_model
         else:
             self.llm_client = llm_client
-            self.llm_model = model  # Use the provided model name
+            self.llm_model = resolved_model  # Use the provided model name
     
     def implement(
         self,

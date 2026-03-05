@@ -5,6 +5,7 @@ import logging
 import re
 from typing import Any, Dict, List, Union
 from openai import OpenAI
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class DatasetContextGenerator:
         self,
         api_key: str,
         base_url: str | None = None,
-        model_name: str = "gpt-4o",
+        model_name: str | None = None,
         temperature: float = 0.0,
         max_tokens: int | None = None,
     ):
@@ -43,7 +44,10 @@ class DatasetContextGenerator:
         """
         self.api_key = api_key
         self.base_url = base_url
-        self.model_name = model_name
+        resolved_model = (model_name or settings.LLM_MODEL or "").strip()
+        if not resolved_model:
+            raise ValueError("LLM_MODEL is required for report generation")
+        self.model_name = resolved_model
         self.temperature = temperature
         self.max_tokens = max_tokens
         client_kwargs: dict[str, Any] = {"api_key": api_key}

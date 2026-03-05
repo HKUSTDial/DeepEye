@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 
 from ..llm_compat import LLMClient, Message
+from app.core.config import settings
 from .chart_prompts import (
     HIGHLIGHT_DESIGN_PROMPT,
     HIGHLIGHT_CONFIG_PROMPT,
@@ -41,7 +42,7 @@ class DashboardDesigner:
         >>> print(design["blocks"])
     """
     
-    def __init__(self, llm_client: Optional[LLMClient] = None, model: str = "gpt-4o"):
+    def __init__(self, llm_client: Optional[LLMClient] = None, model: str | None = None):
         """Initialize the designer
         
         Args:
@@ -52,21 +53,23 @@ class DashboardDesigner:
         self.design_result: Optional[Dict[str, Any]] = None
         self.output_dir: Optional[Path] = None
         
+        resolved_model = model or settings.LLM_MODEL
+
         # Initialize LLM client
         if llm_client is None:
-            api_key = os.getenv("DEEPEYE_LLM_API_KEY")
-            base_url = os.getenv("DEEPEYE_LLM_BASE_URL", "https://api.openai.com/v1")
-            model = os.getenv("DEEPEYE_LLM_MODEL", model)
+            api_key = os.getenv("DEEPEYE_LLM_API_KEY") or settings.LLM_API_KEY
+            base_url = os.getenv("DEEPEYE_LLM_BASE_URL") or settings.LLM_BASE_URL
+            resolved_model = os.getenv("DEEPEYE_LLM_MODEL", resolved_model)
             
             if api_key:
                 self.llm_client = LLMClient(api_key=api_key, base_url=base_url)
-                self.llm_model = model
+                self.llm_model = resolved_model
             else:
                 self.llm_client = None
-                self.llm_model = model
+                self.llm_model = resolved_model
         else:
             self.llm_client = llm_client
-            self.llm_model = model
+            self.llm_model = resolved_model
     
     def design(
         self, 
@@ -427,7 +430,7 @@ class DashboardDesigner:
             textgen_config = TextGenerationConfig(
                 n=1,
                 temperature=0,
-                model="gpt-4o",
+                model=self.llm_model,
                 use_cache=False
             )
             

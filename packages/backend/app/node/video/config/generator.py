@@ -143,10 +143,13 @@ class TransformationExecutionError(Exception):
 class LLMClient:
     """LLM API Client"""
     
-    def __init__(self, api_base: str, api_key: str, model: str = "claude-sonnet-4-20250514", debug_prompts: bool = False):
+    def __init__(self, api_base: str, api_key: str, model: str | None = None, debug_prompts: bool = False):
+        resolved_model = (model or settings.LLM_MODEL or "").strip()
+        if not resolved_model:
+            raise ValueError("LLM_MODEL is required for video generation")
         self.api_base = api_base
         self.api_key = api_key
-        self.model = model
+        self.model = resolved_model
         self.debug_prompts = debug_prompts
         self.headers = {
             "Content-Type": "application/json",
@@ -698,7 +701,7 @@ class SimpleConfigGenerator:
         self, 
         api_base: str,
         api_key: str,
-        model: str = "claude-sonnet-4-20250514",
+        model: str | None = None,
         debug_prompts: bool = False
     ):
         self.client = LLMClient(api_base, api_key, model, debug_prompts=debug_prompts)
@@ -4429,16 +4432,34 @@ def create_generator(
     In DeepEye-DataMagic, this function is used by VideoGeneratorHandler.
     It should get api_base/api_key/model from settings if not provided.
     """
+    resolved_api_base = api_base
+    resolved_api_key = api_key
+    resolved_model = model
+
     # Try to import settings if available
     try:
         from app.core.config import settings
-        api_base = api_base or settings.LLM_BASE_URL or "https://newapi.deepwisdom.ai"
-        api_key = api_key or settings.LLM_API_KEY or ""
-        model = model or settings.LLM_MODEL or "claude-sonnet-4-20250514"
+        resolved_api_base = resolved_api_base or settings.LLM_BASE_URL
+        resolved_api_key = resolved_api_key or settings.LLM_API_KEY
+        resolved_model = resolved_model or settings.LLM_MODEL
     except ImportError:
         # Fallback if settings not available
-        api_base = api_base or "https://newapi.deepwisdom.ai"
-        api_key = api_key or ""
-        model = model or "claude-sonnet-4-20250514"
+        import os
+
+        resolved_api_base = resolved_api_base or os.getenv("LLM_BASE_URL")
+        resolved_api_key = resolved_api_key or os.getenv("LLM_API_KEY")
+        resolved_model = resolved_model or os.getenv("LLM_MODEL")
+
+    if not resolved_api_base:
+        raise ValueError("LLM_BASE_URL is required for video generation")
+    if not resolved_api_key:
+        raise ValueError("LLM_API_KEY is required for video generation")
+    if not resolved_model:
+        raise ValueError("LLM_MODEL is required for video generation")
     
-    return SimpleConfigGenerator(api_base, api_key, model, debug_prompts=debug_prompts)
+    return SimpleConfigGenerator(
+        resolved_api_base,
+        resolved_api_key,
+        resolved_model,
+        debug_prompts=debug_prompts,
+    )
