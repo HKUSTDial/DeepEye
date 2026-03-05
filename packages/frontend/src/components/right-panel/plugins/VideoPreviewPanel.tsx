@@ -3,10 +3,8 @@ import { Loader2 } from 'lucide-react'
 import { useTheme } from '../../../hooks/useTheme'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { config } from '../../../config'
-import { http } from '../../../api/client'
 
 interface VideoPreviewPanelProps {
-  configPath?: string
   taskId?: string
   sessionId?: string | null
 }
@@ -79,17 +77,13 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const isDark = theme === 'dark'
   const videoProgressLogsRef = useRef<HTMLDivElement | null>(null)
   const [pastedTaskId, setPastedTaskId] = useState('')
-  const [testStarting, setTestStarting] = useState(false)
-  const [testError, setTestError] = useState<string | null>(null)
-  const [startPreviewLoading, setStartPreviewLoading] = useState(false)
-  const [startPreviewError, setStartPreviewError] = useState<string | null>(null)
 
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
   const runOutput = sessionState?.runOutput ?? ''
   const videoProgress = sessionState?.videoProgress ?? { visible: false, step: 0, percent: 0, logs: [] }
-  const runStatus = sessionState?.runStatus ?? null
+  const runStatus = (sessionState?.runStatus as string | null | undefined) ?? null
   const runError = sessionState?.runError ?? null
   const videoPreviewUrl = sessionState?.videoPreviewUrl ?? null
   const [isPreviewReady, setIsPreviewReady] = useState(false)
@@ -173,10 +167,6 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     }
   }, [effectivePreviewUrl])
 
-  useEffect(() => {
-    setStartPreviewError(null)
-  }, [effectivePreviewUrl])
-
   // 控制台调试信息，便于排查预览不加载
   useEffect(() => {
     const prefix = '[VideoPreview]'
@@ -205,6 +195,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   }, [videoProgress.visible, videoProgress.logs.length])
 
   const runInProgress = runStatus === 'running' || runStatus === null
+  const runFailed = runStatus === 'failed'
 
   // 1) 有预览 URL：轮询就绪后显示 iframe（与仪表盘一致，避免 502/主应用）
   if (effectivePreviewUrl) {
@@ -222,45 +213,6 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
           flexShrink: 0,
         }}>
           <span style={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>Video Preview</span>
-          {displayTaskId && displayTaskId !== '20260302_999999' && !isPreviewReady && (
-            <button
-              type="button"
-              onClick={async () => {
-                setStartPreviewError(null)
-                setStartPreviewLoading(true)
-                try {
-                  await http.post<{ task_id: string; url: string; status: string }>(
-                    '/video/start-preview',
-                    { task_id: displayTaskId, session_id: sessionId ?? undefined },
-                    { timeout: 120000 }
-                  )
-                  // 轮询会继续，无需额外操作
-                } catch (e: unknown) {
-                  const msg = e instanceof Error ? e.message : String(e)
-                  setStartPreviewError(msg || '启动预览失败')
-                } finally {
-                  setStartPreviewLoading(false)
-                }
-              }}
-              disabled={startPreviewLoading}
-              style={{
-                padding: '4px 10px',
-                fontSize: 11,
-                fontWeight: 500,
-                background: isDark ? '#334155' : '#e2e8f0',
-                color: isDark ? '#e2e8f0' : '#475569',
-                border: `1px solid ${isDark ? '#475569' : '#cbd5e1'}`,
-                borderRadius: 6,
-                cursor: startPreviewLoading ? 'wait' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              {startPreviewLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-              {startPreviewLoading ? '启动中…' : '启动预览容器'}
-            </button>
-          )}
           {(!isPreviewReady || isCheckingPreview) && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: isDark ? '#94a3b8' : '#64748b' }}>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -278,17 +230,6 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
             </a>
           )}
         </div>
-        {startPreviewError && (
-          <div style={{
-            padding: '8px 16px',
-            fontSize: 12,
-            color: isDark ? '#f87171' : '#dc2626',
-            background: isDark ? 'rgba(248,113,113,0.1)' : 'rgba(220,38,38,0.08)',
-            borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          }}>
-            {startPreviewError}
-          </div>
-        )}
         {!isPreviewReady ? (
           <div style={{
             flex: 1,
@@ -341,14 +282,14 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14, color: isDark ? '#e2e8f0' : '#1e293b' }}>
-              {runStatus === 'failed' ? 'Video generation failed' : 'Generating data video'}
+              {runFailed ? 'Video generation failed' : 'Generating data video'}
             </span>
-            {runStatus !== 'failed' && (
+            {!runFailed && (
               <span style={{ fontSize: 12, fontWeight: 500, color: isDark ? '#818cf8' : '#4f46e5' }}>
                 {videoProgress.percent}%
               </span>
             )}
-            {runStatus === 'failed' && (
+            {runFailed && (
               <span style={{ fontSize: 12, fontWeight: 500, color: isDark ? '#ef4444' : '#dc2626' }}>
                 Failed
               </span>
@@ -539,50 +480,10 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         If the preview did not load automatically, paste the <strong>Task ID</strong> from the chat (e.g. 20260302_121928) and open the preview.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 320 }}>
-        <button
-          type="button"
-          onClick={async () => {
-            setTestError(null)
-            setTestStarting(true)
-            try {
-              const res = await http.post<{ task_id: string; url: string; status: string }>(
-                '/test/start-video-preview',
-                undefined,
-                { timeout: 120000 }
-              )
-              setPastedTaskId(res.task_id)
-            } catch (e: unknown) {
-              const msg = e instanceof Error ? e.message : String(e)
-              setTestError(msg || 'Failed to start test preview')
-            } finally {
-              setTestStarting(false)
-            }
-          }}
-          disabled={testStarting}
-          style={{
-            padding: '10px 16px',
-            background: isDark ? '#334155' : '#e2e8f0',
-            color: isDark ? '#e2e8f0' : '#475569',
-            border: `1px solid ${isDark ? '#475569' : '#cbd5e1'}`,
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: testStarting ? 'wait' : 'pointer',
-          }}
-        >
-          {testStarting ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Starting test container (about 30s)…
-            </span>
-          ) : (
-            '🧪 Test preview (no cost) — verify nginx → container'
-          )}
-        </button>
         <input
           type="text"
           value={pastedTaskId}
-          onChange={(e) => { setPastedTaskId(e.target.value); setTestError(null) }}
+          onChange={(e) => setPastedTaskId(e.target.value)}
           placeholder="e.g. 20260302_121928"
           style={{
             padding: '10px 12px',
@@ -617,21 +518,6 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
           Open preview
         </button>
       </div>
-      {testError && (
-        <div style={{ maxWidth: 360, textAlign: 'left' }}>
-          <p style={{ fontSize: 12, color: isDark ? '#f87171' : '#dc2626', marginBottom: 8 }}>
-            {testError}
-          </p>
-          <p style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', marginBottom: 4 }}>
-            <strong>排查步骤：</strong>
-          </p>
-          <ol style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
-            <li>先构建预览镜像：<code style={{ fontSize: 10 }}>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code></li>
-            <li>确认容器在跑：<code style={{ fontSize: 10 }}>docker ps | grep deepeye-video</code></li>
-            <li>确认网关能访问：<code style={{ fontSize: 10 }}>curl -I http://localhost:8080/video-previews/deepeye-video-20260302_999999/</code> 应为 200</li>
-          </ol>
-        </div>
-      )}
     </div>
   )
 }
