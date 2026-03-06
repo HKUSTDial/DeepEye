@@ -1,42 +1,42 @@
-/* Light Theme Override - Manus AI Style */
+/* Light Theme Override - White/Gray Workspace */
 
 /* Apply light theme globally */
 body.light-theme {
-  --sidebar-bg: #f8f9fa;
-  --sidebar-hover: #e9ecef;
-  --sidebar-active: #dee2e6;
-  --sidebar-border: #e9ecef;
-  --sidebar-text: #212529;
-  --sidebar-text-muted: #6c757d;
+  --sidebar-bg: #f7f7f8;
+  --sidebar-hover: #f1f2f4;
+  --sidebar-active: #ebedf0;
+  --sidebar-border: #e5e7eb;
+  --sidebar-text: #202123;
+  --sidebar-text-muted: #6b7280;
 
-  --main-bg: #ffffff;
-  --main-bg-alt: #f1f3f5;
-  --main-text: #212529;
-  --main-text-muted: #6c757d;
+  --main-bg: #f7f7f8;
+  --main-bg-alt: #ffffff;
+  --main-text: #111827;
+  --main-text-muted: #6b7280;
 
-  --accent: #0066ff;
-  --accent-hover: #0052cc;
+  --accent: #202123;
+  --accent-hover: #111111;
 
   --input-bg: #ffffff;
-  --input-border: #ced4da;
-  --input-focus: #0066ff;
+  --input-border: #e5e7eb;
+  --input-focus: #202123;
 
-  --border-color: #dee2e6;
-  --border-hover: #ced4da;
+  --border-color: #e5e7eb;
+  --border-hover: #d1d5db;
 
   --card-bg: #ffffff;
-  --card-bg-hover: #f8f9fa;
-  --card-border: #dee2e6;
-  --card-border-hover: #ced4da;
+  --card-bg-hover: #f9fafb;
+  --card-border: #e5e7eb;
+  --card-border-hover: #d1d5db;
 
-  --table-header-bg: #f8f9fa;
-  --table-header-text: #495057;
-  --table-row-hover: #f1f3f5;
-  --table-border: #dee2e6;
+  --table-header-bg: #f8fafc;
+  --table-header-text: #6b7280;
+  --table-row-hover: #f9fafb;
+  --table-border: #e5e7eb;
 
   --panel-bg: #ffffff;
-  --panel-border: #dee2e6;
-  --panel-resize: #0066ff;
+  --panel-border: #e5e7eb;
+  --panel-resize: #9ca3af;
 
   --success: #22c55e;
   --success-bg: rgba(34, 197, 94, 0.1);
@@ -44,11 +44,11 @@ body.light-theme {
   --warning-bg: rgba(245, 158, 11, 0.1);
   --error: #ef4444;
   --error-bg: rgba(239, 68, 68, 0.1);
-  --info: #0066ff;
-  --info-bg: rgba(0, 102, 255, 0.1);
+  --info: #4b5563;
+  --info-bg: rgba(75, 85, 99, 0.12);
 
-  background: #ffffff;
-  color: #1f1f1f;
+  background: var(--main-bg);
+  color: var(--main-text);
 }
 
 /* Button Styles */
@@ -57,35 +57,35 @@ body.light-theme .btn {
 }
 
 body.light-theme .btn-primary {
-  background: #0066ff;
+  background: var(--accent);
   color: #ffffff;
   border: none;
 }
 
 body.light-theme .btn-primary:hover {
-  background: #0052cc;
+  background: var(--accent-hover);
 }
 
 body.light-theme .btn-secondary {
   background: #ffffff;
-  color: #1f1f1f;
-  border: 1px solid #e5e5e6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
 }
 
 body.light-theme .btn-secondary:hover {
-  background: #f7f7f8;
-  border-color: #d4d4d5;
+  background: #f9fafb;
+  border-color: #d1d5db;
 }
 
 /* Card Styles */
 body.light-theme .card {
   background: #ffffff;
-  border: 1px solid #dee2e6;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
 }
 
 body.light-theme .card:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
 }
 
 /* Input Styles */
@@ -93,39 +93,39 @@ body.light-theme input,
 body.light-theme textarea,
 body.light-theme select {
   background: #ffffff;
-  border: 1px solid #e5e5e6;
-  color: #1f1f1f;
+  border: 1px solid #e5e7eb;
+  color: #111827;
 }
 
 body.light-theme input:focus,
 body.light-theme textarea:focus,
 body.light-theme select:focus {
-  border-color: #0066ff;
+  border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(32, 33, 35, 0.08);
 }
 
 body.light-theme input::placeholder,
 body.light-theme textarea::placeholder {
-  color: #9e9ea7;
+  color: #9ca3af;
 }
 
 /* Sidebar Specific */
 body.light-theme .sidebar {
   background: #f7f7f8;
-  border-right: 1px solid #e5e5e6;
+  border-right: 1px solid #e5e7eb;
 }
 
 /* Message Bubbles */
 body.light-theme .message-user {
-  background: #f7f7f8;
-  color: #1f1f1f;
+  background: #202123;
+  color: #ffffff;
 }
 
 body.light-theme .message-assistant {
   background: #ffffff;
-  color: #1f1f1f;
-  border: 1px solid #e5e5e6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
 }
 
 /* Scrollbar */
@@ -139,38 +139,38 @@ body.light-theme ::-webkit-scrollbar-track {
 }
 
 body.light-theme ::-webkit-scrollbar-thumb {
-  background: #d4d4d5;
+  background: #d1d5db;
   border-radius: 4px;
 }
 
 body.light-theme ::-webkit-scrollbar-thumb:hover {
-  background: #b4b4b5;
+  background: #9ca3af;
 }
 
 /* Code Blocks */
 body.light-theme pre {
   background: #f7f7f8;
-  border: 1px solid #e5e5e6;
+  border: 1px solid #e5e7eb;
 }
 
 body.light-theme code {
   background: #f7f7f8;
-  color: #1f1f1f;
+  color: #111827;
 }
 
 /* Tables */
 body.light-theme table {
-  border-color: #e5e5e6;
+  border-color: #e5e7eb;
 }
 
 body.light-theme th {
   background: #f7f7f8;
-  color: #6e6e80;
+  color: #6b7280;
   font-weight: 500;
 }
 
 body.light-theme td {
-  border-color: #e5e5e6;
+  border-color: #e5e7eb;
 }
 
 body.light-theme tr:hover {
@@ -184,32 +184,32 @@ body.light-theme .modal-overlay {
 
 body.light-theme .modal-content {
   background: #ffffff;
-  border: 1px solid #e5e5e6;
-  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.14);
 }
 
 /* Dropdown */
 body.light-theme .dropdown {
   background: #ffffff;
-  border: 1px solid #e5e5e6;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
 }
 
 body.light-theme .dropdown-item:hover {
-  background: #f7f7f8;
+  background: #f9fafb;
 }
 
 /* Badge/Tag */
 body.light-theme .badge {
   background: #f7f7f8;
-  color: #6e6e80;
-  border: 1px solid #e5e5e6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
 }
 
 body.light-theme .badge-primary {
-  background: rgba(0, 102, 255, 0.1);
-  color: #0066ff;
-  border-color: rgba(0, 102, 255, 0.2);
+  background: rgba(17, 24, 39, 0.05);
+  color: var(--accent);
+  border-color: rgba(17, 24, 39, 0.08);
 }
 
 body.light-theme .badge-success {
@@ -253,16 +253,16 @@ body.light-theme .skeleton {
 
 /* Divider */
 body.light-theme .divider {
-  border-color: #e5e5e6;
+  border-color: #e5e7eb;
 }
 
 /* Link */
 body.light-theme a {
-  color: #0066ff;
+  color: var(--accent);
 }
 
 body.light-theme a:hover {
-  color: #0052cc;
+  color: var(--accent-hover);
 }
 
 /* Disabled State */
@@ -274,8 +274,8 @@ body.light-theme :disabled {
 
 /* Selection */
 body.light-theme ::selection {
-  background: rgba(0, 102, 255, 0.2);
-  color: #1f1f1f;
+  background: rgba(17, 24, 39, 0.12);
+  color: #111827;
 }
 
 /* Workflow Styles */
@@ -300,29 +300,29 @@ body.light-theme .workflow-inspector {
 
 body.light-theme .workflow-node {
   background: #ffffff;
-  border: 1px solid #ced4da;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
 body.light-theme .workflow-node:hover {
-  border-color: #adb5bd;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  border-color: #d1d5db;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.09);
 }
 
 body.light-theme .workflow-node.selected {
-  border-color: #0066ff;
-  box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.2), 0 8px 16px rgba(0, 0, 0, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(32, 33, 35, 0.08), 0 14px 28px rgba(15, 23, 42, 0.09);
 }
 
 body.light-theme .workflow-node-palette-item {
   background: #ffffff;
-  border-color: #dee2e6;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border-color: #e5e7eb;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 body.light-theme .workflow-node-palette-item:hover {
-  border-color: #0066ff;
-  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
   background: #ffffff;
 }
 
@@ -331,13 +331,13 @@ body.light-theme .workflow-edge {
 }
 
 body.light-theme .workflow-edge.selected {
-  stroke: #0066ff;
+  stroke: var(--accent);
 }
 
 body.light-theme .workflow-context-menu {
   background: #ffffff;
-  border: 1px solid #e5e5e6;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
 }
 
 body.light-theme .workflow-context-menu-item:hover {
@@ -347,28 +347,28 @@ body.light-theme .workflow-context-menu-item:hover {
 /* Right Panel Styles */
 body.light-theme .right-panel {
   background: #ffffff;
-  border-left: 1px solid #e5e5e6;
+  border-left: 1px solid #e5e7eb;
 }
 
 body.light-theme .right-panel-header {
   background: #f7f7f8;
-  border-bottom: 1px solid #e5e5e6;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 body.light-theme .right-panel-tab {
-  color: #6e6e80;
-  border-bottom: 2px solid transparent;
+  color: #6b7280;
+  border-bottom: none;
 }
 
 body.light-theme .right-panel-tab:hover {
-  color: #1f1f1f;
-  background: #ececed;
+  color: #111827;
+  background: #f3f4f6;
 }
 
 body.light-theme .right-panel-tab.active {
-  color: #0066ff;
-  border-bottom-color: #0066ff;
+  color: #111827;
   background: #ffffff;
+  box-shadow: none;
 }
 
 body.light-theme .right-panel-content {
@@ -376,10 +376,9 @@ body.light-theme .right-panel-content {
 }
 
 body.light-theme .right-panel-divider {
-  background: #e5e5e6;
+  background: #e5e7eb;
 }
 
 body.light-theme .right-panel-divider:hover {
-  background: #0066ff;
+  background: #cfd4dc;
 }
-

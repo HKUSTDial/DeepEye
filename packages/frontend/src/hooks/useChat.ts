@@ -277,7 +277,7 @@ export function useChat() {
             if (!currentlyGenerating) {
               startReportGeneration()
               openOrFocusTab('report')
-              setRightPanelRatio(50)
+              setRightPanelRatio(28)
             }
             addReportStep(stepContent)
           }
@@ -286,7 +286,7 @@ export function useChat() {
         if (agentEvent.type === 'agent_start' && agentEvent.source === 'report') {
           startReportGeneration()
           openOrFocusTab('report')
-          setRightPanelRatio(50)
+          setRightPanelRatio(28)
         }
 
         if (agentEvent.type === 'agent_end' && agentEvent.source === 'report') {
@@ -298,7 +298,7 @@ export function useChat() {
           setReportResult(data?.report_html ?? null, data?.steps ?? [], data?.report_filename ?? null, data?.error ?? null)
           // Open the Report panel and enlarge the right panel for better reading
           openOrFocusTab('report')
-          setRightPanelRatio(50)
+          setRightPanelRatio(28)
         }
 
         if (agentEvent.type === 'token') {

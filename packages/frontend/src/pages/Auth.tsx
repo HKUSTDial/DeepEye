@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import AuthShell from '../components/auth/AuthShell'
 import { useAuthStore } from '../stores/auth'
 
-const INPUT_CLASS =
-  'w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-[var(--main-text)] placeholder-[var(--main-text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none'
+const INPUT_CLASS = 'auth-input'
 
 function sanitizeNextPath(raw: string | null): string {
   const value = (raw ?? '').trim()
@@ -26,6 +25,12 @@ export default function Auth() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  const requestFormSubmit = () => {
+    if (isLoading) return
+    formRef.current?.requestSubmit()
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,14 +55,14 @@ export default function Auth() {
       leftDescription="Standard entry point with separated signup and recovery flows."
     >
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div className="auth-feedback auth-feedback--error">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleLogin} className="space-y-4">
-        <div>
-          <label htmlFor="auth-email" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+      <form ref={formRef} onSubmit={handleLogin} className="auth-form">
+        <div className="auth-form-row">
+          <label htmlFor="auth-email" className="auth-form-label">
             Email
           </label>
           <input
@@ -72,8 +77,8 @@ export default function Auth() {
           />
         </div>
 
-        <div>
-          <label htmlFor="auth-password" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+        <div className="auth-form-row">
+          <label htmlFor="auth-password" className="auth-form-label">
             Password
           </label>
           <input
@@ -81,6 +86,12 @@ export default function Auth() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                requestFormSubmit()
+              }
+            }}
             required
             disabled={isLoading}
             placeholder="••••••••"
@@ -91,19 +102,19 @@ export default function Auth() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-xl bg-[var(--accent)] py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+          className="auth-submit"
         >
           {isLoading ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
 
-      <div className="space-y-2 text-sm text-[var(--main-text-muted)]">
+      <div className="auth-muted-actions">
         <div>
           New to DeepEye?{' '}
           <button
             type="button"
             onClick={() => navigate('/register')}
-            className="text-[var(--accent)] hover:underline"
+            className="auth-link"
           >
             Create account
           </button>
@@ -113,7 +124,7 @@ export default function Auth() {
           <button
             type="button"
             onClick={() => navigate('/forgot-password')}
-            className="text-[var(--accent)] hover:underline"
+            className="auth-link"
           >
             Recover access
           </button>

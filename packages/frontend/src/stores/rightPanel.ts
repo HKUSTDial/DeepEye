@@ -43,7 +43,7 @@ export const useRightPanelStore = create<RightPanelState>()(
   persist(
     (set) => ({
       collapsed: true,
-      panelRatio: 40,
+      panelRatio: 28,
       panes: [],
       activePaneId: null,
       maxPanes: 2,

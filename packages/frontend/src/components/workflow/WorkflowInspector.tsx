@@ -162,7 +162,7 @@ export function WorkflowInspector({
             className="workflow-inspector-placeholder"
           >
             <Settings className="workflow-inspector-placeholder-icon" />
-            <p className="workflow-inspector-placeholder-text">Select a node to edit parameters</p>
+            <p className="workflow-inspector-placeholder-text">Select a node to review parameters and run output</p>
           </motion.div>
         )}
 
@@ -199,7 +199,7 @@ export function WorkflowInspector({
             {resolvedRunOutput && (
               <div className="workflow-inspector-output">
                 <div className="workflow-inspector-output-header">
-                  <CheckCircle2 className="w-3 h-12" />
+                  <CheckCircle2 className="w-3 h-3" />
                   Output
                 </div>
                 <pre className="workflow-inspector-output-content">

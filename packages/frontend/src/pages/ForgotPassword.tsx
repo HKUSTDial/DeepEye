@@ -7,8 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import AuthShell from '../components/auth/AuthShell'
 import { authApi } from '../api/auth'
 
-const INPUT_CLASS =
-  'w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-[var(--main-text)] placeholder-[var(--main-text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none'
+const INPUT_CLASS = 'auth-input'
 
 export default function ForgotPassword() {
   const navigate = useNavigate()
@@ -45,25 +44,25 @@ export default function ForgotPassword() {
       leftDescription="Generate a one-time reset link and continue in a dedicated reset screen."
     >
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div className="auth-feedback auth-feedback--error">
           {error}
         </div>
       )}
 
       {message && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 break-words">
+        <div className="auth-feedback auth-feedback--success break-words">
           {message}
           {debugToken && (
-            <div className="mt-2 text-xs text-emerald-200/90">
+            <div className="auth-feedback-meta">
               Debug token: <code>{debugToken}</code>
             </div>
           )}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+      <form onSubmit={handleSubmit} className="auth-form">
+        <div className="auth-form-row">
+          <label htmlFor="email" className="auth-form-label">
             Email
           </label>
           <input
@@ -81,14 +80,14 @@ export default function ForgotPassword() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-xl bg-[var(--accent)] py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+          className="auth-submit"
         >
           {isLoading ? 'Sending...' : 'Send reset link'}
         </button>
       </form>
 
-      <div className="text-sm text-[var(--main-text-muted)]">
-        <button onClick={() => navigate('/auth')} className="text-[var(--accent)] hover:underline">
+      <div className="auth-muted-actions">
+        <button type="button" onClick={() => navigate('/auth')} className="auth-link">
           Back to login
         </button>
       </div>

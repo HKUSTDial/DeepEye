@@ -1,16 +1,13 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { LayoutDashboard, ExternalLink, RefreshCw, Loader2 } from 'lucide-react'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
-import { useTheme } from '../../../hooks/useTheme'
 import { config } from '../../../config'
 
-export function DashboardPanel({ 
-  sessionId 
-}: { 
-  sessionId: string | null 
+export function DashboardPanel({
+  sessionId,
+}: {
+  sessionId: string | null
 }) {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
   const [localRefreshKey, setLocalRefreshKey] = useState(0)
   const [isReady, setIsReady] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
@@ -27,15 +24,15 @@ export function DashboardPanel({
 
   const dashboardUrls = useMemo(() => {
     if (!sessionState?.nodeStatus) return []
-    
-    const urls: { nodeId: string, url: string }[] = []
+
+    const urls: { nodeId: string; url: string }[] = []
     Object.entries(sessionState.nodeStatus).forEach(([nodeId, statusInfo]) => {
       const info = statusInfo as { outputs?: Record<string, unknown> }
       const outputs = info.outputs
       if (outputs?.dashboard_url && typeof outputs.dashboard_url === 'string') {
         urls.push({
           nodeId,
-          url: outputs.dashboard_url
+          url: outputs.dashboard_url,
         })
       }
     })
@@ -47,13 +44,11 @@ export function DashboardPanel({
   const fullDashboardUrl = useMemo(() => {
     if (!latestDashboard?.url) return ''
     if (latestDashboard.url.startsWith('http')) return latestDashboard.url
-    
-    // Construct full URL from API base
+
     const base = config.api.baseUrl.replace('/api/v1', '')
     return `${base}${latestDashboard.url.startsWith('/') ? '' : '/'}${latestDashboard.url}`
   }, [latestDashboard?.url])
 
-  // Check if dashboard is ready (avoid 502)
   useEffect(() => {
     if (!fullDashboardUrl) {
       setIsReady(false)
@@ -72,7 +67,7 @@ export function DashboardPanel({
           }
         }
       } catch {
-        // Ignore errors
+        // Ignore errors while the preview service is still booting.
       } finally {
         setIsChecking(false)
       }
@@ -80,8 +75,6 @@ export function DashboardPanel({
 
     setIsReady(false)
     checkReady()
-
-    // Start polling and stop automatically once ready.
     checkIntervalRef.current = window.setInterval(checkReady, 2000)
 
     return () => {
@@ -92,8 +85,6 @@ export function DashboardPanel({
     }
   }, [fullDashboardUrl, refreshKey])
 
-  // Handle scaling based on container width
-  // Assume dashboard target width is 1280px
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -101,8 +92,8 @@ export function DashboardPanel({
       for (const entry of entries) {
         const { width } = entry.contentRect
         const targetWidth = 1280
-        const newScale = Math.min(width / targetWidth, 1) // Only scale down
-        setScale(newScale)
+        const nextScale = Math.min(width / targetWidth, 1)
+        setScale(nextScale)
       }
     })
 
@@ -112,92 +103,87 @@ export function DashboardPanel({
 
   if (!sessionId) {
     return (
-      <div className={`flex h-full w-full items-center justify-center p-8 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        <p>No active session</p>
+      <div className="right-panel-empty">
+        <div className="right-panel-empty-kicker">Dashboard</div>
+        <LayoutDashboard className="right-panel-empty-icon" />
+        <h3 className="right-panel-empty-title">No active session</h3>
+        <p className="right-panel-empty-subtitle">
+          Start a conversation or run a workflow to open a live dashboard here.
+        </p>
       </div>
     )
   }
 
   if (!latestDashboard) {
     return (
-      <div className={`h-full w-full flex flex-col items-center justify-center p-8 text-center ${
-        isDark ? 'bg-slate-950' : 'bg-slate-50'
-      }`}>
-        <div className={`mb-6 rounded-2xl p-4 ring-1 ${
-          isDark ? 'bg-slate-900/50 ring-slate-800' : 'bg-white ring-slate-200'
-        }`}>
-          <LayoutDashboard className={`h-8 w-8 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
-        </div>
-        <h3 className={`mb-2 text-lg font-medium ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
-          No Dashboard Generated
-        </h3>
-        <p className={`max-w-xs text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-          Ask DeepEye to "generate a dashboard" for your data, and it will appear here.
+      <div className="right-panel-empty">
+        <div className="right-panel-empty-kicker">Dashboard</div>
+        <LayoutDashboard className="right-panel-empty-icon" />
+        <h3 className="right-panel-empty-title">No dashboard yet</h3>
+        <p className="right-panel-empty-subtitle">
+          Ask DeepEye to generate a dashboard for your attached data and the live preview will appear here.
         </p>
       </div>
     )
   }
 
   return (
-    <div className={`h-full w-full flex flex-col ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
-      <div className={`flex items-center justify-between border-b px-3 py-2 text-xs ${
-        isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'
-      }`}>
-        <div className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-          <LayoutDashboard className="h-3.5 w-3.5" />
-          <span className="font-semibold">Dashboard Preview</span>
-          {(!isReady || isChecking) && (
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Waiting for service...
-            </div>
-          )}
+    <div className="panel-view">
+      <div className="panel-toolbar">
+        <div className="panel-toolbar-main">
+          <div className="panel-toolbar-icon">
+            <LayoutDashboard />
+          </div>
+          <div className="panel-toolbar-copy">
+            <div className="panel-toolbar-label">Dashboard</div>
+            <div className="panel-toolbar-title">Live preview</div>
+            {(!isReady || isChecking) && (
+              <div className="panel-toolbar-meta">
+                <span className="panel-toolbar-status">
+                  <Loader2 className="animate-spin" />
+                  Waiting for service...
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="panel-toolbar-actions">
           <button
+            type="button"
             onClick={() => {
               setIsReady(false)
-              setLocalRefreshKey(prev => prev + 1)
+              setLocalRefreshKey((prev) => prev + 1)
             }}
-            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
-              isDark 
-                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
-                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-            }`}
+            className="panel-toolbar-btn"
           >
-            <RefreshCw className="h-3 w-3" />
+            <RefreshCw />
             Refresh
           </button>
           <a
             href={fullDashboardUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
-              isDark 
-                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
-                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-            }`}
+            className="panel-toolbar-link"
           >
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink />
             Open
           </a>
         </div>
       </div>
-      <div 
-        ref={containerRef}
-        className="flex-1 min-h-0 bg-white relative overflow-hidden"
-      >
+
+      <div ref={containerRef} className="panel-frame">
         {!isReady ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-50/50 backdrop-blur-[2px] z-10">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-            <p className="text-sm text-slate-500">Starting dashboard service...</p>
-            <p className="text-xs text-slate-400 max-w-[200px] text-center">
-              This might take up to 30 seconds to install dependencies and start the server.
+          <div className="panel-frame-overlay">
+            <Loader2 className="h-7 w-7 animate-spin text-[var(--accent)]" />
+            <p className="panel-frame-overlay-title">Starting dashboard service</p>
+            <p className="panel-frame-overlay-subtitle">
+              This can take a short while while the preview environment starts.
             </p>
           </div>
         ) : null}
-        
-        <div 
+
+        <div
           className="absolute top-0 left-0"
           style={{
             width: '1280px',
@@ -209,7 +195,7 @@ export function DashboardPanel({
           <iframe
             key={`${fullDashboardUrl}-${refreshKey}`}
             src={fullDashboardUrl}
-            className="w-full h-full border-none"
+            className="h-full w-full border-none"
             title="Dashboard Preview"
           />
         </div>

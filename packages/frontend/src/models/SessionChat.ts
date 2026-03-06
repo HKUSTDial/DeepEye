@@ -64,6 +64,9 @@ export class SessionChat {
     if (last?.isStreaming) {
       last.isStreaming = false
     }
+    if (last?.timeline) {
+      this.clearTextStreamingFlags(last)
+    }
     // 不再这里清空 streamEvents，允许在 agent_end 之后到达的“延迟”Token 继续追加到当前消息
     // this.streamEvents = []
     this.updatedAt = new Date()
@@ -166,13 +169,6 @@ export class SessionChat {
         label,
       })
     }
-    const markLastTextStreaming = (message: Message, streaming: boolean) => {
-      const last = message.timeline?.[message.timeline.length - 1]
-      if (last && last.kind === 'text') {
-        last.isStreaming = streaming
-      }
-    }
-
     for (const e of eventList) {
       const { type, data = {} } = e
       const d = data as Record<string, unknown>
@@ -306,7 +302,8 @@ export class SessionChat {
       }
       else if (type === 'agent_end' || type === 'error') {
         if (current) {
-          markLastTextStreaming(current, false)
+          this.clearTextStreamingFlags(current)
+          current.isStreaming = false
         }
         if (current) result.push(current)
         current = null
@@ -316,6 +313,15 @@ export class SessionChat {
 
     if (current) result.push(current)
     return result
+  }
+
+  private clearTextStreamingFlags(message: Message) {
+    if (!message.timeline) return
+    message.timeline.forEach((item) => {
+      if (item.kind === 'text') {
+        item.isStreaming = false
+      }
+    })
   }
 
   /**

@@ -4,63 +4,49 @@ import { useChatStore } from './stores/chat'
 import { useAuthStore } from './stores/auth'
 import { useRightPanelStore } from './stores/rightPanel'
 import Sidebar from './components/Sidebar'
-import DataSourceManager from './components/DataSourceManager'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
 import './App.css'
 
 function App() {
   const navigate = useNavigate()
-  const [selectedDataSourceIds, setSelectedDataSourceIds] = useState<string[]>([])
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [dataSourceIds, setDataSourceIds] = useState<string[]>([])
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1440 : false,
+  )
+  const [chatCollapsed, setChatCollapsed] = useState(false)
 
-  // Resizable panel ratios (percentage based)
-  const MIN_PANEL_RATIO = 25
-  const MAX_PANEL_RATIO = 60
+  const MIN_CHAT_RATIO = 22
+  const MAX_CHAT_RATIO = 38
 
-  // Drag state
-  const [isDraggingPanel, setIsDraggingPanel] = useState(false)
+  const [isDraggingChat, setIsDraggingChat] = useState(false)
+  const hasNormalizedLayoutRef = useRef(false)
   const mainAreaRef = useRef<HTMLDivElement>(null)
 
-  // 每个属性单独订阅 - 最简单可靠的方式
   const sessionId = useChatStore((state) => state.sessionId)
   const currentSession = useChatStore((state) => state.currentSession)
   const messages = useChatStore((state) => state.messages)
   const createDraftSession = useChatStore((state) => state.createDraftSession)
   const currentUser = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
-  const rightPanelCollapsed = useRightPanelStore((state) => state.collapsed)
-  const setRightPanelCollapsed = useRightPanelStore((state) => state.setCollapsed)
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
   const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
-  const rightPanelPanes = useRightPanelStore((state) => state.panes)
-  const openRightPanelTab = useRightPanelStore((state) => state.openTab)
+
   const chatTitle = useMemo(() => {
     const title = currentSession?.title?.trim()
-    if (!title || title === 'New conversation') return 'DeepEye Assistant'
+    if (!title || title === 'New conversation') return 'Ask DeepEye'
     return title
   }, [currentSession?.title])
-  const selectedDataSourceCount = selectedDataSourceIds.length
-
-  const handleDataSourceToggle = (id: string) => {
-    setSelectedDataSourceIds((prev) => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    )
-  }
-
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed)
-  }
-
-  const toggleRightPanel = () => {
-    if (rightPanelCollapsed) {
-      setRightPanelCollapsed(false)
-      if (rightPanelPanes.length === 0) {
-        openRightPanelTab('files')
-      }
-      return
+  const workspaceNote = useMemo(() => {
+    if (chatTitle !== 'Ask DeepEye') {
+      return `Thread: ${chatTitle}`
     }
-    setRightPanelCollapsed(true)
+    return 'Reports, dashboards, files, and previews'
+  }, [chatTitle])
+
+  const toggleSidebarCollapse = () => {
+    setSidebarCollapsed((current) => !current)
   }
 
   const handleNewChat = () => {
@@ -75,172 +61,202 @@ function App() {
     navigate('/auth')
   }
 
-  // Panel resize handlers
-  const startPanelDrag = (e: React.MouseEvent) => {
+  const startChatDrag = (e: React.MouseEvent) => {
     e.preventDefault()
-    setIsDraggingPanel(true)
+    setIsDraggingChat(true)
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
   }
 
-  const onPanelDrag = useCallback((e: MouseEvent) => {
-    if (!isDraggingPanel || !mainAreaRef.current) return
+  const onChatDrag = useCallback((e: MouseEvent) => {
+    if (!isDraggingChat || !mainAreaRef.current) return
+
     const mainRect = mainAreaRef.current.getBoundingClientRect()
     const mainWidth = mainRect.width
     const relativeX = e.clientX - mainRect.left
-    const newRatio = ((mainWidth - relativeX) / mainWidth) * 100
-    setRightPanelRatio(Math.max(MIN_PANEL_RATIO, Math.min(MAX_PANEL_RATIO, newRatio)))
-  }, [isDraggingPanel, setRightPanelRatio])
+    const nextRatio = ((mainWidth - relativeX) / mainWidth) * 100
 
-  const stopPanelDrag = useCallback(() => {
-    setIsDraggingPanel(false)
+    setRightPanelRatio(Math.max(MIN_CHAT_RATIO, Math.min(MAX_CHAT_RATIO, nextRatio)))
+  }, [isDraggingChat, setRightPanelRatio])
+
+  const stopChatDrag = useCallback(() => {
+    setIsDraggingChat(false)
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
   }, [])
 
   useEffect(() => {
-    if (isDraggingPanel) {
-      document.addEventListener('mousemove', onPanelDrag)
-      document.addEventListener('mouseup', stopPanelDrag)
-      return () => {
-        document.removeEventListener('mousemove', onPanelDrag)
-        document.removeEventListener('mouseup', stopPanelDrag)
-      }
+    if (!isDraggingChat) return
+
+    document.addEventListener('mousemove', onChatDrag)
+    document.addEventListener('mouseup', stopChatDrag)
+    return () => {
+      document.removeEventListener('mousemove', onChatDrag)
+      document.removeEventListener('mouseup', stopChatDrag)
     }
-  }, [isDraggingPanel, onPanelDrag, stopPanelDrag])
+  }, [isDraggingChat, onChatDrag, stopChatDrag])
 
-  const isDragging = isDraggingPanel
+  useEffect(() => {
+    if (hasNormalizedLayoutRef.current || typeof window === 'undefined') return
+    hasNormalizedLayoutRef.current = true
 
-  const rightPanelStyle = useMemo(
+    if (rightPanelRatio < MIN_CHAT_RATIO || rightPanelRatio > 42) {
+      setRightPanelRatio(window.innerWidth < 1320 ? 30 : 28)
+    }
+  }, [rightPanelRatio, setRightPanelRatio])
+
+  const workspaceStyle = useMemo(
     () => ({
-      flex: rightPanelCollapsed ? '0 0 0' : `0 0 ${rightPanelRatio}%`,
+      flex: chatCollapsed ? '1 1 auto' : `1 1 ${100 - rightPanelRatio}%`,
     }),
-    [rightPanelCollapsed, rightPanelRatio],
+    [chatCollapsed, rightPanelRatio],
   )
 
-  const chatAreaStyle = useMemo(() => ({
-    flex: rightPanelCollapsed ? '1 1 100%' : `1 1 ${100 - rightPanelRatio}%`,
-  }), [rightPanelCollapsed, rightPanelRatio])
+  const chatStyle = useMemo(
+    () => ({
+      flex: chatCollapsed ? '0 0 56px' : `0 0 ${rightPanelRatio}%`,
+    }),
+    [chatCollapsed, rightPanelRatio],
+  )
 
   return (
-    <div className="app-shell flex h-screen w-screen overflow-hidden">
-      {/* Sidebar */}
+    <div className="app-shell">
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close navigation drawer"
+        />
+      )}
+
       <aside
-        className={`sidebar flex flex-col h-full flex-shrink-0 transition-all duration-300 ${
-          sidebarCollapsed ? 'w-20' : 'w-64'
-        }`}
-        style={{ background: 'var(--sidebar-bg)' }}
+        className={`sidebar-drawer ${sidebarOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'is-collapsed' : 'is-expanded'}`}
+        style={{ width: sidebarCollapsed ? '96px' : '304px' }}
       >
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="app-sidebar-panel">
+          <div className="app-sidebar-body">
             <Sidebar
               collapsed={sidebarCollapsed}
-              onToggleCollapse={toggleSidebar}
+              onToggleCollapse={toggleSidebarCollapse}
               currentUser={currentUser}
               onLogout={handleLogout}
-            />
-          </div>
-          <div className="flex-shrink-0">
-            <DataSourceManager
-              selectedIds={selectedDataSourceIds}
-              onToggle={handleDataSourceToggle}
-              collapsed={sidebarCollapsed}
             />
           </div>
         </div>
       </aside>
 
-      {/* Main Area */}
-      <main ref={mainAreaRef} className="flex-1 flex min-w-0 relative" style={{ background: 'var(--main-bg)' }}>
-        {/* Chat Area */}
-        <div className="chat-area-shell flex flex-col min-w-0 relative" style={chatAreaStyle}>
-          <div className="chat-topbar">
-            <div className="chat-topbar-meta">
-              <span className="chat-topbar-kicker">Chat</span>
-              <span className="chat-topbar-title" title={chatTitle}>
-                {chatTitle}
-              </span>
-            </div>
-            <div className="chat-topbar-actions">
-              <button
-                type="button"
-                className="chat-topbar-new-btn"
-                onClick={handleNewChat}
-                title="Start a new conversation"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>New chat</span>
-              </button>
-              <span className="chat-status-pill">
-                {selectedDataSourceCount > 0 ? `${selectedDataSourceCount} data source(s) attached` : 'No data source selected'}
-              </span>
-              {sessionId && (
+      <main className="workspace-shell">
+        <section className="workspace-stage">
+          <div ref={mainAreaRef} className={`workspace-split ${chatCollapsed ? 'chat-collapsed' : ''}`}>
+            <section className="workspace-main" style={workspaceStyle}>
+              <div className="workspace-main-card">
+                <div className="workspace-main-toolbar">
+                  <div className="workspace-main-toolbar-copy">
+                    <button
+                      type="button"
+                      className="workspace-shell-btn"
+                      onClick={() => setSidebarOpen(true)}
+                      aria-label="Open navigation"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                      <span>Menu</span>
+                    </button>
+                    <div className="workspace-main-toolbar-copytext">
+                      <span className="workspace-main-toolbar-heading">Workspace</span>
+                      <span className="workspace-main-toolbar-note" title={workspaceNote}>{workspaceNote}</span>
+                    </div>
+                  </div>
+                  <div className="workspace-main-toolbar-actions">
+                    <button
+                      type="button"
+                      className="workspace-toolbar-btn"
+                      onClick={() => setChatCollapsed((current) => !current)}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {chatCollapsed ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M3 7h18M3 12h18M3 17h18" />
+                        ) : (
+                          <>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M4 7h16M4 12h10M4 17h16" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M18 10v4" />
+                          </>
+                        )}
+                      </svg>
+                      {chatCollapsed ? 'Show assistant' : 'Hide assistant'}
+                    </button>
+                    <button
+                      type="button"
+                      className="workspace-toolbar-btn workspace-toolbar-btn-primary"
+                      onClick={handleNewChat}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+                      </svg>
+                      New chat
+                    </button>
+                  </div>
+                </div>
+                <div className="workspace-main-body">
+                  <RightPanelLayout sessionId={sessionId} dataSourceIds={dataSourceIds} />
+                </div>
+              </div>
+            </section>
+
+            {!chatCollapsed && (
+              <div
+                className={`chat-rail-splitter ${isDraggingChat ? 'is-active' : ''}`}
+                onMouseDown={startChatDrag}
+              />
+            )}
+
+            <aside className={`chat-rail ${chatCollapsed ? 'is-collapsed' : 'is-open'}`} style={chatStyle}>
+              {chatCollapsed ? (
                 <button
-                  onClick={toggleRightPanel}
-                  className={`chat-panel-toggle ${rightPanelCollapsed ? '' : 'active'}`}
-                  title={rightPanelCollapsed ? 'Open workspace panel' : 'Hide workspace panel'}
-                  aria-label={rightPanelCollapsed ? 'Open workspace panel' : 'Hide workspace panel'}
+                  type="button"
+                  className="chat-rail-collapsed-bar"
+                  onClick={() => setChatCollapsed(false)}
+                  aria-label="Open assistant"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                    />
-                  </svg>
-                  <span className="chat-panel-toggle-status"></span>
+                  <span className="chat-rail-collapsed-icon" aria-hidden="true">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M8 10h8M8 14h5" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M12 3c4.971 0 9 3.806 9 8.5S16.971 20 12 20a9.57 9.57 0 01-3.756-.741L4 20l1.05-3.063C3.768 15.43 3 13.544 3 11.5 3 6.806 7.029 3 12 3Z" />
+                    </svg>
+                  </span>
+                  <span className="chat-rail-collapsed-title">Open</span>
                 </button>
+              ) : (
+                <div className="chat-rail-card">
+                  <div className="chat-rail-header">
+                    <div className="chat-rail-header-copy">
+                      <span className="chat-rail-kicker">Assistant</span>
+                      <span className="chat-rail-title" title={chatTitle}>{chatTitle}</span>
+                    </div>
+                    <div className="chat-rail-actions">
+                      <button
+                        type="button"
+                        className="chat-rail-action-btn"
+                        onClick={() => setChatCollapsed(true)}
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  </div>
+                  <div className="chat-rail-body">
+                    <ChatBox
+                      dataSourceIds={dataSourceIds}
+                      onDataSourceIdsChange={setDataSourceIds}
+                      compact
+                    />
+                  </div>
+                </div>
               )}
-            </div>
+            </aside>
           </div>
-
-          <div className="chat-main-shell">
-            {/* ChatBox is now always shown */}
-            <ChatBox dataSourceIds={selectedDataSourceIds} />
-          </div>
-        </div>
-
-        {!rightPanelCollapsed && (
-          <button
-            type="button"
-            className="right-panel-mobile-backdrop"
-            onClick={toggleRightPanel}
-            aria-label="Close workspace panel"
-          />
-        )}
-
-        {/* Right Panel */}
-        <aside
-          className={`right-panel flex relative ${rightPanelCollapsed ? 'is-collapsed' : 'is-open'} ${isDragging ? 'no-transition' : ''}`}
-          style={rightPanelStyle}
-        >
-          {!rightPanelCollapsed && (
-            <div
-              className={`resize-handle-panel ${isDraggingPanel ? 'resize-active' : ''}`}
-              onMouseDown={startPanelDrag}
-            ></div>
-          )}
-          <div
-            className={`right-panel-content flex h-full flex-1 overflow-hidden ${
-              rightPanelCollapsed ? 'opacity-0 pointer-events-none' : ''
-            }`}
-          >
-            <RightPanelLayout 
-              sessionId={sessionId} 
-              dataSourceIds={selectedDataSourceIds} 
-              onRequestClose={() => setRightPanelCollapsed(true)}
-            />
-          </div>
-        </aside>
+        </section>
       </main>
     </div>
   )

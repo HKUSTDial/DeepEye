@@ -1,41 +1,41 @@
 /* Dark Theme - TaskHarbor Style */
 
 body.dark-theme {
-  --sidebar-bg: #1a1d23;
-  --sidebar-hover: #252930;
-  --sidebar-active: #2d323a;
-  --sidebar-border: #2d323a;
-  --sidebar-text: #e4e4e7;
-  --sidebar-text-muted: #a1a1aa;
+  --sidebar-bg: #131c1c;
+  --sidebar-hover: #1d2a29;
+  --sidebar-active: #243433;
+  --sidebar-border: #263736;
+  --sidebar-text: #e4ece8;
+  --sidebar-text-muted: #8fa39c;
 
-  --main-bg: #111318;
-  --main-bg-alt: #1a1d23;
-  --main-text: #e4e4e7;
-  --main-text-muted: #a1a1aa;
+  --main-bg: #0d1314;
+  --main-bg-alt: #162223;
+  --main-text: #e4ece8;
+  --main-text-muted: #90a59f;
 
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
+  --accent: #49b6a6;
+  --accent-hover: #2f9385;
 
-  --input-bg: #1a1d23;
-  --input-border: #2d323a;
-  --input-focus: #3b82f6;
+  --input-bg: #162223;
+  --input-border: #29403d;
+  --input-focus: #49b6a6;
 
-  --border-color: #2d323a;
-  --border-hover: #3d424a;
+  --border-color: #263a38;
+  --border-hover: #35504d;
 
-  --card-bg: #1a1d23;
-  --card-bg-hover: #252930;
-  --card-border: #2d323a;
-  --card-border-hover: #3d424a;
+  --card-bg: #162120;
+  --card-bg-hover: #1c2b2a;
+  --card-border: #28403d;
+  --card-border-hover: #35524f;
 
-  --table-header-bg: #1a1d23;
-  --table-header-text: #a1a1aa;
-  --table-row-hover: #252930;
-  --table-border: #2d323a;
+  --table-header-bg: #162223;
+  --table-header-text: #92a7a0;
+  --table-row-hover: #1d2a29;
+  --table-border: #263a38;
 
-  --panel-bg: #1a1d23;
-  --panel-border: #2d323a;
-  --panel-resize: #3b82f6;
+  --panel-bg: #131e1e;
+  --panel-border: #28403d;
+  --panel-resize: #49b6a6;
 
   --success: #22c55e;
   --success-bg: rgba(34, 197, 94, 0.1);
@@ -43,21 +43,21 @@ body.dark-theme {
   --warning-bg: rgba(245, 158, 11, 0.1);
   --error: #ef4444;
   --error-bg: rgba(239, 68, 68, 0.1);
-  --info: #3b82f6;
-  --info-bg: rgba(59, 130, 246, 0.1);
+  --info: #49b6a6;
+  --info-bg: rgba(73, 182, 166, 0.14);
 
-  background: #111318;
-  color: #e4e4e7;
+  background: #0d1314;
+  color: #e4ece8;
 }
 
 /* Buttons */
 body.dark-theme .btn-primary {
-  background: #3b82f6;
+  background: var(--accent);
   color: #ffffff;
 }
 
 body.dark-theme .btn-primary:hover {
-  background: #2563eb;
+  background: var(--accent-hover);
 }
 
 body.dark-theme .btn-secondary {
@@ -95,8 +95,8 @@ body.dark-theme select {
 body.dark-theme input:focus,
 body.dark-theme textarea:focus,
 body.dark-theme select:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(73, 182, 166, 0.12);
 }
 
 body.dark-theme input::placeholder,
@@ -193,9 +193,9 @@ body.dark-theme .badge {
 }
 
 body.dark-theme .badge-primary {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(73, 182, 166, 0.16);
+  color: color-mix(in srgb, var(--accent) 82%, #ffffff);
+  border-color: rgba(73, 182, 166, 0.28);
 }
 
 body.dark-theme .badge-success {
@@ -233,16 +233,16 @@ body.dark-theme .divider {
 
 /* Links */
 body.dark-theme a {
-  color: #60a5fa;
+  color: color-mix(in srgb, var(--accent) 82%, #ffffff);
 }
 
 body.dark-theme a:hover {
-  color: #3b82f6;
+  color: var(--accent);
 }
 
 /* Selection */
 body.dark-theme ::selection {
-  background: rgba(59, 130, 246, 0.3);
+  background: rgba(73, 182, 166, 0.28);
   color: #e4e4e7;
 }
 
@@ -278,8 +278,8 @@ body.dark-theme .workflow-node:hover {
 }
 
 body.dark-theme .workflow-node.selected {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(73, 182, 166, 0.28);
 }
 
 body.dark-theme .workflow-edge {
@@ -287,7 +287,7 @@ body.dark-theme .workflow-edge {
 }
 
 body.dark-theme .workflow-edge.selected {
-  stroke: #3b82f6;
+  stroke: var(--accent);
 }
 
 body.dark-theme .workflow-context-menu {
@@ -313,7 +313,7 @@ body.dark-theme .right-panel-header {
 
 body.dark-theme .right-panel-tab {
   color: #a1a1aa;
-  border-bottom: 2px solid transparent;
+  border-bottom: none;
 }
 
 body.dark-theme .right-panel-tab:hover {
@@ -322,9 +322,9 @@ body.dark-theme .right-panel-tab:hover {
 }
 
 body.dark-theme .right-panel-tab.active {
-  color: #60a5fa;
-  border-bottom-color: #3b82f6;
+  color: color-mix(in srgb, var(--accent) 82%, #ffffff);
   background: #252930;
+  box-shadow: none;
 }
 
 body.dark-theme .right-panel-content {
@@ -336,6 +336,5 @@ body.dark-theme .right-panel-divider {
 }
 
 body.dark-theme .right-panel-divider:hover {
-  background: #3b82f6;
+  background: var(--accent);
 }
-

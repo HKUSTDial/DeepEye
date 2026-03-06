@@ -8,8 +8,7 @@ import AuthShell from '../components/auth/AuthShell'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
 
-const INPUT_CLASS =
-  'w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-[var(--main-text)] placeholder-[var(--main-text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none'
+const INPUT_CLASS = 'auth-input'
 
 export default function VerifyEmail() {
   const navigate = useNavigate()
@@ -76,16 +75,16 @@ export default function VerifyEmail() {
       leftDescription="Verification remains a dedicated trust step, not a primary entry point."
     >
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div className="auth-feedback auth-feedback--error">
           {error}
         </div>
       )}
 
       {message && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 break-words">
+        <div className="auth-feedback auth-feedback--success break-words">
           {message}
           {debugToken && (
-            <div className="mt-2 text-xs text-emerald-200/90">
+            <div className="auth-feedback-meta">
               Debug token: <code>{debugToken}</code>
             </div>
           )}
@@ -93,25 +92,26 @@ export default function VerifyEmail() {
       )}
 
       {token ? (
-        <div className="space-y-4">
+        <div className="auth-form">
           <p className="text-sm text-[var(--main-text-muted)]">
             Click below to confirm your email with the verification token in this URL.
           </p>
           <button
+            type="button"
             onClick={handleConfirm}
             disabled={isSubmitting}
-            className="w-full rounded-xl bg-[var(--accent)] py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+            className="auth-submit"
           >
             {isSubmitting ? 'Verifying...' : 'Verify email now'}
           </button>
         </div>
       ) : (
-        <form onSubmit={handleResend} className="space-y-4">
+        <form onSubmit={handleResend} className="auth-form">
           <p className="text-sm text-[var(--main-text-muted)]">
             Need a new verification email? Enter your account email below.
           </p>
-          <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+          <div className="auth-form-row">
+            <label htmlFor="email" className="auth-form-label">
               Email
             </label>
             <input
@@ -128,18 +128,18 @@ export default function VerifyEmail() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-xl bg-[var(--accent)] py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+            className="auth-submit"
           >
             {isSubmitting ? 'Sending...' : 'Send verification email'}
           </button>
         </form>
       )}
 
-      <div className="space-x-3 text-sm text-[var(--main-text-muted)]">
-        <button onClick={() => navigate('/auth')} className="text-[var(--accent)] hover:underline">
+      <div className="auth-inline-actions">
+        <button type="button" onClick={() => navigate('/auth')} className="auth-link">
           Back to login
         </button>
-        <button onClick={() => navigate('/forgot-password')} className="text-[var(--accent)] hover:underline">
+        <button type="button" onClick={() => navigate('/forgot-password')} className="auth-link">
           Forgot password
         </button>
       </div>

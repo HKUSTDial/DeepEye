@@ -1,18 +1,27 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { datasourceApi } from '../api'
 import { useChat } from '../hooks/useChat'
 import { useChatStore } from '../stores/chat'
 import { useKnowledgeBasesStore } from '../stores/knowledgeBases'
+import DataSourceManager from './DataSourceManager'
 import StepItem from './StepItem'
 import type { Message } from '../types'
 import './ChatBox.css'
 
 interface ChatBoxProps {
   dataSourceIds: string[]
+  onDataSourceIdsChange?: (ids: string[]) => void
+  compact?: boolean
 }
 
-export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
+export default function ChatBox({
+  dataSourceIds,
+  onDataSourceIdsChange,
+  compact = false,
+}: ChatBoxProps) {
   const { sendMessage, stopMessage, error } = useChat()
   // 每个属性单独订阅 - 最简单可靠的方式
   const messages = useChatStore((state) => state.messages)
@@ -24,51 +33,76 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
-  const [csvFiles, setCsvFiles] = useState<File[]>([])
-  const [uploadNotice, setUploadNotice] = useState<string | null>(null)
-  const [attachmentsExpanded, setAttachmentsExpanded] = useState(true)
+  const [showDataSourceManager, setShowDataSourceManager] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
   const compositionEndedAtRef = useRef(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const mentionDropdownRef = useRef<HTMLDivElement>(null)
   const starterPrompts = [
     {
-      label: 'Analyze This Data',
-      description: 'Profile fields, data quality, and immediate risks.',
-      prompt: 'Please analyze my selected data sources, highlight key fields, data quality issues, and the most practical next steps.',
+      label: 'Profile the data',
+      description: 'Check fields, structure, data quality, and immediate issues.',
+      prompt: 'Please analyze my attached data sources, highlight key fields, data quality issues, and the most practical next steps.',
     },
     {
-      label: 'Suggest Visual Insights',
-      description: 'Propose high-impact charts with business questions.',
+      label: 'Recommend charts',
+      description: 'Suggest the highest-signal visuals and what each one answers.',
       prompt: 'Recommend three high-value visualizations for this dataset and explain what business questions each chart answers.',
     },
     {
-      label: 'Draft a Report',
-      description: 'Create an executive summary with actions and follow-ups.',
+      label: 'Outline a report',
+      description: 'Draft a concise report with findings, risks, and actions.',
       prompt: 'Generate a business report draft with summary, key findings, risks, and actionable recommendations.',
     },
   ]
 
-  const isSupportedReportFile = (name: string) => {
-    const n = name.toLowerCase()
-    return n.endsWith('.csv') || n.endsWith('.json') || n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.parquet')
-  }
+  const syncDatasourceIds = useCallback(async () => {
+    if (!onDataSourceIdsChange) return
+    try {
+      const list = await datasourceApi.list()
+      onDataSourceIdsChange(list.map((item) => item.id))
+    } catch {
+      // Keep composer usable even if datasource refresh fails.
+    }
+  }, [onDataSourceIdsChange])
 
   useEffect(() => {
     loadBases()
   }, [loadBases])
 
   useEffect(() => {
-    if (!uploadNotice) return
-    const timer = window.setTimeout(() => {
-      setUploadNotice(null)
-    }, 3200)
-    return () => window.clearTimeout(timer)
-  }, [uploadNotice])
+    void syncDatasourceIds()
+  }, [syncDatasourceIds])
+
+  useEffect(() => {
+    const onUpdated = () => {
+      void syncDatasourceIds()
+    }
+    window.addEventListener('datasources:updated', onUpdated)
+    return () => window.removeEventListener('datasources:updated', onUpdated)
+  }, [syncDatasourceIds])
+
+  useEffect(() => {
+    if (!showDataSourceManager) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowDataSourceManager(false)
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [showDataSourceManager])
 
   useEffect(() => {
     const onMouseDown = (event: MouseEvent) => {
@@ -84,6 +118,17 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [showMentions])
 
+  const resizeTextarea = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+  }, [])
+
+  useEffect(() => {
+    resizeTextarea()
+  }, [input, resizeTextarea])
+
   const extractKbIds = (text: string) => {
     const ids: string[] = []
     kbBases.forEach((kb) => {
@@ -95,28 +140,18 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   }
 
   const handleSend = () => {
-    const canSend = (input.trim() || csvFiles.length > 0) && !isStreaming
+    const canSend = Boolean(input.trim()) && !isStreaming
     if (!canSend) return
-    const query = input.trim() || 'Generate a comprehensive report.'
+    const query = input.trim()
     const kbIds = extractKbIds(query)
-    sendMessage(query, dataSourceIds, kbIds, csvFiles.length > 0 ? csvFiles : undefined)
+    sendMessage(query, dataSourceIds, kbIds)
     setInput('')
-    setCsvFiles([])
-    setUploadNotice(null)
-    setAttachmentsExpanded(false)
     setShowMentions(false)
     setMentionQuery('')
     setActiveMentionIndex(0)
     setIsNearBottom(true)
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    if (fileInputRef.current) fileInputRef.current.value = ''
     scrollToBottom()
-  }
-
-  const autoResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const el = e.target
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 200) + 'px'
   }
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -231,11 +266,13 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
 
   const applyStarterPrompt = (prompt: string) => {
     setInput(prompt)
-    if (textareaRef.current) {
+    requestAnimationFrame(() => {
+      if (!textareaRef.current) return
       textareaRef.current.focus()
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px'
-    }
+      const caret = prompt.length
+      textareaRef.current.setSelectionRange(caret, caret)
+      resizeTextarea()
+    })
   }
 
   const copyMessageContent = async (content: string, index: number) => {
@@ -260,8 +297,16 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   )
   const hasText = (value?: string) => Boolean(value && value.trim().length > 0)
   const showJumpButton = messages.length > 0 && !isNearBottom
-  const sourceStatusText = dataSourceIds.length > 0 ? `${dataSourceIds.length} data source(s) ready` : 'No data source attached yet'
-  const attachmentCount = csvFiles.length
+  const sourceStatusText = dataSourceIds.length > 0
+    ? `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}`
+    : 'No attached data yet'
+  const composerHelperText = dataSourceIds.length > 0
+    ? 'All attached data is used automatically.'
+    : 'Attach a file or connect a database from Attached data.'
+  const emptyTitle = dataSourceIds.length > 0 ? 'Ask about the workspace' : 'Attach data to begin'
+  const emptySubtitle = dataSourceIds.length > 0
+    ? 'Use the assistant to inspect attached data, explain outputs, write SQL, or draft next steps.'
+    : 'Use + to add files or databases. Once attached, they are available automatically in this thread.'
 
   const renderAssistantMessage = (msg: Message) => {
     const timeline = msg.timeline && msg.timeline.length > 0 ? msg.timeline : null
@@ -316,7 +361,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   }
 
   return (
-    <div className="chat-container">
+    <div className={`chat-container ${compact ? 'compact' : ''}`}>
       {/* Messages Area */}
       <div ref={chatContainerRef} className="chat-messages">
         {/* Empty State */}
@@ -325,13 +370,15 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             <svg className="chat-empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <h2 className="chat-empty-title">How can I help you today?</h2>
-            <p className="chat-empty-subtitle">
-              Ask me to analyze your data, write SQL queries, or create visualizations.
-            </p>
+            <h2 className="chat-empty-title">{emptyTitle}</h2>
+            <p className="chat-empty-subtitle">{emptySubtitle}</p>
+            <div className={`chat-empty-status ${dataSourceIds.length > 0 ? 'is-active' : ''}`}>
+              <span className="chat-empty-status-dot" aria-hidden="true"></span>
+              <span>{sourceStatusText}</span>
+            </div>
             <div className="chat-empty-context">
-              <span className={`chat-empty-context-chip ${dataSourceIds.length > 0 ? 'active' : ''}`}>{sourceStatusText}</span>
-              <span className="chat-empty-context-chip">@knowledge-base mentions supported</span>
+              <span className={`chat-empty-context-chip ${dataSourceIds.length > 0 ? 'active' : ''}`}>Files and databases join automatically</span>
+              <span className="chat-empty-context-chip">Use @ to reference a knowledge base</span>
             </div>
             <div className="chat-empty-prompts">
               {starterPrompts.map((item) => (
@@ -341,8 +388,15 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
                   className="chat-empty-prompt"
                   onClick={() => applyStarterPrompt(item.prompt)}
                 >
-                  <span className="chat-empty-prompt-title">{item.label}</span>
-                  <span className="chat-empty-prompt-desc">{item.description}</span>
+                  <span className="chat-empty-prompt-copy">
+                    <span className="chat-empty-prompt-title">{item.label}</span>
+                    <span className="chat-empty-prompt-desc">{item.description}</span>
+                  </span>
+                  <span className="chat-empty-prompt-arrow" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M9 7h8v8" />
+                    </svg>
+                  </span>
                 </button>
               ))}
             </div>
@@ -428,91 +482,20 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
       {/* Input Area */}
       <div className="chat-input-container">
         <div className="chat-input-shell">
-          {attachmentCount > 0 && (
-            <div className="chat-attachments">
-              <button
-                type="button"
-                className="chat-attachments-toggle"
-                onClick={() => setAttachmentsExpanded((prev) => !prev)}
-                aria-expanded={attachmentsExpanded}
-              >
-                <span className="chat-attachments-label">Files for workflow</span>
-                <span className="chat-attachments-count">{attachmentCount}</span>
-                <svg className={`chat-attachments-chevron ${attachmentsExpanded ? 'expanded' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {attachmentsExpanded && (
-                <div className="chat-attachments-list">
-                  {csvFiles.map((f, i) => (
-                    <span key={i} className="chat-attachment-chip">
-                      {f.name}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCsvFiles((prev) => {
-                            const next = prev.filter((_, j) => j !== i)
-                            if (next.length === 0) {
-                              setAttachmentsExpanded(false)
-                            }
-                            return next
-                          })
-                        }
-                        className="chat-attachment-remove"
-                        aria-label="Remove file"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           <div className="chat-input-wrapper">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.json,.xlsx,.xls,.parquet"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const list = e.target.files ? Array.from(e.target.files) : []
-                const supported = list.filter((f) => isSupportedReportFile(f.name))
-                const existing = new Set(csvFiles.map((f) => `${f.name}:${f.size}:${f.lastModified}`))
-                const uniqueSupported = supported.filter((f) => {
-                  const signature = `${f.name}:${f.size}:${f.lastModified}`
-                  if (existing.has(signature)) return false
-                  existing.add(signature)
-                  return true
-                })
-                const unsupportedCount = list.length - supported.length
-                const duplicateCount = supported.length - uniqueSupported.length
-                const noticeParts: string[] = []
-                if (unsupportedCount > 0) {
-                  noticeParts.push(`${unsupportedCount} unsupported file(s) ignored`)
-                }
-                if (duplicateCount > 0) {
-                  noticeParts.push(`${duplicateCount} duplicate file(s) skipped`)
-                }
-                setUploadNotice(noticeParts.length > 0 ? `${noticeParts.join('. ')}.` : null)
-                setCsvFiles((prev) => [...prev, ...uniqueSupported])
-                if (uniqueSupported.length > 0) {
-                  setAttachmentsExpanded(true)
-                }
-                e.target.value = ''
-              }}
-            />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="chat-upload-btn"
-              title="Upload data files"
-              disabled={isStreaming}
+              className={`chat-upload-btn ${showDataSourceManager ? 'is-active' : ''}`}
+              onClick={() => setShowDataSourceManager((current) => !current)}
+              title={dataSourceIds.length > 0 ? `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}` : 'Attach data'}
+              aria-label={dataSourceIds.length > 0 ? `Manage ${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}` : 'Attach data'}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.9">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
               </svg>
+              {dataSourceIds.length > 0 && (
+                <span className="chat-upload-count">{dataSourceIds.length}</span>
+              )}
             </button>
             <textarea
               ref={textareaRef}
@@ -520,7 +503,6 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               onChange={(e) => {
                 const value = e.target.value
                 setInput(value)
-                autoResize(e)
                 const match = value.match(/@([^\s@]*)$/)
                 if (match) {
                   setShowMentions(true)
@@ -538,7 +520,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               rows={1}
               className="chat-input"
               style={{ maxHeight: '200px' }}
-              placeholder={csvFiles.length > 0 ? 'Describe what report you want (or send as-is)...' : 'Message DeepEye...'}
+              placeholder={dataSourceIds.length > 0 ? 'Ask DeepEye about your attached data...' : 'Attach data, then message DeepEye...'}
               disabled={isStreaming}
             />
             {showMentions && (
@@ -573,7 +555,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             ) : (
               <button
                 onClick={handleSend}
-                disabled={(!input.trim() && csvFiles.length === 0) || isStreaming}
+                disabled={!input.trim() || isStreaming}
                 className="chat-send-btn"
               >
                 <svg
@@ -592,21 +574,56 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               </button>
             )}
           </div>
-          <div className="chat-input-meta">
-            <p className="chat-input-hint">
-              Enter to send, Shift+Enter for newline. DeepEye can make mistakes, please verify important results.
-            </p>
-            <span className="chat-input-ds-badge">
-              {dataSourceIds.length > 0 ? `${dataSourceIds.length} source(s) attached` : 'No source attached'}
-            </span>
-          </div>
-          {uploadNotice && (
-            <p className="chat-upload-notice" role="status">
-              {uploadNotice}
-            </p>
+          {!compact && (
+            <div className="chat-input-meta">
+              <p className="chat-input-hint">
+                {composerHelperText} Enter to send. Shift+Enter for newline. Verify critical results.
+              </p>
+              <span className={`chat-input-ds-badge ${dataSourceIds.length > 0 ? 'is-active' : ''}`}>
+                {dataSourceIds.length > 0 ? `${dataSourceIds.length} data attached` : 'Use + to add data'}
+              </span>
+            </div>
+          )}
+          {compact && (
+            <div className="chat-input-meta">
+              <span className={`chat-input-ds-badge ${dataSourceIds.length > 0 ? 'is-active' : ''}`}>
+                {dataSourceIds.length > 0 ? `${dataSourceIds.length} data attached` : 'Use + to add data'}
+              </span>
+            </div>
           )}
         </div>
       </div>
+      {showDataSourceManager &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="chat-datasource-modal-overlay"
+            onClick={() => setShowDataSourceManager(false)}
+          >
+            <div
+              className="chat-datasource-modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="chat-datasource-modal-close"
+                onClick={() => setShowDataSourceManager(false)}
+                aria-label="Close attached data dialog"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <DataSourceManager
+                variant="modal"
+                onDataSourcesChange={(sources) =>
+                  onDataSourceIdsChange?.(sources.map((source) => source.id))
+                }
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

@@ -373,16 +373,19 @@
 /* Inspector */
 .workflow-inspector {
   width: 320px;
-  background: var(--panel-bg);
-  border-left: 1px solid var(--panel-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 99%, #ffffff) 0%, color-mix(in srgb, var(--panel-bg) 94%, var(--main-bg-alt)) 100%);
+  border-left: 1px solid color-mix(in srgb, var(--panel-border) 86%, transparent);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .workflow-inspector-header {
-  padding: 16px;
-  border-bottom: 1px solid var(--panel-border);
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 86%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 99%, #ffffff) 0%, color-mix(in srgb, var(--panel-bg) 95%, var(--main-bg-alt)) 100%);
 }
 
 .workflow-inspector-title-wrapper {
@@ -392,15 +395,17 @@
 }
 
 .workflow-inspector-icon {
-  width: 20px;
-  height: 20px;
-  color: #a855f7;
+  width: 16px;
+  height: 16px;
+  color: var(--main-text-muted);
   flex-shrink: 0;
 }
 
 .workflow-inspector-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--main-text);
 }
 
@@ -428,16 +433,17 @@
 }
 
 .workflow-inspector-node-info {
-  padding: 16px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
+  padding: 15px;
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--main-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--card-border) 88%, transparent);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
   margin-bottom: 16px;
 }
 
 .workflow-inspector-node-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--main-text);
   margin-bottom: 4px;
 }
@@ -457,12 +463,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--main-text-muted);
   text-transform: uppercase;
   margin-bottom: 12px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
 }
 
 .workflow-inspector-section-title--icon {
@@ -470,10 +476,13 @@
 }
 
 .workflow-inspector-empty {
-  padding: 16px;
+  padding: 14px 15px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--main-text-muted);
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--main-bg-alt));
 }
 
 .workflow-inspector-field {
@@ -489,7 +498,7 @@
 
 .workflow-inspector-label-text {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--main-text);
 }
 
@@ -498,22 +507,31 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  font-weight: 400;
-  color: var(--warning);
+  font-weight: 500;
+  color: #b45309;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #d97706 18%, var(--border-color));
+  background: color-mix(in srgb, #d97706 6%, var(--card-bg));
 }
 
 .workflow-inspector-label-optional {
   font-size: 11px;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--main-text-muted);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  background: color-mix(in srgb, var(--main-bg-alt) 88%, transparent);
 }
 
 .workflow-inspector-input {
   width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card-bg) 96%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--input-border) 88%, transparent);
   color: var(--main-text);
   font-size: 13px;
   transition: all 0.2s ease;
@@ -526,8 +544,8 @@
 
 .workflow-inspector-input:focus {
   outline: none;
-  border-color: var(--input-focus);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--input-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .workflow-inspector-textarea {
@@ -541,20 +559,26 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 16px;
+  padding: 52px 16px;
   text-align: center;
 }
 
 .workflow-inspector-placeholder-icon {
-  width: 48px;
-  height: 48px;
+  width: 54px;
+  height: 54px;
   color: var(--main-text-muted);
-  opacity: 0.3;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--main-bg-alt));
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
   margin-bottom: 12px;
 }
 
 .workflow-inspector-placeholder-text {
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.55;
+  max-width: 220px;
   color: var(--main-text-muted);
 }
 
@@ -564,10 +588,11 @@
 }
 
 .workflow-inspector-run-info {
-  padding: 12px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--main-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--card-border) 88%, transparent);
+  border-radius: 18px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
 }
 
 .workflow-inspector-run-row {
@@ -592,35 +617,35 @@
 }
 
 .workflow-inspector-run-badge {
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   border: 1px solid;
 }
 
 .workflow-inspector-run-badge.running {
-  background: var(--success-bg);
-  border-color: var(--success);
-  color: var(--success);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
+  border-color: color-mix(in srgb, var(--accent) 16%, var(--border-color));
+  color: var(--main-text);
 }
 
 .workflow-inspector-run-badge.success {
-  background: var(--info-bg);
-  border-color: var(--info);
-  color: var(--info);
+  background: color-mix(in srgb, #059669 6%, var(--card-bg));
+  border-color: color-mix(in srgb, #059669 16%, var(--border-color));
+  color: #047857;
 }
 
 .workflow-inspector-run-badge.failed {
-  background: var(--error-bg);
-  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 6%, var(--card-bg));
+  border-color: color-mix(in srgb, var(--error) 16%, var(--border-color));
   color: var(--error);
 }
 
 .workflow-inspector-run-badge.pending {
-  background: var(--warning-bg);
-  border-color: var(--warning);
-  color: var(--warning);
+  background: color-mix(in srgb, #d97706 6%, var(--card-bg));
+  border-color: color-mix(in srgb, #d97706 16%, var(--border-color));
+  color: #b45309;
 }
 
 .workflow-inspector-output {
@@ -638,14 +663,14 @@
 
 .workflow-inspector-output-content {
   padding: 12px;
-  background: var(--main-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--main-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  border-radius: 16px;
   font-size: 11px;
   font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
   color: var(--main-text);
   overflow: auto;
-  max-height: 1024px;
+  max-height: 520px;
   line-height: 1.6;
 }
 
@@ -687,18 +712,38 @@
 }
 
 .workflow-canvas-controls {
-  background: var(--card-bg) !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  background: color-mix(in srgb, var(--card-bg) 96%, #ffffff) !important;
+  border: 1px solid color-mix(in srgb, var(--card-border) 88%, transparent) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08) !important;
   overflow: hidden !important;
 }
 
 .workflow-canvas-minimap {
-  background: var(--card-bg) !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  background: color-mix(in srgb, var(--card-bg) 96%, #ffffff) !important;
+  border: 1px solid color-mix(in srgb, var(--card-border) 88%, transparent) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08) !important;
+}
+
+.workflow-canvas-controls .react-flow__controls-button {
+  width: 30px !important;
+  height: 30px !important;
+  border: none !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 86%, transparent) !important;
+  background: transparent !important;
+  color: var(--main-text-muted) !important;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease !important;
+}
+
+.workflow-canvas-controls .react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.workflow-canvas-controls .react-flow__controls-button:hover {
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg)) !important;
+  color: var(--main-text) !important;
+  transform: translateY(-1px);
 }
 
 /* Node */
@@ -719,28 +764,28 @@
 
 .workflow-node.selected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* Node Status Variants */
 .workflow-node--running {
-  border-color: var(--success);
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--card-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .workflow-node--success {
-  border-color: var(--info);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: color-mix(in srgb, #059669 18%, var(--card-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, #059669 10%, transparent);
 }
 
 .workflow-node--failed {
-  border-color: var(--error);
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  border-color: color-mix(in srgb, var(--error) 18%, var(--card-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 10%, transparent);
 }
 
 .workflow-node--pending {
-  border-color: var(--warning);
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+  border-color: color-mix(in srgb, #d97706 18%, var(--card-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, #d97706 10%, transparent);
 }
 
 .workflow-node--new {
@@ -977,4 +1022,3 @@
   font-size: 13px;
   color: var(--main-text-muted);
 }
-

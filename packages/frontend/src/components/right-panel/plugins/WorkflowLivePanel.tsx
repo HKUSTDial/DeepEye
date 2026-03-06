@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { BackgroundVariant, type Edge, type Node } from 'reactflow'
-import { Workflow as WorkflowIcon } from 'lucide-react'
+import { ArrowUpRight, Loader2, Workflow as WorkflowIcon } from 'lucide-react'
 import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
@@ -758,42 +758,33 @@ export function WorkflowLivePanel({
   ) {
     const hasDataSources = dataSourceIds.length > 0
     return (
-      <div className={`workflow-live-panel h-full w-full flex flex-col items-center justify-center p-8 text-center ${
-        isDark ? 'bg-slate-950' : 'bg-slate-50'
-      }`}>
-        <div className={`mb-6 rounded-2xl p-4 ring-1 ${
-          isDark ? 'bg-slate-900/50 ring-slate-800' : 'bg-white ring-slate-200'
-        }`}>
-          <WorkflowIcon className={`h-8 w-8 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
-        </div>
-        <h3 className={`mb-2 text-lg font-medium ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
-          {hasDataSources ? 'Ready to Analyze' : 'Select Data Source'}
+      <div className="right-panel-empty">
+        <div className="right-panel-empty-kicker">Workflow</div>
+        <WorkflowIcon className="right-panel-empty-icon" />
+        <h3 className="right-panel-empty-title">
+          {hasDataSources ? 'Ready to analyze' : 'Attach data to begin'}
         </h3>
-        <p className={`max-w-xs text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+        <p className="right-panel-empty-subtitle">
           {hasDataSources 
-            ? `You have ${dataSourceIds.length} data source(s) selected. Ask DeepEye to analyze them, and the workflow will appear here.`
-            : 'Please select a database or upload a file from the sidebar to start your data exploration.'}
+            ? `You have ${dataSourceIds.length} attached data source(s). Ask DeepEye to analyze them and the workflow graph will open here.`
+            : 'Upload a file or connect a database from the composer to start your first analysis workflow.'}
         </p>
         
         {hasDataSources && (
-          <div className="mt-8 flex flex-col gap-2 w-full max-w-xs">
-            <div className={`text-xs font-semibold uppercase tracking-wider mb-1 ${
-              isDark ? 'text-slate-500' : 'text-slate-400'
-            }`}>Suggested prompts</div>
+          <div className="panel-empty-suggestions">
             {[
               'Show me a summary of the data',
               'Analyze trends over time',
               'Visualize the distribution of key metrics'
             ].map((suggestion) => (
-              <div 
+              <div
                 key={suggestion}
-                className={`rounded-lg border px-3 py-2 text-xs text-left transition-colors cursor-default ${
-                  isDark 
-                    ? 'border-slate-800 bg-slate-900/30 text-slate-400 hover:bg-slate-800 hover:text-slate-200' 
-                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-                }`}
+                className="panel-empty-suggestion"
               >
-                "{suggestion}"
+                <span className="panel-empty-suggestion-label">"{suggestion}"</span>
+                <span className="panel-empty-suggestion-arrow">
+                  <ArrowUpRight size={13} />
+                </span>
               </div>
             ))}
           </div>
@@ -803,28 +794,35 @@ export function WorkflowLivePanel({
   }
 
   return (
-    <div className={`workflow-live-panel h-full w-full flex flex-col ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
-      <div className={`flex items-center justify-between border-b px-3 py-2 text-xs ${
-        isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'
-      }`}>
-        <div className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-          <span className="font-semibold">Workflow</span>
-          {isViewSwitching && <span className="text-slate-500">· Switching session...</span>}
-          {runStatus && <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>· {runStatus}</span>}
-          {runError && <span className="text-rose-300">· {runError}</span>}
-          {error && <span className="text-rose-300">· {error}</span>}
-          {displayFileError && <span className="text-rose-300">· {displayFileError}</span>}
+    <div className={`workflow-live-panel panel-view ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
+      <div className="panel-toolbar">
+        <div className="panel-toolbar-main">
+          <div className="panel-toolbar-icon">
+            <WorkflowIcon />
+          </div>
+          <div className="panel-toolbar-copy">
+            <div className="panel-toolbar-label">Workflow</div>
+            <div className="panel-toolbar-title">Live graph</div>
+            <div className="panel-toolbar-meta">
+              {isViewSwitching && (
+                <span className="panel-toolbar-status">
+                  <Loader2 className="animate-spin" />
+                  Switching session...
+                </span>
+              )}
+              {runStatus && <span>Run: {runStatus}</span>}
+              {runError && <span className="panel-toolbar-error">{runError}</span>}
+              {error && <span className="panel-toolbar-error">{error}</span>}
+              {displayFileError && <span className="panel-toolbar-error">{displayFileError}</span>}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="panel-toolbar-actions">
           <select
             value={activeFilePathForControls || ''}
             disabled={!sessionId || isLoadingFiles || activeFiles.length === 0 || isStreaming}
             onChange={(event) => loadWorkflowFile(event.target.value)}
-            className={`rounded-md border px-2 py-1 text-xs ${
-              isDark 
-                ? 'border-slate-700 bg-slate-950 text-slate-200' 
-                : 'border-slate-300 bg-white text-slate-700'
-            }`}
+            className="panel-toolbar-select"
           >
             {activeFiles.length === 0 ? (
               <option value="">No workflow files</option>
@@ -861,11 +859,7 @@ export function WorkflowLivePanel({
                 setIsSaving(false)
               }
             }}
-            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-              isDark 
-                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
-                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-            } disabled:opacity-40`}
+            className="panel-toolbar-btn"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
@@ -897,11 +891,7 @@ export function WorkflowLivePanel({
                 setIsUploading(false)
               }
             }}
-            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-              isDark 
-                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
-                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-            } disabled:opacity-40`}
+            className="panel-toolbar-btn"
           >
             {isUploading ? 'Uploading...' : 'Upload'}
           </button>
@@ -942,11 +932,7 @@ export function WorkflowLivePanel({
                 setIsExporting(false)
               }
             }}
-            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-              isDark 
-                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
-                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-            } disabled:opacity-40`}
+            className="panel-toolbar-btn"
           >
             {isExporting ? 'Exporting...' : 'Export'}
           </button>
@@ -1020,11 +1006,7 @@ export function WorkflowLivePanel({
                 }
               }
             }}
-            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-              isDark 
-                ? 'border-slate-700 text-slate-200 hover:bg-slate-800' 
-                : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-            } disabled:opacity-40`}
+            className="panel-toolbar-btn panel-toolbar-btn--primary"
           >
             {isRunning ? 'Running...' : 'Run'}
           </button>

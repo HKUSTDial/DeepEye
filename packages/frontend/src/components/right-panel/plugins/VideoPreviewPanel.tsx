@@ -1,6 +1,5 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
-import { Loader2 } from 'lucide-react'
-import { useTheme } from '../../../hooks/useTheme'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ExternalLink, Film, Loader2, PlayCircle, Sparkles, TriangleAlert } from 'lucide-react'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { config } from '../../../config'
 
@@ -9,10 +8,8 @@ interface VideoPreviewPanelProps {
   sessionId?: string | null
 }
 
-/** Task ID 格式：YYYYMMDD_HHMMSS，仅允许该格式用于 URL，避免误粘贴整段控制台输出 */
 const TASK_ID_REGEX = /^\d{8}_\d{6}$/
 
-/** 从粘贴内容中规范出合法 Task ID：精确匹配或从长文本中提取第一处 \d{8}_\d{6} */
 function normalizePastedTaskId(raw: string): string | undefined {
   const trimmed = raw.trim()
   if (!trimmed) return undefined
@@ -21,7 +18,6 @@ function normalizePastedTaskId(raw: string): string | undefined {
   return extracted ? extracted[1] : undefined
 }
 
-/** 从工作流输出中提取 Task ID（支持 JSON 与纯文本） */
 function extractTaskIdFromOutput(runOutput: string): string | undefined {
   if (!runOutput || typeof runOutput !== 'string') return undefined
   const taskIdLabelMatch = runOutput.match(/Task ID:\s*(\d{8}_\d{6})/i)
@@ -36,7 +32,7 @@ function extractTaskIdFromOutput(runOutput: string): string | undefined {
       }
     }
   } catch {
-    // not JSON, continue
+    // Not JSON. Fall back to text extraction.
   }
   const taskIdMatch = runOutput.match(/(\d{8}_\d{6})/)
   return taskIdMatch ? taskIdMatch[1] : undefined
@@ -57,38 +53,41 @@ const STEP_MESSAGES: Record<number, string> = {
 }
 
 function getLogEntryType(message: string): 'success' | 'warn' | 'error' | 'info' | null {
-  const t = message.trim()
-  if (t.includes('✅') || t.includes('✓')) return 'success'
-  if (t.includes('⚠️') || t.includes('Warning')) return 'warn'
-  if (t.includes('❌') || t.includes('Error') || t.includes('Failed')) return 'error'
-  if (t.includes('📊') || t.includes('Step') || /^\s*\[?\d+\/\d+\]/.test(t)) return 'info'
+  const text = message.trim()
+  if (text.includes('✅') || text.includes('✓')) return 'success'
+  if (text.includes('⚠️') || text.includes('Warning')) return 'warn'
+  if (text.includes('❌') || text.includes('Error') || text.includes('Failed')) return 'error'
+  if (text.includes('📊') || text.includes('Step') || /^\s*\[?\d+\/\d+\]/.test(text)) return 'info'
   return null
 }
 
 function withQueryParam(url: string, key: string, value?: string | null): string {
   if (!value) return url
   try {
-    const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
-    u.searchParams.set(key, value)
-    return /^https?:\/\//i.test(url) ? u.toString() : `${u.pathname}${u.search}${u.hash}`
+    const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+    parsed.searchParams.set(key, value)
+    return /^https?:\/\//i.test(url) ? parsed.toString() : `${parsed.pathname}${parsed.search}${parsed.hash}`
   } catch {
-    const sep = url.includes('?') ? '&' : '?'
-    return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`
   }
 }
 
-/**
- * Video Preview panel: Doc Docker only.
- * - When video_preview_ready: show iframe (container URL).
- * - When container deploying: show "starting…".
- * - When generating: show progress (steps + logs).
- * - Otherwise: show empty state (no manual Task ID / in-page player).
- */
+function getVideoStepClass(index: number, currentStep: number, failed: boolean) {
+  if (failed && index === currentStep) return 'panel-step-pill panel-step-pill--warning'
+  if (index < currentStep) return 'panel-step-pill panel-step-pill--done'
+  if (index === currentStep) return 'panel-step-pill panel-step-pill--active'
+  return 'panel-step-pill'
+}
+
+function getLogRowClass(type: ReturnType<typeof getLogEntryType>) {
+  return type ? `panel-log-row panel-log-row--${type}` : 'panel-log-row'
+}
+
 export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps) {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
   const videoProgressLogsRef = useRef<HTMLDivElement | null>(null)
   const [pastedTaskId, setPastedTaskId] = useState('')
+  const [manualTaskId, setManualTaskId] = useState<string | null>(null)
 
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
@@ -102,14 +101,15 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const [isCheckingPreview, setIsCheckingPreview] = useState(false)
   const previewCheckIntervalRef = useRef<number | null>(null)
 
-  // 与仪表盘一致：从 node 输出收集 video_url，取最后一个并拼完整 URL
   const videoUrlsFromNode = useMemo(() => {
     if (!sessionState?.nodeStatus) return []
     const urls: { nodeId: string; url: string }[] = []
     Object.entries(sessionState.nodeStatus).forEach(([nodeId, statusInfo]) => {
       const info = statusInfo as { outputs?: Record<string, unknown> }
-      const u = info.outputs?.video_url
-      if (typeof u === 'string' && u) urls.push({ nodeId, url: u })
+      const value = info.outputs?.video_url
+      if (typeof value === 'string' && value) {
+        urls.push({ nodeId, url: value })
+      }
     })
     return urls
   }, [sessionState?.nodeStatus])
@@ -123,17 +123,14 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   }, [latestVideoUrlFromNode])
 
   const pastedNormalized = normalizePastedTaskId(pastedTaskId)
-  const displayTaskId = taskId || extractTaskIdFromOutput(runOutput) || pastedNormalized || undefined
+  const displayTaskId = taskId || extractTaskIdFromOutput(runOutput) || manualTaskId || undefined
 
-  // 约定 URL：有 taskId 但尚无事件/节点输出时使用（与后端容器命名一致）
   const constructedPreviewUrl =
     displayTaskId && typeof window !== 'undefined'
       ? `${window.location.origin}/video-previews/deepeye-video-${displayTaskId}/`
       : null
 
-  // 统一预览 URL 优先级：事件 > 节点输出 > 约定 URL（与仪表盘逻辑一致）
-  const effectivePreviewUrl =
-    videoPreviewUrl || fullPreviewUrlFromNode || constructedPreviewUrl || null
+  const effectivePreviewUrl = videoPreviewUrl || fullPreviewUrlFromNode || constructedPreviewUrl || null
   const effectivePreviewUrlWithSession = useMemo(() => {
     if (!effectivePreviewUrl) return null
     let next = effectivePreviewUrl
@@ -141,7 +138,6 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     return next
   }, [effectivePreviewUrl, sessionId])
 
-  // 与仪表盘一致：有预览 URL 时轮询就绪，就绪后再显示 iframe。用 GET 避免 Vite 对 HEAD 返回异常导致 502
   useEffect(() => {
     if (!effectivePreviewUrlWithSession) {
       setIsPreviewReady(false)
@@ -152,11 +148,9 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     const checkReady = async () => {
       setIsCheckingPreview(true)
       try {
-        // GET 更可靠：Vite 对 HEAD 可能未正确响应，nginx 易报 502
-        const res = await fetch(effectivePreviewUrlWithSession, { method: 'GET', cache: 'no-store' })
-        // 仅当来自「预览路由」且 200 时才视为就绪，避免误把主站首页当预览（若被错误转发到前端会缺 X-Video-Preview）
-        const fromPreviewRoute = res.headers.get('X-Video-Preview') === '1'
-        if (res.ok && fromPreviewRoute) {
+        const response = await fetch(effectivePreviewUrlWithSession, { method: 'GET', cache: 'no-store' })
+        const fromPreviewRoute = response.headers.get('X-Video-Preview') === '1'
+        if (response.ok && fromPreviewRoute) {
           setIsPreviewReady(true)
           if (previewCheckIntervalRef.current) {
             window.clearInterval(previewCheckIntervalRef.current)
@@ -164,20 +158,19 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
           }
         }
       } catch {
-        // 502/网络错误时继续轮询，容器可能仍在启动
+        // Keep polling while the preview container starts.
       } finally {
         setIsCheckingPreview(false)
       }
     }
 
-    // 首次延迟 3s 再开始轮询，减少容器刚启动时的 502
-    const t = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       checkReady()
       previewCheckIntervalRef.current = window.setInterval(checkReady, 2000)
     }, 3000)
 
     return () => {
-      window.clearTimeout(t)
+      window.clearTimeout(timeoutId)
       if (previewCheckIntervalRef.current) {
         window.clearInterval(previewCheckIntervalRef.current)
         previewCheckIntervalRef.current = null
@@ -185,7 +178,6 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     }
   }, [effectivePreviewUrlWithSession])
 
-  // 控制台调试信息，便于排查预览不加载
   useEffect(() => {
     const prefix = '[VideoPreview]'
     if (effectivePreviewUrlWithSession) {
@@ -215,326 +207,202 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const runInProgress = runStatus === 'running' || runStatus === null
   const runFailed = runStatus === 'failed'
 
-  // 1) 有预览 URL：轮询就绪后显示 iframe（与仪表盘一致，避免 502/主应用）
   if (effectivePreviewUrlWithSession) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: isDark ? '#0f1419' : '#f8fafc' }}>
-        <div style={{
-          padding: '8px 16px',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: isDark ? '#94a3b8' : '#64748b',
-          background: isDark ? 'rgba(15,23,42,0.8)' : '#ffffff',
-          flexShrink: 0,
-        }}>
-          <span style={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>Video Preview</span>
-          {(!isPreviewReady || isCheckingPreview) && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: isDark ? '#94a3b8' : '#64748b' }}>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Waiting for preview…
-            </span>
-          )}
-          {isPreviewReady && (
-            <a
-              href={effectivePreviewUrlWithSession}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: isDark ? '#818cf8' : '#4f46e5', textDecoration: 'none', fontSize: 11 }}
-            >
-              Open in new tab ↗
-            </a>
-          )}
-        </div>
-        {!isPreviewReady ? (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 12,
-            background: isDark ? '#0f1419' : '#f8fafc',
-            color: isDark ? '#e2e8f0' : '#1e293b',
-          }}>
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-            <p className="text-sm text-slate-500">Starting preview container…</p>
-            <p className="text-xs text-slate-400 max-w-[260px] text-center">
-              This usually takes 15–30 seconds. The panel will show the video when ready.
-            </p>
-            <p className="text-xs text-slate-400 max-w-[300px] text-center mt-2" style={{ marginTop: 8 }}>
-              若超过 1 分钟仍不出现，请先构建镜像：<br />
-              <code style={{ fontSize: 10 }}>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code>
-            </p>
-          </div>
-        ) : (
-          <iframe
-            src={effectivePreviewUrlWithSession}
-            style={{ flex: 1, border: 'none', width: '100%' }}
-            title="Video Preview"
-            allow="autoplay"
-          />
-        )}
-      </div>
-    )
-  }
-
-  // 2) Generating: progress (steps + logs)
-  if (sessionId && videoProgress.visible && runInProgress) {
-    return (
-      <div style={{
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        background: isDark ? 'var(--panel-bg)' : '#f8fafc',
-        height: '100%',
-      }}>
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: '12px',
-          border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          background: isDark ? 'rgba(15,23,42,0.6)' : '#ffffff',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, color: isDark ? '#e2e8f0' : '#1e293b' }}>
-              {runFailed ? 'Video generation failed' : 'Generating data video'}
-            </span>
-            {!runFailed && (
-              <span style={{ fontSize: 12, fontWeight: 500, color: isDark ? '#818cf8' : '#4f46e5' }}>
-                {videoProgress.percent}%
-              </span>
-            )}
-            {runFailed && (
-              <span style={{ fontSize: 12, fontWeight: 500, color: isDark ? '#ef4444' : '#dc2626' }}>
-                Failed
-              </span>
-            )}
-          </div>
-          {runError && (
-            <div style={{
-              padding: '8px 12px',
-              borderRadius: 8,
-              background: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fee2e2',
-              border: `1px solid ${isDark ? '#ef4444' : '#dc2626'}`,
-              marginBottom: 12,
-              color: isDark ? '#fca5a5' : '#991b1b',
-              fontSize: 12,
-            }}>
-              <strong>Error:</strong> {runError}
+      <div className="panel-view">
+        <div className="panel-toolbar">
+          <div className="panel-toolbar-main">
+            <div className="panel-toolbar-icon">
+              <Film />
             </div>
-          )}
-          <div style={{
-            height: 8,
-            width: '100%',
-            borderRadius: 4,
-            overflow: 'hidden',
-            background: isDark ? '#334155' : '#e2e8f0',
-            marginBottom: 12,
-          }}>
-            <div
-              style={{
-                height: '100%',
-                width: `${videoProgress.percent}%`,
-                background: '#6366f1',
-                borderRadius: 4,
-                transition: 'width 0.3s',
-              }}
-            />
-          </div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 4,
-            padding: '8px 12px',
-            borderRadius: 8,
-            background: isDark ? 'rgba(30,41,59,0.5)' : '#f1f5f9',
-            marginBottom: 12,
-          }}>
-            {STEP_LABELS.map(({ icon, label, index }) => (
-              <div
-                key={index}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 2,
-                  opacity: videoProgress.step >= index ? 1 : 0.4,
-                }}
-              >
-                <span style={{ fontSize: 16 }}>{icon}</span>
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: videoProgress.step === index ? 600 : 400,
-                  color: videoProgress.step === index
-                    ? (isDark ? '#22d3ee' : '#4f46e5')
-                    : videoProgress.step > index
-                      ? (isDark ? '#34d399' : '#059669')
-                      : (isDark ? '#64748b' : '#94a3b8'),
-                }}>
-                  {label}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div style={{
-            marginTop: 16,
-            paddingTop: 16,
-            borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-          }}>
-            <div
-              ref={videoProgressLogsRef}
-              style={{
-                maxHeight: 300,
-                overflowY: 'auto',
-                padding: 12,
-                borderRadius: 8,
-                border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-                fontFamily: "'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace",
-                fontSize: 12,
-                lineHeight: 1.6,
-                background: isDark ? 'rgba(15,23,42,0.8)' : '#ffffff',
-                color: isDark ? '#cbd5e1' : '#1e293b',
-              }}
-            >
-              {videoProgress.logs.length === 0 ? (
-                <div style={{ padding: '8px 0' }}>
-                  {(videoProgress.step > 0 || videoProgress.percent > 0) && STEP_MESSAGES[videoProgress.step] ? (
-                    <>
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: 12,
-                          padding: '4px 0',
-                          color: isDark ? '#818cf8' : '#4f46e5',
-                          fontSize: 12,
-                          fontFamily: "'JetBrains Mono', 'Consolas', monospace",
-                        }}
-                      >
-                        <span style={{ color: isDark ? '#94a3b8' : '#64748b', minWidth: 80 }}>—</span>
-                        <span>{STEP_MESSAGES[videoProgress.step]}</span>
-                      </div>
-                      <div style={{ color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic', fontSize: 11, marginTop: 12, textAlign: 'center' }}>
-                        Live log lines will appear here when the backend sends progress.
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ color: isDark ? '#64748b' : '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
-                      Progress will appear here (workflow live output).
-                    </div>
-                  )}
+            <div className="panel-toolbar-copy">
+              <div className="panel-toolbar-label">Video</div>
+              <div className="panel-toolbar-title">Live preview</div>
+              {(!isPreviewReady || isCheckingPreview) && (
+                <div className="panel-toolbar-meta">
+                  <span className="panel-toolbar-status">
+                    <Loader2 className="animate-spin" />
+                    Waiting for preview...
+                  </span>
                 </div>
-              ) : (
-                videoProgress.logs.slice(-50).map((log, idx, arr) => {
-                  const type = getLogEntryType(log.message)
-                  const isLast = idx === arr.length - 1
-                  const msgColor =
-                    type === 'success'
-                      ? isDark ? '#34d399' : '#059669'
-                      : type === 'warn'
-                        ? isDark ? '#fbbf24' : '#d97706'
-                        : type === 'error'
-                          ? isDark ? '#f87171' : '#dc2626'
-                          : type === 'info'
-                            ? isDark ? '#818cf8' : '#4f46e5'
-                            : isDark ? '#cbd5e1' : '#475569'
-                  return (
-                    <div
-                      key={log.id}
-                      style={{
-                        display: 'flex',
-                        gap: 12,
-                        padding: '4px 0',
-                        borderBottom: isLast ? 'none' : `1px solid ${isDark ? '#334155' : '#f1f5f9'}`,
-                      }}
-                    >
-                      <span
-                        style={{
-                          color: isDark ? '#94a3b8' : '#64748b',
-                          minWidth: 80,
-                          flexShrink: 0,
-                          fontSize: 11,
-                        }}
-                      >
-                        {log.time}
-                      </span>
-                      <span style={{ wordBreak: 'break-word', flex: 1, color: msgColor }}>
-                        {log.message}
-                      </span>
-                    </div>
-                  )
-                })
               )}
             </div>
           </div>
+
+          {isPreviewReady && (
+            <div className="panel-toolbar-actions">
+              <a
+                href={effectivePreviewUrlWithSession}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="panel-toolbar-link"
+              >
+                <ExternalLink />
+                Open
+              </a>
+            </div>
+          )}
+        </div>
+
+        <div className="panel-frame">
+          {!isPreviewReady ? (
+            <div className="panel-frame-overlay">
+              <Loader2 className="h-7 w-7 animate-spin text-[var(--accent)]" />
+              <p className="panel-frame-overlay-title">Starting preview container</p>
+              <p className="panel-frame-overlay-subtitle">
+                This usually takes 15 to 30 seconds. The panel will switch to the rendered video as soon as the service responds.
+              </p>
+              <p className="panel-helper-text">
+                If it stays blank for more than a minute, build the preview image first: <code>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code>
+              </p>
+            </div>
+          ) : (
+            <iframe
+              src={effectivePreviewUrlWithSession}
+              className="h-full w-full border-none"
+              title="Video Preview"
+              allow="autoplay"
+            />
+          )}
         </div>
       </div>
     )
   }
 
-  // 3) Empty state: no preview URL — show hint and paste Task ID
+  if (sessionId && videoProgress.visible && (runInProgress || runFailed)) {
+    return (
+      <div className="panel-view">
+        <div className="panel-toolbar">
+          <div className="panel-toolbar-main">
+            <div className="panel-toolbar-icon">
+              {runFailed ? <TriangleAlert /> : <PlayCircle />}
+            </div>
+            <div className="panel-toolbar-copy">
+              <div className="panel-toolbar-label">Video</div>
+              <div className="panel-toolbar-title">Generation status</div>
+              <div className="panel-toolbar-meta">
+                <span className={`panel-toolbar-status ${runFailed ? 'panel-toolbar-error' : ''}`}>
+                  {runFailed ? 'Failed' : `${videoProgress.percent}% complete`}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel-surface">
+          <div className="panel-stack">
+            <div className="panel-progress-card">
+              <div className="panel-progress-header">
+                <div className="panel-progress-copy">
+                  <div className="panel-toolbar-label">Video</div>
+                  <div className="panel-progress-title">
+                    {runFailed ? 'Video generation failed' : 'Rendering data video'}
+                  </div>
+                  <div className="panel-progress-description">
+                    {runFailed
+                      ? 'The workflow stopped before the preview could open. Inspect the latest logs below.'
+                      : 'DeepEye is generating the video config, timeline, and render artifacts.'}
+                  </div>
+                </div>
+                <div className="panel-progress-percent tabular-nums">
+                  {runFailed ? 'Failed' : `${videoProgress.percent}%`}
+                </div>
+              </div>
+
+              {!runFailed && (
+                <div className="panel-progress-bar">
+                  <div className="panel-progress-fill" style={{ width: `${videoProgress.percent}%` }} />
+                </div>
+              )}
+
+              <div className="panel-step-rail">
+                {STEP_LABELS.map((step) => (
+                  <div key={step.index} className={getVideoStepClass(step.index, videoProgress.step, runFailed)}>
+                    <span className="panel-step-pill-icon">{step.icon}</span>
+                    <span className="panel-step-pill-label">{step.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {runError ? (
+              <div className="panel-state-card panel-state-card--error">
+                <div className="panel-state-icon">
+                  <TriangleAlert size={16} />
+                </div>
+                <div className="panel-state-copy">
+                  <div className="panel-state-title">Render error</div>
+                  <div className="panel-state-body">{runError}</div>
+                </div>
+              </div>
+            ) : null}
+
+            <div>
+              <div className="panel-inline-header">
+                <div className="panel-inline-note">Live render logs</div>
+              </div>
+              <div ref={videoProgressLogsRef} className="panel-log-console">
+                {videoProgress.logs.length === 0 ? (
+                  <div className="panel-log-empty">
+                    {(videoProgress.step > 0 || videoProgress.percent > 0) && STEP_MESSAGES[videoProgress.step]
+                      ? `${STEP_MESSAGES[videoProgress.step]} Live log lines will appear here when the backend emits progress.`
+                      : 'Progress logs will appear here while the render is running.'}
+                  </div>
+                ) : (
+                  videoProgress.logs.slice(-50).map((log) => {
+                    const type = getLogEntryType(log.message)
+                    return (
+                      <div key={log.id} className={getLogRowClass(type)}>
+                        <span className="panel-log-time">{log.time}</span>
+                        <span className="panel-log-message">{log.message}</span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 16,
-      padding: 24,
-      background: isDark ? '#0f1419' : '#f8fafc',
-      color: isDark ? '#94a3b8' : '#64748b',
-      textAlign: 'center',
-    }}>
-      <div style={{ fontSize: 32 }}>🎬</div>
-      <div style={{ fontWeight: 600, fontSize: 15, color: isDark ? '#e2e8f0' : '#1e293b' }}>
-        Video Preview
-      </div>
-      <div style={{ fontSize: 13, maxWidth: 320 }}>
-        If the preview did not load automatically, paste the <strong>Task ID</strong> from the chat (e.g. YYYYMMDD_HHMMSS) and open the preview.
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 320 }}>
-        <input
-          type="text"
-          value={pastedTaskId}
-          onChange={(e) => setPastedTaskId(e.target.value)}
-          placeholder="e.g. YYYYMMDD_HHMMSS"
-          style={{
-            padding: '10px 12px',
-            border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-            borderRadius: 8,
-            fontSize: 14,
-            fontFamily: 'monospace',
-            background: isDark ? 'rgba(30,41,59,0.8)' : '#fff',
-            color: isDark ? '#e2e8f0' : '#1e293b',
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && pastedNormalized) {
-              setPastedTaskId(pastedNormalized)
-            }
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => pastedNormalized && setPastedTaskId(pastedNormalized)}
-          disabled={!pastedNormalized}
-          style={{
-            padding: '10px 16px',
-            background: pastedNormalized ? (isDark ? '#4f46e5' : '#6366f1') : (isDark ? '#334155' : '#e2e8f0'),
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: pastedNormalized ? 'pointer' : 'not-allowed',
-          }}
-        >
-          Open preview
-        </button>
+    <div className="right-panel-empty">
+      <div className="right-panel-empty-kicker">Video</div>
+      <Film className="right-panel-empty-icon" />
+      <h3 className="right-panel-empty-title">No video preview yet</h3>
+      <p className="right-panel-empty-subtitle">
+        DeepEye will open the rendered video here automatically. If you already have a task ID, you can open the preview manually.
+      </p>
+
+      <div className="panel-form-card">
+        <div className="panel-form-row">
+          <input
+            type="text"
+            value={pastedTaskId}
+            onChange={(event) => setPastedTaskId(event.target.value)}
+            placeholder="e.g. 20260306_121530"
+            className="panel-input panel-input--mono"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && pastedNormalized) {
+                setManualTaskId(pastedNormalized)
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => pastedNormalized && setManualTaskId(pastedNormalized)}
+            disabled={!pastedNormalized}
+            className="panel-toolbar-btn panel-toolbar-btn--primary"
+          >
+            <Sparkles />
+            Open preview
+          </button>
+        </div>
+        <p className="panel-helper-text">
+          Paste the task ID from chat or workflow output. Supported format: <code>YYYYMMDD_HHMMSS</code>.
+        </p>
       </div>
     </div>
   )

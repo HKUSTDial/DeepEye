@@ -1,4 +1,5 @@
-import { useRef, useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Download, FileText, Loader2, Sparkles, TriangleAlert } from 'lucide-react'
 import { useReportStore } from '../../../stores/report'
 
 const STAGES = [
@@ -11,7 +12,6 @@ const STAGES = [
   { label: 'Render final HTML report', icon: '🎨' },
 ]
 
-// Expected end-percent for each stage – matches pipeline step order
 const STAGE_END_PCT = [8, 22, 42, 58, 82, 93, 100]
 
 type StageStatus = 'done' | 'active' | 'warning' | 'pending'
@@ -25,9 +25,9 @@ function parseStages(
   let lastStageIdx = -1
 
   for (const line of steps) {
-    const m = line.match(/\[(\d+)\/7\]/)
-    if (m) {
-      const idx = Math.min(parseInt(m[1], 10), 6)
+    const match = line.match(/\[(\d+)\/7\]/)
+    if (match) {
+      const idx = Math.min(parseInt(match[1], 10), 6)
       if (idx > maxStage) maxStage = idx
       lastStageIdx = idx
     }
@@ -42,9 +42,9 @@ function parseStages(
     }
   }
 
-  const stageStatuses: StageStatus[] = STAGES.map((_, i) => {
-    if (isDone || i < maxStage) return warningStages.has(i) ? 'warning' : 'done'
-    if (i === maxStage) return isDone ? (warningStages.has(i) ? 'warning' : 'done') : 'active'
+  const stageStatuses: StageStatus[] = STAGES.map((_, index) => {
+    if (isDone || index < maxStage) return warningStages.has(index) ? 'warning' : 'done'
+    if (index === maxStage) return isDone ? (warningStages.has(index) ? 'warning' : 'done') : 'active'
     return 'pending'
   })
 
@@ -52,65 +52,50 @@ function parseStages(
 }
 
 export function ReportPanel() {
-  const reportHtml = useReportStore((s) => s.reportHtml)
-  const reportSteps = useReportStore((s) => s.reportSteps)
-  const reportFilename = useReportStore((s) => s.reportFilename)
-  const reportError = useReportStore((s) => s.reportError)
-  const isGenerating = useReportStore((s) => s.isGenerating)
+  const reportHtml = useReportStore((state) => state.reportHtml)
+  const reportSteps = useReportStore((state) => state.reportSteps)
+  const reportFilename = useReportStore((state) => state.reportFilename)
+  const reportError = useReportStore((state) => state.reportError)
+  const isGenerating = useReportStore((state) => state.isGenerating)
 
   const [displayPercent, setDisplayPercent] = useState(0)
-  // Only track the committed stage index – mirroring index.html's _committedStage
   const committedStageRef = useRef(-1)
 
   const isDone = !!reportHtml
   const showProgress = !isDone && (isGenerating || reportSteps.length > 0) && !reportError
+  const isWaiting = isGenerating && reportSteps.length === 0 && !reportError
 
   const { stageStatuses, maxStage } = parseStages(reportSteps, isDone)
 
-  // Keep committedStage in sync; never go backwards
   useEffect(() => {
     if (maxStage > committedStageRef.current) {
       committedStageRef.current = maxStage
     }
   }, [maxStage])
 
-  // Snap to 100% when done
   useEffect(() => {
     if (!isDone) return
     const timeoutId = window.setTimeout(() => setDisplayPercent(100), 0)
     return () => window.clearTimeout(timeoutId)
   }, [isDone])
 
-  // Tween – fires every 150 ms, identical logic to index.html's startTween()
-  //
-  //  1. Compute floor  = end of previous stage  (guarantee we never slip behind)
-  //  2. Compute ceiling = end of current stage - 0.8  (wait for server confirmation)
-  //  3. Creep toward ceiling with exponential decay; fast when far, slow when close
-  //
-  // Because ceiling advances every time a new [N/7] log arrives, the bar moves
-  // continuously through every stage without ever stopping or jumping.
   useEffect(() => {
     if (!showProgress || isDone) return
-    const id = setInterval(() => {
+    const id = window.setInterval(() => {
       setDisplayPercent((prev) => {
         const stage = committedStageRef.current
-        // floor: start of current stage (= end of previous stage, or 0)
         const floor = stage <= 0 ? 0 : STAGE_END_PCT[stage - 1]
-        // ceiling: just below end of current stage
         const ceiling = STAGE_END_PCT[Math.min(Math.max(stage, 0), STAGE_END_PCT.length - 1)] - 0.8
-        // Snap up to floor if we've fallen behind (stage jumped forward)
         const current = Math.max(prev, floor)
         if (current >= ceiling) return current
-        // Exponential decay: fast when far from ceiling, slow when close
         const gap = ceiling - current
         const step = Math.max(0.03, gap * 0.012)
         return Math.min(current + step, ceiling)
       })
     }, 150)
-    return () => clearInterval(id)
+    return () => window.clearInterval(id)
   }, [showProgress, isDone])
 
-  // Full reset when a new generation starts (showProgress goes false → true)
   useEffect(() => {
     if (showProgress) return
     committedStageRef.current = -1
@@ -122,203 +107,126 @@ export function ReportPanel() {
     if (!reportHtml) return
     const blob = new Blob([reportHtml], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = reportFilename || 'report.html'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = reportFilename || 'report.html'
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
     URL.revokeObjectURL(url)
   }
 
-  // Displayed integer percent (for the counter label)
   const roundedPct = isDone ? 100 : Math.round(displayPercent)
 
   if (!reportHtml && reportSteps.length === 0 && !isGenerating) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-[var(--main-text-muted)] p-6">
-        <svg className="w-12 h-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-        <p className="text-sm">No report yet</p>
-        <p className="text-xs mt-1 opacity-75">
-          Upload CSV file(s) and describe the report you want. The report will appear here when ready.
+      <div className="right-panel-empty">
+        <div className="right-panel-empty-kicker">Report</div>
+        <FileText className="right-panel-empty-icon" />
+        <h3 className="right-panel-empty-title">No report yet</h3>
+        <p className="right-panel-empty-subtitle">
+          Ask DeepEye to draft a report for your attached data. The rendered document will open here when it is ready.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[var(--panel-bg)]">
-
-      {/* Progress section – hidden when report is done to free space */}
+    <div className="panel-view">
       {showProgress && (
-        <div
-          className="flex-shrink-0 border-b border-[var(--border-color)] px-4 pt-4 pb-3"
-          style={{ background: 'rgba(255,255,255,0.03)' }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-base">⚡</span>
-            <span className="text-sm font-bold" style={{ color: '#a5b4fc' }}>
-              Generating Report
-            </span>
-          </div>
-
-          <div className="mb-3">
-            <div className="flex justify-between items-center mb-1.5">
-              <span className="text-xs font-semibold" style={{ color: '#a5b4fc' }}>Progress</span>
-              <span className="text-xs font-bold tabular-nums" style={{ color: '#818cf8' }}>
-                {roundedPct}%
-              </span>
-            </div>
-            <div
-              className="h-1.5 rounded-full overflow-hidden"
-              style={{ background: 'rgba(129,140,248,0.18)' }}
-            >
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${displayPercent}%`,
-                  background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
-                  transition: 'width 0.6s ease',
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            {STAGES.map((stage, i) => {
-              const status = stageStatuses[i]
-              return (
-                <div
-                  key={i}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300"
-                  style={{
-                    border: `1px solid ${
-                      status === 'active'
-                        ? 'rgba(99,179,237,0.5)'
-                        : status === 'done'
-                        ? 'rgba(104,211,145,0.35)'
-                        : status === 'warning'
-                        ? 'rgba(251,191,36,0.4)'
-                        : 'rgba(255,255,255,0.12)'
-                    }`,
-                    background:
-                      status === 'active'
-                        ? 'rgba(99,179,237,0.1)'
-                        : status === 'done'
-                        ? 'rgba(104,211,145,0.08)'
-                        : status === 'warning'
-                        ? 'rgba(251,191,36,0.08)'
-                        : 'rgba(255,255,255,0.04)',
-                  }}
-                >
-                  <span
-                    className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all duration-300"
-                    style={{
-                      border: `1px solid ${
-                        status === 'active'
-                          ? 'rgba(99,179,237,0.6)'
-                          : status === 'done'
-                          ? 'rgba(104,211,145,0.5)'
-                          : status === 'warning'
-                          ? 'rgba(251,191,36,0.5)'
-                          : 'rgba(255,255,255,0.15)'
-                      }`,
-                      background:
-                        status === 'active'
-                          ? 'rgba(99,179,237,0.18)'
-                          : status === 'done'
-                          ? 'rgba(104,211,145,0.15)'
-                          : status === 'warning'
-                          ? 'rgba(251,191,36,0.15)'
-                          : 'rgba(255,255,255,0.06)',
-                      animation: status === 'active' ? 'pulse-ring 1.6s ease-in-out infinite' : undefined,
-                    }}
-                  >
-                    {status === 'done' ? '✓' : stage.icon}
-                  </span>
-
-                  <span
-                    className="text-xs transition-colors duration-300"
-                    style={{
-                      color:
-                        status === 'active'
-                          ? '#e0e7ff'
-                          : status === 'done'
-                          ? '#c4b5fd'
-                          : status === 'warning'
-                          ? '#fbbf24'
-                          : '#a5b4fc',
-                      fontWeight: status === 'active' ? 700 : 500,
-                    }}
-                  >
-                    {stage.label}
-                  </span>
+        <div className="panel-progress-shell">
+          <div className="panel-progress-card">
+            <div className="panel-progress-header">
+              <div className="panel-progress-copy">
+                <div className="panel-toolbar-label">Report</div>
+                <div className="panel-progress-title">Generating report</div>
+                <div className="panel-progress-description">
+                  DeepEye is preparing the narrative, metrics, and charts for the final document.
                 </div>
-              )
-            })}
+              </div>
+              <div className="panel-progress-percent tabular-nums">{roundedPct}%</div>
+            </div>
+
+            <div className="panel-progress-bar">
+              <div className="panel-progress-fill" style={{ width: `${displayPercent}%` }} />
+            </div>
+
+            <div className="panel-stage-list">
+              {STAGES.map((stage, index) => {
+                const status = stageStatuses[index]
+                return (
+                  <div key={stage.label} className={`panel-stage-item panel-stage-item--${status}`}>
+                    <span className="panel-stage-icon">{status === 'done' ? '✓' : stage.icon}</span>
+                    <span className="panel-stage-text">{stage.label}</span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col">
+      <div className="panel-surface">
         {reportError ? (
-          <div className="flex flex-col items-center justify-center text-center p-6">
-            <svg className="w-12 h-12 mb-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            <p className="text-sm font-medium text-red-500 mb-2">Report Generation Failed</p>
-            <p className="text-xs text-[var(--main-text)] max-w-md">{reportError}</p>
+          <div className="panel-state-card panel-state-card--error">
+            <div className="panel-state-icon">
+              <TriangleAlert size={16} />
+            </div>
+            <div className="panel-state-copy">
+              <div className="panel-state-title">Report generation failed</div>
+              <div className="panel-state-body">{reportError}</div>
+            </div>
           </div>
         ) : reportHtml ? (
           <>
-            <div className="flex-shrink-0 mb-3 flex items-center justify-between">
-              <div className="text-xs font-medium text-[var(--main-text)]">
-                {reportFilename && (
+            <div className="panel-inline-header">
+              <div className="panel-inline-note">
+                {reportFilename ? (
                   <span>
-                    Report saved to workspace: <span className="font-mono">{reportFilename}</span>
+                    Report saved to workspace: <code>{reportFilename}</code>
                   </span>
+                ) : (
+                  'Report ready to review.'
                 )}
               </div>
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="px-3 py-1 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
-              >
-                Download HTML
+              <button type="button" onClick={handleDownload} className="panel-toolbar-btn panel-toolbar-btn--primary">
+                <Download />
+                Download
               </button>
             </div>
             <iframe
               title="Report"
               srcDoc={reportHtml}
-              className="flex-1 w-full min-h-[400px] border-0 rounded-lg bg-white text-black"
+              className="panel-report-frame"
               sandbox="allow-same-origin allow-scripts"
             />
           </>
+        ) : isWaiting ? (
+          <div className="panel-state-card">
+            <div className="panel-state-icon">
+              <Loader2 size={16} className="animate-spin" />
+            </div>
+            <div className="panel-state-copy">
+              <div className="panel-state-title">Waiting for the report pipeline</div>
+              <div className="panel-state-body">
+                DeepEye has started the report workflow and will stream progress here as soon as the first stage begins.
+              </div>
+            </div>
+          </div>
         ) : isGenerating ? (
-          <div className="flex items-center justify-center text-xs font-semibold py-4" style={{ color: '#a5b4fc' }}>
-            The report is being generated, please wait...
+          <div className="panel-state-card">
+            <div className="panel-state-icon">
+              <Sparkles size={16} />
+            </div>
+            <div className="panel-state-copy">
+              <div className="panel-state-title">Report is in progress</div>
+              <div className="panel-state-body">
+                The workflow is still running. This pane will switch to the final document automatically.
+              </div>
+            </div>
           </div>
         ) : null}
       </div>
-
-      <style>{`
-        @keyframes pulse-ring {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(99,179,237,0.4); }
-          50%       { box-shadow: 0 0 0 6px rgba(99,179,237,0); }
-        }
-      `}</style>
     </div>
   )
 }

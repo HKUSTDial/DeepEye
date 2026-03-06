@@ -7,8 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import AuthShell from '../components/auth/AuthShell'
 import { useAuthStore } from '../stores/auth'
 
-const INPUT_CLASS =
-  'w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-[var(--main-text)] placeholder-[var(--main-text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none'
+const INPUT_CLASS = 'auth-input'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -65,14 +64,14 @@ export default function Register() {
       leftDescription="Keep authentication and verification as focused, independent steps."
     >
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div className="auth-feedback auth-feedback--error">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+      <form onSubmit={handleSubmit} className="auth-form">
+        <div className="auth-form-row">
+          <label htmlFor="email" className="auth-form-label">
             Email
           </label>
           <input
@@ -87,8 +86,8 @@ export default function Register() {
           />
         </div>
 
-        <div>
-          <label htmlFor="username" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+        <div className="auth-form-row">
+          <label htmlFor="username" className="auth-form-label">
             Username
           </label>
           <input
@@ -104,8 +103,8 @@ export default function Register() {
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+        <div className="auth-form-row">
+          <label htmlFor="password" className="auth-form-label">
             Password
           </label>
           <input
@@ -122,8 +121,8 @@ export default function Register() {
           />
         </div>
 
-        <div>
-          <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-[var(--main-text)]">
+        <div className="auth-form-row">
+          <label htmlFor="confirmPassword" className="auth-form-label">
             Confirm password
           </label>
           <input
@@ -143,17 +142,19 @@ export default function Register() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-xl bg-[var(--accent)] py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+          className="auth-submit"
         >
           {isLoading ? 'Creating account...' : 'Register'}
         </button>
       </form>
 
-      <div className="text-sm text-[var(--main-text-muted)]">
-        Already have an account?{' '}
-        <button onClick={() => navigate('/auth')} className="text-[var(--accent)] hover:underline">
-          Sign in
-        </button>
+      <div className="auth-muted-actions">
+        <div>
+          Already have an account?{' '}
+          <button type="button" onClick={() => navigate('/auth')} className="auth-link">
+            Sign in
+          </button>
+        </div>
       </div>
     </AuthShell>
   )

@@ -6,47 +6,47 @@
 :root {
   /* Sidebar */
   --sidebar-bg: #f7f7f8;
-  --sidebar-hover: #ececed;
-  --sidebar-active: #e3e3e4;
-  --sidebar-border: #e5e5e6;
-  --sidebar-text: #1f1f1f;
-  --sidebar-text-muted: #6e6e80;
+  --sidebar-hover: #f1f2f4;
+  --sidebar-active: #ebedf0;
+  --sidebar-border: #e5e7eb;
+  --sidebar-text: #202123;
+  --sidebar-text-muted: #6b7280;
 
   /* Main */
-  --main-bg: #ffffff;
-  --main-bg-alt: #f9f9f9;
-  --main-text: #1f1f1f;
-  --main-text-muted: #6e6e80;
+  --main-bg: #f7f7f8;
+  --main-bg-alt: #ffffff;
+  --main-text: #111827;
+  --main-text-muted: #6b7280;
 
   /* Accent */
-  --accent: #0066ff;
-  --accent-hover: #0052cc;
+  --accent: #202123;
+  --accent-hover: #111111;
 
   /* Input */
   --input-bg: #ffffff;
-  --input-border: #e5e5e6;
-  --input-focus: #0066ff;
+  --input-border: #e5e7eb;
+  --input-focus: #202123;
 
   /* Borders */
-  --border-color: #e5e5e6;
-  --border-hover: #d4d4d5;
+  --border-color: #e5e7eb;
+  --border-hover: #d1d5db;
 
   /* Card */
   --card-bg: #ffffff;
-  --card-bg-hover: #f9f9f9;
-  --card-border: #e5e5e6;
-  --card-border-hover: #d4d4d5;
+  --card-bg-hover: #f9fafb;
+  --card-border: #e5e7eb;
+  --card-border-hover: #d1d5db;
 
   /* Table */
-  --table-header-bg: #f7f7f8;
-  --table-header-text: #6e6e80;
-  --table-row-hover: #f9f9f9;
-  --table-border: #e5e5e6;
+  --table-header-bg: #f8fafc;
+  --table-header-text: #6b7280;
+  --table-row-hover: #f9fafb;
+  --table-border: #e5e7eb;
 
   /* Panel */
   --panel-bg: #ffffff;
-  --panel-border: #e5e5e6;
-  --panel-resize: #0066ff;
+  --panel-border: #e5e7eb;
+  --panel-resize: #9ca3af;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -56,6 +56,21 @@
   /* Animation */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Typography */
+  --font-family-sans: 'Manrope', 'Noto Sans SC', 'PingFang SC', 'Segoe UI Variable', 'Helvetica Neue', sans-serif;
+  --font-family-mono: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  --ui-font-xs: 11px;
+  --ui-font-sm: 13px;
+  --ui-font-md: 14px;
+  --ui-font-lg: 16px;
+  --ui-font-xl: 18px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --tracking-tight: -0.02em;
+  --tracking-label: 0.08em;
 }
 
 /* Theme Toggle Button */
@@ -112,20 +127,30 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Space Grotesk', 'Manrope', 'Noto Sans SC', 'PingFang SC', 'Segoe UI Variable', sans-serif;
+  font-family: var(--font-family-sans);
   background: var(--main-bg);
   color: var(--main-text);
-  line-height: 1.6;
+  line-height: 1.55;
   font-size: 14px;
+  font-weight: var(--font-weight-regular);
+  letter-spacing: -0.01em;
+  font-feature-settings: 'liga' 1, 'calt' 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--input-focus); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
 
 /* Custom scrollbar for workflow components */
 .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -183,7 +208,7 @@ body {
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, var(--main-bg-alt) 25%, #555 50%, var(--main-bg-alt) 75%);
+  background: linear-gradient(90deg, var(--main-bg-alt) 25%, #eceff3 50%, var(--main-bg-alt) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
@@ -201,7 +226,7 @@ body {
   padding: 0.1em 0.3em;
   border-radius: 4px;
   font-size: 0.875em;
-  font-family: 'Fira Code', 'Consolas', monospace;
+  font-family: var(--font-family-mono);
 }
 
 /* Code blocks */
@@ -343,7 +368,7 @@ body {
 }
 
 .react-flow__handle-connecting {
-  background: #3b82f6;
+  background: var(--accent);
 }
 
 .react-flow__handle-valid {
@@ -353,10 +378,10 @@ body {
 /* ===== Workflow Animations ===== */
 @keyframes pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 0 0 rgba(32, 33, 35, 0.18);
   }
   100% {
-    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 10px rgba(32, 33, 35, 0);
   }
 }
 

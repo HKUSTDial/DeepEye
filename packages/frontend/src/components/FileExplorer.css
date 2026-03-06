@@ -26,18 +26,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--panel-border);
+  padding: 0 11px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 99%, #ffffff) 0%, color-mix(in srgb, var(--panel-bg) 95%, var(--main-bg-alt)) 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-border) 86%, transparent);
 }
 
 .file-explorer-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: var(--explorer-font-xs);
   color: var(--main-text);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .file-explorer-breadcrumb-separator {
@@ -47,25 +48,31 @@
 .file-explorer-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .file-explorer-btn {
-  padding: 4px;
-  border-radius: 4px;
-  background: transparent;
-  border: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-bg) 94%, var(--main-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
   color: var(--main-text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
 }
 
 .file-explorer-btn:hover {
-  background: var(--sidebar-hover);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
+  border-color: color-mix(in srgb, var(--accent) 14%, var(--border-color));
   color: var(--main-text);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.06);
 }
 
 .file-explorer-btn:disabled {
@@ -95,21 +102,24 @@
 .delete-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(17, 24, 39, 0.26);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  animation: file-dialog-fade-in 180ms ease;
 }
 
 .delete-dialog {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 8px;
-  padding: 20px;
+  border-radius: 18px;
+  padding: 18px;
   min-width: 320px;
   max-width: 420px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  animation: file-dialog-sheet-in 200ms var(--ease-out-expo);
 }
 
 .delete-title {
@@ -126,6 +136,11 @@
   line-height: 1.5;
 }
 
+.delete-target {
+  color: var(--main-text);
+  font-weight: 600;
+}
+
 .delete-actions {
   display: flex;
   justify-content: flex-end;
@@ -134,7 +149,7 @@
 
 .delete-btn {
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 12px;
   font-size: var(--explorer-font-sm);
   font-weight: 500;
   cursor: pointer;
@@ -169,20 +184,74 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 24px;
+  padding: 22px 18px;
   text-align: center;
   color: var(--main-text-muted);
+  animation: file-empty-in 220ms ease;
 }
 
 .file-explorer-empty-icon {
   width: 48px;
   height: 48px;
   margin-bottom: 12px;
-  opacity: 0.3;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--main-bg-alt));
+  color: var(--main-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
 }
 
-.file-explorer-empty-text {
-  font-size: var(--explorer-font-sm);
+.file-explorer-empty-icon--error {
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 20%, var(--border-color));
+  background: color-mix(in srgb, var(--error) 6%, var(--card-bg));
+}
+
+.file-explorer-empty-title {
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--main-text);
+}
+
+.file-explorer-empty-subtitle {
+  max-width: 240px;
+  margin-top: 4px;
+  font-size: 11px;
   line-height: 1.5;
+  color: var(--main-text-muted);
 }
 
+@keyframes file-empty-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes file-dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes file-dialog-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

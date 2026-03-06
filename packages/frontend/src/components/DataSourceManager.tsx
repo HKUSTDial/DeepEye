@@ -1,21 +1,135 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { datasourceApi, type DatasourceTablesResponse } from '../api'
 import { useChatStore } from '../stores/chat'
 import type { DataSource } from '../types'
 import './DataSourceManager.css'
 
 interface DataSourceManagerProps {
-  selectedIds: string[]
-  onToggle: (id: string) => void
-  collapsed?: boolean
+  onDataSourcesChange?: (dataSources: DataSource[]) => void
+  variant?: 'sidebar' | 'composer' | 'modal'
 }
 
-export default function DataSourceManager({ selectedIds, onToggle, collapsed = false }: DataSourceManagerProps) {
+const ENGINE_OPTIONS = [
+  { value: 'postgres', label: 'PostgreSQL' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'sqlite', label: 'SQLite' },
+] as const
+
+const URI_EXAMPLES: Record<string, string> = {
+  postgres: 'postgresql://user:password@localhost:5432/analytics',
+  mysql: 'mysql://user:password@localhost:3306/analytics',
+  sqlite: 'sqlite:////absolute/path/to/analytics.db',
+}
+
+const emitDatasourceUpdated = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('datasources:updated'))
+  }
+}
+
+const isSupportedFile = (file: File) => {
+  const name = file.name.toLowerCase()
+  return (
+    name.endsWith('.csv') ||
+    name.endsWith('.json') ||
+    name.endsWith('.xlsx') ||
+    name.endsWith('.xls') ||
+    name.endsWith('.parquet')
+  )
+}
+
+interface EngineSelectProps {
+  value: string
+  onChange: (value: string) => void
+}
+
+function EngineSelect({ value, onChange }: EngineSelectProps) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  const selected = ENGINE_OPTIONS.find((option) => option.value === value) ?? ENGINE_OPTIONS[0]
+
+  useEffect(() => {
+    if (!open) return
+
+    const onMouseDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div className={`data-source-select-shell ${open ? 'is-open' : ''}`} ref={rootRef}>
+      <button
+        type="button"
+        className={`data-source-field data-source-select-trigger ${open ? 'is-open' : ''}`}
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="data-source-select-trigger-value">{selected.label}</span>
+        <span className="data-source-select-chevron" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="m5.5 7.5 4.5 5 4.5-5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </button>
+
+      {open && (
+        <div className="data-source-select-menu" role="listbox" aria-label="Database engine">
+          {ENGINE_OPTIONS.map((option) => {
+            const isSelected = option.value === value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                className={`data-source-select-option ${isSelected ? 'is-selected' : ''}`}
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                }}
+              >
+                <span className="data-source-select-option-label">{option.label}</span>
+                {isSelected && (
+                  <span className="data-source-select-option-check" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="m4.5 10 3.2 3.2L15.5 5.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function DataSourceManager({ onDataSourcesChange, variant = 'sidebar' }: DataSourceManagerProps) {
   const sessionId = useChatStore((state) => state.sessionId)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [newDs, setNewDs] = useState({ name: '', type: 'postgres', connection_string: '' })
   const [isUploading, setIsUploading] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tablesByDsId, setTablesByDsId] = useState<Record<string, DatasourceTablesResponse>>({})
   const [loadingTablesId, setLoadingTablesId] = useState<string | null>(null)
@@ -23,16 +137,24 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
   const [editingDsId, setEditingDsId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', type: 'mysql', connection_string: '' })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
-  const [showCollapsedPanel, setShowCollapsedPanel] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const collapsedPanelRef = useRef<HTMLDivElement>(null)
-  const effectiveExpanded = collapsed || isExpanded
 
-  const loadDataSources = async () => {
+  const applyDataSources = useCallback(
+    (next: DataSource[] | ((current: DataSource[]) => DataSource[])) => {
+      setDataSources((current) => {
+        const resolved =
+          typeof next === 'function' ? (next as (value: DataSource[]) => DataSource[])(current) : next
+        onDataSourcesChange?.(resolved)
+        return resolved
+      })
+    },
+    [onDataSourcesChange],
+  )
+
+  const loadDataSources = useCallback(async () => {
     setError(null)
     try {
       const list = await datasourceApi.list()
-      setDataSources(list)
+      applyDataSources(list)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to load'
       const is502 = typeof msg === 'string' && (msg.includes('Bad Gateway') || msg.includes('502'))
@@ -42,10 +164,44 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
           : msg,
       )
     }
-  }
+  }, [applyDataSources])
+
+  const uploadFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return
+
+      const supportedFiles = files.filter(isSupportedFile)
+      const ignoredCount = files.length - supportedFiles.length
+      if (supportedFiles.length === 0) {
+        setError('Only CSV, JSON, Excel, and Parquet files are supported.')
+        return
+      }
+
+      setIsUploading(true)
+      setError(null)
+      try {
+        const createdSources: DataSource[] = []
+        for (const file of supportedFiles) {
+          const created = await datasourceApi.upload(file, sessionId)
+          createdSources.push(created)
+        }
+        applyDataSources((current) => [...current, ...createdSources])
+        emitDatasourceUpdated()
+        if (ignoredCount > 0) {
+          setError(`${ignoredCount} unsupported file(s) were skipped.`)
+        }
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Upload failed')
+      } finally {
+        setIsUploading(false)
+        setIsDragOver(false)
+      }
+    },
+    [applyDataSources, sessionId],
+  )
 
   const createDataSource = async () => {
-    const conn = (newDs.connection_string || '').trim()
+    const conn = newDs.connection_string.trim()
     if (!conn) {
       setError('请填写连接字符串 (Connection URI)')
       return
@@ -53,14 +209,14 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
     try {
       setError(null)
       const created = await datasourceApi.create({
-        name: (newDs.name || '').trim() || newDs.type,
+        name: newDs.name.trim() || newDs.type,
         type: newDs.type,
         connection_string: conn,
       })
-      setDataSources([...dataSources, created])
+      applyDataSources((current) => [...current, created])
       setIsCreating(false)
       setNewDs({ name: '', type: 'postgres', connection_string: '' })
-      onToggle(created.id)
+      emitDatasourceUpdated()
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to create'
       const detail = (e as { response?: { detail?: string } })?.response?.detail
@@ -68,28 +224,25 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
     }
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? Array.from(event.target.files) : []
+    await uploadFiles(files)
+    event.target.value = ''
+  }
 
-    setIsUploading(true)
-    setError(null)
-    try {
-      const created = await datasourceApi.upload(file, sessionId)
-      setDataSources((prev) => [...prev, created])
-      onToggle(created.id)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Upload failed')
-    } finally {
-      setIsUploading(false)
-      e.target.value = '' // Reset input
-    }
+  const handleDrop = async (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragOver(false)
+    const files = Array.from(event.dataTransfer.files || [])
+    await uploadFiles(files)
   }
 
   const startEdit = (ds: DataSource, event: React.MouseEvent) => {
     event.stopPropagation()
     if (ds.category !== 'database') return
     setEditingDsId(ds.id)
+    setExpandedDsId(null)
     setEditForm({
       name: ds.name,
       type: ds.type || 'mysql',
@@ -100,7 +253,7 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
 
   const saveEdit = async () => {
     if (!editingDsId) return
-    const conn = (editForm.connection_string || '').trim()
+    const conn = editForm.connection_string.trim()
     if (!conn) {
       setError('请填写连接字符串')
       return
@@ -109,18 +262,18 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
     setError(null)
     try {
       const updated = await datasourceApi.update(editingDsId, {
-        name: (editForm.name || '').trim() || editForm.type,
+        name: editForm.name.trim() || editForm.type,
         type: editForm.type,
         connection_string: conn,
       })
-      setDataSources((prev) => prev.map((d) => (d.id === updated.id ? updated : d)))
+      applyDataSources((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       setTablesByDsId((prev) => {
         const next = { ...prev }
         delete next[editingDsId]
         return next
       })
-      if (expandedDsId === editingDsId) setExpandedDsId(null)
       setEditingDsId(null)
+      emitDatasourceUpdated()
     } catch (e: unknown) {
       const msg = (e as { response?: { detail?: string } })?.response?.detail ?? (e instanceof Error ? e.message : 'Update failed')
       setError(String(msg))
@@ -137,14 +290,14 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
   const loadTables = async (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
     if (tablesByDsId[id]) {
-      setExpandedDsId((prev) => (prev === id ? null : id))
+      setExpandedDsId((current) => (current === id ? null : id))
       return
     }
     setLoadingTablesId(id)
     setError(null)
     try {
-      const res = await datasourceApi.tables(id)
-      setTablesByDsId((prev) => ({ ...prev, [id]: res }))
+      const response = await datasourceApi.tables(id)
+      setTablesByDsId((prev) => ({ ...prev, [id]: response }))
       setExpandedDsId(id)
     } catch (e: unknown) {
       const msg = (e as { response?: { detail?: string } })?.response?.detail ?? (e instanceof Error ? e.message : 'Failed to load tables')
@@ -159,118 +312,70 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
     if (!confirm('Delete this data source?')) return
     try {
       await datasourceApi.delete(id, sessionId)
-      setDataSources(dataSources.filter((ds) => ds.id !== id))
+      applyDataSources((current) => current.filter((item) => item.id !== id))
       setTablesByDsId((prev) => {
         const next = { ...prev }
         delete next[id]
         return next
       })
       if (expandedDsId === id) setExpandedDsId(null)
-      if (selectedIds.includes(id)) {
-        onToggle(id)
-      }
+      if (editingDsId === id) setEditingDsId(null)
+      emitDatasourceUpdated()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to delete')
     }
   }
 
   useEffect(() => {
-    loadDataSources()
-  }, [])
+    void loadDataSources()
+  }, [loadDataSources])
 
   useEffect(() => {
     const onUpdated = () => {
-      loadDataSources()
+      void loadDataSources()
     }
     window.addEventListener('datasources:updated', onUpdated)
     return () => window.removeEventListener('datasources:updated', onUpdated)
-  }, [])
+  }, [loadDataSources])
 
-  useEffect(() => {
-    if (!collapsed) {
-      setShowCollapsedPanel(false)
-    }
-  }, [collapsed])
+  return (
+    <div className={`data-source-manager ${variant === 'modal' ? 'is-modal' : variant === 'composer' ? 'is-composer' : 'is-sidebar'}`}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileUpload}
+        disabled={isUploading}
+        accept=".csv,.json,.xlsx,.xls,.parquet"
+        multiple
+      />
 
-  useEffect(() => {
-    if (collapsed) {
-      setIsExpanded(false)
-    }
-  }, [collapsed])
-
-  useEffect(() => {
-    if (!showCollapsedPanel) return
-    const onMouseDown = (event: MouseEvent) => {
-      if (!collapsedPanelRef.current) return
-      if (!collapsedPanelRef.current.contains(event.target as Node)) {
-        setShowCollapsedPanel(false)
-      }
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
-  }, [showCollapsedPanel])
-
-  const handleDsItemKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, id: string) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onToggle(id)
-    }
-  }
-
-  const managerContent = (
-    <>
-      {/* Header */}
-      <div className="data-source-header px-2 py-1.5 mb-1">
-        <button
-          type="button"
-          className="data-source-title-btn"
-          onClick={() => {
-            if (!collapsed) {
-              setIsExpanded((prev) => !prev)
-            }
-          }}
-          aria-label={effectiveExpanded ? 'Collapse data sources' : 'Expand data sources'}
-        >
-          <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider whitespace-nowrap truncate">
-            Data Sources
-          </span>
-          <span className="data-source-count-chip">{selectedIds.length}</span>
-          {!collapsed && (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className={`data-source-chevron ${effectiveExpanded ? 'expanded' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          )}
-        </button>
-        <div className="flex gap-1">
-          {/* File Upload Button */}
-          <label className="btn p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] cursor-pointer">
-            <input
-              type="file"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={isUploading}
-              accept=".csv,.json,.xlsx,.xls,.parquet"
-            />
+      <div className="data-source-header">
+        <div className="data-source-heading">
+          <span className="data-source-heading-label">Attached Data</span>
+          <span className="data-source-heading-note">Everything attached here is available to the assistant automatically.</span>
+        </div>
+        <div className="data-source-actions">
+          <button
+            type="button"
+            className="data-source-toolbar-btn"
+            title="Upload file data"
+            onClick={() => fileInputRef.current?.click()}
+          >
             {isUploading ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <div className="data-source-spinner" />
             ) : (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
             )}
-          </label>
-          {/* Add DB Button */}
+            <span>Upload file</span>
+          </button>
           <button
-            onClick={() => setIsCreating(!isCreating)}
-            className="btn p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)]"
-            title={isCreating ? 'Cancel' : 'Add Database'}
+            type="button"
+            onClick={() => setIsCreating((current) => !current)}
+            className={`data-source-toolbar-btn ${isCreating ? 'is-active' : ''}`}
+            title={isCreating ? 'Cancel database form' : 'Add database'}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -282,266 +387,256 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
+            <span>Database</span>
           </button>
+          <span className="data-source-count-chip">{dataSources.length}</span>
         </div>
       </div>
 
-      {effectiveExpanded && (
-        <>
-          {/* Error */}
-          {error && (
-            <div className="text-red-400 text-xs px-2 mb-2 flex items-center justify-between gap-2">
-              <span>{error}</span>
-              <button type="button" onClick={() => loadDataSources()} className="shrink-0 text-[var(--accent)] hover:underline">
-                重试
-              </button>
-            </div>
-          )}
-
-          {/* Create Form */}
-          {isCreating && (
-            <div className="form-panel">
-              <div className="space-y-2 p-2.5 bg-[var(--sidebar-hover)] rounded-xl mb-2">
-                <input
-                  value={newDs.name}
-                  onChange={(e) => setNewDs({ ...newDs, name: e.target.value })}
-                  placeholder="Name"
-                  className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
-                />
-                <select
-                  value={newDs.type}
-                  onChange={(e) => setNewDs({ ...newDs, type: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
-                >
-                  <option value="postgres">PostgreSQL</option>
-                  <option value="mysql">MySQL</option>
-                  <option value="sqlite">SQLite</option>
-                </select>
-                <input
-                  value={newDs.connection_string}
-                  onChange={(e) => setNewDs({ ...newDs, connection_string: e.target.value })}
-                  placeholder="Connection URI"
-                  className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
-                />
-                <button
-                  onClick={createDataSource}
-                  className="btn w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium"
-                >
-                  Connect
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* List */}
-          <div className="space-y-1 max-h-52 overflow-y-auto">
-            {dataSources.length === 0 && !isCreating && (
-              <div className="text-[var(--sidebar-text-muted)] text-xs text-center py-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-6 h-6 mx-auto mb-1.5 opacity-40"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
-                  />
-                </svg>
-                No data sources
-              </div>
-            )}
-
-            {dataSources.map((ds) => (
-              <div key={ds.id} className="rounded-xl overflow-hidden">
-                <div
-                  onClick={() => onToggle(ds.id)}
-                  onKeyDown={(event) => handleDsItemKeyDown(event, ds.id)}
-                  role="button"
-                  tabIndex={0}
-                  className={`group flex items-center gap-2 px-2.5 py-2 cursor-pointer text-sm ds-item ${
-                    selectedIds.includes(ds.id)
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'hover:bg-[var(--sidebar-hover)]'
-                  }`}
-                >
-              {/* Icon */}
-              {ds.category === 'file' ? (
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-4 h-4 flex-shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-                  />
-                </svg>
-              )}
-              {/* Name */}
-              <span className="flex-1 truncate">{ds.name}</span>
-              {/* Database: edit */}
-              {ds.category === 'database' && (
-                <button
-                  onClick={(e) => startEdit(ds, e)}
-                  className={`btn p-1 rounded-lg shrink-0 ${
-                    selectedIds.includes(ds.id) ? 'hover:bg-white/20' : 'hover:bg-[var(--sidebar-border)] text-[var(--sidebar-text-muted)]'
-                  }`}
-                  title="编辑连接（如将 mx-mysql 改为 localhost）"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-              )}
-              {/* Database: load tables */}
-              {ds.category === 'database' && (
-                <button
-                  onClick={(e) => loadTables(ds.id, e)}
-                  className={`btn p-1 rounded-lg shrink-0 ${
-                    selectedIds.includes(ds.id) ? 'hover:bg-white/20' : 'hover:bg-[var(--sidebar-border)] text-[var(--sidebar-text-muted)]'
-                  }`}
-                  title="查看表列表"
-                >
-                  {loadingTablesId === ds.id ? (
-                    <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
-                  )}
-                </button>
-              )}
-              {/* Delete */}
-              <button
-                onClick={(e) => deleteDataSource(ds.id, e)}
-                className={`btn opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 p-1 rounded-lg ${
-                  selectedIds.includes(ds.id)
-                    ? 'hover:bg-white/20'
-                    : 'hover:bg-red-500/20 text-[var(--sidebar-text-muted)] hover:text-red-400'
-                }`}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-                </div>
-                {/* Edit form for database */}
-                {ds.category === 'database' && editingDsId === ds.id && (
-                  <div
-                    className="p-2.5 bg-[var(--sidebar-hover)] border-t border-[var(--sidebar-border)] space-y-2 text-sm"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                <div className="text-[var(--sidebar-text-muted)] text-xs">编辑连接（本机连接请用 localhost）</div>
-                <input
-                  value={editForm.name}
-                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="名称"
-                  className="w-full px-2 py-1.5 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded text-xs"
-                />
-                <select
-                  value={editForm.type}
-                  onChange={(e) => setEditForm((f) => ({ ...f, type: e.target.value }))}
-                  className="w-full px-2 py-1.5 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded text-xs"
-                >
-                  <option value="postgres">PostgreSQL</option>
-                  <option value="mysql">MySQL</option>
-                  <option value="sqlite">SQLite</option>
-                </select>
-                <input
-                  value={editForm.connection_string}
-                  onChange={(e) => setEditForm((f) => ({ ...f, connection_string: e.target.value }))}
-                  placeholder="mysql://root:密码@localhost:3306/数据库名"
-                  className="w-full px-2 py-1.5 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded text-xs font-mono"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={saveEdit}
-                    disabled={isSavingEdit}
-                    className="btn flex-1 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded text-xs disabled:opacity-50"
-                  >
-                    {isSavingEdit ? '保存中...' : '保存'}
-                  </button>
-                  <button type="button" onClick={cancelEdit} className="btn py-1.5 px-3 rounded text-xs hover:bg-[var(--sidebar-border)]">
-                    取消
-                  </button>
-                </div>
-                  </div>
-                )}
-                {/* Expanded: table list for database */}
-                {ds.category === 'database' && expandedDsId === ds.id && tablesByDsId[ds.id] && (
-                  <div
-                    className="pl-6 pr-2 py-2 bg-[var(--sidebar-hover)] border-t border-[var(--sidebar-border)] text-xs max-h-28 overflow-y-auto"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                <div className="text-[var(--sidebar-text-muted)] mb-1">表 ({tablesByDsId[ds.id].tables.length})</div>
-                <ul className="space-y-0.5">
-                  {tablesByDsId[ds.id].tables.map((t) => (
-                    <li key={t.name} className="truncate" title={`${t.name}: ${t.columns.map((c) => c.name).join(', ')}`}>
-                      <span className="font-medium text-[var(--sidebar-text)]">{t.name}</span>
-                      <span className="text-[var(--sidebar-text-muted)] ml-1">({t.columns.length} 列)</span>
-                    </li>
-                  ))}
-                </ul>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </>
-  )
-
-  if (collapsed) {
-    return (
-      <div className="data-source-manager border-t border-[var(--sidebar-border)] p-2 relative">
-        <div className="flex justify-start pl-[14px]">
-          <button
-            onClick={() => setShowCollapsedPanel((prev) => !prev)}
-            className="btn w-12 h-12 p-0 rounded-xl hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text)] relative inline-flex items-center justify-center"
-            title="Data Sources"
-            aria-label="Data Sources"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+      {variant === 'modal' && (
+        <button
+          type="button"
+          className={`data-source-dropzone ${isDragOver ? 'is-dragover' : ''} ${isUploading ? 'is-uploading' : ''}`}
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setIsDragOver(true)
+          }}
+          onDragEnter={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setIsDragOver(true)
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setIsDragOver(false)
+          }}
+          onDrop={handleDrop}
+        >
+          <span className="data-source-dropzone-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 15 12 10.5 16.5 15M12 10.5V21M20.25 16.5A3.75 3.75 0 0 0 18 9.672 5.25 5.25 0 0 0 7.5 8.25a4.5 4.5 0 0 0-.63 8.956" />
             </svg>
-            {selectedIds.length > 0 && (
-              <span className="ds-badge">{selectedIds.length}</span>
-            )}
+          </span>
+          <span className="data-source-dropzone-copy">
+            <span className="data-source-dropzone-title">
+              {isUploading ? 'Uploading files...' : 'Drag files here or click to browse'}
+            </span>
+            <span className="data-source-dropzone-note">
+              CSV, JSON, Excel, and Parquet are supported.
+            </span>
+          </span>
+        </button>
+      )}
+
+      {error && (
+        <div className="data-source-error">
+          <span>{error}</span>
+          <button type="button" onClick={() => void loadDataSources()} className="data-source-link-btn">
+            重试
           </button>
         </div>
-        {showCollapsedPanel && (
-          <div ref={collapsedPanelRef} className="collapsed-ds-panel">
-            {managerContent}
+      )}
+
+      {isCreating && (
+        <div className="data-source-form-panel data-source-form-panel-db">
+          <div className="data-source-form-intro">
+            <span className="data-source-form-kicker">Database connection</span>
+            <span className="data-source-form-copy">Create a reusable live source for reports, dashboards, and follow-up analysis.</span>
+          </div>
+          <div className="data-source-form-grid">
+            <label className="data-source-field-group">
+              <span className="data-source-field-label">Display name</span>
+              <input
+                value={newDs.name}
+                onChange={(event) => setNewDs({ ...newDs, name: event.target.value })}
+                placeholder="Revenue warehouse"
+                className="data-source-field"
+              />
+            </label>
+            <label className="data-source-field-group">
+              <span className="data-source-field-label">Engine</span>
+              <EngineSelect
+                value={newDs.type}
+                onChange={(nextType) => setNewDs({ ...newDs, type: nextType })}
+              />
+            </label>
+          </div>
+          <label className="data-source-field-group">
+            <span className="data-source-field-label">Connection URI</span>
+            <textarea
+              value={newDs.connection_string}
+              onChange={(event) => setNewDs({ ...newDs, connection_string: event.target.value })}
+              placeholder={URI_EXAMPLES[newDs.type] || 'Connection URI'}
+              className="data-source-field data-source-field-mono data-source-textarea"
+              rows={3}
+            />
+          </label>
+          <div className="data-source-uri-help">
+            <span className="data-source-uri-label">Example</span>
+            <code className="data-source-uri-example">{URI_EXAMPLES[newDs.type] || 'Connection URI'}</code>
+          </div>
+          <div className="data-source-form-footer">
+            <button type="button" onClick={createDataSource} className="data-source-submit-btn">
+              Connect database
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="data-source-list">
+        {dataSources.length === 0 && !isCreating && (
+          <div className="data-source-empty-state">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-6 h-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="1.25"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
+              />
+            </svg>
+            <span>No attached data yet</span>
           </div>
         )}
-      </div>
-    )
-  }
 
-  return (
-    <div className="data-source-manager border-t border-[var(--sidebar-border)] p-2">
-      {managerContent}
+        {dataSources.map((ds) => {
+          const isDatabase = ds.category === 'database'
+          const isOpen = expandedDsId === ds.id || editingDsId === ds.id
+          return (
+            <div key={ds.id} className={`data-source-card ${isOpen ? 'is-open' : ''}`}>
+              <div className="data-source-row">
+                <div className={`data-source-kind ${isDatabase ? 'is-database' : 'is-file'}`}>
+                  {isDatabase ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  )}
+                </div>
+                <div className="data-source-copy">
+                  <span className="data-source-name">{ds.name}</span>
+                  <span className="data-source-meta">{isDatabase ? (ds.type || 'database').toUpperCase() : 'FILE'}</span>
+                </div>
+                <div className="data-source-row-actions">
+                  {isDatabase && (
+                    <button
+                      type="button"
+                      onClick={(event) => startEdit(ds, event)}
+                      className="data-source-icon-btn"
+                      title="Edit connection"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  )}
+                  {isDatabase && (
+                    <button
+                      type="button"
+                      onClick={(event) => void loadTables(ds.id, event)}
+                      className="data-source-icon-btn"
+                      title="View tables"
+                    >
+                      {loadingTablesId === ds.id ? (
+                        <div className="data-source-spinner is-small" />
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(event) => void deleteDataSource(ds.id, event)}
+                    className="data-source-icon-btn is-danger"
+                    title="Delete data source"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {isDatabase && editingDsId === ds.id && (
+                <div className="data-source-subpanel" onClick={(event) => event.stopPropagation()}>
+                  <div className="data-source-form-grid">
+                    <label className="data-source-field-group">
+                      <span className="data-source-field-label">Display name</span>
+                      <input
+                        value={editForm.name}
+                        onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+                        placeholder="Revenue warehouse"
+                        className="data-source-field"
+                      />
+                    </label>
+                    <label className="data-source-field-group">
+                      <span className="data-source-field-label">Engine</span>
+                      <EngineSelect
+                        value={editForm.type}
+                        onChange={(nextType) => setEditForm((current) => ({ ...current, type: nextType }))}
+                      />
+                    </label>
+                  </div>
+                  <label className="data-source-field-group">
+                    <span className="data-source-field-label">Connection URI</span>
+                    <textarea
+                      value={editForm.connection_string}
+                      onChange={(event) => setEditForm((current) => ({ ...current, connection_string: event.target.value }))}
+                      placeholder={URI_EXAMPLES[editForm.type] || 'Connection URI'}
+                      className="data-source-field data-source-field-mono data-source-textarea"
+                      rows={3}
+                    />
+                  </label>
+                  <div className="data-source-uri-help">
+                    <span className="data-source-uri-label">Example</span>
+                    <code className="data-source-uri-example">{URI_EXAMPLES[editForm.type] || 'Connection URI'}</code>
+                  </div>
+                  <div className="data-source-subpanel-actions">
+                    <button
+                      type="button"
+                      onClick={saveEdit}
+                      disabled={isSavingEdit}
+                      className="data-source-submit-btn"
+                    >
+                      {isSavingEdit ? '保存中...' : '保存连接'}
+                    </button>
+                    <button type="button" onClick={cancelEdit} className="data-source-secondary-btn">
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isDatabase && expandedDsId === ds.id && tablesByDsId[ds.id] && (
+                <div className="data-source-subpanel" onClick={(event) => event.stopPropagation()}>
+                  <div className="data-source-subpanel-note">Tables ({tablesByDsId[ds.id].tables.length})</div>
+                  <ul className="data-source-table-list">
+                    {tablesByDsId[ds.id].tables.map((table) => (
+                      <li key={table.name} className="data-source-table-item" title={`${table.name}: ${table.columns.map((column) => column.name).join(', ')}`}>
+                        <span className="data-source-table-name">{table.name}</span>
+                        <span className="data-source-table-meta">{table.columns.length} columns</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

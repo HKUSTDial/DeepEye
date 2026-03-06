@@ -12,12 +12,10 @@ interface RightPanelLayoutProps {
 
 export function RightPanelLayout({ sessionId, dataSourceIds, onRequestClose }: RightPanelLayoutProps) {
   const panes = useRightPanelStore((state) => state.panes)
-  const maxPanes = useRightPanelStore((state) => state.maxPanes)
   const openTab = useRightPanelStore((state) => state.openTab)
   const closeTab = useRightPanelStore((state) => state.closeTab)
   const setActiveTab = useRightPanelStore((state) => state.setActiveTab)
   const setActivePane = useRightPanelStore((state) => state.setActivePane)
-  const splitPane = useRightPanelStore((state) => state.splitPane)
   const closePane = useRightPanelStore((state) => state.closePane)
 
   const [menuPaneId, setMenuPaneId] = useState<string | null>(null)
@@ -53,13 +51,14 @@ export function RightPanelLayout({ sessionId, dataSourceIds, onRequestClose }: R
     return (
       <div className="right-panel-container" ref={containerRef}>
         <div className="right-panel-empty">
+          <div className="right-panel-empty-kicker">Workspace</div>
           <div className="right-panel-empty-icon">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <div className="right-panel-empty-title">Workspace</div>
-          <div className="right-panel-empty-subtitle">Select a panel to start inspecting execution artifacts.</div>
+          <div className="right-panel-empty-title">Open a workspace view</div>
+          <div className="right-panel-empty-subtitle">Files, workflows, reports, dashboards, and video previews appear here.</div>
           <div className="right-panel-empty-actions">
             {panelRegistry.map((plugin) => (
               <button
@@ -74,6 +73,11 @@ export function RightPanelLayout({ sessionId, dataSourceIds, onRequestClose }: R
                     {typeof plugin.title === 'string' ? plugin.title : plugin.title()}
                   </span>
                   <span className="right-panel-entry-desc">{plugin.description}</span>
+                </span>
+                <span className="right-panel-entry-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="m6 14 8-8M7 6h7v7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </span>
               </button>
             ))}
@@ -167,7 +171,7 @@ export function RightPanelLayout({ sessionId, dataSourceIds, onRequestClose }: R
                   </button>
                   {menuPaneId === pane.id && (
                     <div className="right-panel-menu">
-                      <div className="right-panel-menu-title">Open panel</div>
+                      <div className="right-panel-menu-title">Open view</div>
                       {panelRegistry.map((plugin) => (
                         <button
                           key={plugin.id}
@@ -190,18 +194,6 @@ export function RightPanelLayout({ sessionId, dataSourceIds, onRequestClose }: R
                     </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    splitPane()
-                  }}
-                  disabled={panes.length >= maxPanes}
-                  className="right-panel-action-btn"
-                  title="Split pane"
-                >
-                  <span className="right-panel-split-label">Split</span>
-                </button>
                 {panes.length > 1 && (
                   <button
                     type="button"
