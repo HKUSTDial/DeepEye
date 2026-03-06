@@ -718,6 +718,13 @@ body.dark-theme .chat-container .chat-input:active {
   font-weight: 600;
 }
 
+.chat-upload-notice {
+  margin: 6px 2px 0;
+  font-size: var(--chat-font-xs);
+  color: var(--main-text-muted);
+  line-height: 1.45;
+}
+
 .chat-jump-latest-btn {
   position: absolute;
   right: max(16px, calc((100vw - min(100vw, 960px)) / 2 + 4px));
@@ -797,8 +804,15 @@ body.dark-theme .chat-container .chat-input:active {
   font-family: inherit;
 }
 
-.mention-item:hover {
+.mention-item:hover,
+.mention-item.active {
   background: var(--sidebar-hover);
+}
+
+.mention-empty {
+  padding: 11px 12px;
+  font-size: var(--chat-font-sm);
+  color: var(--main-text-muted);
 }
 
 /* Error */
@@ -916,6 +930,10 @@ body.dark-theme .chat-container .chat-input:active {
   .chat-input-meta {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .chat-upload-notice {
+    margin-top: 4px;
   }
 }
 

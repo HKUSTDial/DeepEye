@@ -23,7 +23,9 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const [input, setInput] = useState('')
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0)
   const [csvFiles, setCsvFiles] = useState<File[]>([])
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null)
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(true)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
@@ -32,6 +34,7 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const composingRef = useRef(false)
   const compositionEndedAtRef = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const mentionDropdownRef = useRef<HTMLDivElement>(null)
   const starterPrompts = [
     {
       label: 'Analyze This Data',
@@ -59,6 +62,28 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     loadBases()
   }, [loadBases])
 
+  useEffect(() => {
+    if (!uploadNotice) return
+    const timer = window.setTimeout(() => {
+      setUploadNotice(null)
+    }, 3200)
+    return () => window.clearTimeout(timer)
+  }, [uploadNotice])
+
+  useEffect(() => {
+    const onMouseDown = (event: MouseEvent) => {
+      if (!showMentions) return
+      const target = event.target as Node
+      if (mentionDropdownRef.current?.contains(target)) return
+      if (textareaRef.current?.contains(target)) return
+      setShowMentions(false)
+      setMentionQuery('')
+      setActiveMentionIndex(0)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [showMentions])
+
   const extractKbIds = (text: string) => {
     const ids: string[] = []
     kbBases.forEach((kb) => {
@@ -77,9 +102,11 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     sendMessage(query, dataSourceIds, kbIds, csvFiles.length > 0 ? csvFiles : undefined)
     setInput('')
     setCsvFiles([])
+    setUploadNotice(null)
     setAttachmentsExpanded(false)
     setShowMentions(false)
     setMentionQuery('')
+    setActiveMentionIndex(0)
     setIsNearBottom(true)
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -130,20 +157,58 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     composingRef.current = true
   }
 
-  const handleCompositionEnd = () => {
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLTextAreaElement>) => {
     composingRef.current = false
-    compositionEndedAtRef.current = Date.now()
+    compositionEndedAtRef.current = e.timeStamp
   }
 
+  const mentionMatches = showMentions
+    ? kbBases.filter((kb) => kb.name.toLowerCase().includes(mentionQuery.toLowerCase()))
+    : []
+  const effectiveMentionIndex =
+    mentionMatches.length > 0 ? Math.min(activeMentionIndex, mentionMatches.length - 1) : 0
+
+  useEffect(() => {
+    if (!showMentions || mentionMatches.length === 0 || !mentionDropdownRef.current) return
+    const active = mentionDropdownRef.current.querySelector<HTMLButtonElement>('.mention-item.active')
+    active?.scrollIntoView({ block: 'nearest' })
+  }, [showMentions, mentionMatches.length, effectiveMentionIndex])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const native = e.nativeEvent
+    const keyCode = native.keyCode || native.which || 0
+    const composingOrSelecting =
+      composingRef.current ||
+      native.isComposing ||
+      keyCode === 229 ||
+      native.timeStamp - compositionEndedAtRef.current < 30
+
+    if (showMentions) {
+      if (e.key === 'ArrowDown' && mentionMatches.length > 0) {
+        e.preventDefault()
+        setActiveMentionIndex((current) => (current + 1) % mentionMatches.length)
+        return
+      }
+      if (e.key === 'ArrowUp' && mentionMatches.length > 0) {
+        e.preventDefault()
+        setActiveMentionIndex((current) => (current - 1 + mentionMatches.length) % mentionMatches.length)
+        return
+      }
+      if ((e.key === 'Enter' || e.key === 'Tab') && mentionMatches.length > 0 && !composingOrSelecting) {
+        e.preventDefault()
+        handleMentionSelect(mentionMatches[effectiveMentionIndex].name)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowMentions(false)
+        setMentionQuery('')
+        setActiveMentionIndex(0)
+        return
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
-      const native = e.nativeEvent
-      const keyCode = native.keyCode || native.which || 0
-      const composingOrSelecting =
-        composingRef.current ||
-        native.isComposing ||
-        keyCode === 229 ||
-        Date.now() - compositionEndedAtRef.current < 30
       // IME composing state: do not send message on Enter while user is selecting candidates.
       if (composingOrSelecting) {
         return
@@ -153,15 +218,12 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     }
   }
 
-  const mentionMatches = showMentions
-    ? kbBases.filter((kb) => kb.name.toLowerCase().includes(mentionQuery.toLowerCase()))
-    : []
-
   const handleMentionSelect = (name: string) => {
     const next = input.replace(/@([^\s@]*)$/, `@${name} `)
     setInput(next)
     setShowMentions(false)
     setMentionQuery('')
+    setActiveMentionIndex(0)
     if (textareaRef.current) {
       textareaRef.current.focus()
     }
@@ -417,10 +479,28 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               onChange={(e) => {
                 const list = e.target.files ? Array.from(e.target.files) : []
                 const supported = list.filter((f) => isSupportedReportFile(f.name))
-                setCsvFiles((prev) => [...prev, ...supported])
-                if (supported.length > 0) {
+                const existing = new Set(csvFiles.map((f) => `${f.name}:${f.size}:${f.lastModified}`))
+                const uniqueSupported = supported.filter((f) => {
+                  const signature = `${f.name}:${f.size}:${f.lastModified}`
+                  if (existing.has(signature)) return false
+                  existing.add(signature)
+                  return true
+                })
+                const unsupportedCount = list.length - supported.length
+                const duplicateCount = supported.length - uniqueSupported.length
+                const noticeParts: string[] = []
+                if (unsupportedCount > 0) {
+                  noticeParts.push(`${unsupportedCount} unsupported file(s) ignored`)
+                }
+                if (duplicateCount > 0) {
+                  noticeParts.push(`${duplicateCount} duplicate file(s) skipped`)
+                }
+                setUploadNotice(noticeParts.length > 0 ? `${noticeParts.join('. ')}.` : null)
+                setCsvFiles((prev) => [...prev, ...uniqueSupported])
+                if (uniqueSupported.length > 0) {
                   setAttachmentsExpanded(true)
                 }
+                e.target.value = ''
               }}
             />
             <button
@@ -445,9 +525,11 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
                 if (match) {
                   setShowMentions(true)
                   setMentionQuery(match[1])
+                  setActiveMentionIndex(0)
                 } else {
                   setShowMentions(false)
                   setMentionQuery('')
+                  setActiveMentionIndex(0)
                 }
               }}
               onKeyDown={handleKeyDown}
@@ -459,21 +541,29 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               placeholder={csvFiles.length > 0 ? 'Describe what report you want (or send as-is)...' : 'Message DeepEye...'}
               disabled={isStreaming}
             />
-            {showMentions && mentionMatches.length > 0 && (
-              <div className="mention-dropdown">
+            {showMentions && (
+              <div className="mention-dropdown" ref={mentionDropdownRef}>
                 <div className="mention-header">Knowledge Bases</div>
-                <div className="mention-list">
-                  {mentionMatches.map((kb) => (
-                    <button
-                      key={kb.id}
-                      type="button"
-                      onClick={() => handleMentionSelect(kb.name)}
-                      className="mention-item"
-                    >
-                      @{kb.name}
-                    </button>
-                  ))}
-                </div>
+                {mentionMatches.length > 0 ? (
+                  <div className="mention-list">
+                    {mentionMatches.map((kb, idx) => (
+                      <button
+                        key={kb.id}
+                        type="button"
+                        onClick={() => handleMentionSelect(kb.name)}
+                        onMouseEnter={() => setActiveMentionIndex(idx)}
+                        className={`mention-item ${idx === effectiveMentionIndex ? 'active' : ''}`}
+                        aria-selected={idx === effectiveMentionIndex}
+                      >
+                        @{kb.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mention-empty">
+                    No knowledge base matched @{mentionQuery || '...'}
+                  </div>
+                )}
               </div>
             )}
             {isStreaming ? (
@@ -510,6 +600,11 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               {dataSourceIds.length > 0 ? `${dataSourceIds.length} source(s) attached` : 'No source attached'}
             </span>
           </div>
+          {uploadNotice && (
+            <p className="chat-upload-notice" role="status">
+              {uploadNotice}
+            </p>
+          )}
         </div>
       </div>
     </div>

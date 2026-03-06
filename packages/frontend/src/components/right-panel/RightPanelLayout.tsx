@@ -7,9 +7,10 @@ import './RightPanel.css'
 interface RightPanelLayoutProps {
   sessionId: string | null
   dataSourceIds: string[]
+  onRequestClose?: () => void
 }
 
-export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutProps) {
+export function RightPanelLayout({ sessionId, dataSourceIds, onRequestClose }: RightPanelLayoutProps) {
   const panes = useRightPanelStore((state) => state.panes)
   const maxPanes = useRightPanelStore((state) => state.maxPanes)
   const openTab = useRightPanelStore((state) => state.openTab)
@@ -138,6 +139,20 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
                 })}
               </div>
               <div className="right-panel-actions">
+                {onRequestClose && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onRequestClose()
+                    }}
+                    className="right-panel-action-btn right-panel-mobile-close"
+                    title="Close workspace"
+                    aria-label="Close workspace"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
                 <div className="relative">
                   <button
                     type="button"

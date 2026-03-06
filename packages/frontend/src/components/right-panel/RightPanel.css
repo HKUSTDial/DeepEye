@@ -166,6 +166,10 @@
   cursor: not-allowed;
 }
 
+.right-panel-mobile-close {
+  display: none;
+}
+
 /* Content */
 .right-panel-content {
   flex: 1;
@@ -451,6 +455,13 @@
   .right-panel-action-btn {
     width: 26px;
     height: 26px;
+  }
+
+  .right-panel-mobile-close {
+    display: inline-flex;
+    border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--panel-border));
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel-bg));
+    color: color-mix(in srgb, var(--accent) 88%, var(--main-text));
   }
 
   .right-panel-split-label {

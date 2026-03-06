@@ -237,6 +237,7 @@ function App() {
             <RightPanelLayout 
               sessionId={sessionId} 
               dataSourceIds={selectedDataSourceIds} 
+              onRequestClose={() => setRightPanelCollapsed(true)}
             />
           </div>
         </aside>
