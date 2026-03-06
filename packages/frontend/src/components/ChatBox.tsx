@@ -13,7 +13,7 @@ interface ChatBoxProps {
 }
 
 export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
-  const { sendMessage, error } = useChat()
+  const { sendMessage, stopMessage, error } = useChat()
   // 每个属性单独订阅 - 最简单可靠的方式
   const messages = useChatStore((state) => state.messages)
   const isStreaming = useChatStore((state) => state.isStreaming)
@@ -24,11 +24,31 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [csvFiles, setCsvFiles] = useState<File[]>([])
+  const [attachmentsExpanded, setAttachmentsExpanded] = useState(true)
+  const [isNearBottom, setIsNearBottom] = useState(true)
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
   const compositionEndedAtRef = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const starterPrompts = [
+    {
+      label: 'Analyze This Data',
+      description: 'Profile fields, data quality, and immediate risks.',
+      prompt: 'Please analyze my selected data sources, highlight key fields, data quality issues, and the most practical next steps.',
+    },
+    {
+      label: 'Suggest Visual Insights',
+      description: 'Propose high-impact charts with business questions.',
+      prompt: 'Recommend three high-value visualizations for this dataset and explain what business questions each chart answers.',
+    },
+    {
+      label: 'Draft a Report',
+      description: 'Create an executive summary with actions and follow-ups.',
+      prompt: 'Generate a business report draft with summary, key findings, risks, and actionable recommendations.',
+    },
+  ]
 
   const isSupportedReportFile = (name: string) => {
     const n = name.toLowerCase()
@@ -57,10 +77,13 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     sendMessage(query, dataSourceIds, kbIds, csvFiles.length > 0 ? csvFiles : undefined)
     setInput('')
     setCsvFiles([])
+    setAttachmentsExpanded(false)
     setShowMentions(false)
     setMentionQuery('')
+    setIsNearBottom(true)
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     if (fileInputRef.current) fileInputRef.current.value = ''
+    scrollToBottom()
   }
 
   const autoResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -69,22 +92,39 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     el.style.height = Math.min(el.scrollHeight, 200) + 'px'
   }
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     setTimeout(() => {
       if (chatContainerRef.current) {
         chatContainerRef.current.scrollTo({
           top: chatContainerRef.current.scrollHeight,
-          behavior: 'smooth'
+          behavior,
         })
       }
     }, 0)
   }
   const lastMessageContent = messages.length > 0 ? messages[messages.length - 1]?.content ?? '' : ''
 
+  useEffect(() => {
+    const container = chatContainerRef.current
+    if (!container) return
+    const threshold = 96
+    const updateScrollState = () => {
+      const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+      const nearBottom = distanceToBottom <= threshold
+      setIsNearBottom(nearBottom)
+    }
+    updateScrollState()
+    container.addEventListener('scroll', updateScrollState)
+    return () => container.removeEventListener('scroll', updateScrollState)
+  }, [])
+
   // Auto-scroll when messages change
   useEffect(() => {
-    scrollToBottom()
-  }, [messages.length, lastMessageContent])
+    if (messages.length === 0) return
+    if (isNearBottom) {
+      scrollToBottom('smooth')
+    }
+  }, [messages.length, lastMessageContent, isNearBottom])
 
   const handleCompositionStart = () => {
     composingRef.current = true
@@ -127,6 +167,28 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     }
   }
 
+  const applyStarterPrompt = (prompt: string) => {
+    setInput(prompt)
+    if (textareaRef.current) {
+      textareaRef.current.focus()
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px'
+    }
+  }
+
+  const copyMessageContent = async (content: string, index: number) => {
+    if (!content.trim()) return
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageIndex(index)
+      window.setTimeout(() => {
+        setCopiedMessageIndex((current) => (current === index ? null : current))
+      }, 1400)
+    } catch {
+      setCopiedMessageIndex(null)
+    }
+  }
+
   const renderStreamingIndicator = () => (
     <span className="streaming-indicator" aria-hidden="true">
       <span className="streaming-indicator-dot"></span>
@@ -135,6 +197,9 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
     </span>
   )
   const hasText = (value?: string) => Boolean(value && value.trim().length > 0)
+  const showJumpButton = messages.length > 0 && !isNearBottom
+  const sourceStatusText = dataSourceIds.length > 0 ? `${dataSourceIds.length} data source(s) ready` : 'No data source attached yet'
+  const attachmentCount = csvFiles.length
 
   const renderAssistantMessage = (msg: Message) => {
     const timeline = msg.timeline && msg.timeline.length > 0 ? msg.timeline : null
@@ -202,6 +267,23 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
             <p className="chat-empty-subtitle">
               Ask me to analyze your data, write SQL queries, or create visualizations.
             </p>
+            <div className="chat-empty-context">
+              <span className={`chat-empty-context-chip ${dataSourceIds.length > 0 ? 'active' : ''}`}>{sourceStatusText}</span>
+              <span className="chat-empty-context-chip">@knowledge-base mentions supported</span>
+            </div>
+            <div className="chat-empty-prompts">
+              {starterPrompts.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  className="chat-empty-prompt"
+                  onClick={() => applyStarterPrompt(item.prompt)}
+                >
+                  <span className="chat-empty-prompt-title">{item.label}</span>
+                  <span className="chat-empty-prompt-desc">{item.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -217,9 +299,6 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
                 )}
 
                 <div className="chat-message-main">
-                  <div className="message-role-label">
-                    {msg.role === 'user' ? 'You' : 'DeepEye'}
-                  </div>
                   <div className={`message-bubble ${msg.role}`}>
                     {msg.role === 'user' ? (
                       <div className="message-content">
@@ -241,6 +320,17 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
                         </div>
                       )}
                   </div>
+                  {msg.role === 'assistant' && hasText(msg.content) && !msg.isStreaming && (
+                    <div className="message-actions">
+                      <button
+                        type="button"
+                        className="message-action-btn"
+                        onClick={() => copyMessageContent(msg.content, index)}
+                      >
+                        {copiedMessageIndex === index ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {msg.role === 'user' && (
@@ -260,26 +350,61 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
           </div>
         )}
       </div>
+      {showJumpButton && (
+        <button
+          type="button"
+          className="chat-jump-latest-btn"
+          onClick={() => {
+            setIsNearBottom(true)
+            scrollToBottom('smooth')
+          }}
+        >
+          Jump to latest
+        </button>
+      )}
 
       {/* Input Area */}
       <div className="chat-input-container">
         <div className="chat-input-shell">
-          {csvFiles.length > 0 && (
+          {attachmentCount > 0 && (
             <div className="chat-attachments">
-              <span className="chat-attachments-label">Files for workflow:</span>
-              {csvFiles.map((f, i) => (
-                <span key={i} className="chat-attachment-chip">
-                  {f.name}
-                  <button
-                    type="button"
-                    onClick={() => setCsvFiles((prev) => prev.filter((_, j) => j !== i))}
-                    className="chat-attachment-remove"
-                    aria-label="Remove file"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+              <button
+                type="button"
+                className="chat-attachments-toggle"
+                onClick={() => setAttachmentsExpanded((prev) => !prev)}
+                aria-expanded={attachmentsExpanded}
+              >
+                <span className="chat-attachments-label">Files for workflow</span>
+                <span className="chat-attachments-count">{attachmentCount}</span>
+                <svg className={`chat-attachments-chevron ${attachmentsExpanded ? 'expanded' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {attachmentsExpanded && (
+                <div className="chat-attachments-list">
+                  {csvFiles.map((f, i) => (
+                    <span key={i} className="chat-attachment-chip">
+                      {f.name}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCsvFiles((prev) => {
+                            const next = prev.filter((_, j) => j !== i)
+                            if (next.length === 0) {
+                              setAttachmentsExpanded(false)
+                            }
+                            return next
+                          })
+                        }
+                        className="chat-attachment-remove"
+                        aria-label="Remove file"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           <div className="chat-input-wrapper">
@@ -291,7 +416,11 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
               className="hidden"
               onChange={(e) => {
                 const list = e.target.files ? Array.from(e.target.files) : []
-                setCsvFiles((prev) => [...prev, ...list].filter((f) => isSupportedReportFile(f.name)))
+                const supported = list.filter((f) => isSupportedReportFile(f.name))
+                setCsvFiles((prev) => [...prev, ...supported])
+                if (supported.length > 0) {
+                  setAttachmentsExpanded(true)
+                }
               }}
             />
             <button
@@ -347,29 +476,40 @@ export default function ChatBox({ dataSourceIds }: ChatBoxProps) {
                 </div>
               </div>
             )}
-            <button
-              onClick={handleSend}
-              disabled={(!input.trim() && csvFiles.length === 0) || isStreaming}
-              className="chat-send-btn"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-5 h-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            {isStreaming ? (
+              <button type="button" onClick={stopMessage} className="chat-stop-btn" title="Stop generation">
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={(!input.trim() && csvFiles.length === 0) || isStreaming}
+                className="chat-send-btn"
               >
-                <path d="m5 12 7-7 7 7" />
-                <path d="M12 19V5" />
-              </svg>
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m5 12 7-7 7 7" />
+                  <path d="M12 19V5" />
+                </svg>
+              </button>
+            )}
           </div>
-          <p className="chat-input-hint">
-            DeepEye can make mistakes. Consider checking important information.
-          </p>
+          <div className="chat-input-meta">
+            <p className="chat-input-hint">
+              Enter to send, Shift+Enter for newline. DeepEye can make mistakes, please verify important results.
+            </p>
+            <span className="chat-input-ds-badge">
+              {dataSourceIds.length > 0 ? `${dataSourceIds.length} source(s) attached` : 'No source attached'}
+            </span>
+          </div>
         </div>
       </div>
     </div>

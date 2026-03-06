@@ -24,7 +24,9 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
   const [editForm, setEditForm] = useState({ name: '', type: 'mysql', connection_string: '' })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [showCollapsedPanel, setShowCollapsedPanel] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const collapsedPanelRef = useRef<HTMLDivElement>(null)
+  const effectiveExpanded = collapsed || isExpanded
 
   const loadDataSources = async () => {
     setError(null)
@@ -191,6 +193,12 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
   }, [collapsed])
 
   useEffect(() => {
+    if (collapsed) {
+      setIsExpanded(false)
+    }
+  }, [collapsed])
+
+  useEffect(() => {
     if (!showCollapsedPanel) return
     const onMouseDown = (event: MouseEvent) => {
       if (!collapsedPanelRef.current) return
@@ -202,13 +210,44 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [showCollapsedPanel])
 
+  const handleDsItemKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, id: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onToggle(id)
+    }
+  }
+
   const managerContent = (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between px-2 py-1.5 mb-1">
-        <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider whitespace-nowrap truncate">
-          Data Sources
-        </span>
+      <div className="data-source-header px-2 py-1.5 mb-1">
+        <button
+          type="button"
+          className="data-source-title-btn"
+          onClick={() => {
+            if (!collapsed) {
+              setIsExpanded((prev) => !prev)
+            }
+          }}
+          aria-label={effectiveExpanded ? 'Collapse data sources' : 'Expand data sources'}
+        >
+          <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider whitespace-nowrap truncate">
+            Data Sources
+          </span>
+          <span className="data-source-count-chip">{selectedIds.length}</span>
+          {!collapsed && (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className={`data-source-chevron ${effectiveExpanded ? 'expanded' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </button>
         <div className="flex gap-1">
           {/* File Upload Button */}
           <label className="btn p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] cursor-pointer">
@@ -247,83 +286,88 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="text-red-400 text-xs px-2 mb-2 flex items-center justify-between gap-2">
-          <span>{error}</span>
-          <button type="button" onClick={() => loadDataSources()} className="shrink-0 text-[var(--accent)] hover:underline">
-            重试
-          </button>
-        </div>
-      )}
+      {effectiveExpanded && (
+        <>
+          {/* Error */}
+          {error && (
+            <div className="text-red-400 text-xs px-2 mb-2 flex items-center justify-between gap-2">
+              <span>{error}</span>
+              <button type="button" onClick={() => loadDataSources()} className="shrink-0 text-[var(--accent)] hover:underline">
+                重试
+              </button>
+            </div>
+          )}
 
-      {/* Create Form */}
-      {isCreating && (
-        <div className="form-panel">
-          <div className="space-y-2 p-2.5 bg-[var(--sidebar-hover)] rounded-xl mb-2">
-            <input
-              value={newDs.name}
-              onChange={(e) => setNewDs({ ...newDs, name: e.target.value })}
-              placeholder="Name"
-              className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
-            />
-            <select
-              value={newDs.type}
-              onChange={(e) => setNewDs({ ...newDs, type: e.target.value })}
-              className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
-            >
-              <option value="postgres">PostgreSQL</option>
-              <option value="mysql">MySQL</option>
-              <option value="sqlite">SQLite</option>
-            </select>
-            <input
-              value={newDs.connection_string}
-              onChange={(e) => setNewDs({ ...newDs, connection_string: e.target.value })}
-              placeholder="Connection URI"
-              className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
-            />
-            <button
-              onClick={createDataSource}
-              className="btn w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium"
-            >
-              Connect
-            </button>
-          </div>
-        </div>
-      )}
+          {/* Create Form */}
+          {isCreating && (
+            <div className="form-panel">
+              <div className="space-y-2 p-2.5 bg-[var(--sidebar-hover)] rounded-xl mb-2">
+                <input
+                  value={newDs.name}
+                  onChange={(e) => setNewDs({ ...newDs, name: e.target.value })}
+                  placeholder="Name"
+                  className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
+                />
+                <select
+                  value={newDs.type}
+                  onChange={(e) => setNewDs({ ...newDs, type: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
+                >
+                  <option value="postgres">PostgreSQL</option>
+                  <option value="mysql">MySQL</option>
+                  <option value="sqlite">SQLite</option>
+                </select>
+                <input
+                  value={newDs.connection_string}
+                  onChange={(e) => setNewDs({ ...newDs, connection_string: e.target.value })}
+                  placeholder="Connection URI"
+                  className="w-full px-3 py-2 bg-[var(--sidebar-bg)] border border-[var(--sidebar-border)] rounded-lg text-sm focus:outline-none input-focus-ring"
+                />
+                <button
+                  onClick={createDataSource}
+                  className="btn w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium"
+                >
+                  Connect
+                </button>
+              </div>
+            </div>
+          )}
 
-      {/* List */}
-      <div className="space-y-1 max-h-36 overflow-y-auto">
-        {dataSources.length === 0 && !isCreating && (
-          <div className="text-[var(--sidebar-text-muted)] text-xs text-center py-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-6 h-6 mx-auto mb-1.5 opacity-40"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="1"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
-              />
-            </svg>
-            No data sources
-          </div>
-        )}
+          {/* List */}
+          <div className="space-y-1 max-h-52 overflow-y-auto">
+            {dataSources.length === 0 && !isCreating && (
+              <div className="text-[var(--sidebar-text-muted)] text-xs text-center py-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-6 h-6 mx-auto mb-1.5 opacity-40"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
+                  />
+                </svg>
+                No data sources
+              </div>
+            )}
 
-        {dataSources.map((ds) => (
-          <div key={ds.id} className="rounded-xl overflow-hidden">
-            <div
-              onClick={() => onToggle(ds.id)}
-              className={`group flex items-center gap-2 px-2.5 py-2 cursor-pointer text-sm ds-item ${
-                selectedIds.includes(ds.id)
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'hover:bg-[var(--sidebar-hover)]'
-              }`}
-            >
+            {dataSources.map((ds) => (
+              <div key={ds.id} className="rounded-xl overflow-hidden">
+                <div
+                  onClick={() => onToggle(ds.id)}
+                  onKeyDown={(event) => handleDsItemKeyDown(event, ds.id)}
+                  role="button"
+                  tabIndex={0}
+                  className={`group flex items-center gap-2 px-2.5 py-2 cursor-pointer text-sm ds-item ${
+                    selectedIds.includes(ds.id)
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'hover:bg-[var(--sidebar-hover)]'
+                  }`}
+                >
               {/* Icon */}
               {ds.category === 'file' ? (
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -382,7 +426,7 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
               {/* Delete */}
               <button
                 onClick={(e) => deleteDataSource(ds.id, e)}
-                className={`btn opacity-0 group-hover:opacity-100 p-1 rounded-lg ${
+                className={`btn opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 p-1 rounded-lg ${
                   selectedIds.includes(ds.id)
                     ? 'hover:bg-white/20'
                     : 'hover:bg-red-500/20 text-[var(--sidebar-text-muted)] hover:text-red-400'
@@ -399,13 +443,13 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-            </div>
-            {/* Edit form for database */}
-            {ds.category === 'database' && editingDsId === ds.id && (
-              <div
-                className="p-2.5 bg-[var(--sidebar-hover)] border-t border-[var(--sidebar-border)] space-y-2 text-sm"
-                onClick={(e) => e.stopPropagation()}
-              >
+                </div>
+                {/* Edit form for database */}
+                {ds.category === 'database' && editingDsId === ds.id && (
+                  <div
+                    className="p-2.5 bg-[var(--sidebar-hover)] border-t border-[var(--sidebar-border)] space-y-2 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                 <div className="text-[var(--sidebar-text-muted)] text-xs">编辑连接（本机连接请用 localhost）</div>
                 <input
                   value={editForm.name}
@@ -441,14 +485,14 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
                     取消
                   </button>
                 </div>
-              </div>
-            )}
-            {/* Expanded: table list for database */}
-            {ds.category === 'database' && expandedDsId === ds.id && tablesByDsId[ds.id] && (
-              <div
-                className="pl-6 pr-2 py-2 bg-[var(--sidebar-hover)] border-t border-[var(--sidebar-border)] text-xs max-h-28 overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
+                  </div>
+                )}
+                {/* Expanded: table list for database */}
+                {ds.category === 'database' && expandedDsId === ds.id && tablesByDsId[ds.id] && (
+                  <div
+                    className="pl-6 pr-2 py-2 bg-[var(--sidebar-hover)] border-t border-[var(--sidebar-border)] text-xs max-h-28 overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                 <div className="text-[var(--sidebar-text-muted)] mb-1">表 ({tablesByDsId[ds.id].tables.length})</div>
                 <ul className="space-y-0.5">
                   {tablesByDsId[ds.id].tables.map((t) => (
@@ -458,11 +502,13 @@ export default function DataSourceManager({ selectedIds, onToggle, collapsed = f
                     </li>
                   ))}
                 </ul>
+                  </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </>
   )
 

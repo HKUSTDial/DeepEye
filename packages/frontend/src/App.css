@@ -26,6 +26,10 @@
   transition: opacity 0.2s ease;
 }
 
+.right-panel-mobile-backdrop {
+  display: none;
+}
+
 /* Panel resize handle (left edge of the entire panel) */
 .resize-handle-panel {
   position: absolute;
@@ -75,16 +79,17 @@
 }
 
 .chat-topbar {
-  height: 58px;
-  padding: 0 16px;
+  height: 60px;
+  padding: 0 18px;
   border-bottom: 1px solid var(--border-color);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--main-bg) 92%, var(--main-bg-alt)) 0%, var(--main-bg) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--main-bg) 95%, var(--main-bg-alt)) 0%, var(--main-bg) 100%);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+  backdrop-filter: blur(8px);
 }
 
 .chat-topbar-meta {
@@ -105,7 +110,7 @@
 .chat-topbar-title {
   font-size: var(--ui-font-md);
   color: var(--main-text);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
@@ -119,39 +124,44 @@
   gap: 8px;
 }
 
-.chat-user-pill {
-  max-width: 180px;
-  padding: 6px 10px;
+.chat-topbar-new-btn {
+  height: 34px;
   border-radius: 999px;
   border: var(--chat-surface-border);
-  background: color-mix(in srgb, var(--card-bg) 84%, var(--main-bg));
+  background: color-mix(in srgb, var(--card-bg) 88%, var(--main-bg-alt));
   color: var(--main-text);
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-font-xs);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--chat-surface-shadow-soft);
+}
+
+.chat-topbar-new-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border-color));
+  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg));
+}
+
+.chat-topbar-new-btn:active {
+  transform: scale(0.97);
+}
+
+.chat-status-pill {
+  max-width: min(48vw, 360px);
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: var(--chat-surface-border);
+  background: color-mix(in srgb, var(--card-bg) 86%, var(--main-bg-alt));
+  color: var(--main-text-muted);
   font-size: var(--ui-font-xs);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.chat-logout-btn {
-  border: var(--chat-surface-border);
-  background: color-mix(in srgb, var(--card-bg) 86%, var(--main-bg-alt));
-  color: var(--main-text);
-  height: 36px;
-  border-radius: var(--chat-surface-radius);
-  padding: 0 10px;
-  font-size: var(--ui-font-xs);
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: var(--chat-surface-shadow-soft);
-}
-
-.chat-logout-btn:hover {
-  border-color: color-mix(in srgb, #dc2626 40%, var(--border-hover));
-  background: color-mix(in srgb, #dc2626 10%, var(--main-bg-alt));
-  color: color-mix(in srgb, #dc2626 80%, var(--main-text));
-  box-shadow: var(--chat-surface-shadow-hover);
 }
 
 .chat-panel-toggle {
@@ -225,12 +235,68 @@
     height: 34px;
   }
 
-  .chat-user-pill {
+  .chat-topbar-new-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .chat-topbar-new-btn span {
     display: none;
   }
 
-  .chat-logout-btn {
-    height: 34px;
-    padding: 0 8px;
+  .chat-status-pill {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .chat-area-shell {
+    flex: 1 1 100% !important;
+  }
+
+  .right-panel-mobile-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 35;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: rgba(15, 23, 42, 0.34);
+    backdrop-filter: blur(1px);
+    cursor: pointer;
+  }
+
+  .right-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(92vw, 430px);
+    max-width: 92vw;
+    flex: 0 0 auto !important;
+    z-index: 40;
+    border-left: 1px solid var(--panel-border);
+    box-shadow: -14px 0 34px rgba(0, 0, 0, 0.18);
+    transition: transform 0.24s ease, opacity 0.2s ease;
+  }
+
+  .right-panel.is-collapsed {
+    transform: translateX(102%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .right-panel.is-open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .resize-handle-panel {
+    display: none;
   }
 }

@@ -14,6 +14,7 @@ export type PanelRenderContext = {
 export type PanelPlugin = {
   id: string
   title: string | ((params?: Record<string, unknown>) => string)
+  description: string
   icon?: ReactNode
   render: (context: PanelRenderContext, params?: Record<string, unknown>) => ReactNode
 }
@@ -22,12 +23,14 @@ export const panelRegistry: PanelPlugin[] = [
   {
     id: 'files',
     title: 'Files',
+    description: 'Browse session files and generated outputs.',
     icon: <FolderOpen className="h-4 w-4" />,
     render: (context) => <FilesPanel sessionId={context.sessionId} />,
   },
   {
     id: 'workflow',
     title: 'Workflow',
+    description: 'Inspect node graph and runtime progression.',
     icon: <WorkflowIcon className="h-4 w-4" />,
     render: (context) => (
       <WorkflowLivePanel 
@@ -39,18 +42,21 @@ export const panelRegistry: PanelPlugin[] = [
   {
     id: 'report',
     title: 'Report',
+    description: 'Read generated report content and steps.',
     icon: <FileText className="h-4 w-4" />,
     render: () => <ReportPanel />,
   },
   {
     id: 'dashboard',
     title: 'Dashboard',
+    description: 'Preview charts and visual analytics results.',
     icon: <LayoutDashboard className="h-4 w-4" />,
     render: (context) => <DashboardPanel sessionId={context.sessionId} />,
   },
   {
     id: 'video-preview',
     title: (params) => (params?.taskId ? `Video: ${params.taskId}` : 'Video Preview'),
+    description: 'Track and preview generated video artifacts.',
     icon: <Video className="h-4 w-4" />,
     render: (context, params) => (
       <VideoPreviewPanel

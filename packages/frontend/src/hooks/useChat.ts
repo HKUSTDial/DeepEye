@@ -210,41 +210,30 @@ export function useChat() {
               finished_at: new Date().toISOString(),
             })
             if (payload?.outputs && typeof payload.outputs === 'object') {
-              setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
-              console.log('🎬 useChat: run_end phase, checking for video output...')
-              const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
-              console.log('🎬 useChat: Extracted video params:', videoParams)
-              const taskIdToOpen = videoParams.taskId ?? null
-              if (taskIdToOpen) {
-                console.log('🎬 useChat: Video output detected, opening preview panel...', {
-                  taskId: taskIdToOpen,
-                })
-                const openVideoPanel = () => openOrFocusTab('video-preview', taskIdToOpen ? { taskId: taskIdToOpen } : {})
-                console.log('🎬 useChat: Focusing video panel (task_id from workflow outputs)')
-                openVideoPanel()
-              } else {
-                console.log('⚠️ useChat: No video output detected in payload.outputs, trying to extract from messages...')
-                // 如果 outputs 中没有找到，尝试从消息文本中提取 taskId
-                const lastMessage = messages[messages.length - 1]
-                if (lastMessage?.role === 'assistant' && lastMessage.content) {
-                  const taskIdMatch = String(lastMessage.content).match(/Task ID:\s*(\d{8}_\d{6})/i)
-                  if (taskIdMatch) {
-                    const extractedTaskId = taskIdMatch[1]
-                    console.log('✅ useChat: Found taskId from message text:', extractedTaskId)
-                    const currentRunOutput = useWorkflowSessionsStore.getState().sessions[sessionId]?.runOutput || ''
-                    setRunOutput(sessionId, currentRunOutput + `\nTask ID: ${extractedTaskId}`)
-                    openOrFocusTab('video-preview', { taskId: extractedTaskId })
-                  } else {
-                    console.log('⚠️ useChat: Could not find taskId in message text either')
-                    // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
-                    if (isDataVideoWorkflow) {
-                      openOrFocusTab('video-preview', {})
-                    }
-                  }
-                } else if (isDataVideoWorkflow) {
-                  // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
-                  openOrFocusTab('video-preview', {})
-                }
+	              setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
+	              const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
+	              const taskIdToOpen = videoParams.taskId ?? null
+	              if (taskIdToOpen) {
+	                const openVideoPanel = () => openOrFocusTab('video-preview', taskIdToOpen ? { taskId: taskIdToOpen } : {})
+	                openVideoPanel()
+	              } else {
+	                // 如果 outputs 中没有找到，尝试从消息文本中提取 taskId
+	                const lastMessage = messages[messages.length - 1]
+	                if (lastMessage?.role === 'assistant' && lastMessage.content) {
+	                  const taskIdMatch = String(lastMessage.content).match(/Task ID:\s*(\d{8}_\d{6})/i)
+	                  if (taskIdMatch) {
+	                    const extractedTaskId = taskIdMatch[1]
+	                    const currentRunOutput = useWorkflowSessionsStore.getState().sessions[sessionId]?.runOutput || ''
+	                    setRunOutput(sessionId, currentRunOutput + `\nTask ID: ${extractedTaskId}`)
+	                    openOrFocusTab('video-preview', { taskId: extractedTaskId })
+	                  } else if (isDataVideoWorkflow) {
+	                    // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
+	                    openOrFocusTab('video-preview', {})
+	                  }
+	                } else if (isDataVideoWorkflow) {
+	                  // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
+	                  openOrFocusTab('video-preview', {})
+	                }
               }
             } else if (isDataVideoWorkflow) {
               // 数据视频工作流失败时，即使没有 outputs，也确保 Video Preview 面板已打开
@@ -258,20 +247,18 @@ export function useChat() {
             setViewState(sessionId, 'error')
             return
           }
-          if (phase === 'video_preview_ready') {
-            const videoUrl = typeof payload?.video_url === 'string' ? payload.video_url : null
-            if (videoUrl) {
-              console.log('🎬 Video preview container ready:', videoUrl)
-              useWorkflowSessionsStore.getState().setVideoPreviewUrl(sessionId, videoUrl)
-              openOrFocusTab('video-preview', {})
-            }
-            return
-          }
-          if (phase === 'refresh') {
-            console.log('🔄 Triggering dashboard refresh as requested by agent...')
-            triggerDashboardRefresh(sessionId)
-            return
-          }
+	          if (phase === 'video_preview_ready') {
+	            const videoUrl = typeof payload?.video_url === 'string' ? payload.video_url : null
+	            if (videoUrl) {
+	              useWorkflowSessionsStore.getState().setVideoPreviewUrl(sessionId, videoUrl)
+	              openOrFocusTab('video-preview', {})
+	            }
+	            return
+	          }
+	          if (phase === 'refresh') {
+	            triggerDashboardRefresh(sessionId)
+	            return
+	          }
         }
 
         if (agentEvent.type === 'tool_end') {
@@ -432,5 +419,15 @@ export function useChat() {
     }
   }
 
-  return { sendMessage, error }
+  const stopMessage = () => {
+    closedNormallyRef.current = true
+    if (esRef.current) {
+      esRef.current.close()
+      esRef.current = null
+    }
+    stopStreaming()
+    setError(null)
+  }
+
+  return { sendMessage, stopMessage, error }
 }

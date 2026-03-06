@@ -2,6 +2,49 @@
   overflow: hidden;
 }
 
+.data-source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.data-source-title-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.data-source-count-chip {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.data-source-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--sidebar-text-muted);
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+
+.data-source-chevron.expanded {
+  transform: rotate(180deg);
+}
+
 .data-source-manager .text-xs {
   font-size: var(--ui-font-xs);
 }
@@ -16,6 +59,11 @@
 }
 .ds-item:active {
   transform: scale(0.98);
+}
+
+.ds-item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .collapsed-ds-panel {
@@ -48,4 +96,3 @@
   font-weight: 600;
   text-align: center;
 }
-

@@ -25,17 +25,22 @@ function App() {
   // 每个属性单独订阅 - 最简单可靠的方式
   const sessionId = useChatStore((state) => state.sessionId)
   const currentSession = useChatStore((state) => state.currentSession)
+  const messages = useChatStore((state) => state.messages)
+  const createDraftSession = useChatStore((state) => state.createDraftSession)
   const currentUser = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const rightPanelCollapsed = useRightPanelStore((state) => state.collapsed)
   const setRightPanelCollapsed = useRightPanelStore((state) => state.setCollapsed)
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
   const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
+  const rightPanelPanes = useRightPanelStore((state) => state.panes)
+  const openRightPanelTab = useRightPanelStore((state) => state.openTab)
   const chatTitle = useMemo(() => {
     const title = currentSession?.title?.trim()
     if (!title || title === 'New conversation') return 'DeepEye Assistant'
     return title
   }, [currentSession?.title])
+  const selectedDataSourceCount = selectedDataSourceIds.length
 
   const handleDataSourceToggle = (id: string) => {
     setSelectedDataSourceIds((prev) => 
@@ -48,7 +53,21 @@ function App() {
   }
 
   const toggleRightPanel = () => {
-    setRightPanelCollapsed(!rightPanelCollapsed)
+    if (rightPanelCollapsed) {
+      setRightPanelCollapsed(false)
+      if (rightPanelPanes.length === 0) {
+        openRightPanelTab('files')
+      }
+      return
+    }
+    setRightPanelCollapsed(true)
+  }
+
+  const handleNewChat = () => {
+    if (currentSession?.isDraft && messages.length === 0) {
+      return
+    }
+    createDraftSession()
   }
 
   const handleLogout = () => {
@@ -117,9 +136,11 @@ function App() {
             <Sidebar
               collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
             />
           </div>
-          <div className="flex-shrink-0 border-t border-[var(--sidebar-border)]">
+          <div className="flex-shrink-0">
             <DataSourceManager
               selectedIds={selectedDataSourceIds}
               onToggle={handleDataSourceToggle}
@@ -141,20 +162,20 @@ function App() {
               </span>
             </div>
             <div className="chat-topbar-actions">
-              {currentUser && (
-                <span className="chat-user-pill" title={currentUser.email}>
-                  {currentUser.username}
-                </span>
-              )}
               <button
                 type="button"
-                onClick={handleLogout}
-                className="chat-logout-btn"
-                title="Sign out"
-                aria-label="Sign out"
+                className="chat-topbar-new-btn"
+                onClick={handleNewChat}
+                title="Start a new conversation"
               >
-                Sign out
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>New chat</span>
               </button>
+              <span className="chat-status-pill">
+                {selectedDataSourceCount > 0 ? `${selectedDataSourceCount} data source(s) attached` : 'No data source selected'}
+              </span>
               {sessionId && (
                 <button
                   onClick={toggleRightPanel}
@@ -188,9 +209,18 @@ function App() {
           </div>
         </div>
 
+        {!rightPanelCollapsed && (
+          <button
+            type="button"
+            className="right-panel-mobile-backdrop"
+            onClick={toggleRightPanel}
+            aria-label="Close workspace panel"
+          />
+        )}
+
         {/* Right Panel */}
         <aside
-          className={`right-panel flex relative ${isDragging ? 'no-transition' : ''}`}
+          className={`right-panel flex relative ${rightPanelCollapsed ? 'is-collapsed' : 'is-open'} ${isDragging ? 'no-transition' : ''}`}
           style={rightPanelStyle}
         >
           {!rightPanelCollapsed && (

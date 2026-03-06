@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { panelRegistry, getPanelPlugin, type PanelRenderContext } from './panelRegistry'
 import { useRightPanelStore } from '../../stores/rightPanel'
@@ -20,23 +20,45 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
   const closePane = useRightPanelStore((state) => state.closePane)
 
   const [menuPaneId, setMenuPaneId] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const context = useMemo<PanelRenderContext>(
     () => ({ sessionId, dataSourceIds }),
     [sessionId, dataSourceIds],
   )
 
+  useEffect(() => {
+    if (!menuPaneId) return
+    const onMouseDown = (event: MouseEvent) => {
+      if (!containerRef.current) return
+      if (!containerRef.current.contains(event.target as Node)) {
+        setMenuPaneId(null)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuPaneId(null)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [menuPaneId])
+
   if (panes.length === 0) {
     return (
-      <div className="right-panel-container">
+      <div className="right-panel-container" ref={containerRef}>
         <div className="right-panel-empty">
           <div className="right-panel-empty-icon">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <div className="right-panel-empty-title">No panels open</div>
-          <div className="right-panel-empty-subtitle">Open a panel to get started</div>
+          <div className="right-panel-empty-title">Workspace</div>
+          <div className="right-panel-empty-subtitle">Select a panel to start inspecting execution artifacts.</div>
           <div className="right-panel-empty-actions">
             {panelRegistry.map((plugin) => (
               <button
@@ -45,8 +67,13 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
                 onClick={() => openTab(plugin.id)}
                 className="right-panel-empty-action"
               >
-                {plugin.icon}
-                Open {typeof plugin.title === 'string' ? plugin.title : plugin.title()}
+                <span className="right-panel-entry-icon">{plugin.icon}</span>
+                <span className="right-panel-entry-text">
+                  <span className="right-panel-entry-title">
+                    {typeof plugin.title === 'string' ? plugin.title : plugin.title()}
+                  </span>
+                  <span className="right-panel-entry-desc">{plugin.description}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -56,7 +83,7 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
   }
 
   return (
-    <div className="right-panel-container">
+    <div className="right-panel-container" ref={containerRef}>
       {panes.map((pane) => {
         const activeTab =
           pane.tabs.find((tab) => tab.id === pane.activeTabId) || pane.tabs[0] || null
@@ -90,6 +117,9 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
                         onClick={() => setActiveTab(pane.id, tab.id)}
                         className="right-panel-tab-button"
                       >
+                        <span className="right-panel-tab-icon" aria-hidden="true">
+                          {tabPlugin?.icon}
+                        </span>
                         <span className="truncate">{tabTitle}</span>
                       </button>
                       <button
@@ -122,6 +152,7 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
                   </button>
                   {menuPaneId === pane.id && (
                     <div className="right-panel-menu">
+                      <div className="right-panel-menu-title">Open panel</div>
                       {panelRegistry.map((plugin) => (
                         <button
                           key={plugin.id}
@@ -132,8 +163,13 @@ export function RightPanelLayout({ sessionId, dataSourceIds }: RightPanelLayoutP
                           }}
                           className="right-panel-menu-item"
                         >
-                          {plugin.icon}
-                          {typeof plugin.title === 'string' ? plugin.title : plugin.title()}
+                          <span className="right-panel-entry-icon">{plugin.icon}</span>
+                          <span className="right-panel-entry-text">
+                            <span className="right-panel-entry-title">
+                              {typeof plugin.title === 'string' ? plugin.title : plugin.title()}
+                            </span>
+                            <span className="right-panel-entry-desc">{plugin.description}</span>
+                          </span>
                         </button>
                       ))}
                     </div>
