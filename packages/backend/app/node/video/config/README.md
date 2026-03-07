@@ -2,7 +2,7 @@
 
 ## 概述
 
-`video.generator` 节点用于从数据行和用户查询生成完整的数据视频。该节点会自动：
+`video.generator` 节点用于从数据集引用和用户查询生成完整的数据视频。该节点会自动：
 1. 生成视频配置（场景、图表、动画等）
 2. **自动生成音频**（使用 Azure Speech TTS）
 3. **自动对齐时间戳**（将动画和场景时间与音频同步）
@@ -63,7 +63,7 @@ video.generator
 ```
 
 ### 输入 (Inputs)
-- **rows** (`list[dict]`): 输入数据行，用于生成视频
+- **dataset_ref** (`dict`): 输入数据集引用，节点会读取其预览/采样数据用于生成视频
 - **query** (`string`, 必需): 用户查询或分析目标
 
 ### 输出 (Outputs)
@@ -99,9 +99,9 @@ video.generator
       "video_generator_1": {
         "type": "video.generator",
         "inputs": {
-          "rows": {
+          "dataset_ref": {
             "node_id": "data_source_1",
-            "port_id": "rows"
+            "port_id": "dataset_ref"
           },
           "query": {
             "node_id": "user_query_node",
@@ -115,8 +115,8 @@ video.generator
     },
     "edges": [
       {
-        "source": {"node_id": "data_source_1", "port_id": "rows"},
-        "target": {"node_id": "video_generator_1", "port_id": "rows"}
+        "source": {"node_id": "data_source_1", "port_id": "dataset_ref"},
+        "target": {"node_id": "video_generator_1", "port_id": "dataset_ref"}
       },
       {
         "source": {"node_id": "user_query_node", "port_id": "query"},
@@ -145,22 +145,29 @@ from app.node.video.node import VideoGeneratorHandler
 # 创建 handler
 handler = VideoGeneratorHandler(db=db, user_id=user_id)
 
-# 准备输入（query 现在是输入端口）
+# 准备输入（query 现在是输入端口，表格数据统一通过 dataset_ref 传递）
 inputs = {
-    "rows": [
-        {"company": "A", "revenue": 100},
-        {"company": "B", "revenue": 150},
-    ],
+    "dataset_ref": {
+        "kind": "dataset_ref",
+        "path": "/workspace/.datasets/revenue.jsonl",
+        "format": "jsonl",
+        "preview_rows": [
+            {"company": "A", "revenue": 100},
+            {"company": "B", "revenue": 150}
+        ],
+        "row_count": 2,
+        "columns": ["company", "revenue"]
+    },
     "query": "展示各公司的营收对比"
 }
 
 # 创建节点
-    node = Node(
-        id="test_node",
-        type="video.generator",
-        params={
-            "language": "English",
-            "workers": 5
+node = Node(
+    id="test_node",
+    type="video.generator",
+    params={
+        "language": "English",
+        "workers": 5,
     }
 )
 

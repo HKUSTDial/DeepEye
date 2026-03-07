@@ -68,10 +68,15 @@ class MyNode(BaseNode):
         return NodeSpec(
             type=cls.node_type,
             description="做一些有用的事情。",
-            inputs={"rows": Port(schema="list[dict]", required=True)},
-            outputs={"rows": Port(schema="list[dict]")},
+            inputs={"dataset_ref": Port(schema="dict", required=True)},
+            outputs={
+                "dataset_ref": Port(schema="dict", required=True),
+                "preview_rows": Port(schema="list[dict]"),
+                "row_count": Port(schema="int"),
+                "columns": Port(schema="list[string]"),
+            },
             params_schema={
-                "limit": {"type": "integer", "required": False, "description": "最大行数"},
+                "limit": {"type": "integer", "required": False, "description": "预览行数上限"},
             },
         )
 
@@ -116,22 +121,20 @@ workflow agent 的提示词由 NodeSpec 自动生成，确保 AI 只使用已注
 - node type 用命名空间：`data.*` / `stats.*` / `datasource.*`
 - 领域包统一使用 `node.py` 作为节点入口，内部实现放在子目录
 - handler 逻辑单一、可测试
+- 节点之间传递表格数据时，统一使用 `dataset_ref`。`preview_rows` 仅用于界面展示和摘要。
 
 ## 现有核心节点
 
 Data:
 - `datasource.read`
 - `sql.execute`
+- `rows.select`
+- `rows.filter`
+- `rows.sort`
+- `rows.aggregate`
+- `rows.profile`
+- `python.code`
 - `report.generate`
-- `data.select_columns`
-- `data.filter_rows`
-- `data.sort_rows`
-- `data.limit_rows`
-- `data.aggregate`
-
-Stats:
-- `stats.summary`
-- `stats.correlation`
-
-Viz:
-当前移除了可视化节点。
+- `data.generate_dashboard`
+- `video.generator`
+- `llm.answer`

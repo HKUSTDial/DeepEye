@@ -68,10 +68,15 @@ class MyNode(BaseNode):
         return NodeSpec(
             type=cls.node_type,
             description="Do something useful.",
-            inputs={"rows": Port(schema="list[dict]", required=True)},
-            outputs={"rows": Port(schema="list[dict]")},
+            inputs={"dataset_ref": Port(schema="dict", required=True)},
+            outputs={
+                "dataset_ref": Port(schema="dict", required=True),
+                "preview_rows": Port(schema="list[dict]"),
+                "row_count": Port(schema="int"),
+                "columns": Port(schema="list[string]"),
+            },
             params_schema={
-                "limit": {"type": "integer", "required": False, "description": "Max rows"},
+                "limit": {"type": "integer", "required": False, "description": "Preview row limit"},
             },
         )
 
@@ -118,22 +123,20 @@ This ensures any new node automatically appears in the AI prompt.
 - Node type strings are namespaced: `data.*`, `stats.*`, `datasource.*`
 - Domain packages use `node.py` as the node entrypoint, and keep internals under subpackages
 - Handlers are small and single-purpose
+- Use `dataset_ref` as the primary tabular data edge between nodes. `preview_rows` is only for UI and summaries.
 
 ## Current Core Nodes
 
 Data:
 - `datasource.read`
 - `sql.execute`
+- `rows.select`
+- `rows.filter`
+- `rows.sort`
+- `rows.aggregate`
+- `rows.profile`
+- `python.code`
 - `report.generate`
-- `data.select_columns`
-- `data.filter_rows`
-- `data.sort_rows`
-- `data.limit_rows`
-- `data.aggregate`
-
-Stats:
-- `stats.summary`
-- `stats.correlation`
-
-Viz:
-Visualization nodes are currently removed.
+- `data.generate_dashboard`
+- `video.generator`
+- `llm.answer`

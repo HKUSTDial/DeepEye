@@ -51,6 +51,7 @@ packages/backend/app/node/src/components/CustomInfographic/
 /deepeye_dataset.sql
 /packages/backend/.workflow_scripts/
 /packages/backend/.video_workspace/
+/.video_workspace/
 /packages/backend/app/services/report_workspace/reports/
 /report_module/final_report*.html
 /packages/frontend/src/components/video/*/
