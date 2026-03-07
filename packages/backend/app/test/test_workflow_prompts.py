@@ -71,12 +71,14 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "\"edge_sql_to_python\"" in prompt
     assert "\"query\": \"SELECT client_id AS client_id, revenue AS revenue FROM sales\"" in prompt
     assert "Artifact nodes do not fetch attached data on their own." in prompt
-    assert "If an artifact node is missing `dataset_ref`, fix the wiring" in prompt
+    assert "determine whether the problem is missing wiring or missing upstream output" in prompt
+    assert "its stdout MUST be either a JSON array of row objects or a JSON `dataset_ref` object" in prompt
     assert "The workflow must stay connected end-to-end." in prompt
     assert "\"planning_notes\": \"1) ... 2) ...\"" in prompt
     assert "`workflow_wiring_invalid`" in prompt
     assert "`workflow_artifact_input_missing`" in prompt
     assert "`workflow_dataset_input_missing`" in prompt
+    assert "`workflow_dataset_output_missing`" in prompt
     assert "\"edge_python_to_report\"" in prompt
     assert "create_plan" not in prompt
     assert "update_plan" not in prompt

@@ -352,6 +352,46 @@ def test_normalize_workflow_run_result_marks_missing_artifact_dataset_ref_repair
     assert normalized["issues"] == ["Connect join_and_aggregate.dataset_ref -> generate_report.dataset_ref."]
 
 
+def test_normalize_workflow_run_result_marks_missing_artifact_dataset_output_repairable() -> None:
+    workflow = {
+        "root": {
+            "nodes": {
+                "join_and_aggregate": {"id": "join_and_aggregate", "type": "python.code", "params": {"code": "print('done')"}},
+                "generate_report": {"id": "generate_report", "type": "report.generate", "params": {"query": "Build report"}},
+            },
+            "edges": {
+                "e1": {
+                    "id": "e1",
+                    "source": {"node_id": "join_and_aggregate", "port_id": "dataset_ref"},
+                    "target": {"node_id": "generate_report", "port_id": "dataset_ref"},
+                }
+            },
+        }
+    }
+
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "error": "Workflow execution failed at node generate_report (report.generate): dataset_ref input is required",
+            "details": [
+                {
+                    "node_id": "generate_report",
+                    "node_type": "report.generate",
+                    "message": "dataset_ref input is required",
+                }
+            ],
+        },
+        draft_id="draft-1",
+        workflow_definition=workflow,
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_dataset_output_missing"
+    assert "already has incoming dataset_ref edge" in normalized["issues"][0]
+    assert "prints tabular JSON rows" in normalized["issues"][0]
+
+
 def test_normalize_workflow_run_result_marks_missing_transform_dataset_ref_repairable() -> None:
     workflow = {
         "root": {

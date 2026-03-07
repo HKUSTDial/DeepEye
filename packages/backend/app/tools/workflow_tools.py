@@ -214,6 +214,85 @@ def _ordered_node_ids(workflow_definition: dict[str, Any] | None) -> list[str]:
     return list(_workflow_nodes(workflow_definition).keys())
 
 
+def _incoming_dataset_sources(
+    workflow_definition: dict[str, Any] | None,
+    *,
+    node_id: str,
+    port_id: str = "dataset_ref",
+) -> list[str]:
+    incoming_sources: list[str] = []
+    for edge in _workflow_edges(workflow_definition).values():
+        source = edge.get("source")
+        target = edge.get("target")
+        if not isinstance(source, dict) or not isinstance(target, dict):
+            continue
+        if target.get("node_id") != node_id or target.get("port_id") != port_id:
+            continue
+        source_node_id = source.get("node_id")
+        source_port_id = source.get("port_id")
+        if not isinstance(source_node_id, str) or source_port_id != "dataset_ref":
+            continue
+        incoming_sources.append(source_node_id)
+    return incoming_sources
+
+
+def _dataset_ref_repair_hint(
+    *,
+    workflow_definition: dict[str, Any] | None,
+    node_id: str,
+) -> tuple[str, str]:
+    incoming_sources = _incoming_dataset_sources(workflow_definition, node_id=node_id)
+    nodes = _workflow_nodes(workflow_definition)
+    if incoming_sources:
+        source_list = ", ".join(f"`{source}`" for source in incoming_sources[:3])
+        hint = (
+            f"Node {node_id} already has incoming dataset_ref edge(s) from {source_list}, "
+            "but those upstream node outputs did not contain a usable dataset_ref at runtime. "
+            "Fix the upstream node so it actually emits `dataset_ref`."
+        )
+        if len(incoming_sources) == 1 and nodes.get(incoming_sources[0], {}).get("type") == "python.code":
+            hint += (
+                f" Update `{incoming_sources[0]}` so it prints tabular JSON rows "
+                "or an explicit dataset_ref object instead of narrative text."
+            )
+        else:
+            hint += (
+                " If the upstream step is `python.code`, make it print tabular JSON rows "
+                "or an explicit dataset_ref object instead of prose."
+            )
+        return "workflow_dataset_output_missing", hint
+
+    candidates = _candidate_dataset_sources(workflow_definition, exclude_node_id=node_id)
+    if candidates:
+        ordered_node_ids = _ordered_node_ids(workflow_definition)
+        if node_id in ordered_node_ids:
+            target_index = ordered_node_ids.index(node_id)
+            ordered_candidates = sorted(
+                candidates,
+                key=lambda candidate_id: (
+                    ordered_node_ids.index(candidate_id)
+                    if candidate_id in ordered_node_ids
+                    else -1
+                ),
+            )
+            ordered_candidates = [
+                candidate_id
+                for candidate_id in ordered_candidates
+                if candidate_id in ordered_node_ids
+                and ordered_node_ids.index(candidate_id) < target_index
+            ] or ordered_candidates
+        else:
+            ordered_candidates = candidates
+        if len(ordered_candidates) == 1:
+            hint = f"Connect {ordered_candidates[0]}.dataset_ref -> {node_id}.dataset_ref."
+        else:
+            joined = ", ".join(f"{candidate}.dataset_ref" for candidate in ordered_candidates[:3])
+            hint = f"Connect one upstream dataset output ({joined}) to {node_id}.dataset_ref."
+    else:
+        hint = f"Add an incoming edge from an upstream dataset-producing node to {node_id}.dataset_ref."
+    return "workflow_dataset_input_missing", hint
+
+
 def _artifact_input_missing_failure(
     *,
     draft_id: str | None,
@@ -235,41 +314,19 @@ def _artifact_input_missing_failure(
             continue
         if "dataset_ref input is required" not in lower_message and "required input missing" not in lower_message:
             continue
-        candidates = _candidate_dataset_sources(workflow_definition, exclude_node_id=node_id)
-        if candidates:
-            ordered_node_ids = _ordered_node_ids(workflow_definition)
-            if node_id in ordered_node_ids:
-                target_index = ordered_node_ids.index(node_id)
-                ordered_candidates = sorted(
-                    candidates,
-                    key=lambda candidate_id: (
-                        ordered_node_ids.index(candidate_id)
-                        if candidate_id in ordered_node_ids
-                        else -1
-                    ),
-                )
-                ordered_candidates = [
-                    candidate_id
-                    for candidate_id in ordered_candidates
-                    if candidate_id in ordered_node_ids
-                    and ordered_node_ids.index(candidate_id) < target_index
-                ] or ordered_candidates
-            else:
-                ordered_candidates = candidates
-            if len(ordered_candidates) == 1:
-                hint = f"Connect {ordered_candidates[0]}.dataset_ref -> {node_id}.dataset_ref."
-            else:
-                joined = ", ".join(f"{candidate}.dataset_ref" for candidate in ordered_candidates[:3])
-                hint = f"Connect one upstream dataset output ({joined}) to {node_id}.dataset_ref."
-        else:
-            hint = f"Add an incoming edge from an upstream dataset-producing node to {node_id}.dataset_ref."
+        error_type, hint = _dataset_ref_repair_hint(
+            workflow_definition=workflow_definition,
+            node_id=node_id,
+        )
         summary = (
             f"Artifact node {node_id} ({node_type}) is missing its required dataset_ref input. {hint}"
         )
         failure = _build_tool_failure(
             draft_id=draft_id,
             run_id=run_id,
-            error_type="workflow_artifact_input_missing",
+            error_type="workflow_artifact_input_missing"
+            if error_type == "workflow_dataset_input_missing"
+            else error_type,
             error_summary=summary,
             repairable=True,
             details=details,
@@ -299,39 +356,15 @@ def _dataset_input_missing_failure(
         lower_message = message.lower()
         if "dataset_ref input is required" not in lower_message and "required input missing" not in lower_message:
             continue
-        candidates = _candidate_dataset_sources(workflow_definition, exclude_node_id=node_id)
-        if candidates:
-            ordered_node_ids = _ordered_node_ids(workflow_definition)
-            if node_id in ordered_node_ids:
-                target_index = ordered_node_ids.index(node_id)
-                ordered_candidates = sorted(
-                    candidates,
-                    key=lambda candidate_id: (
-                        ordered_node_ids.index(candidate_id)
-                        if candidate_id in ordered_node_ids
-                        else -1
-                    ),
-                )
-                ordered_candidates = [
-                    candidate_id
-                    for candidate_id in ordered_candidates
-                    if candidate_id in ordered_node_ids
-                    and ordered_node_ids.index(candidate_id) < target_index
-                ] or ordered_candidates
-            else:
-                ordered_candidates = candidates
-            if len(ordered_candidates) == 1:
-                hint = f"Connect {ordered_candidates[0]}.dataset_ref -> {node_id}.dataset_ref."
-            else:
-                joined = ", ".join(f"{candidate}.dataset_ref" for candidate in ordered_candidates[:3])
-                hint = f"Connect one upstream dataset output ({joined}) to {node_id}.dataset_ref."
-        else:
-            hint = f"Add an incoming edge from an upstream dataset-producing node to {node_id}.dataset_ref."
+        error_type, hint = _dataset_ref_repair_hint(
+            workflow_definition=workflow_definition,
+            node_id=node_id,
+        )
         summary = f"Node {node_id} ({node_type}) is missing its required dataset_ref input. {hint}"
         failure = _build_tool_failure(
             draft_id=draft_id,
             run_id=run_id,
-            error_type="workflow_dataset_input_missing",
+            error_type=error_type,
             error_summary=summary,
             repairable=True,
             details=details,

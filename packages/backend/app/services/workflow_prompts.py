@@ -196,8 +196,9 @@ The latest user request asks for an answer grounded in the attached data sources
 10. Layout: include positions ONLY under `node.metadata.position` with `x` and `y`. Do NOT use a top-level `position` field.
 11. Do NOT guess categorical values, table names, or columns. Use only what the user, datasource context, or schema context provides.
 12. Artifact nodes do not fetch attached data on their own. `report.generate`, `data.generate_dashboard`, and `video.generator` MUST receive `dataset_ref` through incoming edges from upstream source or transform nodes.
-13. If an artifact node is missing `dataset_ref`, fix the wiring by adding an incoming edge from the nearest upstream dataset-producing node instead of rewriting the whole workflow.
-14. The workflow must stay connected end-to-end. Every non-source node must have its required upstream inputs, and every intermediate node must eventually feed the final answer or artifact.
+13. If a downstream node reports a missing `dataset_ref`, determine whether the problem is missing wiring or missing upstream output. Fix missing edges by connecting the correct upstream node. If the edge already exists, update the upstream node so it actually emits `dataset_ref`.
+14. If `python.code` feeds any downstream `dataset_ref` consumer, its stdout MUST be either a JSON array of row objects or a JSON `dataset_ref` object. Do not print narrative text, explanations, or mixed logs when a downstream node expects `dataset_ref`.
+15. The workflow must stay connected end-to-end. Every non-source node must have its required upstream inputs, and every intermediate node must eventually feed the final answer or artifact.
 
 ## Tool Discipline
 1. For a new task, prefer `create_workflow_and_run` with the complete workflow.
@@ -384,6 +385,7 @@ The latest user request asks for an answer grounded in the attached data sources
 - Never bypass source nodes by hardcoding attached datasource paths or database connections inside `python.code`. `python.code` should consume upstream `dataset_ref` inputs, not raw attached datasources.
 - Put the Python source directly in `params.code`.
 - For small outputs, return normal Python objects. For large tabular outputs, write a dataset file in the sandbox and print a `dataset_ref` JSON object instead.
+- If a downstream node consumes `python.code.dataset_ref`, print only tabular JSON rows or a `dataset_ref` object. Do not print prose, markdown, or extra debug lines.
 - For multi-line text, use triple quotes or explicit `\\n`. Never emit malformed Python strings.
 
 # Output Format
@@ -397,7 +399,7 @@ Return tool calls only.
 ## Structured Run Failure Signals
 - `status`: `success` or `failed`
 - `repairable`: whether another workflow edit is worth attempting
-- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `workflow_wiring_invalid`, `workflow_artifact_input_missing`, `workflow_dataset_input_missing`, `draft_reuse_required`, `repair_limit_exceeded`
+- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `workflow_wiring_invalid`, `workflow_artifact_input_missing`, `workflow_dataset_input_missing`, `workflow_dataset_output_missing`, `draft_reuse_required`, `repair_limit_exceeded`
 - `error_summary`: concise explanation of the failure
 - `issues`: short human-readable issue summaries
 - Raw fields such as `validation_errors` and `details` may still be present. Use `error_summary` and `issues` first, then consult the raw fields if needed.
