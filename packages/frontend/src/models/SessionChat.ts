@@ -307,19 +307,6 @@ export class SessionChat {
           }
         }
       }
-      else if (type === 'report_step' && current) {
-        const line = (content || '').trim()
-        if (line) {
-          const stageMatch = line.match(/\[(\d+)\/7\]/)
-          if (stageMatch) {
-            const stageIndex = Math.min(parseInt(stageMatch[1], 10), 6)
-            appendReportStepToTimeline(current, stageIndex)
-          }
-        }
-      }
-      else if (type === 'report_done' && current) {
-        // Tool output already shows completion message; avoid duplicate
-      }
       else if (type === 'agent_end' || type === 'error') {
         if (current) {
           this.clearTextStreamingFlags(current)

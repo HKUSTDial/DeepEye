@@ -43,6 +43,7 @@ export function useChat() {
   const setNodeStatus = useWorkflowSessionsStore((state) => state.setNodeStatus)
   const setRunStatus = useWorkflowSessionsStore((state) => state.setRunStatus)
   const setActiveWorkflowFile = useWorkflowSessionsStore((state) => state.setActiveFilePath)
+  const setActiveDraftId = useWorkflowSessionsStore((state) => state.setActiveDraftId)
   const setActiveRun = useWorkflowSessionsStore((state) => state.setActiveRun)
   const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
   const setVideoPreviewUrl = useWorkflowSessionsStore((state) => state.setVideoPreviewUrl)
@@ -190,8 +191,19 @@ export function useChat() {
             return
           }
 
-          const activeWorkflowFile = useWorkflowSessionsStore.getState().sessions[sessionId]?.activeFilePath
-          if (filePath && activeWorkflowFile && activeWorkflowFile !== filePath) {
+          const workflowSession = useWorkflowSessionsStore.getState().sessions[sessionId]
+          const activeWorkflowFile = workflowSession?.activeFilePath
+          const activeWorkflowDraftId = workflowSession?.activeDraftId
+
+          if (workflowEvent.draftId && activeWorkflowDraftId && activeWorkflowDraftId !== workflowEvent.draftId) {
+            clearWorkflow(sessionId)
+            clearValidated(sessionId)
+            setActiveDraftId(sessionId, workflowEvent.draftId)
+            if (filePath) {
+              setActiveWorkflowFile(sessionId, filePath)
+            }
+            setViewState(sessionId, 'switching')
+          } else if (!workflowEvent.draftId && filePath && activeWorkflowFile && activeWorkflowFile !== filePath) {
             clearWorkflow(sessionId)
             clearValidated(sessionId)
             setActiveWorkflowFile(sessionId, filePath)
@@ -200,6 +212,7 @@ export function useChat() {
           if (phase === 'create_file') {
             clearWorkflow(sessionId)
             clearValidated(sessionId)
+            setActiveDraftId(sessionId, null)
             setActiveWorkflowFile(sessionId, filePath)
             setViewState(sessionId, 'switching')
             notifyFilesChanged()
@@ -219,6 +232,7 @@ export function useChat() {
               // Clear draft and validated graph
               clearWorkflow(sessionId)
               clearValidated(sessionId)
+              setActiveDraftId(sessionId, workflowEvent.draftId)
               setActiveWorkflowFile(sessionId, filePath)
               setWorkflowDefinition(sessionId, workflow as Record<string, unknown>)
               setViewState(sessionId, 'switching')

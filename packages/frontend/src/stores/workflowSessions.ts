@@ -25,6 +25,7 @@ export interface WorkflowSessionState {
   fileError: string | null
   viewState: WorkflowViewState
   activeFilePath: string | null
+  activeDraftId: string | null
   definition: WorkflowDefinition
   draftNodes: Record<string, WorkflowNode>
   draftEdges: Record<string, WorkflowEdge>
@@ -53,6 +54,7 @@ interface WorkflowSessionsStore {
   setFileError: (sessionId: string, error: string | null) => void
   setDefinition: (sessionId: string, definition: WorkflowDefinition) => void
   setActiveFilePath: (sessionId: string, path: string | null) => void
+  setActiveDraftId: (sessionId: string, draftId: string | null) => void
   clearDraft: (sessionId: string) => void
   addDraftNode: (sessionId: string, node: WorkflowNode) => void
   addDraftEdge: (sessionId: string, edge: WorkflowEdge) => void
@@ -84,6 +86,7 @@ const createEmptySession = (): WorkflowSessionState => ({
   fileError: null,
   viewState: 'idle',
   activeFilePath: null,
+  activeDraftId: null,
   definition: null,
   draftNodes: {},
   draftEdges: {},
@@ -225,6 +228,7 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
             dashboardRefreshKey: current.dashboardRefreshKey,
             viewState: deriveViewState(definition, run),
             activeFilePath: draft?.file_path ?? run?.file_path ?? null,
+            activeDraftId: draft?.id ?? run?.draft_id ?? null,
             definition,
             nodeStatus: deriveNodeStatus(run),
             runStatus: run?.status ?? null,
@@ -288,6 +292,16 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
         },
       }
     }),
+  setActiveDraftId: (sessionId, activeDraftId) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: { ...current, activeDraftId, lastUpdated: Date.now() },
+        },
+      }
+    }),
   clearDraft: (sessionId) =>
     set((state) => {
       const current = withSession(state.sessions, sessionId)
@@ -296,6 +310,7 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
           ...state.sessions,
           [sessionId]: {
             ...current,
+            activeDraftId: null,
             draftNodes: {},
             draftEdges: {},
             nodeStatus: {},
@@ -457,6 +472,7 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
           ...state.sessions,
           [sessionId]: {
             ...current,
+            activeDraftId: activeRun?.draft_id ?? current.activeDraftId,
             activeRun,
             lastUpdated: Date.now(),
           },

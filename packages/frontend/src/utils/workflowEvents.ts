@@ -74,6 +74,7 @@ export function buildWorkflowRunFromEvent(
 
 export function matchesTrackedWorkflowEvent(
   currentRun: WorkflowRun | null | undefined,
+  currentDraftId: string | null | undefined,
   activeFilePath: string | null | undefined,
   event: ParsedWorkflowEvent,
 ): boolean {
@@ -82,6 +83,10 @@ export function matchesTrackedWorkflowEvent(
   }
 
   if (!currentRun?.id && currentRun?.draft_id && event.draftId && currentRun.draft_id !== event.draftId) {
+    return false
+  }
+
+  if (!currentRun?.id && !currentRun?.draft_id && currentDraftId && event.draftId && currentDraftId !== event.draftId) {
     return false
   }
 

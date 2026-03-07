@@ -255,6 +255,7 @@ export function WorkflowLivePanel({
   const runEventSourceRef = useRef<EventSource | null>(null)
 
   const activeFilePathRef = useRef<string | null>(null)
+  const activeDraftIdRef = useRef<string | null>(null)
   const isLoadingFilesRef = useRef(false)
   const prevNodeIdsRef = useRef<Set<string>>(new Set())
   const prevEdgeIdsRef = useRef<Set<string>>(new Set())
@@ -289,7 +290,16 @@ export function WorkflowLivePanel({
   )
   const activeFiles = activeSessionState?.files ?? []
   const activeFilePathForControls = activeSessionState?.activeFilePath ?? null
+  const activeDraftIdForSession = activeSessionState?.activeDraftId ?? null
   const activeViewState = activeSessionState?.viewState ?? 'idle'
+  const hasTrackedWorkspaceState =
+    !!activeSessionState?.definition ||
+    !!activeSessionState?.activeRun ||
+    !!activeSessionState?.activeDraftId ||
+    Object.keys(activeDraftNodes).length > 0 ||
+    Object.keys(activeDraftEdges).length > 0 ||
+    Object.keys(validatedNodes).length > 0 ||
+    Object.keys(validatedEdges).length > 0
 
   useEffect(() => {
     if (sessionId) {
@@ -320,6 +330,10 @@ export function WorkflowLivePanel({
   useEffect(() => {
     activeFilePathRef.current = activeFilePathForControls
   }, [activeFilePathForControls])
+
+  useEffect(() => {
+    activeDraftIdRef.current = activeDraftIdForSession
+  }, [activeDraftIdForSession])
 
   useEffect(() => {
     isLoadingFilesRef.current = isLoadingFiles
@@ -368,7 +382,7 @@ export function WorkflowLivePanel({
         }
         const { filePath, phase, payload, artifact, artifactKind } = workflowEvent
         const currentTrackedRun = useWorkflowSessionsStore.getState().sessions[sessionId]?.activeRun
-        if (!matchesTrackedWorkflowEvent(currentTrackedRun, activeFilePathRef.current, workflowEvent)) {
+        if (!matchesTrackedWorkflowEvent(currentTrackedRun, activeDraftIdRef.current, activeFilePathRef.current, workflowEvent)) {
           return
         }
         if (phase === 'artifact_ready') {
@@ -639,6 +653,7 @@ export function WorkflowLivePanel({
     if (!sessionId) return
     if (sessionIdFromStore !== sessionId) return
     if (sessionMessages.length > 0) return
+    if (hasTrackedWorkspaceState) return
     setActiveFilePath(sessionId, null)
     setWorkflowDefinition(sessionId, null)
     clearValidated(sessionId)
@@ -649,6 +664,7 @@ export function WorkflowLivePanel({
     sessionId,
     sessionIdFromStore,
     sessionMessages.length,
+    hasTrackedWorkspaceState,
     setActiveFilePath,
     setWorkflowDefinition,
     clearValidated,
@@ -660,6 +676,7 @@ export function WorkflowLivePanel({
     if (sandboxReadySessionId !== sessionId) return
     if (isLoadingFiles || isStreaming) return
     if (activeFiles.length > 0) return
+    if (hasTrackedWorkspaceState) return
     setActiveFilePath(sessionId, null)
     setWorkflowDefinition(sessionId, null)
     clearValidated(sessionId)
@@ -672,6 +689,7 @@ export function WorkflowLivePanel({
     isLoadingFiles,
     isStreaming,
     activeFiles.length,
+    hasTrackedWorkspaceState,
     setActiveFilePath,
     setWorkflowDefinition,
     clearValidated,
@@ -682,6 +700,7 @@ export function WorkflowLivePanel({
     if (!sessionId) return
     if (sandboxReadySessionId !== sessionId) return
     if (activeFiles.length > 0) return
+    if (hasTrackedWorkspaceState) return
     if (activeViewState === 'empty') {
       clearValidated(sessionId)
       setWorkflowDefinition(sessionId, null)
@@ -695,6 +714,7 @@ export function WorkflowLivePanel({
     sandboxReadySessionId,
     activeFiles.length,
     activeViewState,
+    hasTrackedWorkspaceState,
     refreshFiles,
     clearValidated,
     setWorkflowDefinition,

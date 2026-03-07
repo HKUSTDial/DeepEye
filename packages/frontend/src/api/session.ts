@@ -13,8 +13,6 @@ export type AgentEventType =
   | 'agent_end'
   | 'error'
   | 'workflow_event'
-  | 'report_step'
-  | 'report_done'
 
 /**
  * Sandbox event types
