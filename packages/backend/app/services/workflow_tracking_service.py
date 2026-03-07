@@ -343,3 +343,34 @@ def build_workspace_state(db: Session, session_id: str | uuid.UUID) -> dict[str,
         "run": run,
         "artifacts": artifacts,
     }
+
+
+def build_workspace_state_for_turn(db: Session, turn_id: str | uuid.UUID) -> dict[str, Any]:
+    turn_uuid = _as_uuid(turn_id)
+    if not turn_uuid:
+        raise ValueError("Invalid turn_id")
+
+    turn_repo = ChatTurnRepository(db)
+    draft_repo = WorkflowDraftRepository(db)
+    run_repo = WorkflowRunRepository(db)
+    artifact_repo = WorkflowArtifactRepository(db)
+
+    turn = turn_repo.get(turn_uuid)
+    if turn is None:
+        raise ValueError("Chat turn not found")
+
+    draft = draft_repo.get_latest_by_turn(turn_uuid)
+    run = run_repo.get_latest_by_turn(turn_uuid)
+    if run and run.draft_id:
+        run_draft = draft_repo.get(run.draft_id)
+        if run_draft is not None:
+            draft = _select_latest(draft, run_draft, key="updated_at")
+
+    artifacts = artifact_repo.list_by_run(run.id) if run else artifact_repo.list_by_turn(turn_uuid)
+    return {
+        "session_id": turn.session_id,
+        "turn": turn,
+        "draft": draft,
+        "run": run,
+        "artifacts": artifacts,
+    }

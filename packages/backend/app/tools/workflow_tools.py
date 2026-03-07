@@ -50,6 +50,8 @@ def create_plan(
                     content=(
                         "Plan created. Next you MUST call create_workflow_and_run with workflow and an optional name, "
                         "or create_workflow followed by run_workflow. Reuse the returned draft_id for follow-up steps. "
+                        "If execution returns validation_errors or details, read/update the SAME draft_id, fix only the "
+                        "reported issues, and run it again before replying. "
                         "Use file_path only for an explicit legacy sandbox workflow file. "
                         "Do not reply until a workflow run has returned."
                     ),
@@ -407,13 +409,18 @@ def create_design_workflow_tool(
                 snapshot = None
             serialized = _serialize_workspace_state(snapshot) if snapshot else {}
             run = serialized.get("run") or {}
+            run_result = run.get("result") or {}
+            run_status = run.get("status") or "pending"
             return {
-                "status": "success",
+                "status": "success" if run_status == "success" else run_status,
                 "next_action": "summarize_workflow_result",
                 "turn_id": turn_id,
                 "draft_id": (serialized.get("draft") or {}).get("id"),
                 "run_id": run.get("id"),
-                "run_status": run.get("status"),
+                "run_status": run_status,
+                "error": run.get("error"),
+                "validation_errors": run_result.get("validation_errors"),
+                "details": run_result.get("details"),
                 "artifacts": [artifact.get("kind") for artifact in serialized.get("artifacts", [])],
                 "workspace_state": serialized,
                 "message_count": len(result.get("messages", [])),
