@@ -217,6 +217,40 @@ def test_file_datasource_dataset_ref_flows_to_report_and_video(tmp_path, monkeyp
         db.close()
 
 
+def test_report_handler_returns_full_html_for_panel_render(monkeypatch) -> None:
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="report-html@example.com")
+        _create_session(db, user)
+        sandbox = _FakeSandbox()
+
+        long_html = "<html>" + ("x" * 1200) + "</html>"
+
+        def _fake_run_report_pipeline(*, session_id, user_query, csv_paths, template_name, output_filename):
+            del session_id, user_query, csv_paths, template_name, output_filename
+            return long_html, None
+
+        monkeypatch.setattr("app.node.report.node.run_report_pipeline", _fake_run_report_pipeline)
+        report_handler = ReportGenerateHandler(db, str(user.id), sandbox=sandbox, session_id="session-report")
+        dataset_ref = materialize_rows_to_sandbox_dataset(
+            [{"city": "Hangzhou", "revenue": 100}],
+            sandbox=sandbox,
+            name_hint="report_input",
+            source="test",
+        )
+
+        report_result = report_handler.execute(
+            Node(id="report", type="report.generate", params={"query": "Analyze revenue"}),
+            {"dataset_ref": dataset_ref},
+            context=None,
+        )
+
+        assert report_result["report_html"] == long_html
+        assert len(report_result["report_html"]) > 500
+    finally:
+        db.close()
+
+
 def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) -> None:
     db = _build_test_db()
     try:

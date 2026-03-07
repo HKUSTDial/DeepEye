@@ -1,5 +1,6 @@
 """Regression tests for supervisor orchestration order."""
 
+import json
 import os
 
 import pytest
@@ -290,11 +291,14 @@ def test_normalize_workflow_run_result_marks_repairable_definition_failures() ->
     assert len(normalized["issues"]) == 2
 
 
-def test_normalize_workflow_run_result_keeps_runtime_failures_nonrepairable() -> None:
+def test_normalize_workflow_run_result_marks_python_schema_failures_repairable() -> None:
     normalized = _normalize_workflow_run_result(
         {
             "status": "failed",
-            "error": "Workflow execution failed at node join_data (python.code): KeyError: city",
+            "error": (
+                "Workflow execution failed at node join_data (python.code): KeyError: city\n"
+                'INPUT_PREVIEW (first 10 lines): {"dataset_ref":[{"columns":["city","total_revenue","total_orders"]}]}'
+            ),
             "details": [
                 {
                     "node_id": "join_data",
@@ -307,9 +311,9 @@ def test_normalize_workflow_run_result_keeps_runtime_failures_nonrepairable() ->
     )
 
     assert normalized["status"] == "failed"
-    assert normalized["repairable"] is False
-    assert normalized["error_type"] == "workflow_execution_failed"
-    assert normalized["issues"] == ["KeyError: city"]
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_python_schema_invalid"
+    assert "total_revenue" in normalized["issues"][-1]
 
 
 def test_normalize_workflow_run_result_marks_missing_artifact_dataset_ref_repairable() -> None:
@@ -433,6 +437,28 @@ def test_normalize_workflow_run_result_marks_missing_transform_dataset_ref_repai
     assert normalized["issues"] == ["Connect join_and_aggregate.dataset_ref -> sort_by_revenue.dataset_ref."]
 
 
+def test_normalize_workflow_run_result_marks_invalid_sql_as_repairable() -> None:
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "error": "Workflow execution failed at node query_sales (sql.execute): column city does not exist",
+            "details": [
+                {
+                    "node_id": "query_sales",
+                    "node_type": "sql.execute",
+                    "message": '(psycopg2.errors.UndefinedColumn) column "city" does not exist',
+                }
+            ],
+        },
+        draft_id="draft-1",
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_sql_query_invalid"
+    assert "Do not reference file-only columns inside SQL." in normalized["issues"][1]
+
+
 def test_normalize_workflow_run_result_marks_invalid_node_inputs_wiring_repairable() -> None:
     normalized = _normalize_workflow_run_result(
         {
@@ -504,6 +530,65 @@ def test_normalize_workflow_payload_shape_converts_list_nodes_and_edges() -> Non
 
     normalized = _normalize_workflow_payload_shape(workflow)
 
+    assert isinstance(normalized["root"]["nodes"], dict)
+    assert isinstance(normalized["root"]["edges"], dict)
+    assert set(normalized["root"]["nodes"].keys()) == {"read_file", "answer"}
+    assert set(normalized["root"]["edges"].keys()) == {"edge-1"}
+
+
+def test_normalize_workflow_payload_shape_parses_stringified_nodes_and_edges() -> None:
+    workflow = {
+        "id": "wf-1",
+        "root": {
+            "nodes": json.dumps(
+                {
+                    "read_file": {"id": "read_file", "type": "datasource.read", "params": {"datasource_id": "ds-1"}},
+                    "answer": {"id": "answer", "type": "llm.answer", "params": {"question": "Q"}},
+                }
+            ),
+            "edges": json.dumps(
+                {
+                    "edge-1": {
+                        "id": "edge-1",
+                        "source": {"node_id": "read_file", "port_id": "dataset_ref"},
+                        "target": {"node_id": "answer", "port_id": "dataset_ref"},
+                    }
+                }
+            ),
+        },
+    }
+
+    normalized = _normalize_workflow_payload_shape(workflow)
+
+    assert isinstance(normalized["root"]["nodes"], dict)
+    assert isinstance(normalized["root"]["edges"], dict)
+    assert set(normalized["root"]["nodes"].keys()) == {"read_file", "answer"}
+    assert set(normalized["root"]["edges"].keys()) == {"edge-1"}
+
+
+def test_normalize_workflow_payload_shape_parses_stringified_workflow_root() -> None:
+    workflow = json.dumps(
+        {
+            "id": "wf-1",
+            "root": {
+                "nodes": [
+                    {"id": "read_file", "type": "datasource.read", "params": {"datasource_id": "ds-1"}},
+                    {"id": "answer", "type": "llm.answer", "params": {"question": "Q"}},
+                ],
+                "edges": [
+                    {
+                        "id": "edge-1",
+                        "source": {"node_id": "read_file", "port_id": "dataset_ref"},
+                        "target": {"node_id": "answer", "port_id": "dataset_ref"},
+                    }
+                ],
+            },
+        }
+    )
+
+    normalized = _normalize_workflow_payload_shape(workflow)
+
+    assert isinstance(normalized, dict)
     assert isinstance(normalized["root"]["nodes"], dict)
     assert isinstance(normalized["root"]["edges"], dict)
     assert set(normalized["root"]["nodes"].keys()) == {"read_file", "answer"}

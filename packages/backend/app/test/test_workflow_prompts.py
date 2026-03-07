@@ -52,12 +52,18 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "llm.answer" in prompt
     assert "dataset_ref" in prompt
     assert "Treat schema as a contract between nodes." in prompt
+    assert "Never reference file-only columns" in prompt
     assert "always use explicit `AS` aliases" in prompt
     assert "Avoid `SELECT *`" in prompt
+    assert "If `sql.execute` already groups or aggregates the data" in prompt
     assert "update every downstream assumption to match the new schema" in prompt
     assert "Do not assume hidden columns or original source column names survive unchanged." in prompt
+    assert "Before writing `python.code`, inspect the upstream `dataset_ref.columns` mentally" in prompt
     assert "Treat each `dataset_ref` as the authoritative schema source." in prompt
     assert "data.get('dataset_ref', [])" in prompt
+    assert "load_dataset_ref(ref)" in prompt
+    assert "load_dataset_refs(data)" in prompt
+    assert "emit_dataframe(df)" in prompt
     assert "MUST include source nodes" in prompt
     assert "Do NOT create `python.code`-only" in prompt
     assert "Never bypass source nodes" in prompt
@@ -68,20 +74,26 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "### Example 1: Database analysis answered directly" in prompt
     assert "### Example 2: File + database analysis with python.code" in prompt
     assert "### Example 3: Transform output into a report artifact" in prompt
+    assert "### Example 4: Transform output into a dashboard artifact" in prompt
+    assert "### Example 5: Transform output into a video artifact" in prompt
     assert "\"edge_sql_to_python\"" in prompt
     assert "\"query\": \"SELECT client_id AS client_id, revenue AS revenue FROM sales\"" in prompt
     assert "Artifact nodes do not fetch attached data on their own." in prompt
     assert "determine whether the problem is missing wiring or missing upstream output" in prompt
     assert "its stdout MUST be either a JSON array of row objects or a JSON `dataset_ref` object" in prompt
     assert "The workflow must stay connected end-to-end." in prompt
+    assert "Do NOT insert a second narrative `python.code` or `llm.answer` between the final tabular dataset and the artifact node." in prompt
+    assert "If the last `python.code` step is only summarizing or explaining results, remove it" in prompt
     assert "\"planning_notes\": \"1) ... 2) ...\"" in prompt
     assert "`workflow_wiring_invalid`" in prompt
     assert "`workflow_artifact_input_missing`" in prompt
     assert "`workflow_dataset_input_missing`" in prompt
     assert "`workflow_dataset_output_missing`" in prompt
+    assert "`workflow_sql_query_invalid`" in prompt
     assert "\"edge_python_to_report\"" in prompt
     assert "create_plan" not in prompt
     assert "update_plan" not in prompt
+    assert "pd.read_csv(refs[0]['path'])" not in prompt
 
 
 def test_workflow_prompt_includes_preview_for_file_and_database_tables():

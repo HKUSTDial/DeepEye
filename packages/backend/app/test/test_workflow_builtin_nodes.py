@@ -289,6 +289,11 @@ def test_python_code_handler_passes_dataset_refs_instead_of_full_rows() -> None:
     assert payload["dataset_ref"][0]["row_count"] == 30
     assert result["dataset_ref"]["row_count"] == 1
     assert result["dataset_ref"]["kind"] == "dataset_ref"
+    assert sandbox.container.last_python_script_path is not None
+    script = sandbox.container.files[sandbox.container.last_python_script_path].decode("utf-8")
+    assert "def load_dataset_ref(ref):" in script
+    assert "def load_dataset_refs(data):" in script
+    assert "def emit_dataframe(df):" in script
 
 
 def test_workflow_engine_runs_rows_pipeline_with_llm_answer() -> None:

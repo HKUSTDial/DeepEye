@@ -76,7 +76,7 @@ class ReportGenerateHandler:
 
             return {
                 "report_path": f"/workspace/{output_filename}",
-                "report_html": report_html[:500] + "..." if report_html and len(report_html) > 500 else report_html,
+                "report_html": report_html,
             }
         except Exception as exc:
             logger.exception("Report generation failed")

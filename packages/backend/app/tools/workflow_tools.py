@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import uuid
 from typing import Any
 
@@ -255,6 +256,13 @@ def _dataset_ref_repair_hint(
                 f" Update `{incoming_sources[0]}` so it prints tabular JSON rows "
                 "or an explicit dataset_ref object instead of narrative text."
             )
+            upstream_sources = _incoming_dataset_sources(workflow_definition, node_id=incoming_sources[0])
+            if upstream_sources:
+                source_list = ", ".join(f"`{source}`" for source in upstream_sources[:3])
+                hint += (
+                    f" If `{incoming_sources[0]}` is only producing narrative analysis, remove it and connect "
+                    f"{source_list}.dataset_ref directly to `{node_id}`."
+                )
         else:
             hint += (
                 " If the upstream step is `python.code`, make it print tabular JSON rows "
@@ -438,6 +446,122 @@ def _definition_wiring_failure(
     return None
 
 
+def _sql_query_failure(
+    *,
+    draft_id: str | None,
+    run_id: str | None,
+    details: list[Any],
+    error: str | None,
+) -> dict[str, Any] | None:
+    for detail in details:
+        if not isinstance(detail, dict):
+            continue
+        node_id = detail.get("node_id")
+        node_type = detail.get("node_type")
+        message = detail.get("message")
+        if not isinstance(node_id, str) or node_type != "sql.execute" or not isinstance(message, str):
+            continue
+        lower_message = message.lower()
+        if not any(
+            token in lower_message
+            for token in (
+                "does not exist",
+                "undefinedcolumn",
+                "undefinedtable",
+                "syntax error",
+                "missing from-clause",
+                "ambiguous",
+            )
+        ):
+            continue
+        failure = _build_tool_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            error_type="workflow_sql_query_invalid",
+            error_summary=(
+                f"SQL query in node {node_id} is invalid for the attached database schema. "
+                "Fix the query and reuse the same draft_id."
+            ),
+            repairable=True,
+            details=details,
+            error=error,
+        )
+        failure["issues"] = [
+            "Use only tables and columns from the attached database schema inside `sql.execute`.",
+            "Do not reference file-only columns inside SQL. If the analysis needs both file fields and database fields, query the database-native columns in `sql.execute` and join with file data in `python.code`.",
+            "Add explicit `AS` aliases for every derived or aggregated SQL output column used downstream.",
+        ]
+        return failure
+    return None
+
+
+def _python_schema_failure(
+    *,
+    draft_id: str | None,
+    run_id: str | None,
+    details: list[Any],
+    error: str | None,
+) -> dict[str, Any] | None:
+    def _extract_available_columns(error_text: str | None) -> list[str]:
+        if not isinstance(error_text, str) or "INPUT_PREVIEW" not in error_text:
+            return []
+        match = re.search(r'"columns"\s*:\s*\[(.*?)\]', error_text, re.DOTALL)
+        if not match:
+            return []
+        columns_blob = match.group(1)
+        return [
+            column
+            for column in re.findall(r'"([^"]+)"', columns_blob)
+            if isinstance(column, str) and column.strip()
+        ]
+
+    available_columns = _extract_available_columns(error)
+
+    for detail in details:
+        if not isinstance(detail, dict):
+            continue
+        node_id = detail.get("node_id")
+        node_type = detail.get("node_type")
+        message = detail.get("message")
+        if not isinstance(node_id, str) or node_type != "python.code" or not isinstance(message, str):
+            continue
+        lower_message = message.lower()
+        if not any(
+            token in lower_message
+            for token in (
+                "keyerror",
+                "column not found",
+                "no such column",
+            )
+        ):
+            continue
+        failure = _build_tool_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            error_type="workflow_python_schema_invalid",
+            error_summary=(
+                f"python.code node {node_id} referenced columns that were not present in its upstream dataset inputs. "
+                "Fix the code to use the actual upstream schema and reuse the same draft_id."
+            ),
+            repairable=True,
+            details=details,
+            error=error,
+        )
+        failure["issues"] = [
+            "Use only column names that actually appear in upstream `dataset_ref.columns` or preview rows.",
+            "If an upstream `sql.execute` query uses `AS` aliases or aggregates columns, downstream `python.code` must reference those exact output names, not the original source column names.",
+            "Inside `python.code`, inspect `data.get('dataset_ref', [])` metadata first and align every join, groupby, and calculation to the emitted schema.",
+        ]
+        if available_columns:
+            failure["issues"].append(
+                "Upstream preview columns currently visible are: "
+                + ", ".join(f"`{column}`" for column in available_columns[:12])
+                + "."
+            )
+        return failure
+    return None
+
+
 def _build_tool_failure(
     *,
     draft_id: str | None = None,
@@ -484,11 +608,29 @@ def _normalize_indexed_items(value: Any) -> Any:
     return normalized
 
 
-def _normalize_workflow_payload_shape(workflow: dict[str, Any]) -> dict[str, Any]:
+def _parse_json_object_string(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text or text[0] not in "{[":
+        return value
+    try:
+        return json.loads(text)
+    except Exception:
+        return value
+
+
+def _normalize_workflow_payload_shape(workflow: dict[str, Any] | str) -> dict[str, Any] | Any:
+    workflow = _parse_json_object_string(workflow)
+    if not isinstance(workflow, dict):
+        return workflow
     normalized = copy.deepcopy(workflow)
+    normalized["root"] = _parse_json_object_string(normalized.get("root"))
     root = normalized.get("root")
     if not isinstance(root, dict):
         return normalized
+    root["nodes"] = _parse_json_object_string(root.get("nodes"))
+    root["edges"] = _parse_json_object_string(root.get("edges"))
     root["nodes"] = _normalize_indexed_items(root.get("nodes"))
     root["edges"] = _normalize_indexed_items(root.get("edges"))
     return normalized
@@ -559,6 +701,24 @@ def _normalize_workflow_run_result(
         if dataset_input_failure:
             dataset_input_failure["artifacts"] = artifacts
             return dataset_input_failure
+        sql_failure = _sql_query_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            details=details,
+            error=error,
+        )
+        if sql_failure:
+            sql_failure["artifacts"] = artifacts
+            return sql_failure
+        python_failure = _python_schema_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            details=details,
+            error=error,
+        )
+        if python_failure:
+            python_failure["artifacts"] = artifacts
+            return python_failure
     if isinstance(details, list) and details and all(
         isinstance(item, dict) and "node_id" in item and "message" in item for item in details
     ):

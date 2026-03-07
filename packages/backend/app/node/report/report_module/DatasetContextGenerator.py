@@ -150,6 +150,8 @@ class DatasetContextGenerator:
                 semantic_type = "DATETIME"
             elif col.lower() in ["id", "customer_id", "user_id"] or "id" in col.lower():
                 semantic_type = "ID"
+            elif pd.api.types.is_bool_dtype(df[col]):
+                semantic_type = "CATEGORY"
             elif pd.api.types.is_numeric_dtype(df[col]):
                 semantic_type = "NUMERIC"
             elif num_unique < len(df) * 0.5:  # 如果唯一值数量相对较少，视为类别型
@@ -396,6 +398,9 @@ class DatasetContextGenerator:
 
     def _is_categorical(self, series):
         """判断一个列是否为类别型 (supports pandas StringDtype)"""
+        if pd.api.types.is_bool_dtype(series):
+            return True
+
         # 如果是对象/字符串类型（通常是字符串）
         if pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):
             return True

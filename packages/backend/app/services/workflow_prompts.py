@@ -173,13 +173,18 @@ The latest user request asks for an answer grounded in the attached data sources
 - Treat schema as a contract between nodes. Before adding a downstream node, verify that the upstream outputs explicitly provide the columns or fields that downstream logic will use.
 - Every node can change schema. Downstream nodes must use the schema produced by the immediate upstream node, not the original source schema.
 - For `sql.execute`, the output schema is exactly the `SELECT` list and aliases in the SQL query.
+- `sql.execute` can only reference tables and columns that exist in the attached database schema. Never reference file-only columns, CSV headers, or file-derived metadata inside SQL.
 - For `sql.execute`, always use explicit `AS` aliases for derived, aggregated, renamed, or ambiguous columns so downstream nodes receive stable column names.
 - Avoid `SELECT *` when downstream logic depends on specific columns. Project only the columns needed later.
 - Prefer SQL that makes the downstream schema obvious. Use stable, human-readable output column names instead of relying on engine-specific defaults for expressions or aggregates.
+- If `sql.execute` already groups or aggregates the data, downstream nodes must use the aggregated output schema exactly as emitted. Do not keep referencing raw pre-aggregation columns after SQL has replaced them with aliases such as `total_revenue`, `avg_order_value`, or `member_orders`.
 - If a downstream node needs a column, ensure the upstream node still emits that column under the expected name.
 - If a node renames, filters, aggregates, or reshapes data, update every downstream assumption to match the new schema.
 - If one SQL query can already produce the final grouped or filtered result needed by the user, prefer `sql.execute -> llm.answer` instead of adding `python.code`.
+- If the user goal depends on columns that are split across a file datasource and a database datasource, do not pretend the file columns exist in SQL. Query only the database-native columns in `sql.execute`, then join or enrich with file data in `python.code`.
 - For `python.code`, only reference columns that are clearly present in upstream `dataset_ref.columns` or preview rows. Do not assume hidden columns or original source column names survive unchanged.
+- Before writing `python.code`, inspect the upstream `dataset_ref.columns` mentally and ensure every `merge`, `groupby`, column selection, arithmetic expression, and rename uses names that will actually exist at runtime.
+- For `python.code`, do not hardcode `pd.read_csv` / `pd.read_json` based on guesses. Use the preloaded helpers `load_dataset_ref(ref)` or `load_dataset_refs(data)` so file formats are handled correctly.
 
 ## Workflow Construction Rules
 1. Use only node types and exact port ids from the registry specification. Do NOT invent node types, ports, or schemas.
@@ -199,6 +204,8 @@ The latest user request asks for an answer grounded in the attached data sources
 13. If a downstream node reports a missing `dataset_ref`, determine whether the problem is missing wiring or missing upstream output. Fix missing edges by connecting the correct upstream node. If the edge already exists, update the upstream node so it actually emits `dataset_ref`.
 14. If `python.code` feeds any downstream `dataset_ref` consumer, its stdout MUST be either a JSON array of row objects or a JSON `dataset_ref` object. Do not print narrative text, explanations, or mixed logs when a downstream node expects `dataset_ref`.
 15. The workflow must stay connected end-to-end. Every non-source node must have its required upstream inputs, and every intermediate node must eventually feed the final answer or artifact.
+16. For artifact workflows, put narrative intent into the artifact node params (`report.generate.query`, `data.generate_dashboard.question`, `video.generator.query`). Do NOT insert a second narrative `python.code` or `llm.answer` between the final tabular dataset and the artifact node.
+17. The node immediately feeding `report.generate`, `data.generate_dashboard`, or `video.generator` must emit a usable `dataset_ref`. If the last `python.code` step is only summarizing or explaining results, remove it and connect the previous tabular transform directly to the artifact node.
 
 ## Tool Discipline
 1. For a new task, prefer `create_workflow_and_run` with the complete workflow.
@@ -283,7 +290,7 @@ The latest user request asks for an answer grounded in the attached data sources
         "id": "join_data",
         "type": "python.code",
         "params": {{
-          "code": "import json, sys, pandas as pd\\ndata = json.load(sys.stdin)\\nrefs = data.get('dataset_ref', [])\\nclients_df = pd.read_csv(refs[0]['path'])\\nsales_df = pd.read_json(refs[1]['path'], lines=True)\\nmerged = clients_df.merge(sales_df, on='client_id', how='inner')\\ncity_totals = merged.groupby('city', as_index=False)['revenue'].sum().rename(columns={{'revenue': 'total_revenue'}}).sort_values('total_revenue', ascending=False)\\nprint(city_totals.to_json(orient='records'))"
+          "code": "data = json.load(sys.stdin)\\nclients_df, sales_df = load_dataset_refs(data)\\nmerged = clients_df.merge(sales_df, on='client_id', how='inner')\\ncity_totals = merged.groupby('city', as_index=False)['revenue'].sum().rename(columns={{'revenue': 'total_revenue'}}).sort_values('total_revenue', ascending=False)\\nemit_dataframe(city_totals)"
         }},
         "metadata": {{"position": {{"x": 360, "y": 220}}}}
       }},
@@ -343,7 +350,7 @@ The latest user request asks for an answer grounded in the attached data sources
         "id": "join_and_aggregate",
         "type": "python.code",
         "params": {{
-          "code": "import json, sys, pandas as pd\\ndata = json.load(sys.stdin)\\nrefs = data.get('dataset_ref', [])\\nclients_df = pd.read_csv(refs[0]['path'])\\nsales_df = pd.read_json(refs[1]['path'], lines=True)\\nmerged = clients_df.merge(sales_df, on='client_id', how='inner')\\ncity_totals = merged.groupby('city', as_index=False)['revenue'].sum().rename(columns={{'revenue': 'total_revenue'}}).sort_values('total_revenue', ascending=False)\\nprint(city_totals.to_json(orient='records'))"
+          "code": "data = json.load(sys.stdin)\\nclients_df, sales_df = load_dataset_refs(data)\\nmerged = clients_df.merge(sales_df, on='client_id', how='inner')\\ncity_totals = merged.groupby('city', as_index=False)['revenue'].sum().rename(columns={{'revenue': 'total_revenue'}}).sort_values('total_revenue', ascending=False)\\nemit_dataframe(city_totals)"
         }},
         "metadata": {{"position": {{"x": 360, "y": 220}}}}
       }},
@@ -377,11 +384,134 @@ The latest user request asks for an answer grounded in the attached data sources
 }}
 ```
 
+### Example 4: Transform output into a dashboard artifact
+```json
+{{
+  "root": {{
+    "nodes": {{
+      "read_targets": {{
+        "id": "read_targets",
+        "type": "datasource.read",
+        "params": {{
+          "datasource_id": "file_datasource_id"
+        }},
+        "metadata": {{"position": {{"x": 80, "y": 120}}}}
+      }},
+      "query_sales": {{
+        "id": "query_sales",
+        "type": "sql.execute",
+        "params": {{
+          "datasource_id": "db_datasource_id",
+          "query": "SELECT city AS city, SUM(revenue) AS total_revenue, COUNT(*) AS total_orders FROM sales GROUP BY city"
+        }},
+        "metadata": {{"position": {{"x": 80, "y": 320}}}}
+      }},
+      "calculate_metrics": {{
+        "id": "calculate_metrics",
+        "type": "python.code",
+        "params": {{
+          "code": "data = json.load(sys.stdin)\\ntargets_df, sales_df = load_dataset_refs(data)\\nmerged = targets_df.merge(sales_df, on='city', how='left')\\nmerged['target_achievement_rate'] = (merged['total_revenue'] / merged['quarter_target_revenue'] * 100).round(2)\\nmerged['budget_roi'] = (merged['total_revenue'] / merged['marketing_budget']).round(2)\\nemit_dataframe(merged)"
+        }},
+        "metadata": {{"position": {{"x": 380, "y": 220}}}}
+      }},
+      "generate_dashboard": {{
+        "id": "generate_dashboard",
+        "type": "data.generate_dashboard",
+        "params": {{
+          "question": "Generate a dashboard showing city ranking, goal attainment, and budget efficiency."
+        }},
+        "metadata": {{"position": {{"x": 680, "y": 220}}}}
+      }}
+    }},
+    "edges": {{
+      "edge_file_to_python": {{
+        "id": "edge_file_to_python",
+        "source": {{"node_id": "read_targets", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "calculate_metrics", "port_id": "dataset_ref"}}
+      }},
+      "edge_sql_to_python": {{
+        "id": "edge_sql_to_python",
+        "source": {{"node_id": "query_sales", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "calculate_metrics", "port_id": "dataset_ref"}}
+      }},
+      "edge_python_to_dashboard": {{
+        "id": "edge_python_to_dashboard",
+        "source": {{"node_id": "calculate_metrics", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "generate_dashboard", "port_id": "dataset_ref"}}
+      }}
+    }}
+  }}
+}}
+```
+
+### Example 5: Transform output into a video artifact
+```json
+{{
+  "root": {{
+    "nodes": {{
+      "read_targets": {{
+        "id": "read_targets",
+        "type": "datasource.read",
+        "params": {{
+          "datasource_id": "file_datasource_id"
+        }},
+        "metadata": {{"position": {{"x": 80, "y": 120}}}}
+      }},
+      "query_sales": {{
+        "id": "query_sales",
+        "type": "sql.execute",
+        "params": {{
+          "datasource_id": "db_datasource_id",
+          "query": "SELECT city AS city, SUM(revenue) AS total_revenue FROM sales GROUP BY city"
+        }},
+        "metadata": {{"position": {{"x": 80, "y": 320}}}}
+      }},
+      "prepare_video_dataset": {{
+        "id": "prepare_video_dataset",
+        "type": "python.code",
+        "params": {{
+          "code": "data = json.load(sys.stdin)\\ntargets_df, sales_df = load_dataset_refs(data)\\nmerged = targets_df.merge(sales_df, on='city', how='left')\\nmerged['target_achievement_rate'] = (merged['total_revenue'] / merged['quarter_target_revenue'] * 100).round(2)\\nvideo_df = merged[['city', 'total_revenue', 'target_achievement_rate']].sort_values('total_revenue', ascending=False)\\nemit_dataframe(video_df)"
+        }},
+        "metadata": {{"position": {{"x": 380, "y": 220}}}}
+      }},
+      "generate_video": {{
+        "id": "generate_video",
+        "type": "video.generator",
+        "params": {{
+          "query": "Generate a short Chinese summary video about city revenue ranking and target achievement.",
+          "language": "Chinese"
+        }},
+        "metadata": {{"position": {{"x": 680, "y": 220}}}}
+      }}
+    }},
+    "edges": {{
+      "edge_file_to_python": {{
+        "id": "edge_file_to_python",
+        "source": {{"node_id": "read_targets", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "prepare_video_dataset", "port_id": "dataset_ref"}}
+      }},
+      "edge_sql_to_python": {{
+        "id": "edge_sql_to_python",
+        "source": {{"node_id": "query_sales", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "prepare_video_dataset", "port_id": "dataset_ref"}}
+      }},
+      "edge_python_to_video": {{
+        "id": "edge_python_to_video",
+        "source": {{"node_id": "prepare_video_dataset", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "generate_video", "port_id": "dataset_ref"}}
+      }}
+    }}
+  }}
+}}
+```
+
 ## python.code Runtime Contract
 - The runner only pipes LIGHTWEIGHT metadata to stdin. Always start with `import sys, json; data = json.load(sys.stdin)`.
 - Use `data.get('input')` for small scalar or JSON parameters.
 - For tabular data, use `data.get('dataset_ref', [])` and open each referenced sandbox path instead of expecting full rows in stdin.
 - Treat each `dataset_ref` as the authoritative schema source. Read its `columns` and preview before writing column-sensitive logic.
+- Helpers are preloaded inside every `python.code` script: `json`, `sys`, `pd`, `load_dataset_ref(ref)`, `load_dataset_refs(data)`, `emit_dataframe(df)`, and `emit_json(value)`.
+- Prefer `load_dataset_ref(ref)` or `load_dataset_refs(data)` over handwritten `pd.read_csv` / `pd.read_json` calls.
 - Never bypass source nodes by hardcoding attached datasource paths or database connections inside `python.code`. `python.code` should consume upstream `dataset_ref` inputs, not raw attached datasources.
 - Put the Python source directly in `params.code`.
 - For small outputs, return normal Python objects. For large tabular outputs, write a dataset file in the sandbox and print a `dataset_ref` JSON object instead.
@@ -399,7 +529,7 @@ Return tool calls only.
 ## Structured Run Failure Signals
 - `status`: `success` or `failed`
 - `repairable`: whether another workflow edit is worth attempting
-- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `workflow_wiring_invalid`, `workflow_artifact_input_missing`, `workflow_dataset_input_missing`, `workflow_dataset_output_missing`, `draft_reuse_required`, `repair_limit_exceeded`
+- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `workflow_wiring_invalid`, `workflow_artifact_input_missing`, `workflow_dataset_input_missing`, `workflow_dataset_output_missing`, `workflow_sql_query_invalid`, `draft_reuse_required`, `repair_limit_exceeded`
 - `error_summary`: concise explanation of the failure
 - `issues`: short human-readable issue summaries
 - Raw fields such as `validation_errors` and `details` may still be present. Use `error_summary` and `issues` first, then consult the raw fields if needed.
