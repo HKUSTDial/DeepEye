@@ -20,6 +20,8 @@ def test_supervisor_prompt_requires_summary_step():
     assert "workflow_agent" in prompt
     assert "summarize_workflow_result" in prompt
     assert "must call `summarize_workflow_result`".lower() in prompt.lower()
+    assert "Choose one path per turn".lower() in prompt.lower()
+    assert "exactly once" in prompt
     assert "Current Plan" not in prompt
 
 

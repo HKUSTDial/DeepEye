@@ -18,6 +18,9 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "validation_errors" in prompt
     assert "Reuse the SAME `draft_id`" in prompt
     assert "Limit repair attempts to 2" in prompt
+    assert "prefer `create_workflow_and_run`" in prompt
+    assert "Do NOT call `read_workflow`, `update_workflow`, or `run_workflow` before the first run" in prompt
+    assert "File + database joint analysis" in prompt
     assert "rows.select" in prompt
     assert "rows.aggregate" in prompt
     assert "llm.answer" in prompt
