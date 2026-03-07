@@ -24,6 +24,17 @@ from deepeye.tools.base import tool
 from deepeye.utils.logger import logger
 
 _MAX_REPAIR_ATTEMPTS = 2
+_ARTIFACT_NODE_TYPES = {"report.generate", "data.generate_dashboard", "video.generator"}
+_DATASET_PRODUCER_NODE_TYPES = {
+    "datasource.read",
+    "sql.execute",
+    "python.code",
+    "rows.select",
+    "rows.filter",
+    "rows.sort",
+    "rows.aggregate",
+    "rows.profile",
+}
 
 
 def _get_session(db, session_id: str):
@@ -141,6 +152,259 @@ def _summarize_issues(issues: list[Any] | None, *, limit: int = 3) -> list[str]:
     return [_summarize_issue(issue) for issue in issues[:limit]]
 
 
+def _workflow_nodes(workflow_definition: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    if not isinstance(workflow_definition, dict):
+        return {}
+    root = workflow_definition.get("root")
+    if not isinstance(root, dict):
+        return {}
+    nodes = root.get("nodes")
+    if not isinstance(nodes, dict):
+        return {}
+    return {node_id: node for node_id, node in nodes.items() if isinstance(node, dict)}
+
+
+def _workflow_edges(workflow_definition: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    if not isinstance(workflow_definition, dict):
+        return {}
+    root = workflow_definition.get("root")
+    if not isinstance(root, dict):
+        return {}
+    edges = root.get("edges")
+    if not isinstance(edges, dict):
+        return {}
+    return {edge_id: edge for edge_id, edge in edges.items() if isinstance(edge, dict)}
+
+
+def _candidate_dataset_sources(
+    workflow_definition: dict[str, Any] | None,
+    *,
+    exclude_node_id: str | None = None,
+) -> list[str]:
+    nodes = _workflow_nodes(workflow_definition)
+    if not nodes:
+        return []
+
+    producers = [
+        node_id
+        for node_id, node in nodes.items()
+        if (not exclude_node_id or node_id != exclude_node_id)
+        and node.get("type") in _DATASET_PRODUCER_NODE_TYPES
+    ]
+    if not producers:
+        return []
+
+    producer_set = set(producers)
+    downstream_producers: set[str] = set()
+    for edge in _workflow_edges(workflow_definition).values():
+        source = edge.get("source")
+        target = edge.get("target")
+        if not isinstance(source, dict) or not isinstance(target, dict):
+            continue
+        source_node_id = source.get("node_id")
+        target_node_id = target.get("node_id")
+        if source_node_id in producer_set and target_node_id in producer_set:
+            downstream_producers.add(source_node_id)
+
+    terminal_producers = [node_id for node_id in producers if node_id not in downstream_producers]
+    return terminal_producers or producers
+
+
+def _ordered_node_ids(workflow_definition: dict[str, Any] | None) -> list[str]:
+    return list(_workflow_nodes(workflow_definition).keys())
+
+
+def _artifact_input_missing_failure(
+    *,
+    draft_id: str | None,
+    run_id: str | None,
+    details: list[Any],
+    error: str | None,
+    workflow_definition: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    for detail in details:
+        if not isinstance(detail, dict):
+            continue
+        node_id = detail.get("node_id")
+        node_type = detail.get("node_type")
+        message = detail.get("message")
+        if not isinstance(node_id, str) or not isinstance(node_type, str) or not isinstance(message, str):
+            continue
+        lower_message = message.lower()
+        if node_type not in _ARTIFACT_NODE_TYPES:
+            continue
+        if "dataset_ref input is required" not in lower_message and "required input missing" not in lower_message:
+            continue
+        candidates = _candidate_dataset_sources(workflow_definition, exclude_node_id=node_id)
+        if candidates:
+            ordered_node_ids = _ordered_node_ids(workflow_definition)
+            if node_id in ordered_node_ids:
+                target_index = ordered_node_ids.index(node_id)
+                ordered_candidates = sorted(
+                    candidates,
+                    key=lambda candidate_id: (
+                        ordered_node_ids.index(candidate_id)
+                        if candidate_id in ordered_node_ids
+                        else -1
+                    ),
+                )
+                ordered_candidates = [
+                    candidate_id
+                    for candidate_id in ordered_candidates
+                    if candidate_id in ordered_node_ids
+                    and ordered_node_ids.index(candidate_id) < target_index
+                ] or ordered_candidates
+            else:
+                ordered_candidates = candidates
+            if len(ordered_candidates) == 1:
+                hint = f"Connect {ordered_candidates[0]}.dataset_ref -> {node_id}.dataset_ref."
+            else:
+                joined = ", ".join(f"{candidate}.dataset_ref" for candidate in ordered_candidates[:3])
+                hint = f"Connect one upstream dataset output ({joined}) to {node_id}.dataset_ref."
+        else:
+            hint = f"Add an incoming edge from an upstream dataset-producing node to {node_id}.dataset_ref."
+        summary = (
+            f"Artifact node {node_id} ({node_type}) is missing its required dataset_ref input. {hint}"
+        )
+        failure = _build_tool_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            error_type="workflow_artifact_input_missing",
+            error_summary=summary,
+            repairable=True,
+            details=details,
+            error=error,
+        )
+        failure["issues"] = [hint]
+        return failure
+    return None
+
+
+def _dataset_input_missing_failure(
+    *,
+    draft_id: str | None,
+    run_id: str | None,
+    details: list[Any],
+    error: str | None,
+    workflow_definition: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    for detail in details:
+        if not isinstance(detail, dict):
+            continue
+        node_id = detail.get("node_id")
+        node_type = detail.get("node_type")
+        message = detail.get("message")
+        if not isinstance(node_id, str) or not isinstance(node_type, str) or not isinstance(message, str):
+            continue
+        lower_message = message.lower()
+        if "dataset_ref input is required" not in lower_message and "required input missing" not in lower_message:
+            continue
+        candidates = _candidate_dataset_sources(workflow_definition, exclude_node_id=node_id)
+        if candidates:
+            ordered_node_ids = _ordered_node_ids(workflow_definition)
+            if node_id in ordered_node_ids:
+                target_index = ordered_node_ids.index(node_id)
+                ordered_candidates = sorted(
+                    candidates,
+                    key=lambda candidate_id: (
+                        ordered_node_ids.index(candidate_id)
+                        if candidate_id in ordered_node_ids
+                        else -1
+                    ),
+                )
+                ordered_candidates = [
+                    candidate_id
+                    for candidate_id in ordered_candidates
+                    if candidate_id in ordered_node_ids
+                    and ordered_node_ids.index(candidate_id) < target_index
+                ] or ordered_candidates
+            else:
+                ordered_candidates = candidates
+            if len(ordered_candidates) == 1:
+                hint = f"Connect {ordered_candidates[0]}.dataset_ref -> {node_id}.dataset_ref."
+            else:
+                joined = ", ".join(f"{candidate}.dataset_ref" for candidate in ordered_candidates[:3])
+                hint = f"Connect one upstream dataset output ({joined}) to {node_id}.dataset_ref."
+        else:
+            hint = f"Add an incoming edge from an upstream dataset-producing node to {node_id}.dataset_ref."
+        summary = f"Node {node_id} ({node_type}) is missing its required dataset_ref input. {hint}"
+        failure = _build_tool_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            error_type="workflow_dataset_input_missing",
+            error_summary=summary,
+            repairable=True,
+            details=details,
+            error=error,
+        )
+        failure["issues"] = [hint]
+        return failure
+    return None
+
+
+def _definition_wiring_failure(
+    *,
+    draft_id: str | None,
+    run_id: str | None,
+    details: list[Any],
+    error: str | None,
+) -> dict[str, Any] | None:
+    for detail in details:
+        if not isinstance(detail, dict):
+            continue
+        loc = detail.get("loc")
+        msg = detail.get("msg")
+        if not isinstance(msg, str):
+            continue
+        if (
+            isinstance(loc, list)
+            and len(loc) >= 4
+            and loc[0] == "nodes"
+            and loc[2] == "inputs"
+            and "Input should be a valid dictionary or instance of Port" in msg
+        ):
+            node_id = str(loc[1])
+            port_id = str(loc[3])
+            summary = (
+                f"Workflow wiring is invalid for {node_id}.{port_id}. Do not place incoming edge endpoints inside "
+                f"`node.inputs`. Omit node-level `inputs`/`outputs` unless you are copying the registry spec exactly, "
+                f"and express data flow only through `root.edges`."
+            )
+            failure = _build_tool_failure(
+                draft_id=draft_id,
+                run_id=run_id,
+                error_type="workflow_wiring_invalid",
+                error_summary=summary,
+                repairable=True,
+                details=details,
+                error=error,
+            )
+            failure["issues"] = [
+                f"Remove the invalid `inputs.{port_id}` block from node `{node_id}` and connect upstream nodes through `root.edges` only."
+            ]
+            return failure
+        location_text = ".".join(str(part) for part in loc) if isinstance(loc, list) else str(loc or "")
+        if "edge.source.port.missing" in location_text or "Source port missing: input" in msg:
+            summary = (
+                "Workflow wiring is invalid because an edge is using an input port as its source. "
+                "Edges must originate from output ports such as `dataset_ref`, never from an input port like `input`."
+            )
+            failure = _build_tool_failure(
+                draft_id=draft_id,
+                run_id=run_id,
+                error_type="workflow_wiring_invalid",
+                error_summary=summary,
+                repairable=True,
+                details=details,
+                error=error,
+            )
+            failure["issues"] = [
+                "Change the edge source port to a real upstream output port, usually `dataset_ref`, and keep `input` only on the target side."
+            ]
+            return failure
+    return None
+
+
 def _build_tool_failure(
     *,
     draft_id: str | None = None,
@@ -197,7 +461,12 @@ def _normalize_workflow_payload_shape(workflow: dict[str, Any]) -> dict[str, Any
     return normalized
 
 
-def _normalize_workflow_run_result(run_result: dict[str, Any], *, draft_id: str | None) -> dict[str, Any]:
+def _normalize_workflow_run_result(
+    run_result: dict[str, Any],
+    *,
+    draft_id: str | None,
+    workflow_definition: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     status = run_result.get("status") or "failed"
     run_id = run_result.get("run_id")
     artifacts = run_result.get("artifacts") if isinstance(run_result.get("artifacts"), list) else []
@@ -236,6 +505,27 @@ def _normalize_workflow_run_result(run_result: dict[str, Any], *, draft_id: str 
             ),
             "artifacts": artifacts,
         }
+    if isinstance(details, list) and details:
+        artifact_failure = _artifact_input_missing_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            details=details,
+            error=error,
+            workflow_definition=workflow_definition,
+        )
+        if artifact_failure:
+            artifact_failure["artifacts"] = artifacts
+            return artifact_failure
+        dataset_input_failure = _dataset_input_missing_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            details=details,
+            error=error,
+            workflow_definition=workflow_definition,
+        )
+        if dataset_input_failure:
+            dataset_input_failure["artifacts"] = artifacts
+            return dataset_input_failure
     if isinstance(details, list) and details and all(
         isinstance(item, dict) and "node_id" in item and "message" in item for item in details
     ):
@@ -252,6 +542,15 @@ def _normalize_workflow_run_result(run_result: dict[str, Any], *, draft_id: str 
             "artifacts": artifacts,
         }
     if isinstance(details, list) and details:
+        wiring_failure = _definition_wiring_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            details=details,
+            error=error,
+        )
+        if wiring_failure:
+            wiring_failure["artifacts"] = artifacts
+            return wiring_failure
         return {
             **_build_tool_failure(
                 draft_id=draft_id,
@@ -372,6 +671,7 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
         draft_id: str | None = None,
         name: str | None = None,
         file_path: str | None = None,
+        planning_notes: str | None = None,
     ) -> dict:
         """
         Create a workflow draft or replace an existing draft.
@@ -381,6 +681,7 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             draft_id: Existing workflow draft id to update.
             name: Optional logical workflow name. Used to derive file path if needed.
             file_path: Optional explicit legacy sandbox workflow file path. Prefer draft_id or name.
+            planning_notes: Concise step-by-step planning notes explaining nodes, schemas, and edges.
         """
         workflow = _normalize_workflow_payload_shape(workflow)
         db = SessionLocal()
@@ -457,6 +758,7 @@ def create_update_workflow_tool(
         draft_id: str | None = None,
         name: str | None = None,
         file_path: str | None = None,
+        planning_notes: str | None = None,
     ) -> dict:
         """
         Update an existing workflow draft or overwrite a file-backed workflow.
@@ -466,6 +768,7 @@ def create_update_workflow_tool(
             draft_id: Existing workflow draft id to update.
             name: Optional logical workflow name. Used to derive file path if needed.
             file_path: Optional explicit legacy sandbox workflow file path. Prefer draft_id.
+            planning_notes: Concise step-by-step planning notes explaining nodes, schemas, and edges.
         """
         if repair_state:
             blocked = _guard_repair_limit(repair_state)
@@ -587,7 +890,11 @@ def create_run_workflow_tool(
                 str(existing_draft.id),
                 turn_id=turn_id,
             )
-            normalized = _normalize_workflow_run_result(result, draft_id=str(existing_draft.id))
+            normalized = _normalize_workflow_run_result(
+                result,
+                draft_id=str(existing_draft.id),
+                workflow_definition=existing_draft.definition,
+            )
             if repair_state:
                 if normalized["status"] == "success":
                     _note_successful_run(repair_state, str(existing_draft.id))
@@ -619,6 +926,7 @@ def create_workflow_and_run_tool(
         draft_id: str | None = None,
         name: str | None = None,
         file_path: str | None = None,
+        planning_notes: str | None = None,
     ) -> dict:
         """
         Create or update a workflow draft and run it immediately.
@@ -628,6 +936,7 @@ def create_workflow_and_run_tool(
             draft_id: Existing workflow draft id to update and execute.
             name: Optional logical workflow name. Used to derive file path if needed.
             file_path: Optional explicit legacy sandbox workflow file path. Prefer name or draft_id.
+            planning_notes: Concise step-by-step planning notes explaining nodes, schemas, and edges.
         """
         if repair_state:
             blocked = _guard_repair_limit(repair_state)
@@ -669,7 +978,11 @@ def create_workflow_and_run_tool(
                 str(draft.id),
                 turn_id=turn_id,
             )
-            normalized = _normalize_workflow_run_result(result, draft_id=str(draft.id))
+            normalized = _normalize_workflow_run_result(
+                result,
+                draft_id=str(draft.id),
+                workflow_definition=workflow,
+            )
             if repair_state:
                 if normalized["status"] == "success":
                     _note_successful_run(repair_state, str(draft.id))

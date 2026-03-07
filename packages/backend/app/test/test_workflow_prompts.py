@@ -19,6 +19,13 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "# Inputs" in prompt
     assert "# Instructions" in prompt
     assert "# Output Format" in prompt
+    assert "connected DAG" in prompt
+    assert "## Explicit Planning Notes" in prompt
+    assert "produce explicit `planning_notes` in the tool payload" in prompt
+    assert "which nodes are needed" in prompt
+    assert "the required inputs and expected outputs of each node" in prompt
+    assert "how the nodes connect through edges" in prompt
+    assert "why the final graph is a connected DAG" in prompt
     assert "## Schema Continuity Rules" in prompt
     assert "Reuse ONE workflow draft" in prompt
     assert "validation_errors" in prompt
@@ -60,8 +67,17 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "Preferred minimal shape: omit node-level `inputs` and `outputs` blocks" in prompt
     assert "### Example 1: Database analysis answered directly" in prompt
     assert "### Example 2: File + database analysis with python.code" in prompt
+    assert "### Example 3: Transform output into a report artifact" in prompt
     assert "\"edge_sql_to_python\"" in prompt
     assert "\"query\": \"SELECT client_id AS client_id, revenue AS revenue FROM sales\"" in prompt
+    assert "Artifact nodes do not fetch attached data on their own." in prompt
+    assert "If an artifact node is missing `dataset_ref`, fix the wiring" in prompt
+    assert "The workflow must stay connected end-to-end." in prompt
+    assert "\"planning_notes\": \"1) ... 2) ...\"" in prompt
+    assert "`workflow_wiring_invalid`" in prompt
+    assert "`workflow_artifact_input_missing`" in prompt
+    assert "`workflow_dataset_input_missing`" in prompt
+    assert "\"edge_python_to_report\"" in prompt
     assert "create_plan" not in prompt
     assert "update_plan" not in prompt
 

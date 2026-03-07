@@ -19,6 +19,8 @@ from app.tools.workflow_tools import (
     _normalize_workflow_payload_shape,
     _normalize_workflow_run_result,
     _require_reuse_after_failure,
+    create_workflow_and_run_tool,
+    create_update_workflow_tool,
     create_design_workflow_tool,
 )
 from deepeye.agents.factory import AgentFactory
@@ -310,6 +312,108 @@ def test_normalize_workflow_run_result_keeps_runtime_failures_nonrepairable() ->
     assert normalized["issues"] == ["KeyError: city"]
 
 
+def test_normalize_workflow_run_result_marks_missing_artifact_dataset_ref_repairable() -> None:
+    workflow = {
+        "root": {
+            "nodes": {
+                "read": {"id": "read", "type": "datasource.read", "params": {"datasource_id": "ds-1"}},
+                "join_and_aggregate": {"id": "join_and_aggregate", "type": "python.code", "params": {"code": "print('ok')"}},
+                "generate_report": {"id": "generate_report", "type": "report.generate", "params": {"query": "Build report"}},
+            },
+            "edges": {
+                "e1": {
+                    "id": "e1",
+                    "source": {"node_id": "read", "port_id": "dataset_ref"},
+                    "target": {"node_id": "join_and_aggregate", "port_id": "dataset_ref"},
+                }
+            },
+        }
+    }
+
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "error": "Workflow execution failed at node generate_report (report.generate): dataset_ref input is required",
+            "details": [
+                {
+                    "node_id": "generate_report",
+                    "node_type": "report.generate",
+                    "message": "dataset_ref input is required",
+                }
+            ],
+        },
+        draft_id="draft-1",
+        workflow_definition=workflow,
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_artifact_input_missing"
+    assert normalized["issues"] == ["Connect join_and_aggregate.dataset_ref -> generate_report.dataset_ref."]
+
+
+def test_normalize_workflow_run_result_marks_missing_transform_dataset_ref_repairable() -> None:
+    workflow = {
+        "root": {
+            "nodes": {
+                "read": {"id": "read", "type": "datasource.read", "params": {"datasource_id": "ds-1"}},
+                "join_and_aggregate": {"id": "join_and_aggregate", "type": "python.code", "params": {"code": "print('ok')"}},
+                "sort_by_revenue": {"id": "sort_by_revenue", "type": "rows.sort", "params": {"by": "total_revenue"}},
+                "generate_report": {"id": "generate_report", "type": "report.generate", "params": {"query": "Build report"}},
+            },
+            "edges": {
+                "e1": {
+                    "id": "e1",
+                    "source": {"node_id": "read", "port_id": "dataset_ref"},
+                    "target": {"node_id": "join_and_aggregate", "port_id": "dataset_ref"},
+                }
+            },
+        }
+    }
+
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "error": "Workflow execution failed at node sort_by_revenue (rows.sort): Required input missing: sort_by_revenue.dataset_ref",
+            "details": [
+                {
+                    "node_id": "sort_by_revenue",
+                    "node_type": "rows.sort",
+                    "message": "Required input missing: sort_by_revenue.dataset_ref",
+                }
+            ],
+        },
+        draft_id="draft-1",
+        workflow_definition=workflow,
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_dataset_input_missing"
+    assert normalized["issues"] == ["Connect join_and_aggregate.dataset_ref -> sort_by_revenue.dataset_ref."]
+
+
+def test_normalize_workflow_run_result_marks_invalid_node_inputs_wiring_repairable() -> None:
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "details": [
+                {
+                    "type": "model_type",
+                    "loc": ["nodes", "join_data", "inputs", "dataset_ref"],
+                    "msg": "Input should be a valid dictionary or instance of Port",
+                }
+            ],
+        },
+        draft_id="draft-1",
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_wiring_invalid"
+    assert "connect upstream nodes through `root.edges` only" in normalized["issues"][0]
+
+
 def test_repair_state_requires_reusing_existing_draft_after_failure() -> None:
     state = _new_repair_state()
     state["repair_failures"] = 1
@@ -380,6 +484,17 @@ def test_supervisor_does_not_inject_plan_tools() -> None:
     )
 
     assert [tool.name for tool in supervisor.tools] == ["workflow_agent"]
+
+
+def test_workflow_tools_expose_planning_notes_field() -> None:
+    create_tool = create_workflow_and_run_tool("session-1")
+    update_tool = create_update_workflow_tool("session-1", "user-1")
+
+    create_schema = create_tool.args_schema.model_json_schema()
+    update_schema = update_tool.args_schema.model_json_schema()
+
+    assert "planning_notes" in create_schema["properties"]
+    assert "planning_notes" in update_schema["properties"]
 
 
 @pytest.mark.anyio

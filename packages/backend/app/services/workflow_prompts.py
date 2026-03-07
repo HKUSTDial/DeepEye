@@ -134,6 +134,7 @@ def build_workflow_prompt(
 You are a Workflow Designer for data analysis.
 Translate the user's goal into the smallest valid JSON workflow that can answer the request.
 Prefer one-pass success over cleverness. Minimize tool calls, workflow edits, and repair loops.
+The workflow must be a connected DAG from source nodes to the final answer or artifact node.
 
 # Inputs
 ## User Goal
@@ -149,6 +150,15 @@ The latest user request asks for an answer grounded in the attached data sources
 {specs_text}
 
 # Instructions
+## Explicit Planning Notes
+- Before emitting workflow JSON, produce explicit `planning_notes` in the tool payload.
+- `planning_notes` must be concise and step-by-step, covering:
+  1. which nodes are needed,
+  2. the required inputs and expected outputs of each node,
+  3. how the nodes connect through edges,
+  4. why the final graph is a connected DAG that reaches the final answer or artifact.
+- Keep `planning_notes` short and operational. Do not write free-form essays.
+
 ## Planning Priorities
 - Prefer specialized nodes over `python.code` whenever a specialized node cleanly fits the task.
 - Use `rows.select`, `rows.filter`, `rows.sort`, `rows.aggregate`, and `rows.profile` for lightweight declarative transforms.
@@ -185,6 +195,9 @@ The latest user request asks for an answer grounded in the attached data sources
 9. For video requests, the workflow MUST end with `video.generator` receiving `dataset_ref`. Feed it an analysis-ready dataset. For large or raw source tables, add transform nodes first so the video node receives filtered, grouped, or otherwise reduced data instead of the raw dataset.
 10. Layout: include positions ONLY under `node.metadata.position` with `x` and `y`. Do NOT use a top-level `position` field.
 11. Do NOT guess categorical values, table names, or columns. Use only what the user, datasource context, or schema context provides.
+12. Artifact nodes do not fetch attached data on their own. `report.generate`, `data.generate_dashboard`, and `video.generator` MUST receive `dataset_ref` through incoming edges from upstream source or transform nodes.
+13. If an artifact node is missing `dataset_ref`, fix the wiring by adding an incoming edge from the nearest upstream dataset-producing node instead of rewriting the whole workflow.
+14. The workflow must stay connected end-to-end. Every non-source node must have its required upstream inputs, and every intermediate node must eventually feed the final answer or artifact.
 
 ## Tool Discipline
 1. For a new task, prefer `create_workflow_and_run` with the complete workflow.
@@ -303,6 +316,66 @@ The latest user request asks for an answer grounded in the attached data sources
 }}
 ```
 
+### Example 3: Transform output into a report artifact
+```json
+{{
+  "root": {{
+    "nodes": {{
+      "read_clients": {{
+        "id": "read_clients",
+        "type": "datasource.read",
+        "params": {{
+          "datasource_id": "file_datasource_id"
+        }},
+        "metadata": {{"position": {{"x": 80, "y": 120}}}}
+      }},
+      "query_sales": {{
+        "id": "query_sales",
+        "type": "sql.execute",
+        "params": {{
+          "datasource_id": "db_datasource_id",
+          "query": "SELECT client_id AS client_id, revenue AS revenue FROM sales"
+        }},
+        "metadata": {{"position": {{"x": 80, "y": 320}}}}
+      }},
+      "join_and_aggregate": {{
+        "id": "join_and_aggregate",
+        "type": "python.code",
+        "params": {{
+          "code": "import json, sys, pandas as pd\\ndata = json.load(sys.stdin)\\nrefs = data.get('dataset_ref', [])\\nclients_df = pd.read_csv(refs[0]['path'])\\nsales_df = pd.read_json(refs[1]['path'], lines=True)\\nmerged = clients_df.merge(sales_df, on='client_id', how='inner')\\ncity_totals = merged.groupby('city', as_index=False)['revenue'].sum().rename(columns={{'revenue': 'total_revenue'}}).sort_values('total_revenue', ascending=False)\\nprint(city_totals.to_json(orient='records'))"
+        }},
+        "metadata": {{"position": {{"x": 360, "y": 220}}}}
+      }},
+      "generate_report": {{
+        "id": "generate_report",
+        "type": "report.generate",
+        "params": {{
+          "query": "Create a concise report about the top city by total revenue."
+        }},
+        "metadata": {{"position": {{"x": 660, "y": 220}}}}
+      }}
+    }},
+    "edges": {{
+      "edge_file_to_python": {{
+        "id": "edge_file_to_python",
+        "source": {{"node_id": "read_clients", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_and_aggregate", "port_id": "dataset_ref"}}
+      }},
+      "edge_sql_to_python": {{
+        "id": "edge_sql_to_python",
+        "source": {{"node_id": "query_sales", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_and_aggregate", "port_id": "dataset_ref"}}
+      }},
+      "edge_python_to_report": {{
+        "id": "edge_python_to_report",
+        "source": {{"node_id": "join_and_aggregate", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "generate_report", "port_id": "dataset_ref"}}
+      }}
+    }}
+  }}
+}}
+```
+
 ## python.code Runtime Contract
 - The runner only pipes LIGHTWEIGHT metadata to stdin. Always start with `import sys, json; data = json.load(sys.stdin)`.
 - Use `data.get('input')` for small scalar or JSON parameters.
@@ -317,14 +390,14 @@ The latest user request asks for an answer grounded in the attached data sources
 Return tool calls only.
 
 ## Structured Tool Payloads
-- `update_workflow`: {{ "draft_id": "...", "workflow": {{ "root": {{ ... }} }} }}
+- `update_workflow`: {{ "draft_id": "...", "planning_notes": "1) ... 2) ...", "workflow": {{ "root": {{ ... }} }} }}
 - `run_workflow`: {{ "draft_id": "..." }}
-- `create_workflow_and_run`: {{ "name": "analysis_workflow", "workflow": {{ "root": {{ ... }} }} }}
+- `create_workflow_and_run`: {{ "name": "analysis_workflow", "planning_notes": "1) ... 2) ...", "workflow": {{ "root": {{ ... }} }} }}
 
 ## Structured Run Failure Signals
 - `status`: `success` or `failed`
 - `repairable`: whether another workflow edit is worth attempting
-- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `draft_reuse_required`, `repair_limit_exceeded`
+- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `workflow_wiring_invalid`, `workflow_artifact_input_missing`, `workflow_dataset_input_missing`, `draft_reuse_required`, `repair_limit_exceeded`
 - `error_summary`: concise explanation of the failure
 - `issues`: short human-readable issue summaries
 - Raw fields such as `validation_errors` and `details` may still be present. Use `error_summary` and `issues` first, then consult the raw fields if needed.

@@ -118,3 +118,25 @@ def test_workflow_validation_rejects_missing_required_params_and_inputs() -> Non
     assert ("input.required.missing", "nodes.video.inputs.dataset_ref") in issue_codes
     assert ("param.required.missing", "nodes.kb.params.kb_ids") in issue_codes
     assert ("param.required.missing", "nodes.kb.params.query") in issue_codes
+
+
+def test_required_input_is_not_satisfied_by_same_named_param() -> None:
+    registry = build_registry()
+    graph = Graph(
+        nodes={
+            "report": Node(
+                id="report",
+                type="report.generate",
+                params={
+                    "query": "Build a concise report",
+                    "dataset_ref": {"kind": "dataset_ref", "path": "/workspace/fake.jsonl", "format": "jsonl"},
+                },
+            ),
+        },
+        edges={},
+    )
+
+    issues = validate_workflow_graph(graph, registry=registry)
+
+    issue_codes = {(issue.code, issue.location) for issue in issues}
+    assert ("input.required.missing", "nodes.report.inputs.dataset_ref") in issue_codes

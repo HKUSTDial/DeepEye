@@ -280,8 +280,6 @@ def _validate_required_inputs(
                     )
                 )
             if port.required and count == 0 and port.default is None:
-                if _param_satisfies_input(node, port_id):
-                    continue
                 issues.append(
                     ValidationIssue(
                         code="input.required.missing",
@@ -290,13 +288,6 @@ def _validate_required_inputs(
                     )
                 )
     return issues
-
-
-def _param_satisfies_input(node: Node, port_id: str) -> bool:
-    if port_id not in node.params:
-        return False
-    value = node.params.get(port_id)
-    return value not in (None, "", [], {})
 
 
 def _validate_group_nodes(
