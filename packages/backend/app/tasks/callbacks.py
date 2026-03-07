@@ -15,10 +15,8 @@ from app.infra import EventBus
 from app.repositories import MessageRepository
 from app.schemas import AgentEvent, AgentEventType, AssistantMessage, Message, ToolStep
 from app.services.workflow_events import build_workflow_event_data
-from app.services.workflow_tracking_service import upsert_workflow_draft_record
+from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft
 from deepeye.utils.logger import logger
-
-_WORKFLOW_DIR = "/workspace/workflow"
 
 
 def _to_single_object(payload: str | dict | Any) -> dict | None:
@@ -55,26 +53,6 @@ def _to_single_object(payload: str | dict | Any) -> dict | None:
             logger.warning(f"[_to_single_object] all parse methods failed for payload length: {len(payload)}, preview: {payload[:300]}")
             return None
 
-
-def _sanitize_workflow_name(name: str) -> str:
-    base = name.strip()
-    if base.lower().endswith(".json"):
-        base = base[:-5]
-    clean = "".join(ch for ch in base if ch.isalnum() or ch in ("-", "_"))
-    if not clean:
-        clean = "workflow"
-    return f"{clean}.json"
-
-
-def _normalize_workflow_path(path: str) -> str:
-    """Normalize path to always be under WORKFLOW_DIR."""
-    import os
-    if not isinstance(path, str):
-        return path
-    clean = path.strip()
-    # Extract basename to ignore agent-provided subdirectories or wrong roots
-    filename = os.path.basename(clean)
-    return f"{_WORKFLOW_DIR}/{_sanitize_workflow_name(filename)}"
 
 
 def _get_db_session() -> Session:
@@ -253,19 +231,30 @@ class AgentCallback(AsyncCallbackHandler):
             payload = _to_single_object(input_str) or {}
             if isinstance(payload.get("payload"), dict):
                 payload = payload.get("payload")
-            path_from_payload = payload.get("file_path") or payload.get("path") or payload.get("name")
-            if isinstance(path_from_payload, str) and path_from_payload:
-                self._workflow_active_file = _normalize_workflow_path(path_from_payload)
             workflow = payload.get("workflow") or payload.get("definition")
             if isinstance(workflow, dict):
                 phase = "create_workflow" if name == "create_workflow" else "update_workflow"
-                draft = upsert_workflow_draft_record(
-                    session_id=self.session_id,
-                    user_id=self.user_id,
-                    turn_id=self.turn_id,
-                    file_path=self._workflow_active_file,
-                    definition=workflow,
-                )
+                db = _get_db_session()
+                try:
+                    draft = save_workflow_draft(
+                        db,
+                        session_id=self.session_id,
+                        user_id=self.user_id,
+                        turn_id=self.turn_id,
+                        draft_id=payload.get("draft_id") if isinstance(payload.get("draft_id"), str) else None,
+                        file_path=payload.get("file_path") if isinstance(payload.get("file_path"), str) else None,
+                        name=payload.get("name") if isinstance(payload.get("name"), str) else None,
+                        definition=workflow,
+                        source="workflow_agent",
+                    )
+                finally:
+                    db.close()
+                fallback_name = None
+                if isinstance(payload.get("file_path"), str):
+                    fallback_name = payload["file_path"]
+                elif isinstance(payload.get("name"), str):
+                    fallback_name = payload["name"]
+                self._workflow_active_file = draft.file_path or normalize_workflow_path(fallback_name or "workflow.json")
                 await self._publish_workflow_event(
                     phase,
                     {"path": self._workflow_active_file, "workflow": workflow},
