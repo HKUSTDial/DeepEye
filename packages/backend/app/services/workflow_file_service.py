@@ -209,6 +209,34 @@ def prepare_tracked_workflow_draft_run(
     return tracked_turn, tracked_draft, tracked_run, path
 
 
+def _summarize_failed_context(graph: Graph, context: ExecutionContext) -> tuple[str, list[dict[str, Any]]]:
+    failed_nodes: list[dict[str, Any]] = []
+    for node_id, node_run in context.runs.items():
+        if node_run.status != "failed":
+            continue
+        node = graph.nodes.get(node_id)
+        failed_nodes.append(
+            {
+                "node_id": node_id,
+                "node_type": node.type if node else None,
+                "message": node_run.error or "Node execution failed.",
+            }
+        )
+
+    if not failed_nodes:
+        return "Workflow execution failed.", []
+
+    first = failed_nodes[0]
+    node_label = first.get("node_id") or "unknown"
+    node_type = first.get("node_type")
+    message = first.get("message") or "Node execution failed."
+    if node_type:
+        summary = f"Workflow execution failed at node {node_label} ({node_type}): {message}"
+    else:
+        summary = f"Workflow execution failed at node {node_label}: {message}"
+    return summary, failed_nodes
+
+
 async def service_run_workflow_definition(
     db,
     user_id,
@@ -340,6 +368,41 @@ async def service_run_workflow_definition(
         if isinstance(result_holder[0], Exception):
             raise result_holder[0]
         context = result_holder[0]
+        if context.status != "success":
+            error, details = _summarize_failed_context(graph, context)
+            if tracked_run:
+                finalize_tracked_workflow_run(
+                    db,
+                    tracked_run,
+                    status="failed",
+                    result={"status": "failed", "details": details, "outputs": {}},
+                    error=error,
+                    artifacts=[],
+                )
+            await _publish_workflow_event(
+                "error",
+                {
+                    "message": error,
+                    "details": details,
+                },
+            )
+            await _publish_workflow_event(
+                "run_end",
+                {
+                    "status": "failed",
+                    "error": error,
+                    "details": details,
+                    "finished_at": _timestamp(),
+                },
+            )
+            return {
+                "status": "failed",
+                "error": error,
+                "details": details,
+                "turn_id": str(tracked_turn.id) if tracked_turn else turn_id,
+                "draft_id": str(tracked_draft.id) if tracked_draft else None,
+                "run_id": str(tracked_run.id) if tracked_run else None,
+            }
         outputs = _collect_final_outputs(graph, context)
         artifacts = extract_workflow_artifacts(outputs)
         compact_outputs = compact_workflow_outputs(outputs)

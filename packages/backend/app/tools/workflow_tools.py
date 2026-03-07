@@ -236,6 +236,21 @@ def _normalize_workflow_run_result(run_result: dict[str, Any], *, draft_id: str 
             ),
             "artifacts": artifacts,
         }
+    if isinstance(details, list) and details and all(
+        isinstance(item, dict) and "node_id" in item and "message" in item for item in details
+    ):
+        return {
+            **_build_tool_failure(
+                draft_id=draft_id,
+                run_id=run_id,
+                error_type="workflow_execution_failed",
+                error_summary=(error or "Workflow execution failed."),
+                repairable=False,
+                details=details,
+                error=error,
+            ),
+            "artifacts": artifacts,
+        }
     if isinstance(details, list) and details:
         return {
             **_build_tool_failure(

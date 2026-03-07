@@ -12,10 +12,13 @@ from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, User
 from app.services.workflow_file_service import (
+    _summarize_failed_context,
     prepare_tracked_workflow_draft_run,
     prepare_tracked_workflow_file_run,
 )
 from app.services.workflow_tracking_service import create_chat_turn
+from deepeye.workflows.models import Graph, Node
+from deepeye.workflows.runtime import ExecutionContext, NodeRun
 
 
 def _build_test_db():
@@ -129,3 +132,32 @@ def test_prepare_tracked_workflow_draft_run_reuses_existing_draft():
         assert path == tracked_draft.file_path
     finally:
         db.close()
+
+
+def test_summarize_failed_context_reports_failed_node_details():
+    graph = Graph(
+        nodes={
+            "read_file": Node(id="read_file", type="datasource.read"),
+            "join_data": Node(id="join_data", type="python.code"),
+        },
+        edges={},
+    )
+    context = ExecutionContext(
+        workflow_id="wf-1",
+        status="failed",
+        runs={
+            "read_file": NodeRun(node_id="read_file", status="success"),
+            "join_data": NodeRun(node_id="join_data", status="failed", error="KeyError: city"),
+        },
+    )
+
+    error, details = _summarize_failed_context(graph, context)
+
+    assert error == "Workflow execution failed at node join_data (python.code): KeyError: city"
+    assert details == [
+        {
+            "node_id": "join_data",
+            "node_type": "python.code",
+            "message": "KeyError: city",
+        }
+    ]

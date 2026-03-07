@@ -288,6 +288,28 @@ def test_normalize_workflow_run_result_marks_repairable_definition_failures() ->
     assert len(normalized["issues"]) == 2
 
 
+def test_normalize_workflow_run_result_keeps_runtime_failures_nonrepairable() -> None:
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "error": "Workflow execution failed at node join_data (python.code): KeyError: city",
+            "details": [
+                {
+                    "node_id": "join_data",
+                    "node_type": "python.code",
+                    "message": "KeyError: city",
+                }
+            ],
+        },
+        draft_id="draft-1",
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is False
+    assert normalized["error_type"] == "workflow_execution_failed"
+    assert normalized["issues"] == ["KeyError: city"]
+
+
 def test_repair_state_requires_reusing_existing_draft_after_failure() -> None:
     state = _new_repair_state()
     state["repair_failures"] = 1
