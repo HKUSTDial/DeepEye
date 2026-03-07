@@ -12,12 +12,13 @@ from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, User
 from app.repositories import MessageRepository
-from app.schemas import UserMessage
+from app.schemas import AssistantMessage, UserMessage
 from app.services.workflow_tracking_service import (
     build_workspace_state,
     build_workspace_state_for_turn,
     create_chat_turn,
     create_tracked_workflow_run,
+    fail_chat_turn_record,
     finalize_tracked_workflow_run,
     replace_workflow_artifacts,
     upsert_workflow_draft,
@@ -136,6 +137,27 @@ def test_message_append_keeps_primary_key_accessible_after_session_close():
         db.close()
 
     assert message_id is not None
+
+
+def test_fail_chat_turn_record_persists_assistant_message_id(monkeypatch) -> None:
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="trace@example.com")
+        session = _create_session(db, user)
+        turn = create_chat_turn(db, session.id, user.id, "Analyze revenue")
+        assistant_message = MessageRepository(db).append(
+            str(session.id),
+            AssistantMessage(content="Workflow planning failed."),
+        )
+        assistant_message_id = assistant_message.id
+        monkeypatch.setattr("app.services.workflow_tracking_service.SessionLocal", lambda: db)
+        failed = fail_chat_turn_record(turn.id, "workflow failed", assistant_message_id=assistant_message_id)
+
+        assert failed is not None
+        assert failed.status == "failed"
+        assert failed.assistant_message_id == assistant_message_id
+    finally:
+        db.close()
 
 
 def test_workspace_state_falls_back_to_latest_session_run_without_turn():

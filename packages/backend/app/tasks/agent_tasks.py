@@ -36,6 +36,13 @@ from deepeye.utils.logger import logger
 _SCHEMA_PREVIEW_ROWS = 3
 
 
+def _build_failure_message(error: Exception) -> str:
+    message = str(error)
+    if "GraphRecursionError" in message or "Recursion limit" in message:
+        return "工作流规划未收敛，系统已停止自动重试。"
+    return "工作流规划或执行失败。"
+
+
 def _get_datasources_info(datasource_ids: list[str] | None, user_id: uuid.UUID | None = None) -> list[dict[str, str]]:
     if not datasource_ids:
         return []
@@ -349,7 +356,15 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         except Exception as e:
             tb = traceback.format_exc()
             logger.error(f"[AgentTask] Error: {tb}")
-            fail_chat_turn_record(turn_id, str(e))
+            assistant_record = None
+            if collector.has_activity():
+                partial_message = collector.build(fallback_content=_build_failure_message(e))
+                assistant_record = persist_message(session_id, partial_message)
+            fail_chat_turn_record(
+                turn_id,
+                str(e),
+                assistant_message_id=assistant_record.id if assistant_record else None,
+            )
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.ERROR, content=str(e), data={"traceback": tb}))
         finally:
             await event_bus.close()

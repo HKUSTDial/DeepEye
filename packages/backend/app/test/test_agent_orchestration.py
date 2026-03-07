@@ -12,7 +12,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.services.agent_prompts import build_supervisor_prompt
-from app.tasks.callbacks import MessageCollector
+from app.tasks.callbacks import MessageCollector, _workflow_tool_trace_summary
 from app.tools.workflow_tools import _extract_final_answer, create_design_workflow_tool
 from deepeye.agents.factory import AgentFactory
 from deepeye.tools.base import tool
@@ -159,6 +159,46 @@ def test_message_collector_prefers_summary_tool_output() -> None:
     message = collector.build()
 
     assert message.content == "Final concise answer."
+
+
+def test_message_collector_uses_fallback_content_on_failure() -> None:
+    collector = MessageCollector()
+    collector.start_tool("supervisor", "workflow_agent", "{}")
+    collector.fail_tool("supervisor", "Recursion limit hit.")
+
+    message = collector.build(fallback_content="工作流规划未收敛，系统已停止自动重试。")
+
+    assert message.content == "工作流规划未收敛，系统已停止自动重试。"
+    assert message.steps[0].status == "error"
+    assert message.steps[0].output == "Recursion limit hit."
+
+
+def test_workflow_tool_trace_summary_compacts_run_metadata() -> None:
+    summary = _workflow_tool_trace_summary(
+        stage="end",
+        source="workflow_agent",
+        tool_name="create_workflow_and_run",
+        session_id="session-1",
+        turn_id="turn-1",
+        payload={
+            "status": "success",
+            "draft_id": "draft-1",
+            "run": {
+                "status": "failed",
+                "run_id": "run-1",
+                "validation_errors": [{"code": "missing_param"}],
+                "details": [{"loc": ["root", "nodes", 0]}],
+                "artifacts": [{"kind": "report"}],
+            },
+        },
+    )
+
+    assert summary["status"] == "failed"
+    assert summary["draft_id"] == "draft-1"
+    assert summary["run_id"] == "run-1"
+    assert summary["validation_error_count"] == 1
+    assert summary["details_count"] == 1
+    assert summary["artifact_kinds"] == ["report"]
 
 
 def test_extract_final_answer_prefers_workflow_answer_output() -> None:

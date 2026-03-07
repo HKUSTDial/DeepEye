@@ -4,7 +4,7 @@ import ast
 import asyncio
 import json
 import json5
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.callbacks import AsyncCallbackHandler
 from sqlalchemy import create_engine
@@ -17,6 +17,15 @@ from app.schemas import AgentEvent, AgentEventType, AssistantMessage, Message, T
 from app.services.workflow_events import build_workflow_event_data
 from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft
 from deepeye.utils.logger import logger
+
+_WORKFLOW_TRACE_TOOL_NAMES = {
+    "create_workflow",
+    "create_workflow_and_run",
+    "read_workflow",
+    "update_workflow",
+    "run_workflow",
+    "workflow_agent",
+}
 
 
 def _to_single_object(payload: str | dict | Any) -> dict | None:
@@ -52,6 +61,106 @@ def _to_single_object(payload: str | dict | Any) -> dict | None:
                 pass
             logger.warning(f"[_to_single_object] all parse methods failed for payload length: {len(payload)}, preview: {payload[:300]}")
             return None
+
+
+def _extract_workflow_definition(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    workflow = payload.get("workflow") or payload.get("definition")
+    return workflow if isinstance(workflow, dict) else None
+
+
+def _extract_node_types(workflow: dict[str, Any] | None) -> list[str]:
+    if not isinstance(workflow, dict):
+        return []
+    root = workflow.get("root") if isinstance(workflow.get("root"), dict) else workflow
+    if not isinstance(root, dict):
+        return []
+    nodes = root.get("nodes") or []
+    if isinstance(nodes, dict):
+        iterable = nodes.values()
+    elif isinstance(nodes, list):
+        iterable = nodes
+    else:
+        return []
+    node_types: list[str] = []
+    for node in iterable:
+        if not isinstance(node, dict):
+            continue
+        node_type = node.get("type")
+        if isinstance(node_type, str) and node_type:
+            node_types.append(node_type)
+    return node_types
+
+
+def _truncate_for_log(value: str | None, *, limit: int = 240) -> str | None:
+    if value is None or len(value) <= limit:
+        return value
+    return f"{value[:limit]}..."
+
+
+def _workflow_tool_trace_summary(
+    *,
+    stage: str,
+    source: str,
+    tool_name: str,
+    session_id: str,
+    turn_id: str | None,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "stage": stage,
+        "source": source,
+        "tool": tool_name,
+        "session_id": session_id,
+        "turn_id": turn_id,
+    }
+    if not isinstance(payload, dict):
+        return summary
+
+    if stage == "start":
+        workflow = _extract_workflow_definition(payload)
+        summary.update(
+            {
+                "draft_id": payload.get("draft_id"),
+                "name": payload.get("name"),
+                "file_path": payload.get("file_path"),
+                "node_types": _extract_node_types(workflow),
+            }
+        )
+        return summary
+
+    run_payload = payload.get("run") if isinstance(payload.get("run"), dict) else payload
+    workflow = _extract_workflow_definition(payload)
+    validation_errors = run_payload.get("validation_errors")
+    details = run_payload.get("details")
+    artifacts = run_payload.get("artifacts")
+    summary.update(
+        {
+            "status": run_payload.get("status"),
+            "draft_id": payload.get("draft_id") or run_payload.get("draft_id"),
+            "run_id": run_payload.get("run_id"),
+            "error": _truncate_for_log(run_payload.get("error")),
+            "validation_error_count": len(validation_errors) if isinstance(validation_errors, list) else 0,
+            "details_count": len(details) if isinstance(details, list) else 0,
+            "artifact_kinds": [
+                artifact.get("kind")
+                for artifact in artifacts
+                if isinstance(artifact, dict) and isinstance(artifact.get("kind"), str)
+            ] if isinstance(artifacts, list) else [],
+            "node_types": _extract_node_types(workflow),
+            "final_answer_present": isinstance(payload.get("final_answer"), str) and bool(payload.get("final_answer")),
+        }
+    )
+    return summary
+
+
+def _log_workflow_tool_trace(summary: dict[str, Any]) -> None:
+    message = json.dumps(summary, ensure_ascii=False, sort_keys=True)
+    if summary.get("status") in {"failed", "error"} or summary.get("validation_error_count", 0) or summary.get("details_count", 0):
+        logger.warning("[workflow_tool_trace] %s", message)
+    else:
+        logger.info("[workflow_tool_trace] %s", message)
 
 
 
@@ -110,11 +219,19 @@ class MessageCollector:
 
     def end_tool(self, source: str, output: str) -> None:
         """End a tool call with output."""
+        self._finish_tool(source, output, status="completed")
+
+    def fail_tool(self, source: str, output: str) -> None:
+        """Mark a tool call as failed."""
+        self._finish_tool(source, output, status="error")
+
+    def _finish_tool(self, source: str, output: str, *, status: Literal["completed", "error"]) -> None:
+        """Finalize a pending tool call."""
         pending = self._pending_tool.get(source)
         if pending:
             tool = pending.pop(0)
             tool.output = output
-            tool.status = "completed"
+            tool.status = status
             if not pending:
                 self._pending_tool.pop(source, None)
             # Pop from stack if it's the current one
@@ -127,7 +244,10 @@ class MessageCollector:
                 return step.output.strip()
         return None
 
-    def build(self) -> AssistantMessage:
+    def has_activity(self) -> bool:
+        return bool(self._content or self._steps or self._pending_tool)
+
+    def build(self, fallback_content: str | None = None) -> AssistantMessage:
         """Build the final AssistantMessage."""
         # Mark any remaining tools as completed
         for tool_list in self._pending_tool.values():
@@ -136,7 +256,7 @@ class MessageCollector:
         # For workflow tasks, the summary tool output is the final user-facing answer.
         # Prefer it over the supervisor's free-form completion to avoid duplicated or
         # rephrased endings after summarize_workflow_result has already produced the answer.
-        final_content = self._find_top_level_tool_output("summarize_workflow_result") or self._content
+        final_content = self._find_top_level_tool_output("summarize_workflow_result") or self._content or (fallback_content or "")
         return AssistantMessage(content=final_content, steps=self._steps)
 
     def reset(self) -> None:
@@ -239,13 +359,24 @@ class AgentCallback(AsyncCallbackHandler):
         # input_str can be dict or str depending on LangChain version/tool
         input_for_publish = str(input_str) if not isinstance(input_str, str) else input_str
         await self._publish(AgentEvent(type=AgentEventType.TOOL_START, data={"name": name, "input": input_for_publish}))
-        if self.source == "workflow_agent" and name in ("create_workflow", "update_workflow"):
-            payload = _to_single_object(input_str) or {}
+        payload = _to_single_object(input_str) or {}
+        if self.source == "workflow_agent" and name in _WORKFLOW_TRACE_TOOL_NAMES:
+            _log_workflow_tool_trace(
+                _workflow_tool_trace_summary(
+                    stage="start",
+                    source=self.source,
+                    tool_name=name,
+                    session_id=self.session_id,
+                    turn_id=self.turn_id,
+                    payload=payload,
+                )
+            )
+        if self.source == "workflow_agent" and name in ("create_workflow", "create_workflow_and_run", "update_workflow"):
             if isinstance(payload.get("payload"), dict):
                 payload = payload.get("payload")
-            workflow = payload.get("workflow") or payload.get("definition")
+            workflow = _extract_workflow_definition(payload)
             if isinstance(workflow, dict):
-                phase = "create_workflow" if name == "create_workflow" else "update_workflow"
+                phase = "update_workflow" if name == "update_workflow" else "create_workflow"
                 db = _get_db_session()
                 try:
                     draft = save_workflow_draft(
@@ -280,11 +411,45 @@ class AgentCallback(AsyncCallbackHandler):
             return
         out_str = output.content if hasattr(output, "content") else str(output)
         tool_name = self._tool_stack.pop() if self._tool_stack else ""
+        if self.source == "workflow_agent" and tool_name in _WORKFLOW_TRACE_TOOL_NAMES:
+            _log_workflow_tool_trace(
+                _workflow_tool_trace_summary(
+                    stage="end",
+                    source=self.source,
+                    tool_name=tool_name,
+                    session_id=self.session_id,
+                    turn_id=self.turn_id,
+                    payload=_to_single_object(out_str),
+                )
+            )
         await self._publish(
             AgentEvent(type=AgentEventType.TOOL_END, data={"name": tool_name, "output": out_str})
         )
         if self.collector:
             self.collector.end_tool(self.source, out_str)
+
+    async def on_tool_error(self, error: BaseException, **kwargs: Any) -> None:
+        if self._should_ignore(kwargs):
+            return
+        tool_name = self._tool_stack.pop() if self._tool_stack else ""
+        error_message = str(error)
+        if self.source == "workflow_agent" and tool_name in _WORKFLOW_TRACE_TOOL_NAMES:
+            _log_workflow_tool_trace(
+                {
+                    "stage": "error",
+                    "source": self.source,
+                    "tool": tool_name,
+                    "session_id": self.session_id,
+                    "turn_id": self.turn_id,
+                    "status": "error",
+                    "error": _truncate_for_log(error_message),
+                }
+            )
+        await self._publish(
+            AgentEvent(type=AgentEventType.TOOL_ERROR, data={"name": tool_name, "error": error_message})
+        )
+        if self.collector:
+            self.collector.fail_tool(self.source, error_message)
 
 
 

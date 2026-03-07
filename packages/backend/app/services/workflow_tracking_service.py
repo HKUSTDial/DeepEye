@@ -148,13 +148,25 @@ def complete_chat_turn_record(turn_id: str | uuid.UUID | None, *, assistant_mess
         db.close()
 
 
-def fail_chat_turn_record(turn_id: str | uuid.UUID | None, error: str) -> ChatTurn | None:
+def fail_chat_turn_record(
+    turn_id: str | uuid.UUID | None,
+    error: str,
+    *,
+    assistant_message_id: int | None = None,
+) -> ChatTurn | None:
     db = SessionLocal()
     try:
         turn = get_chat_turn(db, turn_id)
         if not turn:
             return None
-        return update_chat_turn(db, turn, status="failed", error=error, finished=True)
+        return update_chat_turn(
+            db,
+            turn,
+            status="failed",
+            assistant_message_id=assistant_message_id,
+            error=error,
+            finished=True,
+        )
     finally:
         db.close()
 
