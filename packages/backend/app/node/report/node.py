@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -36,117 +34,16 @@ class ReportGenerateHandler:
         self.sandbox = sandbox
         self.session_id = session_id
 
-    @staticmethod
-    def _safe_csv_name(raw_name: str, fallback: str) -> str:
-        clean = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "_" for ch in raw_name)
-        clean = clean.strip("._")
-        if not clean:
-            clean = fallback
-        if not clean.lower().endswith(".csv"):
-            clean = f"{clean}.csv"
-        return clean
-
-    @staticmethod
-    def _normalize_file_paths(file_paths: Any) -> list[str]:
-        if isinstance(file_paths, str):
-            try:
-                parsed = json.loads(file_paths)
-                if isinstance(parsed, list):
-                    file_paths = parsed
-                else:
-                    file_paths = [p.strip() for p in file_paths.split(",") if p.strip()]
-            except json.JSONDecodeError:
-                file_paths = [p.strip() for p in file_paths.split(",") if p.strip()]
-
-        if not isinstance(file_paths, list):
-            return []
-
-        normalized: list[str] = []
-        for item in file_paths:
-            value = str(item).strip()
-            if value:
-                normalized.append(value)
-        return normalized
-
-    def _resolve_sandbox_paths(self, file_paths: list[str]) -> list[str]:
-        resolved_paths = []
-        for path in file_paths:
-            if not path.startswith("/workspace"):
-                path = f"/workspace/data/{path}"
-            resolved_paths.append(path)
-        return resolved_paths
-
-    def _download_files_from_sandbox(
-        self,
-        file_paths: list[str],
-        session_id: str | None = None,
-        tmp_dir: str | None = None,
-    ) -> tuple[list[str], str]:
-        if not self.sandbox or not getattr(self.sandbox, "container", None):
-            raise RuntimeError("Sandbox not available for report generation")
-
-        tmp_dir = tmp_dir or create_report_temp_dir(session_id or self.session_id, prefix="deepeye_report_")
-        local_paths: list[str] = []
-
-        for idx, sandbox_path in enumerate(file_paths):
-            exit_code, output = self.sandbox.container.exec_run(
-                cmd=["cat", sandbox_path],
-                demux=True,
-                workdir="/workspace",
-            )
-            if exit_code != 0:
-                stderr = output[1].decode("utf-8") if output and output[1] else ""
-                raise RuntimeError(f"Failed to read file {sandbox_path}: {stderr}")
-
-            content = output[0] if output and output[0] else b""
-            source_name = Path(sandbox_path).name or f"input_{idx}.csv"
-            filename = self._safe_csv_name(source_name, f"input_{idx}.csv")
-            local_path = os.path.join(tmp_dir, f"{idx:02d}_{filename}")
-            with open(local_path, "wb") as f:
-                f.write(content)
-            local_paths.append(local_path)
-            logger.info("Downloaded %s to %s", sandbox_path, local_path)
-
-        return local_paths, tmp_dir
-
-    def _write_input_data_to_csv(self, input_data: Any, tmp_dir: str) -> list[str]:
-        import pandas as pd
-
-        csv_paths: list[str] = []
-        if isinstance(input_data, list):
-            df = pd.DataFrame(input_data)
-            temp_csv = os.path.join(tmp_dir, "input_data.csv")
-            df.to_csv(temp_csv, index=False)
-            csv_paths.append(temp_csv)
-            return csv_paths
-
-        if isinstance(input_data, dict):
-            for name, data in input_data.items():
-                if not isinstance(data, list):
-                    continue
-                df = pd.DataFrame(data)
-                safe_name = self._safe_csv_name(str(name), "table")
-                temp_csv = os.path.join(tmp_dir, safe_name)
-                df.to_csv(temp_csv, index=False)
-                csv_paths.append(temp_csv)
-
-        return csv_paths
-
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
-        user_query = (
-            node.params.get("query")
-            or node.params.get("user_query")
-        )
+        user_query = node.params.get("query")
         if not user_query:
             raise ValueError("query is required")
-        template_name = node.params.get("template") or node.params.get("template_name") or "template_1.html"
-        output_filename = node.params.get("output_path") or node.params.get("output_filename") or "analysis_report.html"
-
-        file_paths = self._normalize_file_paths(node.params.get("file_paths") or [])
+        template_name = "template_1.html"
+        output_filename = "analysis_report.html"
         dataset_input = inputs.get("dataset_ref")
         dataset_refs = dataset_input if isinstance(dataset_input, list) else [dataset_input] if dataset_input else []
         dataset_refs = [ref for ref in dataset_refs if is_dataset_ref(ref)]
-        if not file_paths and not dataset_refs:
+        if not dataset_refs:
             raise ValueError("dataset_ref input is required")
 
         session_id = self.session_id or f"workflow_{self.user_id}"
@@ -154,10 +51,6 @@ class ReportGenerateHandler:
         try:
             tmp_dir = create_report_temp_dir(session_id, prefix="deepeye_report_")
             local_paths: list[str] = []
-            if file_paths:
-                sandbox_paths = self._resolve_sandbox_paths(file_paths)
-                copied_file_paths, _ = self._download_files_from_sandbox(sandbox_paths, session_id=session_id, tmp_dir=tmp_dir)
-                local_paths.extend(copied_file_paths)
             for idx, dataset_ref in enumerate(dataset_refs):
                 local_paths.append(
                     download_dataset_ref_to_local_csv(
@@ -165,18 +58,16 @@ class ReportGenerateHandler:
                         sandbox=self.sandbox,
                         tmp_dir=tmp_dir,
                         name_hint=f"input_{idx}",
-                    )
                 )
-            file_paths = local_paths
-
-            if not file_paths:
+            )
+            if not local_paths:
                 raise RuntimeError("No valid CSV data found for report generation.")
 
-            logger.info("Starting report generation with query=%s, files=%s", user_query, file_paths)
+            logger.info("Starting report generation with query=%s, files=%s", user_query, local_paths)
             report_html, error = run_report_pipeline(
                 session_id=session_id,
                 user_query=user_query,
-                csv_paths=file_paths,
+                csv_paths=local_paths,
                 template_name=str(template_name),
                 output_filename=str(output_filename),
             )

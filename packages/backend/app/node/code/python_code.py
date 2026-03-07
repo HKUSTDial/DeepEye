@@ -25,31 +25,10 @@ class PythonCodeHandler:
             raise RuntimeError("Sandbox not available for python.code node")
         return self.sandbox
 
-    def _resolve_code(self, node: Node, inputs: dict[str, Any], container) -> str:
-        code = inputs.get("code") or node.params.get("code")
-        code_b64 = node.params.get("code_b64")
-        code_path = node.params.get("code_path")
-
-        if code_path:
-            exit_code, output = container.exec_run(
-                cmd=["bash", "-c", f"cat {code_path}"],
-                demux=True,
-                workdir="/workspace",
-            )
-            stdout = output[0].decode("utf-8") if output[0] else ""
-            stderr = output[1].decode("utf-8") if output[1] else ""
-            if exit_code != 0:
-                raise RuntimeError(stderr or stdout or f"Failed to read code_path: {code_path}")
-            code = stdout
-
-        if not code and code_b64:
-            try:
-                code = base64.b64decode(code_b64).decode("utf-8")
-            except Exception as exc:
-                raise ValueError("Invalid code_b64; must be base64-encoded UTF-8 string") from exc
-
+    def _resolve_code(self, node: Node) -> str:
+        code = node.params.get("code")
         if not code:
-            raise ValueError("code is required (provide code, code_path, or code_b64)")
+            raise ValueError("code is required")
         return str(code)
 
     def _normalize_dataset_refs(self, value: Any) -> list[dict[str, Any]]:
@@ -75,8 +54,7 @@ class PythonCodeHandler:
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         sandbox = self._ensure_sandbox()
         container = sandbox.container
-        code = self._resolve_code(node, inputs, container)
-        workdir = node.params.get("workdir") or "/workspace"
+        code = self._resolve_code(node)
 
         safe_id = "".join(ch if str(ch).isalnum() or ch in ("-", "_") else "_" for ch in str(node.id)) or "script"
         script_path = f"/workspace/.workflow_scripts/{safe_id}.py"
@@ -116,7 +94,7 @@ class PythonCodeHandler:
                 raise RuntimeError(write_in_stderr or write_in_stdout or "failed to write python input")
             input_redirect = f" < {input_file}"
 
-        run_cmd = ["bash", "-c", f"cd {workdir} && python {script_path}{input_redirect}"]
+        run_cmd = ["bash", "-c", f"cd /workspace && python {script_path}{input_redirect}"]
         exit_code, output = container.exec_run(
             cmd=run_cmd,
             demux=True,

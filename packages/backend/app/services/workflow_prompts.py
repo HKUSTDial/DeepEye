@@ -183,7 +183,7 @@ python.code runtime contract:
 - Use `data.get('input')` for small scalar or JSON parameters.
 - For tabular data, use `data.get('dataset_ref', [])` and open each referenced sandbox path instead of expecting full rows in stdin.
 - Never bypass source nodes by hardcoding attached datasource paths or database connections inside python.code. python.code should consume upstream `dataset_ref` inputs, not raw attached datasources.
-- Prefer `params.code_path`; `code_b64` is allowed but should be avoided unless necessary; short snippets can use `params.code`.
+- Put the Python source directly in `params.code`.
 - For small outputs, return normal Python objects. For large tabular outputs, write a dataset file in the sandbox and print a `dataset_ref` JSON object instead.
 - For multi-line text, use triple quotes or explicit `\\n`. Never emit malformed Python strings.
 
