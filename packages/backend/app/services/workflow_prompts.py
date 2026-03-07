@@ -129,7 +129,7 @@ Rules (strict, structured JSON only):
 0) Follow the CRITICAL order above. For data video: create_plan then create_workflow_and_run then reply. Use update_plan if the plan changes.
 0a) Do not reply until create_workflow_and_run has been called and returned. Never say "我已开始" or "我已完成" without having called create_workflow_and_run.
 1) Use only node types and port ids from the specifications. Do NOT invent ports or node types.
-2) Include every required input/output exactly as the spec defines (e.g., sql.execute.rows). If the spec defines an output, include it even if only one port is used.
+2) The registry spec is authoritative. `inputs` / `outputs` blocks are optional in workflow JSON. If you include them, they MUST match the registered spec exactly and must not invent extra ports.
 3) Port multiplicity: only ports with `multiple=true` may have more than one incoming edge; all other inputs must have at most one incoming edge.
 4) Keep the workflow minimal and logical. PREFER specialized nodes over python.code when available:
    - For reading data from datasources: Use `datasource.read` node (outputs `rows: list[dict]`) instead of python.code

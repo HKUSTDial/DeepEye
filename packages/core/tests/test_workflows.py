@@ -64,3 +64,38 @@ def test_multiple_edge_violation_detected() -> None:
     workflow = Workflow(id="wf_invalid", root=graph)
     issues = validate_workflow_graph(workflow.root)
     assert any(issue.code == "input.multiple.violation" for issue in issues)
+
+
+def test_registry_ports_are_authoritative_when_graph_omits_port_blocks() -> None:
+    registry = build_registry()
+    graph = Graph(
+        nodes={
+            "n1": Node(id="n1", type="source", params={"text": "Hello"}),
+            "n2": Node(id="n2", type="transform"),
+        },
+        edges={
+            "e1": Edge(
+                id="e1",
+                source=EdgeEndpoint(node_id="n1", port_id="text"),
+                target=EdgeEndpoint(node_id="n2", port_id="text"),
+            )
+        },
+    )
+
+    issues = validate_workflow_graph(graph, registry=registry, schema_check=_schema_check)
+
+    assert issues == []
+
+
+def test_declared_port_schema_mismatch_is_detected_against_spec() -> None:
+    registry = build_registry()
+    graph = Graph(
+        nodes={
+            "n1": Node(id="n1", type="source", outputs={"text": Port(schema="int")}),
+        },
+        edges={},
+    )
+
+    issues = validate_workflow_graph(graph, registry=registry, schema_check=_schema_check)
+
+    assert any(issue.code == "node.output.schema.mismatch" for issue in issues)

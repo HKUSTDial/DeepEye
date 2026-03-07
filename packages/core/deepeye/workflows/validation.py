@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from deepeye.workflows.models import Edge, Graph, Node
-from deepeye.workflows.registry import NodeRegistry
+from deepeye.workflows.models import Edge, Graph, Node, Port
+from deepeye.workflows.registry import NodeRegistry, NodeSpec
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,34 @@ class WorkflowValidationError(ValueError):
 
 
 SchemaCheck = Callable[[Any, Any], bool]
+_DYNAMIC_PORT_NODE_TYPES = {"group", "group_inputs", "group_outputs"}
+
+
+def _port_schema(port: Port | None) -> Any:
+    return getattr(port, "schema_", None) if port else None
+
+
+def _field_was_explicitly_set(port: Port, *field_names: str) -> bool:
+    fields_set = getattr(port, "model_fields_set", set())
+    return any(field_name in fields_set for field_name in field_names)
+
+
+def _spec_for_node(node: Node, registry: NodeRegistry | None) -> NodeSpec | None:
+    return registry.get(node.type) if registry else None
+
+
+def _node_inputs(node: Node, registry: NodeRegistry | None) -> dict[str, Port]:
+    spec = _spec_for_node(node, registry)
+    if spec and node.type in _DYNAMIC_PORT_NODE_TYPES:
+        return node.inputs
+    return spec.inputs if spec else node.inputs
+
+
+def _node_outputs(node: Node, registry: NodeRegistry | None) -> dict[str, Port]:
+    spec = _spec_for_node(node, registry)
+    if spec and node.type in _DYNAMIC_PORT_NODE_TYPES:
+        return node.outputs
+    return spec.outputs if spec else node.outputs
 
 
 def validate_workflow_graph(
@@ -38,7 +66,7 @@ def validate_workflow_graph(
         return f"{location_prefix}{path}" if location_prefix else path
 
     issues.extend(_validate_nodes(graph, registry, _loc))
-    issues.extend(_validate_edges(graph, schema_check, _loc))
+    issues.extend(_validate_edges(graph, registry, schema_check, _loc))
     issues.extend(_validate_required_inputs(graph, registry, _loc))
     issues.extend(_validate_group_nodes(graph, registry, schema_check, _loc))
     issues.extend(_validate_dag(graph, _loc))
@@ -56,7 +84,8 @@ def _validate_nodes(
         return issues
 
     for node in graph.nodes.values():
-        if not registry.get(node.type):
+        spec = registry.get(node.type)
+        if not spec:
             issues.append(
                 ValidationIssue(
                     code="node.type.unknown",
@@ -64,11 +93,79 @@ def _validate_nodes(
                     location=loc(f"nodes.{node.id}.type"),
                 )
             )
+            continue
+
+        issues.extend(_validate_declared_ports_against_spec(node, spec, loc))
+    return issues
+
+
+def _validate_declared_ports_against_spec(
+    node: Node,
+    spec: NodeSpec,
+    loc: Callable[[str], str],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    if node.type in _DYNAMIC_PORT_NODE_TYPES:
+        return issues
+    issues.extend(_validate_port_set(node, spec, "inputs", loc))
+    issues.extend(_validate_port_set(node, spec, "outputs", loc))
+    return issues
+
+
+def _validate_port_set(
+    node: Node,
+    spec: NodeSpec,
+    field_name: str,
+    loc: Callable[[str], str],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    declared_ports = getattr(node, field_name)
+    spec_ports = getattr(spec, field_name)
+    port_kind = field_name[:-1]
+
+    for port_id, port in declared_ports.items():
+        spec_port = spec_ports.get(port_id)
+        if not spec_port:
+            issues.append(
+                ValidationIssue(
+                    code=f"node.{port_kind}.unknown",
+                    message=f"{port_kind.capitalize()} port not defined by spec: {node.id}.{port_id}",
+                    location=loc(f"nodes.{node.id}.{field_name}.{port_id}"),
+                )
+            )
+            continue
+
+        if _field_was_explicitly_set(port, "schema", "schema_") and _port_schema(port) != _port_schema(spec_port):
+            issues.append(
+                ValidationIssue(
+                    code=f"node.{port_kind}.schema.mismatch",
+                    message=f"{port_kind.capitalize()} schema mismatch for {node.id}.{port_id}",
+                    location=loc(f"nodes.{node.id}.{field_name}.{port_id}.schema"),
+                )
+            )
+        if _field_was_explicitly_set(port, "required") and port.required != spec_port.required:
+            issues.append(
+                ValidationIssue(
+                    code=f"node.{port_kind}.required.mismatch",
+                    message=f"{port_kind.capitalize()} required flag mismatch for {node.id}.{port_id}",
+                    location=loc(f"nodes.{node.id}.{field_name}.{port_id}.required"),
+                )
+            )
+        if _field_was_explicitly_set(port, "multiple") and port.multiple != spec_port.multiple:
+            issues.append(
+                ValidationIssue(
+                    code=f"node.{port_kind}.multiple.mismatch",
+                    message=f"{port_kind.capitalize()} multiplicity mismatch for {node.id}.{port_id}",
+                    location=loc(f"nodes.{node.id}.{field_name}.{port_id}.multiple"),
+                )
+            )
+
     return issues
 
 
 def _validate_edges(
     graph: Graph,
+    registry: NodeRegistry | None,
     schema_check: SchemaCheck | None,
     loc: Callable[[str], str],
 ) -> list[ValidationIssue]:
@@ -94,7 +191,9 @@ def _validate_edges(
                 )
             )
             continue
-        if edge.source.port_id not in source_node.outputs:
+        source_ports = _node_outputs(source_node, registry)
+        target_ports = _node_inputs(target_node, registry)
+        if edge.source.port_id not in source_ports:
             issues.append(
                 ValidationIssue(
                     code="edge.source.port.missing",
@@ -102,7 +201,7 @@ def _validate_edges(
                     location=loc(f"edges.{edge.id}.source.port_id"),
                 )
             )
-        if edge.target.port_id not in target_node.inputs:
+        if edge.target.port_id not in target_ports:
             issues.append(
                 ValidationIssue(
                     code="edge.target.port.missing",
@@ -110,10 +209,10 @@ def _validate_edges(
                     location=loc(f"edges.{edge.id}.target.port_id"),
                 )
             )
-        if schema_check and edge.target.port_id in target_node.inputs:
-            src_port = source_node.outputs.get(edge.source.port_id)
-            tgt_port = target_node.inputs.get(edge.target.port_id)
-            if src_port and tgt_port and not schema_check(src_port.schema, tgt_port.schema):
+        if schema_check and edge.target.port_id in target_ports:
+            src_port = source_ports.get(edge.source.port_id)
+            tgt_port = target_ports.get(edge.target.port_id)
+            if src_port and tgt_port and not schema_check(_port_schema(src_port), _port_schema(tgt_port)):
                 issues.append(
                     ValidationIssue(
                         code="edge.schema.incompatible",
@@ -140,7 +239,8 @@ def _validate_required_inputs(
 
     for node in graph.nodes.values():
         spec = registry.get(node.type) if registry else None
-        for port_id, port in node.inputs.items():
+        inputs = spec.inputs if spec else node.inputs
+        for port_id, port in inputs.items():
             count = incoming.get((node.id, port_id), 0)
             if not port.multiple and count > 1:
                 issues.append(
@@ -150,13 +250,8 @@ def _validate_required_inputs(
                         location=loc(f"nodes.{node.id}.inputs.{port_id}"),
                     )
                 )
-            # Use registry's required flag when available (authoritative), else use node's port
-            required = port.required
-            if spec and spec.inputs and port_id in spec.inputs:
-                required = spec.inputs[port_id].required
-            # Allow required input to be satisfied by params (e.g. video.generator params.query)
-            if required and count == 0 and port.default is None:
-                if port_id == "query" and node.params.get("query"):
+            if port.required and count == 0 and port.default is None:
+                if _param_satisfies_input(node, port_id):
                     continue
                 issues.append(
                     ValidationIssue(
@@ -166,6 +261,13 @@ def _validate_required_inputs(
                     )
                 )
     return issues
+
+
+def _param_satisfies_input(node: Node, port_id: str) -> bool:
+    if port_id not in node.params:
+        return False
+    value = node.params.get(port_id)
+    return value not in (None, "", [], {})
 
 
 def _validate_group_nodes(

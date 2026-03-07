@@ -21,6 +21,14 @@ class IdentityTransform(TransformHandler):
         return value
 
 
+def _schema_check(source_schema: Any, target_schema: Any) -> bool:
+    if source_schema is None or target_schema is None:
+        return True
+    if source_schema == "any" or target_schema == "any":
+        return True
+    return source_schema == target_schema
+
+
 def build_registry() -> NodeRegistry:
     registry = NodeRegistry()
     register_node_specs(registry)
@@ -29,7 +37,7 @@ def build_registry() -> NodeRegistry:
 
 def build_engine(db: Session, user_id, sandbox=None, session_id: str | None = None) -> ExecutionEngine:
     registry = build_registry()
-    engine = ExecutionEngine(node_registry=registry)
+    engine = ExecutionEngine(node_registry=registry, schema_check=_schema_check)
     register_node_handlers(engine, db, user_id, sandbox=sandbox, session_id=session_id)
     engine.register_condition("always", AlwaysTrueCondition())
     engine.register_transform("identity", IdentityTransform())

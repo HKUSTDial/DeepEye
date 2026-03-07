@@ -254,6 +254,11 @@ class ReportGenerateNode(BaseNode):
                     schema="string",
                     description="Path to the generated report file in sandbox.",
                 ),
+                "report_html": Port(
+                    schema="string",
+                    required=False,
+                    description="HTML preview content of the generated report.",
+                ),
                 "status": Port(
                     schema="string",
                     description="Generation status: 'success' or 'error'.",

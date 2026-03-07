@@ -49,18 +49,32 @@ const typeToLabel = (type: string) =>
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ')
 
+const toSchemaLabel = (schema: string | Record<string, unknown> | null | undefined) => {
+  if (typeof schema === 'string' && schema.trim()) {
+    return schema
+  }
+  if (schema && typeof schema === 'object') {
+    try {
+      return JSON.stringify(schema)
+    } catch {
+      return 'object'
+    }
+  }
+  return 'any'
+}
+
 const mapNodeSpec = (spec: NodeSpec): NodeDef => {
   const inputs = Object.entries(spec.inputs || {}).map(([id, port]) => ({
     id,
     label: id,
-    schema: port.schema || 'any',
+    schema: toSchemaLabel(port.schema),
     required: port.required,
     multiple: port.multiple,
   }))
   const outputs = Object.entries(spec.outputs || {}).map(([id, port]) => ({
     id,
     label: id,
-    schema: port.schema || 'any',
+    schema: toSchemaLabel(port.schema),
     required: port.required,
     multiple: port.multiple,
   }))

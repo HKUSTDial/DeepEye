@@ -6,9 +6,11 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from deepeye.workflows.models import Graph, Node, Port, Workflow
-from deepeye.workflows.registry import NodeRegistry
+from deepeye.workflows.registry import NodeRegistry, NodeSpec
 from deepeye.workflows.runtime import ExecutionContext, NodeRun
 from deepeye.workflows.validation import WorkflowValidationError, validate_workflow_graph
+
+_DYNAMIC_PORT_NODE_TYPES = {"group", "group_inputs", "group_outputs"}
 
 
 class NodeHandler(Protocol):
@@ -153,10 +155,21 @@ class ExecutionEngine:
                 on_node_start(node_id, run, context)
 
             try:
-                inputs = _resolve_inputs(workflow.root, node, context, self.conditions, self.transforms)
+                inputs = _resolve_inputs(
+                    workflow.root,
+                    node,
+                    context,
+                    self.conditions,
+                    self.transforms,
+                    self.node_registry,
+                )
                 run.inputs = inputs
                 handler = self.handlers.require(node.type)
-                outputs = handler.execute(node, inputs, context)
+                outputs = _validate_handler_outputs(
+                    node,
+                    handler.execute(node, inputs, context),
+                    self.node_registry.get(node.type) if self.node_registry else None,
+                )
                 run.outputs = outputs
                 run.status = "success"
             except Exception as exc:  # noqa: BLE001 - surface error for runtime
@@ -207,8 +220,10 @@ def _resolve_inputs(
     context: ExecutionContext,
     conditions: ConditionRegistry,
     transforms: TransformRegistry,
+    registry: NodeRegistry | None,
 ) -> dict[str, Any]:
     inputs: dict[str, Any] = {}
+    resolved_inputs = _node_inputs(node, registry)
     incoming = [edge for edge in graph.edges.values() if edge.target.node_id == node.id]
 
     for edge in incoming:
@@ -223,7 +238,7 @@ def _resolve_inputs(
         if edge.transform:
             transform = transforms.require(edge.transform)
             value = transform.apply(value, context)
-        target_port = node.inputs.get(edge.target.port_id)
+        target_port = resolved_inputs.get(edge.target.port_id) or node.inputs.get(edge.target.port_id)
         if target_port and target_port.multiple:
             inputs.setdefault(edge.target.port_id, [])
             if value is not None:
@@ -232,7 +247,7 @@ def _resolve_inputs(
             if value is not None:
                 inputs[edge.target.port_id] = value
 
-    for port_id, port in node.inputs.items():
+    for port_id, port in resolved_inputs.items():
         if port_id not in inputs:
             default = _default_for_port(port)
             if default is not None:
@@ -241,6 +256,49 @@ def _resolve_inputs(
                 raise ValueError(f"Required input missing: {node.id}.{port_id}")
 
     return inputs
+
+
+def _node_inputs(
+    node: Node,
+    registry: NodeRegistry | None,
+) -> dict[str, Port]:
+    if registry:
+        spec = registry.get(node.type)
+        if spec:
+            if node.type in _DYNAMIC_PORT_NODE_TYPES:
+                return node.inputs
+            return spec.inputs
+    return node.inputs
+
+
+def _validate_handler_outputs(
+    node: Node,
+    outputs: dict[str, Any] | None,
+    spec: NodeSpec | None,
+) -> dict[str, Any]:
+    if outputs is None:
+        outputs = {}
+    if not isinstance(outputs, dict):
+        raise TypeError(f"Node handler must return a dict: {node.type}")
+    if not spec:
+        return outputs
+
+    unexpected_keys = sorted(set(outputs) - set(spec.outputs))
+    if unexpected_keys:
+        raise ValueError(
+            f"Node {node.id} returned undeclared outputs for {node.type}: {', '.join(unexpected_keys)}"
+        )
+
+    missing_required = sorted(
+        port_id
+        for port_id, port in spec.outputs.items()
+        if port.required and port_id not in outputs
+    )
+    if missing_required:
+        raise ValueError(
+            f"Node {node.id} did not return required outputs for {node.type}: {', '.join(missing_required)}"
+        )
+    return outputs
 
 
 def _default_for_port(port: Port) -> Any | None:

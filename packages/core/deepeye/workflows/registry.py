@@ -17,7 +17,7 @@ class NodeSpec(BaseModel):
     params_schema: dict[str, Any] | None = None
     inputs: dict[str, Port] = Field(default_factory=dict)
     outputs: dict[str, Port] = Field(default_factory=dict)
-    version: str | None = None
+    version: str = "1.0"
 
     model_config = {"extra": "allow"}
 

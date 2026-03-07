@@ -55,10 +55,6 @@ function toDefinition(nodes: WorkflowCanvasNode[], edges: Edge[], nodeDefs: Reco
     nodeMap[node.id] = {
       id: node.id,
       type: node.data.type,
-      inputs: Object.fromEntries(
-        def.inputs.map((p) => [p.id, { schema: p.schema, required: !!p.required, multiple: p.multiple }]),
-      ),
-      outputs: Object.fromEntries(def.outputs.map((p) => [p.id, { schema: p.schema }])),
       params: node.data.params || {},
       metadata: { position: node.position },
     }

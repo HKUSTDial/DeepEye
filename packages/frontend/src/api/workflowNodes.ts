@@ -1,7 +1,7 @@
 import { http } from './client'
 
 export type NodeSpecPort = {
-  schema?: string
+  schema?: string | Record<string, unknown> | null
   required?: boolean
   multiple?: boolean
   description?: string | null
@@ -9,6 +9,7 @@ export type NodeSpecPort = {
 
 export type NodeSpec = {
   type: string
+  version?: string
   description?: string | null
   params_schema?: Record<string, unknown> | null
   inputs?: Record<string, NodeSpecPort>

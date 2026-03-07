@@ -10,4 +10,4 @@ router = APIRouter(prefix="/workflow-nodes", tags=["workflow-nodes"])
 @router.get("")
 def list_workflow_nodes():
     registry = build_registry()
-    return [spec.model_dump() for spec in registry.all()]
+    return [spec.model_dump(mode="json", by_alias=True) for spec in registry.all()]

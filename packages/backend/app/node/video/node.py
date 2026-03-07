@@ -726,6 +726,16 @@ class VideoGeneratorNode(BaseNode):
                     schema="string",
                     description="Path to saved configuration file",
                 ),
+                "task_id": Port(
+                    schema="string",
+                    required=False,
+                    description="Video task identifier used for preview deployment.",
+                ),
+                "session_id": Port(
+                    schema="string",
+                    required=False,
+                    description="Session identifier associated with the generated preview.",
+                ),
                 "video_url": Port(
                     schema="string",
                     required=False,
