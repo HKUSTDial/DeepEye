@@ -31,6 +31,7 @@ class MessageRepository:
         )
         self.db.add(msg)
         self.db.commit()
+        self.db.refresh(msg)
         return msg
 
     def get_messages(self, session_id: str) -> list[dict]:
@@ -47,4 +48,3 @@ class MessageRepository:
         """Delete all messages for a session."""
         self.db.query(SessionMessage).filter(SessionMessage.session_id == session_id).delete()
         self.db.commit()
-

@@ -120,3 +120,16 @@ def test_workflow_tracking_persists_turn_draft_run_artifacts_and_workspace_state
         assert state["artifacts"][0].payload["kind"] == "report"
     finally:
         db.close()
+
+
+def test_message_append_keeps_primary_key_accessible_after_session_close():
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="bob@example.com")
+        session = _create_session(db, user)
+        message = MessageRepository(db).append(str(session.id), UserMessage(content="Hello"))
+        message_id = message.id
+    finally:
+        db.close()
+
+    assert message_id is not None
