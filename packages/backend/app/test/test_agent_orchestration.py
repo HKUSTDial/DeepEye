@@ -13,6 +13,7 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.services.agent_prompts import build_supervisor_prompt
 from app.tasks.callbacks import MessageCollector
+from app.tools.workflow_tools import _extract_final_answer
 from deepeye.agents.factory import AgentFactory
 from deepeye.tools.base import tool
 
@@ -91,6 +92,61 @@ async def test_supervisor_routes_workflow_requests_through_summary_step():
     assert result["messages"][-1].content == "The workflow summary is ready."
 
 
+@pytest.mark.anyio
+async def test_supervisor_replies_directly_when_workflow_agent_returns_final_answer():
+    calls: list[tuple[str, str]] = []
+
+    @tool
+    async def workflow_agent(goal: str) -> dict:
+        """Plan and run the workflow for a user goal."""
+        calls.append(("workflow_agent", goal))
+        return {
+            "status": "success",
+            "next_action": "reply_directly",
+            "run_status": "success",
+            "final_answer": "Final grounded workflow answer.",
+        }
+
+    @tool
+    async def summarize_workflow_result(question: str) -> str:
+        """Summarize the latest workflow result."""
+        calls.append(("summarize_workflow_result", question))
+        return "This should not be used."
+
+    model = ToolCallingFakeChatModel(
+        messages=iter(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "workflow_agent",
+                            "args": {"goal": "Find the highest revenue city"},
+                            "id": "call_workflow",
+                            "type": "tool_call",
+                        }
+                    ],
+                ),
+                AIMessage(content="Final grounded workflow answer."),
+            ]
+        ),
+    )
+
+    supervisor = AgentFactory(model).create_supervisor(
+        [workflow_agent, summarize_workflow_result],
+        system_prompt_template=build_supervisor_prompt(),
+    )
+
+    result = await supervisor.ainvoke(
+        "Find the highest revenue city",
+        thread_id="session-1",
+        config={"configurable": {"datasources_context": "No data sources selected."}},
+    )
+
+    assert calls == [("workflow_agent", "Find the highest revenue city")]
+    assert result["messages"][-1].content == "Final grounded workflow answer."
+
+
 def test_message_collector_prefers_summary_tool_output() -> None:
     collector = MessageCollector()
     collector.add_token("supervisor", "I will analyze this for you. ")
@@ -103,6 +159,22 @@ def test_message_collector_prefers_summary_tool_output() -> None:
     message = collector.build()
 
     assert message.content == "Final concise answer."
+
+
+def test_extract_final_answer_prefers_workflow_answer_output() -> None:
+    workspace_state = {
+        "run": {
+            "status": "success",
+            "result": {
+                "outputs": {
+                    "join": {"dataset_ref": {"kind": "dataset_ref", "path": "/workspace/a.jsonl", "format": "jsonl"}},
+                    "answer": {"answer": "The final grounded answer."},
+                }
+            },
+        }
+    }
+
+    assert _extract_final_answer(workspace_state) == "The final grounded answer."
 
 
 def test_supervisor_does_not_inject_plan_tools() -> None:

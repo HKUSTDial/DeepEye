@@ -94,6 +94,27 @@ def _serialize_workspace_state(snapshot: dict) -> dict:
     }
 
 
+def _extract_final_answer(workspace_state: dict | None) -> str | None:
+    if not isinstance(workspace_state, dict):
+        return None
+    run = workspace_state.get("run")
+    if not isinstance(run, dict):
+        return None
+    result = run.get("result")
+    if not isinstance(result, dict):
+        return None
+    outputs = result.get("outputs")
+    if not isinstance(outputs, dict):
+        return None
+    for node_output in outputs.values():
+        if not isinstance(node_output, dict):
+            continue
+        answer = node_output.get("answer")
+        if isinstance(answer, str) and answer.strip():
+            return answer.strip()
+    return None
+
+
 def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | None = None) -> callable:
     @tool
     async def create_workflow(
@@ -340,7 +361,7 @@ def create_design_workflow_tool(
         """
         Workflow planner and executor.
         Use this for tasks that need workflow planning and execution.
-        Returns structured execution metadata; call summarize_workflow_result before replying to the user.
+        Returns structured execution metadata and may include a ready-to-send final_answer.
         """
         db = SessionLocal()
         try:
@@ -377,9 +398,10 @@ def create_design_workflow_tool(
             run = serialized.get("run") or {}
             run_result = run.get("result") or {}
             run_status = run.get("status") or "pending"
+            final_answer = _extract_final_answer(serialized)
             return {
                 "status": "success" if run_status == "success" else run_status,
-                "next_action": "summarize_workflow_result",
+                "next_action": "reply_directly" if final_answer and run_status == "success" else "summarize_workflow_result",
                 "turn_id": turn_id,
                 "draft_id": (serialized.get("draft") or {}).get("id"),
                 "run_id": run.get("id"),
@@ -389,6 +411,7 @@ def create_design_workflow_tool(
                 "details": run_result.get("details"),
                 "artifacts": [artifact.get("kind") for artifact in serialized.get("artifacts", [])],
                 "workspace_state": serialized,
+                "final_answer": final_answer,
                 "message_count": len(result.get("messages", [])),
             }
         finally:
@@ -422,6 +445,9 @@ def create_summarize_workflow_result_tool(
         run = serialized.get("run")
         if not run:
             return "No workflow run is available to summarize yet."
+        final_answer = _extract_final_answer(serialized)
+        if final_answer:
+            return final_answer
 
         prompt = build_workflow_summary_prompt(question, serialized)
         response = await model.ainvoke(
