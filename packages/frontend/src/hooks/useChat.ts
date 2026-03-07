@@ -358,7 +358,7 @@ export function useChat() {
     }
   }
 
-  const sendMessage = async (text: string, datasourceIds?: string[], kbIds?: string[], csvFiles?: File[]) => {
+  const sendMessage = async (text: string, _datasourceIds?: string[], kbIds?: string[], csvFiles?: File[]) => {
     if (!text.trim() && (!csvFiles || csvFiles.length === 0)) return
 
     setError(null)
@@ -380,26 +380,19 @@ export function useChat() {
     addUserMessage(query)
 
     try {
-      const uploadedDatasourceIds: string[] = []
       if (csvFiles && csvFiles.length > 0) {
         for (const file of csvFiles) {
-          const created = await datasourceApi.upload(file, session_id)
-          uploadedDatasourceIds.push(created.id)
+          await datasourceApi.upload(file, session_id)
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('datasources:updated'))
         }
       }
 
-      const mergedDatasourceIds = Array.from(
-        new Set([...(datasourceIds ?? []), ...uploadedDatasourceIds]),
-      )
-
       connectToSSE(session_id)
       await chatApi.start({
         message: query,
         session_id: session_id,
-        datasource_ids: mergedDatasourceIds.length > 0 ? mergedDatasourceIds : undefined,
         kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
       })
 
