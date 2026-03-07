@@ -9,6 +9,7 @@ from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
 from app.node.core.base import BaseNode
+from app.services.workflow_datasets import compact_value_for_transport, dataset_ref_columns, dataset_ref_preview, is_dataset_ref
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 
@@ -40,13 +41,12 @@ class LLMAnswerHandler:
         if not question:
             raise ValueError("question is required")
 
-        rows = inputs.get("rows")
         context_input = inputs.get("context")
         artifacts = inputs.get("artifacts")
+        dataset_ref = inputs.get("dataset_ref")
         instructions = node.params.get("instructions") or ""
 
-        if isinstance(rows, list) and len(rows) > _MAX_ROWS:
-            rows = rows[:_MAX_ROWS]
+        rows = dataset_ref_preview(dataset_ref, limit=_MAX_ROWS) if is_dataset_ref(dataset_ref) else None
 
         prompt = (
             "You are a workflow answer node.\n"
@@ -62,7 +62,19 @@ class LLMAnswerHandler:
             "rows": rows,
             "context": context_input,
             "artifacts": artifacts,
+            "dataset_ref": (
+                {
+                    "path": dataset_ref.get("path"),
+                    "format": dataset_ref.get("format"),
+                    "row_count": dataset_ref.get("row_count"),
+                    "columns": dataset_ref_columns(dataset_ref),
+                    "preview_rows": dataset_ref_preview(dataset_ref, limit=10),
+                }
+                if is_dataset_ref(dataset_ref)
+                else None
+            ),
         }
+        payload = compact_value_for_transport(payload, row_limit=10, text_limit=3000)
         response = self._resolve_model().invoke(
             [
                 SystemMessage(content=prompt),
@@ -88,7 +100,7 @@ class LLMAnswerNode(BaseNode):
             },
             inputs={
                 "question": Port(schema="string", required=False),
-                "rows": Port(schema="list[dict]", required=False),
+                "dataset_ref": Port(schema="dict", required=False),
                 "context": Port(schema="any", required=False, multiple=True),
                 "artifacts": Port(schema="list[dict]", required=False, multiple=True),
             },

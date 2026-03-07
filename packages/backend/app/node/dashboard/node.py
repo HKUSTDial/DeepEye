@@ -20,6 +20,7 @@ except ImportError:
 
 from app.node.core.base import BaseNode
 from app.repositories import DataSourceRepository
+from app.services.workflow_datasets import download_dataset_ref_to_local_csv, is_dataset_ref
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.models import Port
 from app.node.dashboard.nl2dashboard.design import DashboardDesigner
@@ -197,7 +198,8 @@ class NL2DashboardHandler:
         sandbox_base = "/workspace/.workflow_scripts"
         
         # 2. Unified input data handling
-        data_input = inputs.get("data") or params.get("data")
+        data_input = params.get("data")
+        dataset_ref = inputs.get("dataset_ref")
         dataset_path = None
         
         # Temporary local path (using Beijing timestamp for fresh directory)
@@ -209,6 +211,13 @@ class NL2DashboardHandler:
         os.makedirs(local_tmp_dir, exist_ok=True)
 
         try:
+            if is_dataset_ref(dataset_ref):
+                data_input = download_dataset_ref_to_local_csv(
+                    dataset_ref,
+                    sandbox=self.sandbox,
+                    tmp_dir=local_tmp_dir,
+                    name_hint=f"{safe_id}_input",
+                )
             if data_input:
                 # Try to parse dict/list potentially serialized as string
                 print(f"[DEBUG] Attempting to parse data input: {data_input}")
@@ -492,7 +501,7 @@ class NL2DashboardNode(BaseNode):
             description="Generate a full interactive dashboard from natural language.",
             inputs={
                 "question": Port(schema="string", description="User query"),
-                "data": Port(schema="any", required=False, description="Data records or sandbox path"),
+                "dataset_ref": Port(schema="dict", required=False, description="Dataset reference whose sandbox path can be analyzed directly."),
             },
             outputs={
                 "output_path": Port(schema="string", description="Path in sandbox"),

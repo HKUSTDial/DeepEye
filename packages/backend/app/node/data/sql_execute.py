@@ -7,14 +7,16 @@ from sqlalchemy.orm import Session
 from app.repositories import DataSourceRepository
 from app.node.core.base import BaseNode
 from app.node.core.db_utils import create_engine, fetch_rows, validate_datasource_type
+from app.services.workflow_datasets import build_dataset_ref, materialize_sql_query_to_sandbox_dataset
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 
 
 class SqlExecuteHandler:
-    def __init__(self, db: Session, user_id) -> None:
+    def __init__(self, db: Session, user_id, sandbox=None) -> None:
         self.db = db
         self.user_id = user_id
+        self.sandbox = sandbox
 
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         datasource_id = node.params.get("datasource_id")
@@ -37,7 +39,36 @@ class SqlExecuteHandler:
 
         engine = create_engine(connection_string)
         rows = fetch_rows(engine, str(query), limit)
-        return {"rows": rows}
+        dataset_ref = None
+        if self.sandbox:
+            dataset_ref = materialize_sql_query_to_sandbox_dataset(
+                db=self.db,
+                user_id=self.user_id,
+                sandbox=self.sandbox,
+                datasource_id=str(datasource_id) if datasource_id else None,
+                datasource_url=connection_string,
+                datasource_type=datasource_type,
+                query=str(query),
+                name_hint=f"{node.id}_query",
+                source="sql.execute",
+                preview_limit=limit,
+            )
+        else:
+            dataset_ref = build_dataset_ref(
+                path=f"/virtual/{node.id}_query.jsonl",
+                dataset_format="jsonl",
+                source="sql.execute",
+                preview_rows=rows,
+                row_count=len(rows),
+                columns=sorted({key for row in rows for key in row.keys()}),
+                name=f"{node.id}_query",
+            )
+        return {
+            "preview_rows": rows,
+            "dataset_ref": dataset_ref,
+            "row_count": dataset_ref.get("row_count"),
+            "columns": dataset_ref.get("columns"),
+        }
 
 
 class SqlExecuteNode(BaseNode):
@@ -47,7 +78,7 @@ class SqlExecuteNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Execute SQL and return rows.",
+            description="Execute SQL, materialize the result, and return a dataset_ref plus lightweight preview metadata.",
             params_schema={
                 "datasource_id": {"type": "string", "required": False, "description": "Datasource ID"},
                 "datasource_url": {"type": "string", "required": False, "description": "Connection string"},
@@ -56,9 +87,14 @@ class SqlExecuteNode(BaseNode):
                 "limit": {"type": "integer", "required": False, "description": "Row limit"},
             },
             inputs={"query": Port(schema="string", required=False)},
-            outputs={"rows": Port(schema="list[dict]", description="Query result rows.")},
+            outputs={
+                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows for UI and summaries."),
+                "dataset_ref": Port(schema="dict", required=True, description="Reference to the materialized query result in sandbox storage."),
+                "row_count": Port(schema="int", required=True, description="Materialized row count when available."),
+                "columns": Port(schema="list[string]", required=False, description="Detected query result columns."),
+            },
         )
 
     @classmethod
-    def build_handler(cls, db: Session, user_id):
-        return SqlExecuteHandler(db, user_id)
+    def build_handler(cls, db: Session, user_id, sandbox=None):
+        return SqlExecuteHandler(db, user_id, sandbox=sandbox)

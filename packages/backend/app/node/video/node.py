@@ -1,4 +1,4 @@
-"""Video generator node - generates complete data video from data rows."""
+"""Video generator node - generates complete data video from dataset references."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from typing import Any
 
 from app.core.config import get_video_session_root, settings
 from app.node.core.base import BaseNode
+from app.services.workflow_datasets import dataset_ref_preview, is_dataset_ref, read_dataset_ref_rows
 from app.node.video.config.generator import create_generator
 from app.services.workflow_file_service import (
     get_progress_publisher_by_workflow_id,
@@ -65,9 +66,10 @@ def _list_audio_dir(path: Path, label: str) -> None:
 class VideoGeneratorHandler:
     """Handler for video generator node."""
 
-    def __init__(self, db, user_id) -> None:
+    def __init__(self, db, user_id, sandbox=None) -> None:
         self.db = db
         self.user_id = user_id
+        self.sandbox = sandbox
         # 创建生成器实例
         self.generator = create_generator()
 
@@ -494,9 +496,14 @@ class VideoGeneratorHandler:
             session_id = get_session_id_by_workflow_id(context.workflow_id)
         
         # 从 inputs 获取数据和查询
-        rows = inputs.get("rows", [])
+        dataset_ref = inputs.get("dataset_ref")
+        rows = []
+        if is_dataset_ref(dataset_ref):
+            rows = dataset_ref_preview(dataset_ref, limit=200)
+            if not rows and self.sandbox:
+                rows = read_dataset_ref_rows(dataset_ref, sandbox=self.sandbox, limit=200)
         if not rows:
-            raise ValueError("rows input is required")
+            raise ValueError("dataset_ref input is required")
 
         # Query can come from inputs or params (for simpler workflows)
         query = inputs.get("query") or node.params.get("query")
@@ -677,7 +684,7 @@ class VideoGeneratorHandler:
 
 
 class VideoGeneratorNode(BaseNode):
-    """Node for generating complete data video from data rows."""
+    """Node for generating complete data video from dataset references."""
 
     node_type = "video.generator"
 
@@ -685,12 +692,12 @@ class VideoGeneratorNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Generate complete data video from data rows and user query. Includes configuration generation, audio synthesis, timeline alignment, and video component rendering.",
+            description="Generate complete data video from a dataset_ref and user query. Includes configuration generation, audio synthesis, timeline alignment, and video component rendering.",
             inputs={
-                "rows": Port(
-                    schema="list[dict]",
+                "dataset_ref": Port(
+                    schema="dict",
                     required=True,
-                    description="Input data rows to generate video",
+                    description="Dataset reference. Video generation will use its preview/sample rows.",
                 ),
                 "query": Port(
                     schema="string",
@@ -754,4 +761,4 @@ class VideoGeneratorNode(BaseNode):
 
     @classmethod
     def build_handler(cls, db, user_id, sandbox=None) -> VideoGeneratorHandler | None:
-        return VideoGeneratorHandler(db, user_id)
+        return VideoGeneratorHandler(db, user_id, sandbox=sandbox)

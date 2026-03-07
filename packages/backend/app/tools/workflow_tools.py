@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.repositories import SessionRepository
 from app.sandbox import sandbox_manager
 from app.services.agent_prompts import build_workflow_summary_prompt
+from app.services.workflow_datasets import compact_value_for_transport, compact_workflow_result
 from app.services.workflow_file_service import (
     service_run_workflow_draft,
     service_run_workflow_from_file,
@@ -109,7 +110,7 @@ def _serialize_workspace_state(snapshot: dict) -> dict:
                 "id": str(run.id),
                 "status": run.status,
                 "error": run.error,
-                "result": run.result,
+                "result": compact_workflow_result(run.result, row_limit=10, text_limit=2500),
             }
             if run
             else None
@@ -118,7 +119,7 @@ def _serialize_workspace_state(snapshot: dict) -> dict:
             {
                 "id": str(artifact.id),
                 "kind": artifact.kind,
-                "payload": artifact.payload,
+                "payload": compact_value_for_transport(artifact.payload, row_limit=10, text_limit=2500),
             }
             for artifact in artifacts
         ],

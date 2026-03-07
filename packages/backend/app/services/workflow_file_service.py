@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.schemas import AgentEvent, AgentEventType
 from app.repositories import WorkflowDraftRepository, WorkflowRunRepository
 from app.services.workflow_engine import build_engine
+from app.services.workflow_datasets import compact_node_outputs, compact_workflow_outputs
 from app.services.workflow_events import build_workflow_event_data, extract_workflow_artifacts
 from app.services.workflow_tracking_service import (
     create_tracked_workflow_run,
@@ -309,7 +310,11 @@ async def service_run_workflow_definition(
             loop.call_soon_threadsafe(_schedule)
 
         def _on_node_end(node_id, node_run, _):
-            data = {"node_id": node_id, "status": node_run.status, "outputs": node_run.outputs}
+            data = {
+                "node_id": node_id,
+                "status": node_run.status,
+                "outputs": compact_node_outputs(node_run.outputs),
+            }
 
             def _schedule():
                 asyncio.create_task(_publish_workflow_event("node_status", data))
@@ -337,13 +342,14 @@ async def service_run_workflow_definition(
         context = result_holder[0]
         outputs = _collect_final_outputs(graph, context)
         artifacts = extract_workflow_artifacts(outputs)
+        compact_outputs = compact_workflow_outputs(outputs)
         if tracked_run:
             replace_workflow_artifacts(db, tracked_run, artifacts)
             finalize_tracked_workflow_run(
                 db,
                 tracked_run,
                 status=context.status,
-                result={"status": context.status, "outputs": outputs, "artifacts": artifacts},
+                result={"status": context.status, "outputs": compact_outputs, "artifacts": artifacts},
                 artifacts=artifacts,
             )
         await _publish_workflow_event(
@@ -351,13 +357,13 @@ async def service_run_workflow_definition(
             {
                 "status": context.status,
                 "finished_at": _timestamp(),
-                "outputs": outputs,
+                "outputs": compact_outputs,
                 "artifacts": artifacts,
             },
         )
         return {
             "status": context.status,
-            "outputs": outputs,
+            "outputs": compact_outputs,
             "artifacts": artifacts,
             "turn_id": str(tracked_turn.id) if tracked_turn else turn_id,
             "draft_id": str(tracked_draft.id) if tracked_draft else None,

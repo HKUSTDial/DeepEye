@@ -16,6 +16,7 @@ from app.repositories import (
     WorkflowDraftRepository,
     WorkflowRunRepository,
 )
+from app.services.workflow_datasets import compact_value_for_transport, compact_workflow_result
 
 
 TrackedRecord = TypeVar("TrackedRecord")
@@ -271,9 +272,9 @@ def finalize_tracked_workflow_run(
     artifacts: list[dict[str, Any]] | None = None,
 ) -> WorkflowRun:
     run.status = status
-    run.result = result
+    run.result = compact_workflow_result(result)
     run.error = error
-    run.artifacts = artifacts
+    run.artifacts = compact_value_for_transport(artifacts) if artifacts is not None else None
     run.finished_at = datetime.now(timezone.utc)
     saved = WorkflowRunRepository(db).save(run)
     if saved.turn_id:

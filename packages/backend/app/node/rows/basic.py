@@ -4,15 +4,19 @@ from collections import Counter
 from typing import Any
 
 from app.node.core.base import BaseNode
+from app.services.workflow_datasets import build_tabular_node_result, is_dataset_ref, read_dataset_ref_rows
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 
 
-def _require_rows(inputs: dict[str, Any]) -> list[dict[str, Any]]:
-    rows = inputs.get("rows")
-    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
-        raise ValueError("rows input must be a list of objects")
-    return rows
+def _require_dataset_ref(inputs: dict[str, Any], *, sandbox=None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    dataset_ref = inputs.get("dataset_ref")
+    if is_dataset_ref(dataset_ref):
+        if sandbox is None:
+            raise ValueError("dataset_ref input requires sandbox access")
+        return read_dataset_ref_rows(dataset_ref, sandbox=sandbox, limit=None), dataset_ref
+
+    raise ValueError("dataset_ref input is required")
 
 
 def _parse_columns(value: Any) -> list[str]:
@@ -89,19 +93,44 @@ def _match_filter(candidate: Any, operator: str, expected: Any, *, case_sensitiv
     raise ValueError(f"Unsupported operator: {operator}")
 
 
-class RowsSelectHandler:
+class _BaseRowsHandler:
+    def __init__(self, sandbox=None) -> None:
+        self.sandbox = sandbox
+
+    def _table_result(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        input_dataset_ref: dict[str, Any],
+        source: str,
+        name_hint: str,
+    ) -> dict[str, Any]:
+        return build_tabular_node_result(
+            rows,
+            sandbox=self.sandbox,
+            source=source,
+            name_hint=name_hint,
+        )
+
+
+class RowsSelectHandler(_BaseRowsHandler):
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         del context
-        rows = _require_rows(inputs)
+        rows, dataset_ref = _require_dataset_ref(inputs, sandbox=self.sandbox)
         columns = _parse_columns(node.params.get("columns"))
         selected = [{column: row.get(column) for column in columns} for row in rows]
-        return {"rows": selected}
+        return self._table_result(
+            selected,
+            input_dataset_ref=dataset_ref,
+            source="rows.select",
+            name_hint=f"{node.id or 'rows_select'}_selected",
+        )
 
 
-class RowsFilterHandler:
+class RowsFilterHandler(_BaseRowsHandler):
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         del context
-        rows = _require_rows(inputs)
+        rows, dataset_ref = _require_dataset_ref(inputs, sandbox=self.sandbox)
         column = str(node.params.get("column") or "").strip()
         operator = str(node.params.get("operator") or "eq").strip()
         case_sensitive = bool(node.params.get("case_sensitive", False))
@@ -113,13 +142,18 @@ class RowsFilterHandler:
             for row in rows
             if _match_filter(row.get(column), operator, expected, case_sensitive=case_sensitive)
         ]
-        return {"rows": filtered}
+        return self._table_result(
+            filtered,
+            input_dataset_ref=dataset_ref,
+            source="rows.filter",
+            name_hint=f"{node.id or 'rows_filter'}_filtered",
+        )
 
 
-class RowsSortHandler:
+class RowsSortHandler(_BaseRowsHandler):
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         del context
-        rows = _require_rows(inputs)
+        rows, dataset_ref = _require_dataset_ref(inputs, sandbox=self.sandbox)
         column = str(node.params.get("column") or "").strip()
         if not column:
             raise ValueError("column is required")
@@ -132,13 +166,18 @@ class RowsSortHandler:
                 return (1 if nulls_last else -1, "")
             return (0, value)
 
-        return {"rows": sorted(rows, key=sort_key, reverse=descending)}
+        return self._table_result(
+            sorted(rows, key=sort_key, reverse=descending),
+            input_dataset_ref=dataset_ref,
+            source="rows.sort",
+            name_hint=f"{node.id or 'rows_sort'}_sorted",
+        )
 
 
-class RowsProfileHandler:
+class RowsProfileHandler(_BaseRowsHandler):
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         del context
-        rows = _require_rows(inputs)
+        rows, dataset_ref = _require_dataset_ref(inputs, sandbox=self.sandbox)
         sample_size = int(node.params.get("sample_size") or 5)
         column_names = sorted({key for row in rows for key in row.keys()})
         columns: list[dict[str, Any]] = []
@@ -178,13 +217,20 @@ class RowsProfileHandler:
             "column_count": len(column_names),
             "columns": columns,
         }
-        return {"rows": rows, "row_count": len(rows), "profile": profile}
+        result = self._table_result(
+            rows,
+            input_dataset_ref=dataset_ref,
+            source="rows.profile",
+            name_hint=f"{node.id or 'rows_profile'}_profiled",
+        )
+        result["profile"] = profile
+        return result
 
 
-class RowsAggregateHandler:
+class RowsAggregateHandler(_BaseRowsHandler):
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         del context
-        rows = _require_rows(inputs)
+        rows, dataset_ref = _require_dataset_ref(inputs, sandbox=self.sandbox)
         group_by = node.params.get("group_by") or []
         metrics = node.params.get("metrics") or []
         group_columns = _parse_columns(group_by) if group_by else []
@@ -224,7 +270,12 @@ class RowsAggregateHandler:
                     raise ValueError(f"Unsupported aggregate op: {op}")
             result_rows.append(output_row)
 
-        return {"rows": result_rows}
+        return self._table_result(
+            result_rows,
+            input_dataset_ref=dataset_ref,
+            source="rows.aggregate",
+            name_hint=f"{node.id or 'rows_aggregate'}_aggregated",
+        )
 
 
 class RowsSelectNode(BaseNode):
@@ -238,14 +289,21 @@ class RowsSelectNode(BaseNode):
             params_schema={
                 "columns": {"type": "array[string]", "required": True, "description": "Columns to keep."},
             },
-            inputs={"rows": Port(schema="list[dict]", required=True)},
-            outputs={"rows": Port(schema="list[dict]", required=True)},
+            inputs={
+                "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
+            },
+            outputs={
+                "preview_rows": Port(schema="list[dict]", required=False),
+                "dataset_ref": Port(schema="dict", required=True),
+                "row_count": Port(schema="int", required=True),
+                "columns": Port(schema="list[string]", required=False),
+            },
         )
 
     @classmethod
-    def build_handler(cls, db, user_id):
+    def build_handler(cls, db, user_id, sandbox=None):
         del db, user_id
-        return RowsSelectHandler()
+        return RowsSelectHandler(sandbox=sandbox)
 
 
 class RowsFilterNode(BaseNode):
@@ -266,14 +324,21 @@ class RowsFilterNode(BaseNode):
                 "value": {"type": "any", "required": False, "description": "Comparison value when required by the operator."},
                 "case_sensitive": {"type": "boolean", "required": False, "description": "Case-sensitive string matching."},
             },
-            inputs={"rows": Port(schema="list[dict]", required=True)},
-            outputs={"rows": Port(schema="list[dict]", required=True)},
+            inputs={
+                "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
+            },
+            outputs={
+                "preview_rows": Port(schema="list[dict]", required=False),
+                "dataset_ref": Port(schema="dict", required=True),
+                "row_count": Port(schema="int", required=True),
+                "columns": Port(schema="list[string]", required=False),
+            },
         )
 
     @classmethod
-    def build_handler(cls, db, user_id):
+    def build_handler(cls, db, user_id, sandbox=None):
         del db, user_id
-        return RowsFilterHandler()
+        return RowsFilterHandler(sandbox=sandbox)
 
 
 class RowsSortNode(BaseNode):
@@ -289,14 +354,21 @@ class RowsSortNode(BaseNode):
                 "descending": {"type": "boolean", "required": False, "description": "Sort in descending order."},
                 "nulls_last": {"type": "boolean", "required": False, "description": "Place null values last."},
             },
-            inputs={"rows": Port(schema="list[dict]", required=True)},
-            outputs={"rows": Port(schema="list[dict]", required=True)},
+            inputs={
+                "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
+            },
+            outputs={
+                "preview_rows": Port(schema="list[dict]", required=False),
+                "dataset_ref": Port(schema="dict", required=True),
+                "row_count": Port(schema="int", required=True),
+                "columns": Port(schema="list[string]", required=False),
+            },
         )
 
     @classmethod
-    def build_handler(cls, db, user_id):
+    def build_handler(cls, db, user_id, sandbox=None):
         del db, user_id
-        return RowsSortHandler()
+        return RowsSortHandler(sandbox=sandbox)
 
 
 class RowsProfileNode(BaseNode):
@@ -310,18 +382,22 @@ class RowsProfileNode(BaseNode):
             params_schema={
                 "sample_size": {"type": "integer", "required": False, "description": "Distinct sample values to keep per column."},
             },
-            inputs={"rows": Port(schema="list[dict]", required=True)},
+            inputs={
+                "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
+            },
             outputs={
-                "rows": Port(schema="list[dict]", required=True, description="Pass-through rows for downstream nodes."),
+                "preview_rows": Port(schema="list[dict]", required=False),
+                "dataset_ref": Port(schema="dict", required=True),
                 "row_count": Port(schema="int", required=True, description="Number of rows in the input."),
+                "columns": Port(schema="list[string]", required=False),
                 "profile": Port(schema="dict", required=True, description="Column-level schema and statistics summary."),
             },
         )
 
     @classmethod
-    def build_handler(cls, db, user_id):
+    def build_handler(cls, db, user_id, sandbox=None):
         del db, user_id
-        return RowsProfileHandler()
+        return RowsProfileHandler(sandbox=sandbox)
 
 
 class RowsAggregateNode(BaseNode):
@@ -340,11 +416,18 @@ class RowsAggregateNode(BaseNode):
                     "description": "Metric list: {column, op, as}. Supported ops: count, count_distinct, sum, avg, min, max.",
                 },
             },
-            inputs={"rows": Port(schema="list[dict]", required=True)},
-            outputs={"rows": Port(schema="list[dict]", required=True)},
+            inputs={
+                "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
+            },
+            outputs={
+                "preview_rows": Port(schema="list[dict]", required=False),
+                "dataset_ref": Port(schema="dict", required=True),
+                "row_count": Port(schema="int", required=True),
+                "columns": Port(schema="list[string]", required=False),
+            },
         )
 
     @classmethod
-    def build_handler(cls, db, user_id):
+    def build_handler(cls, db, user_id, sandbox=None):
         del db, user_id
-        return RowsAggregateHandler()
+        return RowsAggregateHandler(sandbox=sandbox)

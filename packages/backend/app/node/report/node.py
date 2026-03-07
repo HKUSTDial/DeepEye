@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.node.core.base import BaseNode
 from app.sandbox.docker_sandbox import DockerSandbox
+from app.services.workflow_datasets import download_dataset_ref_to_local_csv, is_dataset_ref
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 
@@ -79,11 +80,12 @@ class ReportGenerateHandler:
         self,
         file_paths: list[str],
         session_id: str | None = None,
+        tmp_dir: str | None = None,
     ) -> tuple[list[str], str]:
         if not self.sandbox or not getattr(self.sandbox, "container", None):
             raise RuntimeError("Sandbox not available for report generation")
 
-        tmp_dir = create_report_temp_dir(session_id or self.session_id, prefix="deepeye_report_")
+        tmp_dir = tmp_dir or create_report_temp_dir(session_id or self.session_id, prefix="deepeye_report_")
         local_paths: list[str] = []
 
         for idx, sandbox_path in enumerate(file_paths):
@@ -140,23 +142,35 @@ class ReportGenerateHandler:
         output_filename = node.params.get("output_path") or node.params.get("output_filename") or "analysis_report.html"
 
         file_paths = self._normalize_file_paths(node.params.get("file_paths") or [])
-        input_data = inputs.get("data") or inputs.get("input")
-        if not file_paths and not input_data:
+        dataset_input = inputs.get("dataset_ref")
+        dataset_refs = dataset_input if isinstance(dataset_input, list) else [dataset_input] if dataset_input else []
+        dataset_refs = [ref for ref in dataset_refs if is_dataset_ref(ref)]
+        if not file_paths and not dataset_refs:
             return {
                 "report_path": "",
                 "status": "error",
-                "message": "No data source provided. Please specify file_paths in params or connect a data input.",
+                "message": "No data source provided. Please specify file_paths in params or connect dataset_ref input.",
             }
 
         session_id = self.session_id or f"workflow_{self.user_id}"
         tmp_dir: str | None = None
         try:
-            if input_data and not file_paths:
-                tmp_dir = create_report_temp_dir(session_id, prefix="deepeye_report_input_")
-                file_paths = self._write_input_data_to_csv(input_data, tmp_dir)
-            else:
+            tmp_dir = create_report_temp_dir(session_id, prefix="deepeye_report_")
+            local_paths: list[str] = []
+            if file_paths:
                 sandbox_paths = self._resolve_sandbox_paths(file_paths)
-                file_paths, tmp_dir = self._download_files_from_sandbox(sandbox_paths, session_id=session_id)
+                copied_file_paths, _ = self._download_files_from_sandbox(sandbox_paths, session_id=session_id, tmp_dir=tmp_dir)
+                local_paths.extend(copied_file_paths)
+            for idx, dataset_ref in enumerate(dataset_refs):
+                local_paths.append(
+                    download_dataset_ref_to_local_csv(
+                        dataset_ref,
+                        sandbox=self.sandbox,
+                        tmp_dir=tmp_dir,
+                        name_hint=f"input_{idx}",
+                    )
+                )
+            file_paths = local_paths
 
             if not file_paths:
                 return {
@@ -242,11 +256,11 @@ class ReportGenerateNode(BaseNode):
                 },
             },
             inputs={
-                "data": Port(
-                    schema="any",
+                "dataset_ref": Port(
+                    schema="dict",
                     required=False,
                     multiple=True,
-                    description="Optional data input from connected nodes (e.g., rows from datasource.read). If provided, will be converted to CSV for analysis.",
+                    description="Optional dataset references from upstream nodes. Sandbox file paths will be consumed directly.",
                 ),
             },
             outputs={
