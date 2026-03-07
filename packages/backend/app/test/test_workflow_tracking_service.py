@@ -88,6 +88,7 @@ def test_workflow_tracking_persists_turn_draft_run_artifacts_and_workspace_state
         assert first_draft.id == second_draft.id
         assert second_draft.version == 2
         assert second_draft.file_path == "/workspace/workflow/revenue_v2.json"
+        assert second_draft.display_name == "revenue_v2"
 
         run = create_tracked_workflow_run(
             db,
@@ -177,6 +178,7 @@ def test_workspace_state_falls_back_to_latest_session_run_without_turn():
 
         assert state["turn"] is None
         assert state["draft"].id == draft.id
+        assert draft.display_name == "manual"
         assert state["run"].id == run.id
         assert len(state["artifacts"]) == 1
         assert state["artifacts"][0].payload["kind"] == "dashboard"

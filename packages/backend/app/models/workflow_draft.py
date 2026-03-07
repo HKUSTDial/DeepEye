@@ -25,3 +25,13 @@ class WorkflowDraft(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    @property
+    def display_name(self) -> str:
+        if self.file_path:
+            filename = self.file_path.rsplit("/", 1)[-1].strip()
+            if filename.endswith(".json"):
+                filename = filename[:-5]
+            if filename:
+                return filename
+        return f"draft-{str(self.id)[:8]}"

@@ -41,7 +41,6 @@ export interface StoredMessage {
 export interface WorkflowDraftUpsertRequest {
   draft_id?: string | null
   name?: string | null
-  file_path?: string | null
   definition: Record<string, unknown>
 }
 

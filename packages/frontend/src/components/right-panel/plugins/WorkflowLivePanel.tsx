@@ -92,6 +92,7 @@ function dedupeFilePaths(paths: Array<string | null | undefined>) {
 }
 
 function getDraftDisplayName(draft: WorkflowDraft) {
+  if (draft.display_name?.trim()) return draft.display_name.trim()
   const fileName = draft.file_path?.split('/').pop()?.replace(/\.json$/i, '')
   if (fileName) return fileName
   return `draft-${draft.id.slice(0, 8)}`
@@ -303,6 +304,10 @@ export function WorkflowLivePanel({
   )
   const activeFilePathForControls = activeSessionState?.activeFilePath ?? null
   const activeDraftIdForSession = activeSessionState?.activeDraftId ?? null
+  const activeDraftForSession = useMemo(
+    () => availableDrafts.find((draft) => draft.id === activeDraftIdForSession) ?? null,
+    [availableDrafts, activeDraftIdForSession],
+  )
   const activeViewState = activeSessionState?.viewState ?? 'idle'
   const hasTrackedWorkspaceState =
     !!activeSessionState?.definition ||
@@ -462,6 +467,10 @@ export function WorkflowLivePanel({
                 const nextDraft: WorkflowDraft = current
                   ? {
                       ...current,
+                      display_name:
+                        current.display_name ||
+                        filePath?.split('/').pop()?.replace(/\.json$/i, '') ||
+                        `draft-${draftId.slice(0, 8)}`,
                       definition: workflow as Record<string, unknown>,
                       file_path: filePath ?? current.file_path ?? null,
                       updated_at: new Date().toISOString(),
@@ -473,6 +482,7 @@ export function WorkflowLivePanel({
                       user_id: '',
                       source: 'workflow_agent',
                       status: 'draft',
+                      display_name: filePath?.split('/').pop()?.replace(/\.json$/i, '') || `draft-${draftId.slice(0, 8)}`,
                       file_path: filePath,
                       definition: workflow as Record<string, unknown>,
                       version: 1,
@@ -870,10 +880,7 @@ export function WorkflowLivePanel({
 
     try {
       const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
-      const fallbackName =
-        (activeFilePathForControls?.split('/').pop() || '')
-          .replace(/\.json$/i, '')
-          .trim() || 'workflow'
+      const fallbackName = activeDraftForSession?.display_name?.trim() || 'workflow'
       const saved = await sessionApi.saveWorkflowDraft(sessionId, {
         draft_id: activeDraftIdForSession || undefined,
         name: activeDraftIdForSession ? undefined : fallbackName,
@@ -903,8 +910,8 @@ export function WorkflowLivePanel({
     nodeDefs,
     flow.nodes,
     flow.edges,
+    activeDraftForSession,
     activeDraftIdForSession,
-    activeFilePathForControls,
     activeFiles,
     setFiles,
     setActiveDraftId,
@@ -1068,7 +1075,7 @@ export function WorkflowLivePanel({
               try {
                 const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
                 const filename =
-                  activeFilePathForControls?.split('/').pop() ||
+                  (activeDraftForSession?.display_name ? `${activeDraftForSession.display_name}.json` : null) ||
                   (activeDraftIdForSession ? `draft-${activeDraftIdForSession.slice(0, 8)}.json` : 'workflow.json')
                 const json = JSON.stringify(definition, null, 2)
                 const blob = new Blob([json], { type: 'application/json;charset=utf-8' })

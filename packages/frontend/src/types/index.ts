@@ -118,6 +118,7 @@ export interface WorkflowDraft {
   user_id: string
   source: string
   status: string
+  display_name: string
   file_path?: string | null
   definition: Record<string, unknown>
   version: number

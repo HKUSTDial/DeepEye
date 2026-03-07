@@ -220,7 +220,6 @@ async def upsert_session_workflow_draft(
             user_id=user_id,
             draft_id=request.draft_id,
             name=request.name,
-            file_path=request.file_path,
             definition=request.definition,
             source="workflow_editor",
         )

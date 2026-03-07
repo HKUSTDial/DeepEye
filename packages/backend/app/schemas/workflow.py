@@ -71,6 +71,7 @@ class WorkflowDraftResponse(BaseModel):
     user_id: UUID
     source: str
     status: str
+    display_name: str
     file_path: str | None
     definition: dict[str, Any]
     version: int
@@ -83,7 +84,6 @@ class WorkflowDraftResponse(BaseModel):
 class WorkflowDraftUpsertRequest(BaseModel):
     draft_id: UUID | None = None
     name: str | None = None
-    file_path: str | None = None
     definition: dict[str, Any]
 
 
