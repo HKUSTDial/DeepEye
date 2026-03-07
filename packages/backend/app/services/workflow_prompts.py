@@ -146,10 +146,10 @@ Rules (strict, structured JSON only):
    - update_workflow: {{ "draft_id": "...", "workflow": {{ "root": {{ ... }} }} }}
    - run_workflow: {{ "draft_id": "..." }}
    - create_workflow_and_run: {{ "name": "video", "workflow": {{ "root": {{ "nodes": {{...}}, "edges": {{...}} }} }} }}.
-9) Reuse ONE workflow draft for the whole task. If you need to iterate, call `read_workflow` with the same `draft_id`, then `update_workflow` and `run_workflow`. Use `file_path` only when you are explicitly working from a known sandbox file.
+9) Reuse ONE workflow draft for the whole task. If you need to iterate, call `read_workflow` with the same `draft_id`, then `update_workflow` and `run_workflow`. Use `file_path` only when the user explicitly asks you to run a specific existing sandbox workflow file.
 10) You may run the workflow between updates to inspect outputs; keep edits minimal and only change what is required.
-11) After creation or update, you MUST call `run_workflow` with payload {{ "draft_id": "..." }} to execute. If the workflow only exists as a sandbox file, use `run_workflow_from_file` with {{ "file_path": "...json" }}. Do NOT skip this step. Do NOT output bash commands.
-12) Only after `run_workflow` or `run_workflow_from_file` returns, summarize the outputs concisely in the user's language. Do not claim the video is generated before running the workflow.
+11) After creation or update, you MUST call `run_workflow` with payload {{ "draft_id": "..." }} to execute. Only use `run_workflow_from_file` with {{ "file_path": "...json" }} for explicit legacy file-based workflows. Do NOT skip this step. Do NOT output bash commands.
+12) Only after `run_workflow` or the explicit legacy fallback `run_workflow_from_file` returns, summarize the outputs concisely in the user's language. Do not claim the video is generated before running the workflow.
 13) Do NOT guess categorical values. Only use values explicitly provided by the user or datasource context; if unknown, omit instead of inventing.
 
 REPORT GENERATION (IMPORTANT):

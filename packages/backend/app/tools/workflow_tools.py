@@ -192,43 +192,29 @@ def create_update_workflow_tool(session_id: str, user_id: str, turn_id: str | No
 
 def create_run_workflow_from_file_tool(session_id: str, turn_id: str | None = None) -> callable:
     @tool
-    async def run_workflow_from_file(file_path: str | None = None, draft_id: str | None = None) -> dict:
+    async def run_workflow_from_file(file_path: str) -> dict:
         """
-        Run a workflow from an existing draft or sandbox file.
+        Run a workflow directly from a known sandbox file path.
 
         Args:
-            draft_id: Workflow draft id. Preferred.
-            file_path: Workflow JSON file path. Fallback for existing file-based flows.
+            file_path: Workflow JSON file path for an explicitly file-based workflow.
         """
-        if not draft_id and not file_path:
-            return {"status": "error", "error": "Provide draft_id or file_path."}
-
         db = SessionLocal()
         try:
             session = _get_session(db, session_id)
             if not session:
                 return {"status": "error", "error": "Session not found."}
-            existing_draft, norm_path = resolve_workflow_target(
+            _, norm_path = resolve_workflow_target(
                 db,
                 session_id,
-                draft_id=draft_id,
                 file_path=file_path,
             )
-            if existing_draft and isinstance(existing_draft.definition, dict):
-                return await service_run_workflow_draft(
-                    db,
-                    session.user_id,
-                    session_id,
-                    str(existing_draft.id),
-                    turn_id=turn_id,
-                )
             return await service_run_workflow_from_file(
                 db,
                 session.user_id,
                 session_id,
                 norm_path,
                 turn_id=turn_id,
-                draft_id=draft_id,
             )
         finally:
             db.close()

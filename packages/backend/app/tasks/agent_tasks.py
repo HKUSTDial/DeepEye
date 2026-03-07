@@ -25,7 +25,6 @@ from app.services.workflow_tracking_service import (
 from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
 from deepeye.agents import AgentFactory
 from app.tools.workflow_tools import (
-    create_run_workflow_from_file_tool,
     create_design_workflow_tool,
 )
 from app.tools.kb_tools import create_knowledge_base_agent_tool
@@ -267,7 +266,6 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
             turn_id=turn_id,
         )
     )
-    tools.append(create_run_workflow_from_file_tool(session_id, turn_id=turn_id))
 
     user_input = agent_input.user_input
 
