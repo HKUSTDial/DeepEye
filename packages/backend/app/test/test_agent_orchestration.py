@@ -13,7 +13,7 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.services.agent_prompts import build_supervisor_prompt
 from app.tasks.callbacks import MessageCollector
-from app.tools.workflow_tools import _extract_final_answer
+from app.tools.workflow_tools import _extract_final_answer, create_design_workflow_tool
 from deepeye.agents.factory import AgentFactory
 from deepeye.tools.base import tool
 
@@ -191,3 +191,57 @@ def test_supervisor_does_not_inject_plan_tools() -> None:
     )
 
     assert [tool.name for tool in supervisor.tools] == ["workflow_agent"]
+
+
+@pytest.mark.anyio
+async def test_workflow_agent_uses_compact_toolset(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeDb:
+        def close(self) -> None:
+            return None
+
+    class _FakeWorkflowAgent:
+        def __init__(self, *, model, system_prompt, tools, max_steps, **kwargs):
+            del model, system_prompt, kwargs
+            captured["tool_names"] = [tool.name for tool in tools]
+            captured["max_steps"] = max_steps
+
+        async def ainvoke(self, goal: str, thread_id: str | None = None, config: dict | None = None):
+            del goal, thread_id, config
+            return {"messages": []}
+
+    monkeypatch.setattr("app.tools.workflow_tools.SessionLocal", lambda: _FakeDb())
+    monkeypatch.setattr(
+        "app.tools.workflow_tools._get_session",
+        lambda db, session_id: type("Session", (), {"user_id": "user-1"})(),
+    )
+    monkeypatch.setattr("app.tools.workflow_tools.WorkflowAgent", _FakeWorkflowAgent)
+    monkeypatch.setattr(
+        "app.tools.workflow_tools.build_workspace_state",
+        lambda db, session_id: {
+            "session_id": session_id,
+            "draft": type("Draft", (), {"id": "draft-1", "status": "ready", "version": 1, "source": "workflow_agent"})(),
+            "run": type("Run", (), {"id": "run-1", "status": "success", "error": None, "result": {"outputs": {}}})(),
+            "artifacts": [],
+        },
+    )
+
+    workflow_tool = create_design_workflow_tool(
+        model=ToolCallingFakeChatModel(messages=iter([AIMessage(content="Done.")])),
+        session_id="session-1",
+        system_prompt="test prompt",
+        callbacks=[],
+        turn_id=None,
+    )
+
+    result = await workflow_tool.ainvoke({"goal": "Analyze the attached data"})
+
+    assert result["status"] == "success"
+    assert captured["tool_names"] == [
+        "create_workflow_and_run",
+        "read_workflow",
+        "update_workflow",
+        "run_workflow",
+    ]
+    assert captured["max_steps"] == 24

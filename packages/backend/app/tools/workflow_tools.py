@@ -373,12 +373,11 @@ def create_design_workflow_tool(
                 system_prompt=system_prompt,
                 tools=[
                     create_workflow_and_run_tool(session_id, turn_id=turn_id),
-                    create_create_workflow_tool(session_id, str(session.user_id), turn_id=turn_id),
                     create_read_workflow_tool(session_id),
                     create_update_workflow_tool(session_id, str(session.user_id), turn_id=turn_id),
                     create_run_workflow_tool(session_id, turn_id=turn_id),
-                    create_run_workflow_from_file_tool(session_id, turn_id=turn_id),
                 ],
+                max_steps=24,
             )
             result = await workflow_agent_inst.ainvoke(
                 goal,

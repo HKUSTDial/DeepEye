@@ -21,6 +21,8 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "prefer `create_workflow_and_run`" in prompt
     assert "Do NOT call `read_workflow`, `update_workflow`, or `run_workflow` before the first run" in prompt
     assert "File + database joint analysis" in prompt
+    assert "single business answer" in prompt
+    assert "run_workflow_from_file" not in prompt
     assert "rows.select" in prompt
     assert "rows.aggregate" in prompt
     assert "llm.answer" in prompt
