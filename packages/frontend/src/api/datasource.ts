@@ -14,7 +14,10 @@ export interface DatasourceTablesResponse {
 
 export const datasourceApi = {
   list: () => http.get<DataSource[]>('/datasources'),
-  create: (data: DataSourceCreate) => http.post<DataSource>('/datasources', data),
+  create: (data: DataSourceCreate, sessionId?: string | null) => {
+    const url = sessionId ? `/datasources?session_id=${sessionId}` : '/datasources'
+    return http.post<DataSource>(url, data)
+  },
   update: (id: string, data: DataSourceUpdate) => http.patch<DataSource>(`/datasources/${id}`, data),
   tables: (id: string) => http.get<DatasourceTablesResponse>(`/datasources/${id}/tables`),
   delete: (id: string, sessionId?: string | null) => {
@@ -28,4 +31,3 @@ export const datasourceApi = {
     return http.post<DataSource>(url, formData)
   },
 }
-

@@ -10,6 +10,7 @@ from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_base_chunk import KnowledgeBaseChunk
 from app.models.knowledge_base_file import KnowledgeBaseFile
 from app.models.refresh_token import RefreshToken
+from app.models.session_attachment import SessionAttachment
 from app.models.session_message import SessionMessage
 from app.models.user import User
 from app.models.user_email_verification import UserEmailVerification
@@ -27,6 +28,7 @@ __all__ = [
     "KnowledgeBaseChunk",
     "KnowledgeBaseFile",
     "RefreshToken",
+    "SessionAttachment",
     "SessionMessage",
     "User",
     "UserEmailVerification",

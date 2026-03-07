@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.infra import RedisEventBus
-from app.repositories import DataSourceRepository, SessionRepository
+from app.repositories import DataSourceRepository, SessionAttachmentRepository, SessionRepository
 from app.sandbox.manager import SandboxManager, _get_datasource_filename
 from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
 from app.services.workflow_engine import build_registry
@@ -131,6 +131,17 @@ def _get_user_id(session_id: str) -> uuid.UUID | None:
         return session.user_id if session else None
 
 
+def _get_session_attachment_ids(session_id: str) -> list[str]:
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except (TypeError, ValueError):
+        return []
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    with Session() as db:
+        return SessionAttachmentRepository(db).list_datasource_ids(session_uuid)
+
+
 async def _run_agent_async(agent_input: AgentInput) -> None:
     session_id = agent_input.session_id
     model = _create_model()
@@ -163,7 +174,11 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     user_id = _get_user_id(session_id)
 
     # Build tool - handle data sources
-    datasource_ids = agent_input.datasource_ids or []
+    datasource_ids = (
+        list(dict.fromkeys(agent_input.datasource_ids))
+        if agent_input.datasource_ids is not None
+        else _get_session_attachment_ids(session_id)
+    )
     
     # Sync file datasources
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)

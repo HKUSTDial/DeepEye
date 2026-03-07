@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useChatStore } from './stores/chat'
 import { useAuthStore } from './stores/auth'
 import { useRightPanelStore } from './stores/rightPanel'
+import { sessionApi } from './api'
 import Sidebar from './components/Sidebar'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
@@ -104,6 +105,43 @@ function App() {
       setRightPanelRatio(window.innerWidth < 1320 ? 30 : 28)
     }
   }, [rightPanelRatio, setRightPanelRatio])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadSessionAttachments = async () => {
+      if (!sessionId || sessionId === 'draft') {
+        if (!cancelled) {
+          setDataSourceIds([])
+        }
+        return
+      }
+
+      try {
+        const attachedSources = await sessionApi.listAttachments(sessionId)
+        if (!cancelled) {
+          setDataSourceIds(attachedSources.map((source) => source.id))
+        }
+      } catch (e) {
+        console.error('Failed to load session attachments', e)
+        if (!cancelled) {
+          setDataSourceIds([])
+        }
+      }
+    }
+
+    void loadSessionAttachments()
+
+    const onUpdated = () => {
+      void loadSessionAttachments()
+    }
+
+    window.addEventListener('datasources:updated', onUpdated)
+    return () => {
+      cancelled = true
+      window.removeEventListener('datasources:updated', onUpdated)
+    }
+  }, [sessionId])
 
   const workspaceStyle = useMemo(
     () => ({

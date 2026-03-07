@@ -1,4 +1,4 @@
-import type { Session, ToolStep } from '../types'
+import type { DataSource, Session, ToolStep } from '../types'
 import { http } from './client'
 
 /**
@@ -47,5 +47,9 @@ export const sessionApi = {
   update: (id: string, title: string) => http.patch<Session>(`/sessions/${id}`, { title }),
   delete: (id: string) => http.delete<void>(`/sessions/${id}`),
   getMessages: (id: string) => http.get<{ messages: StoredMessage[] }>(`/sessions/${id}/messages`),
+  listAttachments: (id: string) => http.get<DataSource[]>(`/sessions/${id}/attachments`),
+  attachDatasource: (sessionId: string, datasourceId: string) =>
+    http.post<DataSource>(`/sessions/${sessionId}/attachments/${datasourceId}`),
+  detachDatasource: (sessionId: string, datasourceId: string) =>
+    http.delete<void>(`/sessions/${sessionId}/attachments/${datasourceId}`),
 }
-

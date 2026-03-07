@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { datasourceApi } from '../api'
 import { useChat } from '../hooks/useChat'
 import { useChatStore } from '../stores/chat'
 import { useKnowledgeBasesStore } from '../stores/knowledgeBases'
@@ -59,31 +58,9 @@ export default function ChatBox({
     },
   ]
 
-  const syncDatasourceIds = useCallback(async () => {
-    if (!onDataSourceIdsChange) return
-    try {
-      const list = await datasourceApi.list()
-      onDataSourceIdsChange(list.map((item) => item.id))
-    } catch {
-      // Keep composer usable even if datasource refresh fails.
-    }
-  }, [onDataSourceIdsChange])
-
   useEffect(() => {
     loadBases()
   }, [loadBases])
-
-  useEffect(() => {
-    void syncDatasourceIds()
-  }, [syncDatasourceIds])
-
-  useEffect(() => {
-    const onUpdated = () => {
-      void syncDatasourceIds()
-    }
-    window.addEventListener('datasources:updated', onUpdated)
-    return () => window.removeEventListener('datasources:updated', onUpdated)
-  }, [syncDatasourceIds])
 
   useEffect(() => {
     if (!showDataSourceManager) return

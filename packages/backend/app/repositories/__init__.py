@@ -10,6 +10,7 @@ from app.repositories.knowledge_base_file_repo import KnowledgeBaseFileRepositor
 from app.repositories.knowledge_base_repo import KnowledgeBaseRepository
 from app.repositories.message_repo import MessageRepository
 from app.repositories.refresh_token_repo import RefreshTokenRepository
+from app.repositories.session_attachment_repo import SessionAttachmentRepository
 from app.repositories.session_repo import SessionRepository
 from app.repositories.user_email_verification_repo import UserEmailVerificationRepository
 from app.repositories.workflow_repo import WorkflowRepository
@@ -28,6 +29,7 @@ __all__ = [
     "KnowledgeBaseRepository",
     "MessageRepository",
     "RefreshTokenRepository",
+    "SessionAttachmentRepository",
     "UserEmailVerificationRepository",
     "WorkflowRepository",
     "WorkflowRunRepository",

@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.models import DataSource
-from app.repositories import DataSourceRepository
+from app.repositories import DataSourceRepository, SessionAttachmentRepository, SessionRepository
 from app.schemas import DataSourceCreate, DataSourceResponse, DataSourceUpdate, SandboxEvent, SandboxEventType
+from app.services import attach_datasource_to_session
 from app.services.datasource_file_service import create_file_datasource
 from app.services.datasource_specs import (
     DataSourceCategory,
@@ -27,6 +28,18 @@ from app.core.config import settings
 router = APIRouter(prefix="/datasources", tags=["datasources"])
 
 
+def _get_owned_session_or_404(db: Session, session_id: str, user_id: uuid.UUID):
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid session_id") from exc
+
+    session = SessionRepository(db).get_by_id_and_user(session_uuid, user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
 @router.get("", response_model=list[DataSourceResponse])
 def list_datasources(
     user_id: CurrentUserId,  # ⭐ 自动鉴权并注入 user_id
@@ -37,9 +50,10 @@ def list_datasources(
 
 
 @router.post("", response_model=DataSourceResponse)
-def create_datasource(
+async def create_datasource(
     data: DataSourceCreate,
     user_id: CurrentUserId,  # ⭐ 自动鉴权并注入 user_id
+    session_id: str | None = None,
     db: Session = Depends(get_db)
 ):
     """Create a new database datasource for current user (MySQL, PostgreSQL, SQLite, etc.)."""
@@ -58,7 +72,11 @@ def create_datasource(
         category="database",
         connection_string=conn,
     )
-    return DataSourceRepository(db).save(entity)
+    created = DataSourceRepository(db).save(entity)
+    if session_id:
+        session = _get_owned_session_or_404(db, session_id, user_id)
+        await attach_datasource_to_session(db, session, created)
+    return created
 
 
 @router.post("/upload", response_model=DataSourceResponse)
@@ -72,6 +90,7 @@ async def upload_datasource_file(
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
+    session = _get_owned_session_or_404(db, session_id, user_id) if session_id else None
     try:
         ds = create_file_datasource(
             db=db,
@@ -83,26 +102,8 @@ async def upload_datasource_file(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    # Proactive Sync: Push to sandbox if session_id is provided
-    if session_id:
-        from app.sandbox.manager import sandbox_manager
-        try:
-            sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-            filename = get_datasource_filename(getattr(ds, "name", None), getattr(ds, "storage_path", None))
-            dest_path = workspace_data_path(filename)
-            await sandbox.write_file(dest_path, data)
-            
-            # Notify frontend about file change via event bus
-            event_bus = RedisEventBus(settings.REDIS_URL)
-            await event_bus.publish(
-                f"session:{session_id}",
-                SandboxEvent(type=SandboxEventType.FILES_CHANGED, source="sandbox").model_dump_json()
-            )
-            await event_bus.close()
-        except Exception as e:
-            # We don't fail the upload if sandbox sync fails, just log it
-            from deepeye.utils.logger import logger
-            logger.error(f"Proactive sync failed for session {session_id}: {e}")
+    if session:
+        await attach_datasource_to_session(db, session, ds)
 
     return ds
 
@@ -236,5 +237,6 @@ async def delete_datasource(
             except Exception as e:
                 logger.error(f"Failed to delete file from sandbox {session_id}: {e}")
 
+    SessionAttachmentRepository(db).detach_all_for_datasource(datasource_id)
     repo.delete(datasource_id)
     return {"status": "ok"}

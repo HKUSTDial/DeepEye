@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { datasourceApi, type DatasourceTablesResponse } from '../api'
+import { datasourceApi, sessionApi, type DatasourceTablesResponse } from '../api'
 import { useChatStore } from '../stores/chat'
 import type { DataSource } from '../types'
 import './DataSourceManager.css'
@@ -124,6 +124,7 @@ function EngineSelect({ value, onChange }: EngineSelectProps) {
 
 export default function DataSourceManager({ onDataSourcesChange, variant = 'sidebar' }: DataSourceManagerProps) {
   const sessionId = useChatStore((state) => state.sessionId)
+  const createSession = useChatStore((state) => state.createSession)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [isCreating, setIsCreating] = useState(false)
@@ -150,10 +151,15 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     [onDataSourcesChange],
   )
 
-  const loadDataSources = useCallback(async () => {
+  const loadDataSources = useCallback(async (targetSessionId?: string | null) => {
     setError(null)
+    const effectiveSessionId = targetSessionId ?? sessionId
+    if (!effectiveSessionId || effectiveSessionId === 'draft') {
+      applyDataSources([])
+      return
+    }
     try {
-      const list = await datasourceApi.list()
+      const list = await sessionApi.listAttachments(effectiveSessionId)
       applyDataSources(list)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to load'
@@ -164,7 +170,19 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
           : msg,
       )
     }
-  }, [applyDataSources])
+  }, [applyDataSources, sessionId])
+
+  const ensureSessionId = useCallback(async () => {
+    if (sessionId && sessionId !== 'draft') {
+      return sessionId
+    }
+
+    const created = await createSession()
+    if (!created) {
+      throw new Error('Failed to create a session before attaching data')
+    }
+    return created.id
+  }, [createSession, sessionId])
 
   const uploadFiles = useCallback(
     async (files: File[]) => {
@@ -180,12 +198,11 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setIsUploading(true)
       setError(null)
       try {
-        const createdSources: DataSource[] = []
+        const targetSessionId = await ensureSessionId()
         for (const file of supportedFiles) {
-          const created = await datasourceApi.upload(file, sessionId)
-          createdSources.push(created)
+          await datasourceApi.upload(file, targetSessionId)
         }
-        applyDataSources((current) => [...current, ...createdSources])
+        await loadDataSources(targetSessionId)
         emitDatasourceUpdated()
         if (ignoredCount > 0) {
           setError(`${ignoredCount} unsupported file(s) were skipped.`)
@@ -197,7 +214,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         setIsDragOver(false)
       }
     },
-    [applyDataSources, sessionId],
+    [ensureSessionId, loadDataSources],
   )
 
   const createDataSource = async () => {
@@ -208,12 +225,13 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     }
     try {
       setError(null)
-      const created = await datasourceApi.create({
+      const targetSessionId = await ensureSessionId()
+      await datasourceApi.create({
         name: newDs.name.trim() || newDs.type,
         type: newDs.type,
         connection_string: conn,
-      })
-      applyDataSources((current) => [...current, created])
+      }, targetSessionId)
+      await loadDataSources(targetSessionId)
       setIsCreating(false)
       setNewDs({ name: '', type: 'postgres', connection_string: '' })
       emitDatasourceUpdated()
@@ -309,9 +327,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
 
   const deleteDataSource = async (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    if (!confirm('Delete this data source?')) return
+    if (!sessionId || sessionId === 'draft') return
+    if (!confirm('Remove this data source from the current thread?')) return
     try {
-      await datasourceApi.delete(id, sessionId)
+      await sessionApi.detachDatasource(sessionId, id)
       applyDataSources((current) => current.filter((item) => item.id !== id))
       setTablesByDsId((prev) => {
         const next = { ...prev }
