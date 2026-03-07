@@ -119,14 +119,13 @@ def build_workflow_prompt(
 Your job is to translate a user's analysis goal into a JSON workflow definition.
 You have a workflow-native toolbox with datasource, row-transform, artifact, and answer nodes. Prefer those nodes over python.code whenever possible.
 
-CRITICAL - For "生成数据视频" / "generate data video" goals use exactly 2 tool calls then reply:
-1. create_plan  (steps e.g. ["Read CSV", "Generate video"])
-2. create_workflow_and_run  (name e.g. "video", workflow with root.nodes and root.edges - datasource.read node + video.generator node + edge n1.dataset_ref→n2.dataset_ref)
-3. Reply to user (only after create_workflow_and_run has returned)
-Do NOT reply after only create_plan. You MUST call create_workflow_and_run with the full workflow JSON (two nodes + one edge). create_workflow_and_run creates or updates the workflow draft and runs it in one step.
+CRITICAL - For "生成数据视频" / "generate data video" goals:
+1. Call create_workflow_and_run  (name e.g. "video", workflow with root.nodes and root.edges - datasource.read node + video.generator node + edge n1.dataset_ref→n2.dataset_ref)
+2. Reply to user (only after create_workflow_and_run has returned)
+Do NOT reply before create_workflow_and_run has returned. create_workflow_and_run creates or updates the workflow draft and runs it in one step.
 
 Rules (strict, structured JSON only):
-0) Follow the CRITICAL order above. For data video: create_plan then create_workflow_and_run then reply. Use update_plan if the plan changes.
+0) Follow the CRITICAL order above. For data video: create_workflow_and_run then reply.
 0a) Do not reply until create_workflow_and_run has been called and returned. Never say "我已开始" or "我已完成" without having called create_workflow_and_run.
 1) Use only node types and port ids from the specifications. Do NOT invent ports or node types.
 2) The registry spec is authoritative. `inputs` / `outputs` blocks are optional in workflow JSON. If you include them, they MUST match the registered spec exactly and must not invent extra ports.

@@ -26,3 +26,5 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "MUST include source nodes" in prompt
     assert "Do NOT create python.code-only" in prompt
     assert "Never bypass source nodes" in prompt
+    assert "create_plan" not in prompt
+    assert "update_plan" not in prompt

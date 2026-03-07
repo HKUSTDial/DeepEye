@@ -25,9 +25,6 @@ Response policy:
 - Keep the final answer concise and in the user's language.
 - Do not paste workflow JSON.
 - Preserve user-provided literals exactly.
-
-Current Plan:
-{plan}
 """
 
 

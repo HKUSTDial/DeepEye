@@ -103,3 +103,19 @@ def test_message_collector_prefers_summary_tool_output() -> None:
     message = collector.build()
 
     assert message.content == "Final concise answer."
+
+
+def test_supervisor_does_not_inject_plan_tools() -> None:
+    model = ToolCallingFakeChatModel(messages=iter([AIMessage(content="Done.")]))
+
+    @tool
+    async def workflow_agent(goal: str) -> dict:
+        """Plan and run the workflow for a user goal."""
+        return {"status": "success", "goal": goal}
+
+    supervisor = AgentFactory(model).create_supervisor(
+        [workflow_agent],
+        system_prompt_template=build_supervisor_prompt(),
+    )
+
+    assert [tool.name for tool in supervisor.tools] == ["workflow_agent"]

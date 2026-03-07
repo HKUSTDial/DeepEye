@@ -2,12 +2,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Annotated, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.messages import ToolMessage
-from langchain_core.tools import InjectedToolCallId
-from langgraph.types import Command
 
 from app.db.session import SessionLocal
 from app.repositories import SessionRepository
@@ -23,7 +19,6 @@ from app.services.workflow_targets import normalize_workflow_path, save_workflow
 from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
-from deepeye.tools.planning_tools import mark_step_done, update_plan
 from deepeye.utils.logger import logger
 
 
@@ -34,33 +29,6 @@ def _get_session(db, session_id: str):
         logger.warning("[workflow_tools] Invalid session_id=%s", session_id)
         return None
     return SessionRepository(db).get(session_uuid)
-
-
-@tool
-def create_plan(
-    steps: List[str],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-) -> Annotated[Command, "The result of creating the plan"]:
-    """Create a new execution plan with a list of steps. After this you MUST create/update a workflow draft and run it before replying."""
-    return Command(
-        update={
-            "plan": steps,
-            "completed_steps": [],
-            "messages": [
-                ToolMessage(
-                    content=(
-                        "Plan created. Next you MUST call create_workflow_and_run with workflow and an optional name, "
-                        "or create_workflow followed by run_workflow. Reuse the returned draft_id for follow-up steps. "
-                        "If execution returns validation_errors or details, read/update the SAME draft_id, fix only the "
-                        "reported issues, and run it again before replying. "
-                        "Use file_path only for an explicit legacy sandbox workflow file. "
-                        "Do not reply until a workflow run has returned."
-                    ),
-                    tool_call_id=tool_call_id,
-                )
-            ],
-        }
-    )
 
 
 async def _read_workflow_file(session_id: str, path: str) -> dict:
@@ -383,9 +351,6 @@ def create_design_workflow_tool(
                 model=model,
                 system_prompt=system_prompt,
                 tools=[
-                    create_plan,
-                    update_plan,
-                    mark_step_done,
                     create_workflow_and_run_tool(session_id, turn_id=turn_id),
                     create_create_workflow_tool(session_id, str(session.user_id), turn_id=turn_id),
                     create_read_workflow_tool(session_id),

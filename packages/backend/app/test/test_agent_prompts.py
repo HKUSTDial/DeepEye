@@ -20,6 +20,7 @@ def test_supervisor_prompt_requires_summary_step():
     assert "workflow_agent" in prompt
     assert "summarize_workflow_result" in prompt
     assert "must call `summarize_workflow_result`".lower() in prompt.lower()
+    assert "Current Plan" not in prompt
 
 
 def test_workflow_summary_prompt_embeds_workspace_state():
