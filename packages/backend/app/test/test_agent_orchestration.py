@@ -16,6 +16,7 @@ from app.tasks.callbacks import MessageCollector, _workflow_tool_trace_summary
 from app.tools.workflow_tools import (
     _extract_final_answer,
     _new_repair_state,
+    _normalize_workflow_payload_shape,
     _normalize_workflow_run_result,
     _require_reuse_after_failure,
     create_design_workflow_tool,
@@ -153,6 +154,53 @@ async def test_supervisor_replies_directly_when_workflow_agent_returns_final_ans
     assert result["messages"][-1].content == "Final grounded workflow answer."
 
 
+@pytest.mark.anyio
+async def test_supervisor_short_circuits_after_workflow_agent_final_answer_tool_message():
+    calls: list[tuple[str, str]] = []
+
+    @tool
+    async def workflow_agent(goal: str) -> dict:
+        """Plan and run the workflow for a user goal."""
+        calls.append(("workflow_agent", goal))
+        return {
+            "status": "failed",
+            "next_action": "reply_directly",
+            "final_answer": "工作流规划未收敛，请缩小问题范围后重试。",
+        }
+
+    model = ToolCallingFakeChatModel(
+        messages=iter(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "workflow_agent",
+                            "args": {"goal": "分析附加数据并回答问题"},
+                            "id": "call_workflow",
+                            "type": "tool_call",
+                        }
+                    ],
+                ),
+            ]
+        ),
+    )
+
+    supervisor = AgentFactory(model).create_supervisor(
+        [workflow_agent],
+        system_prompt_template=build_supervisor_prompt(),
+    )
+
+    result = await supervisor.ainvoke(
+        "分析附加数据并回答问题",
+        thread_id="session-1",
+        config={"configurable": {"datasources_context": "No data sources selected."}},
+    )
+
+    assert calls == [("workflow_agent", "分析附加数据并回答问题")]
+    assert result["messages"][-1].content == "工作流规划未收敛，请缩小问题范围后重试。"
+
+
 def test_message_collector_prefers_summary_tool_output() -> None:
     collector = MessageCollector()
     collector.add_token("supervisor", "I will analyze this for you. ")
@@ -177,6 +225,20 @@ def test_message_collector_uses_fallback_content_on_failure() -> None:
     assert message.content == "工作流规划未收敛，系统已停止自动重试。"
     assert message.steps[0].status == "error"
     assert message.steps[0].output == "Recursion limit hit."
+
+
+def test_message_collector_prefers_workflow_agent_final_answer() -> None:
+    collector = MessageCollector()
+    collector.add_token("supervisor", "我来帮您分析。")
+    collector.start_tool("supervisor", "workflow_agent", "{}")
+    collector.end_tool(
+        "supervisor",
+        '{"status":"failed","next_action":"reply_directly","final_answer":"工作流规划未收敛，请补充更明确的目标后重试。"}',
+    )
+
+    message = collector.build()
+
+    assert message.content == "工作流规划未收敛，请补充更明确的目标后重试。"
 
 
 def test_workflow_tool_trace_summary_compacts_run_metadata() -> None:
@@ -256,6 +318,32 @@ def test_extract_final_answer_prefers_workflow_answer_output() -> None:
     assert _extract_final_answer(workspace_state) == "The final grounded answer."
 
 
+def test_normalize_workflow_payload_shape_converts_list_nodes_and_edges() -> None:
+    workflow = {
+        "id": "wf-1",
+        "root": {
+            "nodes": [
+                {"id": "read_file", "type": "datasource.read", "params": {"datasource_id": "ds-1"}},
+                {"id": "answer", "type": "llm.answer", "params": {"question": "Q"}},
+            ],
+            "edges": [
+                {
+                    "id": "edge-1",
+                    "source": {"node_id": "read_file", "port_id": "dataset_ref"},
+                    "target": {"node_id": "answer", "port_id": "dataset_ref"},
+                }
+            ],
+        },
+    }
+
+    normalized = _normalize_workflow_payload_shape(workflow)
+
+    assert isinstance(normalized["root"]["nodes"], dict)
+    assert isinstance(normalized["root"]["edges"], dict)
+    assert set(normalized["root"]["nodes"].keys()) == {"read_file", "answer"}
+    assert set(normalized["root"]["edges"].keys()) == {"edge-1"}
+
+
 def test_supervisor_does_not_inject_plan_tools() -> None:
     model = ToolCallingFakeChatModel(messages=iter([AIMessage(content="Done.")]))
 
@@ -324,3 +412,67 @@ async def test_workflow_agent_uses_compact_toolset(monkeypatch) -> None:
         "run_workflow",
     ]
     assert captured["max_steps"] == 24
+
+
+@pytest.mark.anyio
+async def test_workflow_agent_returns_terminal_failure_without_summary(monkeypatch) -> None:
+    class _FakeDb:
+        def close(self) -> None:
+            return None
+
+    class _FakeWorkflowAgent:
+        def __init__(self, *, stop_condition=None, **kwargs):
+            del kwargs
+            self.stop_condition = stop_condition
+
+        async def ainvoke(self, goal: str, thread_id: str | None = None, config: dict | None = None):
+            del goal, thread_id, config
+            assert self.stop_condition is not None
+            assert self.stop_condition() is not None
+            return {"messages": [AIMessage(content="terminal failure stop")]}
+
+    monkeypatch.setattr("app.tools.workflow_tools.SessionLocal", lambda: _FakeDb())
+    monkeypatch.setattr(
+        "app.tools.workflow_tools._get_session",
+        lambda db, session_id: type("Session", (), {"user_id": "user-1"})(),
+    )
+    monkeypatch.setattr(
+        "app.tools.workflow_tools._new_repair_state",
+        lambda: {
+            "repair_failures": 2,
+            "max_repair_failures": 2,
+            "active_draft_id": "draft-1",
+            "limit_exhausted": True,
+            "terminal_failure": {
+                "status": "failed",
+                "draft_id": "draft-1",
+                "repairable": False,
+                "error_type": "repair_limit_exceeded",
+                "error_summary": "Workflow repair limit reached for draft draft-1. Stop editing and explain the failure to the user.",
+                "error": "Workflow repair limit exceeded.",
+                "issues": ["root.nodes: invalid shape"],
+                "validation_errors": None,
+                "details": None,
+            },
+        },
+    )
+    monkeypatch.setattr("app.tools.workflow_tools.WorkflowAgent", _FakeWorkflowAgent)
+    monkeypatch.setattr(
+        "app.tools.workflow_tools.build_workspace_state",
+        lambda db, session_id: {"session_id": session_id, "draft": None, "run": None, "artifacts": []},
+    )
+
+    workflow_tool = create_design_workflow_tool(
+        model=ToolCallingFakeChatModel(messages=iter([AIMessage(content="Done.")])),
+        session_id="session-1",
+        system_prompt="test prompt",
+        callbacks=[],
+        turn_id=None,
+    )
+
+    result = await workflow_tool.ainvoke({"goal": "分析附加数据并回答问题"})
+
+    assert result["status"] == "failed"
+    assert result["next_action"] == "reply_directly"
+    assert result["error_type"] == "repair_limit_exceeded"
+    assert "自动修复两次后仍未收敛" in result["final_answer"]

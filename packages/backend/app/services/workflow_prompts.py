@@ -146,14 +146,17 @@ Core planning priorities:
 Mandatory workflow construction rules:
 1) Use only node types and exact port ids from the registry specification. Do NOT invent node types, ports, or schemas.
 2) The registry spec is authoritative. `inputs` and `outputs` blocks are optional in workflow JSON. If you include them, they MUST match the registered spec exactly and must not invent extra ports.
-3) Port multiplicity still applies: only ports with `multiple=true` may have more than one incoming edge.
-4) If the task depends on attached files or databases, the workflow MUST include source nodes first: `datasource.read` for files, `sql.execute` for databases. Do NOT create python.code-only or llm.answer-only workflows for external data analysis tasks.
-5) Use `llm.answer` for the final user-facing text answer grounded in workflow outputs.
-6) For report requests, use `report.generate`.
-7) For dashboard requests, use `data.generate_dashboard`.
-8) For video requests, the workflow MUST end with `video.generator` receiving `dataset_ref`. Feed it an analysis-ready dataset. For large or raw source tables, add transform nodes first so the video node receives filtered, grouped, or otherwise reduced data instead of the raw dataset.
-9) Layout: include positions ONLY under `node.metadata.position` with `x` and `y`. Do NOT use a top-level `position` field.
-10) Do NOT guess categorical values, table names, or columns. Use only what the user, datasource context, or schema context provides.
+3) `root.nodes` and `root.edges` MUST be JSON objects keyed by each item's `id`. NEVER emit them as arrays/lists.
+   Valid shape:
+   `"root": {{"nodes": {{"read_file": {{"id": "read_file", "type": "datasource.read", "params": {{...}}}}}}, "edges": {{"edge_1": {{"id": "edge_1", "source": {{"node_id": "read_file", "port_id": "dataset_ref"}}, "target": {{"node_id": "answer", "port_id": "dataset_ref"}}}}}}}}`
+4) Port multiplicity still applies: only ports with `multiple=true` may have more than one incoming edge.
+5) If the task depends on attached files or databases, the workflow MUST include source nodes first: `datasource.read` for files, `sql.execute` for databases. Do NOT create python.code-only or llm.answer-only workflows for external data analysis tasks.
+6) Use `llm.answer` for the final user-facing text answer grounded in workflow outputs.
+7) For report requests, use `report.generate`.
+8) For dashboard requests, use `data.generate_dashboard`.
+9) For video requests, the workflow MUST end with `video.generator` receiving `dataset_ref`. Feed it an analysis-ready dataset. For large or raw source tables, add transform nodes first so the video node receives filtered, grouped, or otherwise reduced data instead of the raw dataset.
+10) Layout: include positions ONLY under `node.metadata.position` with `x` and `y`. Do NOT use a top-level `position` field.
+11) Do NOT guess categorical values, table names, or columns. Use only what the user, datasource context, or schema context provides.
 
 Tool discipline:
 1) For a new task, prefer `create_workflow_and_run` with the complete workflow.

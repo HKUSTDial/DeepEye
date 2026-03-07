@@ -29,6 +29,10 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "File + database joint analysis" in prompt
     assert "Use `datasource.read` only for attached files." in prompt
     assert "Use `sql.execute` only for attached databases." in prompt
+    assert "`root.nodes` and `root.edges` MUST be JSON objects keyed by each item's `id`" in prompt
+    assert 'NEVER emit them as arrays/lists' in prompt
+    assert '"root": {"nodes": {"read_file": {' in prompt
+    assert '"edges": {"edge_1": {' in prompt
     assert "single business answer" in prompt
     assert "run_workflow_from_file" not in prompt
     assert "rows.select" in prompt

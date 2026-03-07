@@ -248,6 +248,16 @@ class MessageCollector:
                 return step.output.strip()
         return None
 
+    def _find_workflow_final_answer(self) -> str | None:
+        payload = self._find_top_level_tool_output("workflow_agent")
+        parsed = _to_single_object(payload) if payload else None
+        if not isinstance(parsed, dict):
+            return None
+        final_answer = parsed.get("final_answer")
+        if isinstance(final_answer, str) and final_answer.strip():
+            return final_answer.strip()
+        return None
+
     def has_activity(self) -> bool:
         return bool(self._content or self._steps or self._pending_tool)
 
@@ -260,7 +270,12 @@ class MessageCollector:
         # For workflow tasks, the summary tool output is the final user-facing answer.
         # Prefer it over the supervisor's free-form completion to avoid duplicated or
         # rephrased endings after summarize_workflow_result has already produced the answer.
-        final_content = self._find_top_level_tool_output("summarize_workflow_result") or self._content or (fallback_content or "")
+        final_content = (
+            self._find_top_level_tool_output("summarize_workflow_result")
+            or self._find_workflow_final_answer()
+            or self._content
+            or (fallback_content or "")
+        )
         return AssistantMessage(content=final_content, steps=self._steps)
 
     def reset(self) -> None:
