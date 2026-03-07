@@ -193,7 +193,8 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
   hydrateWorkspaceState: (sessionId, snapshot) =>
     set((state) => {
       const current = withSession(state.sessions, sessionId)
-      if (!snapshot?.turn) {
+      const hasTrackedState = !!snapshot?.turn || !!snapshot?.draft || !!snapshot?.run || !!snapshot?.artifacts?.length
+      if (!hasTrackedState) {
         return {
           sessions: {
             ...state.sessions,

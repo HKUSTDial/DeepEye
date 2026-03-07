@@ -30,3 +30,11 @@ class WorkflowRunRepository(SQLAlchemyRepository[WorkflowRun, uuid.UUID]):
             .order_by(desc(WorkflowRun.created_at))
             .first()
         )
+
+    def get_latest_by_session(self, session_id: uuid.UUID) -> WorkflowRun | None:
+        return (
+            self.db.query(self.model_class)
+            .filter(WorkflowRun.session_id == session_id)
+            .order_by(desc(WorkflowRun.created_at))
+            .first()
+        )

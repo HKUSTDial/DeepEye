@@ -12,6 +12,14 @@ class WorkflowDraftRepository(SQLAlchemyRepository[WorkflowDraft, uuid.UUID]):
     def __init__(self, db: Session):
         super().__init__(db, WorkflowDraft)
 
+    def get_latest_by_session(self, session_id: uuid.UUID) -> WorkflowDraft | None:
+        return (
+            self.db.query(self.model_class)
+            .filter(WorkflowDraft.session_id == session_id)
+            .order_by(WorkflowDraft.updated_at.desc())
+            .first()
+        )
+
     def get_latest_by_turn(self, turn_id: uuid.UUID) -> WorkflowDraft | None:
         return (
             self.db.query(self.model_class)

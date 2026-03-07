@@ -133,3 +133,50 @@ def test_message_append_keeps_primary_key_accessible_after_session_close():
         db.close()
 
     assert message_id is not None
+
+
+def test_workspace_state_falls_back_to_latest_session_run_without_turn():
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="carol@example.com")
+        session = _create_session(db, user)
+        create_chat_turn(db, session.id, user.id, "Previous chat-only request")
+
+        draft = upsert_workflow_draft(
+            db,
+            session_id=session.id,
+            user_id=user.id,
+            file_path="/workspace/workflow/manual.json",
+            definition={"root": {"nodes": {"manual": {"id": "manual"}}, "edges": {}}},
+            source="workflow_file",
+        )
+        run = create_tracked_workflow_run(
+            db,
+            user_id=user.id,
+            session_id=session.id,
+            draft_id=draft.id,
+            file_path=draft.file_path,
+            source="workflow_file",
+        )
+        artifacts = replace_workflow_artifacts(
+            db,
+            run,
+            [{"kind": "dashboard", "dashboard_url": "http://localhost:3000/dashboard/manual"}],
+        )
+        finalize_tracked_workflow_run(
+            db,
+            run,
+            status="success",
+            result={"status": "success"},
+            artifacts=[artifact.payload for artifact in artifacts],
+        )
+
+        state = build_workspace_state(db, session.id)
+
+        assert state["turn"] is None
+        assert state["draft"].id == draft.id
+        assert state["run"].id == run.id
+        assert len(state["artifacts"]) == 1
+        assert state["artifacts"][0].payload["kind"] == "dashboard"
+    finally:
+        db.close()

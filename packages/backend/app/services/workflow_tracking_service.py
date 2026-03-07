@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,9 @@ from app.repositories import (
 )
 
 
+TrackedRecord = TypeVar("TrackedRecord")
+
+
 def _as_uuid(value: str | uuid.UUID | None) -> uuid.UUID | None:
     if value is None or isinstance(value, uuid.UUID):
         return value
@@ -25,6 +28,25 @@ def _as_uuid(value: str | uuid.UUID | None) -> uuid.UUID | None:
         return uuid.UUID(str(value))
     except (TypeError, ValueError):
         return None
+
+
+def _select_latest(
+    preferred: TrackedRecord | None,
+    fallback: TrackedRecord | None,
+    *,
+    key: str,
+) -> TrackedRecord | None:
+    if preferred is None:
+        return fallback
+    if fallback is None:
+        return preferred
+    preferred_value = getattr(preferred, key, None)
+    fallback_value = getattr(fallback, key, None)
+    if preferred_value is None:
+        return fallback
+    if fallback_value is None:
+        return preferred
+    return fallback if fallback_value > preferred_value else preferred
 
 
 def create_chat_turn(
@@ -292,19 +314,28 @@ def build_workspace_state(db: Session, session_id: str | uuid.UUID) -> dict[str,
     run_repo = WorkflowRunRepository(db)
     artifact_repo = WorkflowArtifactRepository(db)
 
-    turn = turn_repo.get_latest_by_session(session_uuid)
-    if not turn:
-        return {
-            "session_id": session_uuid,
-            "turn": None,
-            "draft": None,
-            "run": None,
-            "artifacts": [],
-        }
+    latest_turn = turn_repo.get_latest_by_session(session_uuid)
+    turn_draft = draft_repo.get_latest_by_turn(latest_turn.id) if latest_turn else None
+    turn_run = run_repo.get_latest_by_turn(latest_turn.id) if latest_turn else None
+    session_draft = draft_repo.get_latest_by_session(session_uuid)
+    session_run = run_repo.get_latest_by_session(session_uuid)
 
-    draft = draft_repo.get_latest_by_turn(turn.id)
-    run = run_repo.get_latest_by_turn(turn.id)
-    artifacts = artifact_repo.list_by_turn(turn.id)
+    draft = _select_latest(turn_draft, session_draft, key="updated_at")
+    run = _select_latest(turn_run, session_run, key="created_at")
+    if run and run.draft_id:
+        run_draft = draft_repo.get(run.draft_id)
+        if run_draft is not None:
+            draft = _select_latest(draft, run_draft, key="updated_at")
+
+    turn = None
+    if run and run.turn_id:
+        turn = turn_repo.get(run.turn_id)
+    elif draft and draft.turn_id:
+        turn = turn_repo.get(draft.turn_id)
+    elif latest_turn and not draft and not run:
+        turn = latest_turn
+
+    artifacts = artifact_repo.list_by_run(run.id) if run else ([] if turn is None else artifact_repo.list_by_turn(turn.id))
     return {
         "session_id": session_uuid,
         "turn": turn,
