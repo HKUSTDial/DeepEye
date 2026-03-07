@@ -231,3 +231,50 @@ def test_workspace_state_for_turn_uses_turn_scoped_run_and_artifacts():
         assert state["artifacts"][0].payload["kind"] == "dashboard"
     finally:
         db.close()
+
+
+def test_finalize_tracked_workflow_run_compacts_large_row_outputs():
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="erin@example.com")
+        session = _create_session(db, user)
+        turn = create_chat_turn(db, session.id, user.id, "Analyze a large table")
+        draft = upsert_workflow_draft(
+            db,
+            session_id=session.id,
+            user_id=user.id,
+            turn_id=turn.id,
+            file_path="/workspace/workflow/large.json",
+            definition={"root": {"nodes": {"answer": {"id": "answer"}}, "edges": {}}},
+        )
+        run = create_tracked_workflow_run(
+            db,
+            user_id=user.id,
+            session_id=session.id,
+            turn_id=turn.id,
+            draft_id=draft.id,
+            file_path=draft.file_path,
+        )
+
+        rows = [{"city": f"City {idx}", "revenue": idx} for idx in range(50)]
+        finalized = finalize_tracked_workflow_run(
+            db,
+            run,
+            status="success",
+            result={
+                "status": "success",
+                "outputs": {
+                    "aggregate": {
+                        "rows": rows,
+                    }
+                },
+            },
+            artifacts=[],
+        )
+
+        stored_rows = finalized.result["outputs"]["aggregate"]["rows"]
+        assert len(stored_rows) == 20
+        assert finalized.result["outputs"]["aggregate"]["row_count"] == 50
+        assert finalized.result["outputs"]["aggregate"]["preview_rows"][0]["city"] == "City 0"
+    finally:
+        db.close()

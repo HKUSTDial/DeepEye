@@ -21,3 +21,5 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "rows.select" in prompt
     assert "rows.aggregate" in prompt
     assert "llm.answer" in prompt
+    assert "dataset_ref" in prompt
+    assert "data.get('dataset_ref', [])" in prompt
