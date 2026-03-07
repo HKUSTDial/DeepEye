@@ -76,10 +76,10 @@ class SqlExecuteNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Execute SQL against one attached database datasource, materialize the result, and return a dataset_ref.",
+            description="Execute SQL against one attached database datasource, materialize the result, and return a dataset_ref. The downstream schema is exactly the SQL SELECT list and aliases.",
             params_schema={
                 "datasource_id": {"type": "string", "required": True, "description": "Attached database datasource id to query."},
-                "query": {"type": "string", "required": True, "description": "SQL query to execute. Prefer returning only the rows needed downstream."},
+                "query": {"type": "string", "required": True, "description": "SQL query to execute. Prefer returning only the rows needed downstream. Use explicit AS aliases for derived, aggregated, renamed, or ambiguous columns so downstream nodes receive stable column names."},
                 "limit": {"type": "integer", "required": False, "description": "Preview row limit stored inside the returned `dataset_ref`. Defaults to 500."},
             },
             outputs={

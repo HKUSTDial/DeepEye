@@ -138,12 +138,12 @@ class PythonCodeNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Execute custom Python code inside the sandbox. Use this for joins or custom transforms that specialized nodes cannot express cleanly.",
+            description="Execute custom Python code inside the sandbox. Use this for joins or custom transforms that specialized nodes cannot express cleanly. Downstream logic must only rely on the schema explicitly provided by upstream dataset_ref inputs.",
             params_schema={
                 "code": {
                     "type": "string",
                     "required": True,
-                    "description": "Python code to run. Read stdin with `data = json.load(sys.stdin)`, use `data.get('input')` for small parameters, and read tabular inputs from `data.get('dataset_ref', [])` paths inside the sandbox.",
+                    "description": "Python code to run. Read stdin with `data = json.load(sys.stdin)`, use `data.get('input')` for small parameters, and read tabular inputs from `data.get('dataset_ref', [])` paths inside the sandbox. Only reference columns that are explicitly present in the upstream dataset_ref metadata or preview.",
                 },
             },
             inputs={

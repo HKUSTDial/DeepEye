@@ -12,6 +12,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.tasks import agent_tasks
+from app.services.datasource_specs import normalize_datasource_type
 
 
 class _FakeSessionContext:
@@ -72,3 +73,8 @@ def test_get_datasources_schema_includes_database_preview(monkeypatch, tmp_path:
     assert table_schema["name"] == "sales"
     assert [row["city"] for row in table_schema["preview"]] == ["Shanghai", "Hangzhou", "Shenzhen"]
     assert len(table_schema["preview"]) == 3
+
+
+def test_normalize_datasource_type_accepts_postgresql_alias() -> None:
+    assert normalize_datasource_type("postgresql") == "postgres"
+    assert normalize_datasource_type("postgres") == "postgres"

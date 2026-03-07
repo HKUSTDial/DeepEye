@@ -30,6 +30,10 @@ DATABASE_SOURCE_TYPES: set[str] = {
     DataSourceType.SQLITE.value,
 }
 
+_DATASOURCE_TYPE_ALIASES: dict[str, str] = {
+    "postgresql": DataSourceType.POSTGRES.value,
+}
+
 FILE_SOURCE_TYPES: set[str] = {
     DataSourceType.CSV.value,
     DataSourceType.JSON.value,
@@ -52,7 +56,8 @@ def normalize_datasource_category(category: str | None, default: str = DataSourc
 
 def normalize_datasource_type(datasource_type: str | None) -> str:
     value = (datasource_type or "").strip().lower()
-    return value.lstrip(".")
+    value = value.lstrip(".")
+    return _DATASOURCE_TYPE_ALIASES.get(value, value)
 
 
 def validate_database_datasource_type(datasource_type: str | None) -> None:

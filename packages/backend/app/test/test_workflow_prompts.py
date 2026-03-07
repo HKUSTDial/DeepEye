@@ -15,6 +15,11 @@ from deepeye.workflows.registry import NodeRegistry
 def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     prompt = build_workflow_prompt(NodeRegistry())
 
+    assert "# Task Description" in prompt
+    assert "# Inputs" in prompt
+    assert "# Instructions" in prompt
+    assert "# Output Format" in prompt
+    assert "## Schema Continuity Rules" in prompt
     assert "Reuse ONE workflow draft" in prompt
     assert "validation_errors" in prompt
     assert "Reuse the SAME `draft_id`" in prompt
@@ -30,21 +35,33 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "Use `datasource.read` only for attached files." in prompt
     assert "Use `sql.execute` only for attached databases." in prompt
     assert "`root.nodes` and `root.edges` MUST be JSON objects keyed by each item's `id`" in prompt
-    assert 'NEVER emit them as arrays/lists' in prompt
+    assert 'NEVER emit them as arrays or lists' in prompt
     assert '"root": {"nodes": {"read_file": {' in prompt
     assert '"edges": {"edge_1": {' in prompt
-    assert "single business answer" in prompt
+    assert "Use `llm.answer` for the final user-facing text answer grounded in workflow outputs." in prompt
     assert "run_workflow_from_file" not in prompt
     assert "rows.select" in prompt
     assert "rows.aggregate" in prompt
     assert "llm.answer" in prompt
     assert "dataset_ref" in prompt
+    assert "Treat schema as a contract between nodes." in prompt
+    assert "always use explicit `AS` aliases" in prompt
+    assert "Avoid `SELECT *`" in prompt
+    assert "update every downstream assumption to match the new schema" in prompt
+    assert "Do not assume hidden columns or original source column names survive unchanged." in prompt
+    assert "Treat each `dataset_ref` as the authoritative schema source." in prompt
     assert "data.get('dataset_ref', [])" in prompt
     assert "MUST include source nodes" in prompt
-    assert "Do NOT create python.code-only" in prompt
+    assert "Do NOT create `python.code`-only" in prompt
     assert "Never bypass source nodes" in prompt
     assert "analysis-ready dataset" in prompt
     assert "required transform when the source is large/raw" in prompt
+    assert "## Valid Workflow JSON Examples" in prompt
+    assert "Preferred minimal shape: omit node-level `inputs` and `outputs` blocks" in prompt
+    assert "### Example 1: Database analysis answered directly" in prompt
+    assert "### Example 2: File + database analysis with python.code" in prompt
+    assert "\"edge_sql_to_python\"" in prompt
+    assert "\"query\": \"SELECT client_id AS client_id, revenue AS revenue FROM sales\"" in prompt
     assert "create_plan" not in prompt
     assert "update_plan" not in prompt
 
