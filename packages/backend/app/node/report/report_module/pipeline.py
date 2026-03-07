@@ -17,6 +17,26 @@ from app.core.config import settings
 from .utils import execute_python_code
 
 logger = logging.getLogger(__name__)
+_REPORT_CHAT_MAX_TOKENS_CAP = 8192
+
+
+def _normalize_report_max_tokens(max_tokens: int | None) -> int | None:
+    if max_tokens is None:
+        return None
+    try:
+        normalized = int(max_tokens)
+    except (TypeError, ValueError):
+        return None
+    if normalized <= 0:
+        return None
+    if normalized > _REPORT_CHAT_MAX_TOKENS_CAP:
+        logger.warning(
+            "Report pipeline max_tokens=%s exceeds provider-safe cap %s, clamping.",
+            normalized,
+            _REPORT_CHAT_MAX_TOKENS_CAP,
+        )
+        return _REPORT_CHAT_MAX_TOKENS_CAP
+    return normalized
 
 # --- Dependency Check (Storyteller) ---
 try:
@@ -44,7 +64,7 @@ class AutoReportPipeline:
             raise ValueError("LLM_MODEL is required for report generation")
         self.model_name = resolved_model
         self.temperature = temperature
-        self.max_tokens = max_tokens
+        self.max_tokens = _normalize_report_max_tokens(max_tokens)
         self.progress_callback = progress_callback
 
         if HAS_CONTEXT_GEN:
