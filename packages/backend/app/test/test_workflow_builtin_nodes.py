@@ -9,6 +9,7 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 
 from langchain_core.messages import AIMessage
 
+from app.services.workflow_engine import build_engine
 from app.node.llm.answer import LLMAnswerHandler
 from app.node.rows.basic import (
     RowsAggregateHandler,
@@ -17,7 +18,8 @@ from app.node.rows.basic import (
     RowsSelectHandler,
     RowsSortHandler,
 )
-from deepeye.workflows.models import Node
+from deepeye.workflows.models import Edge, EdgeEndpoint, Graph, Node, Port, Workflow
+from deepeye.workflows.registry import NodeSpec
 
 
 class _FakeModel:
@@ -27,6 +29,18 @@ class _FakeModel:
     def invoke(self, messages):
         self.messages = messages
         return AIMessage(content="Grounded answer.")
+
+
+class _RowsSourceHandler:
+    def execute(self, node: Node, inputs, context):
+        del node, inputs, context
+        return {
+            "rows": [
+                {"segment": "A", "revenue": 120},
+                {"segment": "A", "revenue": 150},
+                {"segment": "B", "revenue": 80},
+            ]
+        }
 
 
 def test_rows_select_filter_sort_and_profile_handlers() -> None:
@@ -112,3 +126,62 @@ def test_llm_answer_handler_uses_grounded_payload() -> None:
     assert model.messages is not None
     assert "哪个城市收入最高" in model.messages[1].content
     assert "Shenzhen" in model.messages[1].content
+
+
+def test_workflow_engine_runs_rows_pipeline_with_llm_answer() -> None:
+    model = _FakeModel()
+    engine = build_engine(db=None, user_id=None, model=model)
+    engine.node_registry.register(
+        NodeSpec(
+            type="rows.source",
+            outputs={"rows": Port(schema="list[dict]", required=True)},
+        )
+    )
+    engine.register_handler("rows.source", _RowsSourceHandler())
+
+    workflow = Workflow(
+        id="wf_rows_answer",
+        root=Graph(
+            nodes={
+                "source": Node(id="source", type="rows.source"),
+                "filter": Node(
+                    id="filter",
+                    type="rows.filter",
+                    params={"column": "segment", "operator": "eq", "value": "A"},
+                ),
+                "aggregate": Node(
+                    id="aggregate",
+                    type="rows.aggregate",
+                    params={"metrics": [{"column": "revenue", "op": "sum", "as": "total_revenue"}]},
+                ),
+                "answer": Node(
+                    id="answer",
+                    type="llm.answer",
+                    params={"question": "A 分组的总收入是多少？"},
+                ),
+            },
+            edges={
+                "e1": Edge(
+                    id="e1",
+                    source=EdgeEndpoint(node_id="source", port_id="rows"),
+                    target=EdgeEndpoint(node_id="filter", port_id="rows"),
+                ),
+                "e2": Edge(
+                    id="e2",
+                    source=EdgeEndpoint(node_id="filter", port_id="rows"),
+                    target=EdgeEndpoint(node_id="aggregate", port_id="rows"),
+                ),
+                "e3": Edge(
+                    id="e3",
+                    source=EdgeEndpoint(node_id="aggregate", port_id="rows"),
+                    target=EdgeEndpoint(node_id="answer", port_id="rows"),
+                ),
+            },
+        ),
+    )
+
+    context = engine.run(workflow)
+
+    assert context.status == "success"
+    assert context.runs["aggregate"].outputs["rows"] == [{"total_revenue": 270}]
+    assert context.runs["answer"].outputs["answer"] == "Grounded answer."
