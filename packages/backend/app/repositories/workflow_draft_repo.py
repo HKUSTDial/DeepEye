@@ -37,14 +37,6 @@ class WorkflowDraftRepository(SQLAlchemyRepository[WorkflowDraft, uuid.UUID]):
             .first()
         )
 
-    def get_latest_by_turn_and_path(self, turn_id: uuid.UUID, file_path: str) -> WorkflowDraft | None:
-        return (
-            self.db.query(self.model_class)
-            .filter(WorkflowDraft.turn_id == turn_id, WorkflowDraft.file_path == file_path)
-            .order_by(WorkflowDraft.updated_at.desc())
-            .first()
-        )
-
     def get_latest_by_session_and_path(self, session_id: uuid.UUID, file_path: str) -> WorkflowDraft | None:
         return (
             self.db.query(self.model_class)

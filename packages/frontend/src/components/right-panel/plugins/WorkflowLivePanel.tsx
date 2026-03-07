@@ -876,11 +876,10 @@ export function WorkflowLivePanel({
           .trim() || 'workflow'
       const saved = await sessionApi.saveWorkflowDraft(sessionId, {
         draft_id: activeDraftIdForSession || undefined,
-        file_path: activeFilePathForControls || undefined,
         name: activeDraftIdForSession ? undefined : fallbackName,
         definition,
       })
-      const savedFilePath = saved.file_path || activeFilePathForControls || `${WORKFLOW_DIR}/${fallbackName}.json`
+      const savedFilePath = saved.file_path || `${WORKFLOW_DIR}/${fallbackName}.json`
       const root = (definition.root as Record<string, unknown>) || definition
       const nodes = (root.nodes as Record<string, DefinitionNode>) || {}
       const edges = (root.edges as Record<string, DefinitionEdge>) || {}
