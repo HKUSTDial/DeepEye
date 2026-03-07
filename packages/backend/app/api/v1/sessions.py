@@ -11,11 +11,27 @@ from sqlalchemy.orm import Session
 from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.models import ChatSession
-from app.repositories import DataSourceRepository, MessageRepository, SessionAttachmentRepository, SessionRepository
-from app.schemas import ChatSessionResponse, DataSourceResponse, WorkspaceStateResponse
+from app.repositories import (
+    DataSourceRepository,
+    MessageRepository,
+    SessionAttachmentRepository,
+    SessionRepository,
+    WorkflowDraftRepository,
+)
+from app.schemas import (
+    ChatSessionResponse,
+    DataSourceResponse,
+    WorkspaceStateResponse,
+    WorkflowDraftResponse,
+    WorkflowDraftUpsertRequest,
+    WorkflowQueuedRunResponse,
+)
 from app.sandbox import sandbox_manager
 from app.services import attach_datasource_to_session, detach_datasource_from_session, list_session_attachments
+from app.services.workflow_file_service import prepare_tracked_workflow_file_run, write_workflow_definition_to_file
+from app.services.workflow_targets import resolve_workflow_target, save_workflow_draft
 from app.services.workflow_tracking_service import build_workspace_state
+from app.tasks.workflow_tasks import run_workflow_file_task
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -170,3 +186,91 @@ def get_session_workspace_state(
     """Return the latest turn/draft/run/artifact snapshot for the session workspace."""
     _get_owned_session_or_404(db, session_id, user_id)
     return build_workspace_state(db, session_id)
+
+
+@router.get("/{session_id}/workflow-drafts", response_model=list[WorkflowDraftResponse])
+def list_session_workflow_drafts(
+    session_id: uuid.UUID,
+    user_id: CurrentUserId,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    """List tracked workflow drafts for the session, most recent first."""
+    _get_owned_session_or_404(db, session_id, user_id)
+    safe_limit = max(1, min(limit, 200))
+    return WorkflowDraftRepository(db).list_by_session(session_id, limit=safe_limit)
+
+
+@router.post("/{session_id}/workflow-drafts", response_model=WorkflowDraftResponse)
+async def upsert_session_workflow_draft(
+    session_id: uuid.UUID,
+    request: WorkflowDraftUpsertRequest,
+    user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+):
+    """Persist an editor workflow draft for the session and mirror it to the sandbox."""
+    session = _get_owned_session_or_404(db, session_id, user_id)
+    try:
+        draft = save_workflow_draft(
+            db,
+            session_id=session.id,
+            user_id=user_id,
+            draft_id=request.draft_id,
+            name=request.name,
+            file_path=request.file_path,
+            definition=request.definition,
+            source="workflow_editor",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if draft.file_path:
+        await write_workflow_definition_to_file(str(session.id), draft.file_path, request.definition)
+    return draft
+
+
+@router.post("/{session_id}/workflow-drafts/{draft_id}/run", response_model=WorkflowQueuedRunResponse)
+async def run_session_workflow_draft(
+    session_id: uuid.UUID,
+    draft_id: uuid.UUID,
+    user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+):
+    """Queue execution for a tracked workflow draft."""
+    session = _get_owned_session_or_404(db, session_id, user_id)
+    try:
+        draft, path = resolve_workflow_target(
+            db,
+            session.id,
+            draft_id=draft_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    if not draft or not isinstance(draft.definition, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow draft not found")
+
+    await write_workflow_definition_to_file(str(session.id), path, draft.definition)
+    tracked_turn, tracked_draft, tracked_run = prepare_tracked_workflow_file_run(
+        db,
+        user_id=session.user_id,
+        session_id=str(session.id),
+        path=path,
+        definition=draft.definition,
+        draft_id=str(draft.id),
+    )
+    task = run_workflow_file_task.delay(
+        str(session.user_id),
+        str(session.id),
+        path,
+        str(tracked_turn.id) if tracked_turn else None,
+        str(tracked_draft.id) if tracked_draft else None,
+        str(tracked_run.id) if tracked_run else None,
+    )
+    return WorkflowQueuedRunResponse(
+        status="queued",
+        task_id=task.id,
+        turn_id=tracked_turn.id if tracked_turn else None,
+        draft_id=tracked_draft.id if tracked_draft else None,
+        run_id=tracked_run.id if tracked_run else None,
+    )

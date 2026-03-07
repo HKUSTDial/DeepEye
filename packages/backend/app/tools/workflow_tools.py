@@ -11,7 +11,7 @@ from langgraph.types import Command
 from app.db.session import SessionLocal
 from app.repositories import SessionRepository
 from app.sandbox import sandbox_manager
-from app.services.workflow_file_service import service_run_workflow_from_file
+from app.services.workflow_file_service import service_run_workflow_from_file, write_workflow_definition_to_file
 from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft, resolve_workflow_target
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
@@ -66,17 +66,6 @@ async def _read_workflow_file(session_id: str, path: str) -> dict:
         raise ValueError(f"invalid workflow json: {exc}") from exc
 
 
-async def _write_workflow_path(session_id: str, path: str, data: dict) -> None:
-    sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-    if not sandbox:
-        raise ValueError("failed to get or create sandbox")
-    await sandbox.exec_command("mkdir -p /workspace/workflow")
-    payload = json.dumps(data, ensure_ascii=False, indent=2)
-    result = await sandbox.exec_command(f"cat > {path} << 'EOF'\n{payload}\nEOF")
-    if result.exit_code != 0:
-        raise ValueError(result.stderr or "failed to write workflow file")
-
-
 def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | None = None) -> callable:
     @tool
     async def create_workflow(
@@ -111,7 +100,7 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             db.close()
 
         norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
-        await _write_workflow_path(session_id, norm_path, workflow)
+        await write_workflow_definition_to_file(session_id, norm_path, workflow)
         return {"status": "success", "draft_id": str(draft.id), "file_path": norm_path}
 
     return create_workflow
@@ -191,7 +180,7 @@ def create_update_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             db.close()
 
         norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
-        await _write_workflow_path(session_id, norm_path, workflow)
+        await write_workflow_definition_to_file(session_id, norm_path, workflow)
         return {"status": "success", "draft_id": str(draft.id), "file_path": norm_path}
 
     return update_workflow
@@ -222,7 +211,7 @@ def create_run_workflow_from_file_tool(session_id: str, turn_id: str | None = No
                 file_path=file_path,
             )
             if existing_draft and isinstance(existing_draft.definition, dict):
-                await _write_workflow_path(session_id, norm_path, existing_draft.definition)
+                await write_workflow_definition_to_file(session_id, norm_path, existing_draft.definition)
             return await service_run_workflow_from_file(
                 db,
                 session.user_id,
@@ -258,7 +247,7 @@ def create_run_workflow_tool(session_id: str, turn_id: str | None = None) -> cal
             )
             if not existing_draft or not isinstance(existing_draft.definition, dict):
                 return {"status": "error", "error": "Workflow draft not found."}
-            await _write_workflow_path(session_id, norm_path, existing_draft.definition)
+            await write_workflow_definition_to_file(session_id, norm_path, existing_draft.definition)
             return await service_run_workflow_from_file(
                 db,
                 session.user_id,
@@ -309,7 +298,7 @@ def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) ->
                 source="workflow_agent",
             )
             norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
-            await _write_workflow_path(session_id, norm_path, workflow)
+            await write_workflow_definition_to_file(session_id, norm_path, workflow)
             result = await service_run_workflow_from_file(
                 db,
                 session.user_id,

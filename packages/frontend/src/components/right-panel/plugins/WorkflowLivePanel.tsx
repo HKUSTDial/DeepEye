@@ -4,9 +4,8 @@ import { ArrowUpRight, Loader2, Workflow as WorkflowIcon } from 'lucide-react'
 import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
-import { chatApi } from '../../../api'
+import { chatApi, sessionApi } from '../../../api'
 import { extractVideoOutputParams } from '../../../api/video'
-import { workflowFilesApi } from '../../../api/workflowFiles'
 import { workflowsApi } from '../../../api/workflows'
 import { sandboxApi } from '../../../api/sandbox'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
@@ -15,7 +14,7 @@ import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNod
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
-import type { WorkflowRun } from '../../../types'
+import type { WorkflowDraft, WorkflowRun } from '../../../types'
 import {
   buildWorkflowRunFromEvent,
   getWorkflowOutputs,
@@ -87,6 +86,10 @@ function typeToLabel(type: string) {
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ')
+}
+
+function dedupeFilePaths(paths: Array<string | null | undefined>) {
+  return [...new Set(paths.filter((path): path is string => typeof path === 'string' && path.length > 0))]
 }
 
 function validateGraph(
@@ -218,6 +221,7 @@ export function WorkflowLivePanel({
   const addWorkflowEdge = useWorkflowSessionsStore((state) => state.addDraftEdge)
   const updateWorkflowNodeParam = useWorkflowSessionsStore((state) => state.updateDraftNodeParam)
   const setActiveFilePath = useWorkflowSessionsStore((state) => state.setActiveFilePath)
+  const setActiveDraftId = useWorkflowSessionsStore((state) => state.setActiveDraftId)
   const setActiveRun = useWorkflowSessionsStore((state) => state.setActiveRun)
   const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
   const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
@@ -244,6 +248,7 @@ export function WorkflowLivePanel({
   const isDark = theme === 'dark'
 
   const [isLoadingFiles, setIsLoadingFiles] = useState(false)
+  const [availableDrafts, setAvailableDrafts] = useState<WorkflowDraft[]>([])
   const [isLoadingFile, setIsLoadingFile] = useState(false)
   const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set())
   const [newEdgeIds, setNewEdgeIds] = useState<Set<string>>(new Set())
@@ -288,7 +293,10 @@ export function WorkflowLivePanel({
     () => (activeSessionState?.draftEdges ?? {}) as Record<string, DefinitionEdge>,
     [activeSessionState?.draftEdges],
   )
-  const activeFiles = activeSessionState?.files ?? []
+  const activeFiles = useMemo(
+    () => activeSessionState?.files ?? [],
+    [activeSessionState?.files],
+  )
   const activeFilePathForControls = activeSessionState?.activeFilePath ?? null
   const activeDraftIdForSession = activeSessionState?.activeDraftId ?? null
   const activeViewState = activeSessionState?.viewState ?? 'idle'
@@ -539,8 +547,14 @@ export function WorkflowLivePanel({
       setIsLoadingFile(true)
       setFileError(sessionId, null)
       try {
-        const response = await sandboxApi.getFileContent(sessionId, path)
-        const parsed = JSON.parse(response.content) as Record<string, unknown>
+        const matchingDraft = availableDrafts.find((draft) => draft.file_path === path) || null
+        let parsed: Record<string, unknown>
+        if (matchingDraft?.definition && typeof matchingDraft.definition === 'object') {
+          parsed = matchingDraft.definition
+        } else {
+          const response = await sandboxApi.getFileContent(sessionId, path)
+          parsed = JSON.parse(response.content) as Record<string, unknown>
+        }
         const root = (parsed.root as Record<string, unknown>) || parsed
         const nodes = (root.nodes as Record<string, DefinitionNode>) || {}
         const edges = (root.edges as Record<string, DefinitionEdge>) || {}
@@ -549,6 +563,7 @@ export function WorkflowLivePanel({
         Object.values(edges).forEach((edge) => addWorkflowEdge(sessionId, edge))
         setWorkflowDefinition(sessionId, parsed)
         setActiveFilePath(sessionId, path)
+        setActiveDraftId(sessionId, matchingDraft?.id ?? null)
         const validationError = validateGraph(nodes, edges, nodeDefs)
         if (validationError) {
           setWorkflowError(sessionId, validationError)
@@ -577,7 +592,9 @@ export function WorkflowLivePanel({
       setValidatedGraph,
       setViewState,
       setFileError,
+      setActiveDraftId,
       nodeDefs,
+      availableDrafts,
     ],
   )
 
@@ -588,11 +605,16 @@ export function WorkflowLivePanel({
       setIsLoadingFiles(true)
       setFileError(sessionId, null)
       try {
-        const response = await sandboxApi.listFiles(sessionId, WORKFLOW_DIR)
-        const jsonFiles = response.files
-          .filter((file) => file.type === 'file' && file.name.endsWith('.json'))
-          .map((file) => file.path)
-          .sort((a, b) => a.localeCompare(b))
+        const drafts = await sessionApi.listWorkflowDrafts(sessionId)
+        setAvailableDrafts(drafts)
+        let jsonFiles = dedupeFilePaths(drafts.map((draft) => draft.file_path))
+        if (jsonFiles.length === 0) {
+          const response = await sandboxApi.listFiles(sessionId, WORKFLOW_DIR)
+          jsonFiles = response.files
+            .filter((file) => file.type === 'file' && file.name.endsWith('.json'))
+            .map((file) => file.path)
+            .sort((a, b) => a.localeCompare(b))
+        }
         const currentActiveFilePath = activeFilePathRef.current
         let nextFiles = jsonFiles
         if (currentActiveFilePath && !jsonFiles.includes(currentActiveFilePath)) {
@@ -630,6 +652,7 @@ export function WorkflowLivePanel({
       setActiveFilePath,
       isStreaming,
       sandboxReadySessionId,
+      setAvailableDrafts,
       clearWorkflow,
       setWorkflowDefinition,
       setWorkflowError,
@@ -817,6 +840,62 @@ export function WorkflowLivePanel({
     }
   }, [flow, nodeStatus, newNodeIds, newEdgeIds])
 
+  const persistWorkflowDraft = useCallback(async () => {
+    if (!sessionId) return null
+    if (Object.keys(nodeDefs).length === 0) {
+      setWorkflowError(sessionId, 'Node definitions are not loaded yet.')
+      return null
+    }
+
+    try {
+      const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
+      const fallbackName =
+        (activeFilePathForControls?.split('/').pop() || '')
+          .replace(/\.json$/i, '')
+          .trim() || 'workflow'
+      const saved = await sessionApi.saveWorkflowDraft(sessionId, {
+        draft_id: activeDraftIdForSession || undefined,
+        file_path: activeFilePathForControls || undefined,
+        name: activeDraftIdForSession ? undefined : fallbackName,
+        definition,
+      })
+      const savedFilePath = saved.file_path || activeFilePathForControls || `${WORKFLOW_DIR}/${fallbackName}.json`
+      const root = (definition.root as Record<string, unknown>) || definition
+      const nodes = (root.nodes as Record<string, DefinitionNode>) || {}
+      const edges = (root.edges as Record<string, DefinitionEdge>) || {}
+
+      setAvailableDrafts((prev) => [saved, ...prev.filter((draft) => draft.id !== saved.id)])
+      setFiles(sessionId, dedupeFilePaths([savedFilePath, ...activeFiles]))
+      setActiveDraftId(sessionId, saved.id)
+      setActiveFilePath(sessionId, savedFilePath)
+      setWorkflowDefinition(sessionId, definition)
+      setValidatedGraph(sessionId, nodes, edges)
+      setWorkflowError(sessionId, null)
+      setViewState(sessionId, 'ready')
+      notifyFilesChanged()
+      return { draft: saved, definition, filePath: savedFilePath }
+    } catch (err) {
+      setWorkflowError(sessionId, err instanceof Error ? err.message : 'Failed to save workflow.')
+      return null
+    }
+  }, [
+    sessionId,
+    nodeDefs,
+    flow.nodes,
+    flow.edges,
+    activeDraftIdForSession,
+    activeFilePathForControls,
+    activeFiles,
+    setFiles,
+    setActiveDraftId,
+    setActiveFilePath,
+    setWorkflowDefinition,
+    setValidatedGraph,
+    setWorkflowError,
+    setViewState,
+    notifyFilesChanged,
+  ])
+
   const nodeTypes = useMemo(() => NODE_TYPES, [])
 
   if (
@@ -904,25 +983,12 @@ export function WorkflowLivePanel({
           </select>
           <button
             type="button"
-            disabled={!sessionId || !activeFilePathForControls || isLoadingFile || isStreaming || isSaving}
+            disabled={!sessionId || isLoadingFile || isStreaming || isSaving}
             onClick={async () => {
-              if (!sessionId || !activeFilePathForControls) return
-              if (Object.keys(nodeDefs).length === 0) {
-                setWorkflowError(sessionId, 'Node definitions are not loaded yet.')
-                return
-              }
+              if (!sessionId) return
               setIsSaving(true)
               try {
-                const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
-                await sandboxApi.writeFile(sessionId, activeFilePathForControls, JSON.stringify(definition, null, 2))
-                notifyFilesChanged()
-                setWorkflowDefinition(sessionId, definition)
-                clearWorkflow(sessionId)
-                Object.values(definition.root.nodes || {}).forEach((node) => addWorkflowNode(sessionId, node))
-                Object.values(definition.root.edges || {}).forEach((edge) => addWorkflowEdge(sessionId, edge))
-                setWorkflowError(sessionId, null)
-              } catch (err) {
-                setWorkflowError(sessionId, err instanceof Error ? err.message : 'Failed to save workflow.')
+                await persistWorkflowDraft()
               } finally {
                 setIsSaving(false)
               }
@@ -966,13 +1032,11 @@ export function WorkflowLivePanel({
           <button
             type="button"
             disabled={
-              !activeFilePathForControls ||
               Object.keys(nodeDefs).length === 0 ||
               isStreaming ||
               isExporting
             }
             onClick={() => {
-              if (!activeFilePathForControls) return
               if (Object.keys(nodeDefs).length === 0) {
                 if (sessionId) {
                   setWorkflowError(sessionId, 'Node definitions are not loaded yet.')
@@ -982,7 +1046,9 @@ export function WorkflowLivePanel({
               setIsExporting(true)
               try {
                 const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
-                const filename = activeFilePathForControls.split('/').pop() || 'workflow.json'
+                const filename =
+                  activeFilePathForControls?.split('/').pop() ||
+                  (activeDraftIdForSession ? `draft-${activeDraftIdForSession.slice(0, 8)}.json` : 'workflow.json')
                 const json = JSON.stringify(definition, null, 2)
                 const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
                 const url = URL.createObjectURL(blob)
@@ -1006,23 +1072,34 @@ export function WorkflowLivePanel({
           </button>
           <button
             type="button"
-            disabled={!sessionId || !activeFilePathForControls || isStreaming || isRunning}
+            disabled={!sessionId || isStreaming || isRunning || flow.nodes.length === 0}
             onClick={async () => {
-              if (sessionId && activeFilePathForControls) {
+              if (sessionId) {
                 setIsRunning(true)
                 setVideoProgressVisible(sessionId, false)
-                setRunStatus(sessionId, 'running', null)
-                setActiveRun(sessionId, buildOptimisticRun(sessionId, activeFilePathForControls, 'running'))
-                setRunOutput(sessionId, '')
                 try {
+                  const saved = await persistWorkflowDraft()
+                  if (!saved) return
+                  const filePath = saved.filePath
+                  const draftId = saved.draft.id
+                  setRunStatus(sessionId, 'running', null)
+                  setActiveRun(
+                    sessionId,
+                    buildOptimisticRun(sessionId, filePath, 'running', { draftId }),
+                  )
+                  setRunOutput(sessionId, '')
                   ensureRunEventStream()
-                  const response = await workflowFilesApi.run(sessionId, activeFilePathForControls)
+                  const response = await sessionApi.runWorkflowDraft(sessionId, draftId)
                   if (response.error) {
                     setRunStatus(sessionId, 'failed', response.error)
                     setWorkflowError(sessionId, response.error)
                     setActiveRun(
                       sessionId,
-                      buildOptimisticRun(sessionId, activeFilePathForControls, 'failed', { error: response.error }),
+                      buildOptimisticRun(sessionId, filePath, 'failed', {
+                        error: response.error,
+                        draftId,
+                        runId: response.run_id ?? null,
+                      }),
                     )
                     setRunOutput(sessionId, response.error)
                   } else {
@@ -1031,20 +1108,14 @@ export function WorkflowLivePanel({
                     setWorkflowError(sessionId, null)
                     setActiveRun(
                       sessionId,
-                      buildOptimisticRun(sessionId, activeFilePathForControls, nextStatus, {
+                      buildOptimisticRun(sessionId, filePath, nextStatus, {
                         taskId: response.task_id ?? null,
                         turnId: response.turn_id ?? null,
-                        draftId: response.draft_id ?? null,
+                        draftId: response.draft_id ?? draftId,
                         runId: response.run_id ?? null,
                       }),
                     )
-                    if (response.outputs) {
-                      setRunOutput(sessionId, JSON.stringify(response.outputs, null, 2))
-                      const videoParams = extractVideoOutputParams(response.outputs as Record<string, unknown>)
-                      if (videoParams.taskId) {
-                        openOrFocusTab('video-preview', { taskId: videoParams.taskId })
-                      }
-                    } else if (response.status && response.status !== 'queued') {
+                    if (response.status && response.status !== 'queued') {
                       setRunOutput(sessionId, '')
                     }
                   }
@@ -1054,7 +1125,10 @@ export function WorkflowLivePanel({
                   setWorkflowError(sessionId, message)
                   setActiveRun(
                     sessionId,
-                    buildOptimisticRun(sessionId, activeFilePathForControls, 'failed', { error: message }),
+                    buildOptimisticRun(sessionId, activeFilePathForControls || `${WORKFLOW_DIR}/workflow.json`, 'failed', {
+                      error: message,
+                      draftId: activeDraftIdForSession || null,
+                    }),
                   )
                   setRunOutput(sessionId, message)
                 } finally {

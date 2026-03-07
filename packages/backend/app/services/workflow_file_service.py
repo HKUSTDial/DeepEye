@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shlex
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -70,6 +71,19 @@ async def load_workflow_definition_from_file(session_id: str, path: str) -> dict
         raise ValueError(result.stderr or "failed to read workflow file")
 
     return json.loads(result.stdout)
+
+
+async def write_workflow_definition_to_file(session_id: str, path: str, definition: dict[str, Any]) -> None:
+    sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
+    if not sandbox:
+        raise ValueError("failed to get or create sandbox")
+
+    await sandbox.exec_command("mkdir -p /workspace/workflow")
+    payload = json.dumps(definition, ensure_ascii=False, indent=2)
+    quoted_path = shlex.quote(path)
+    result = await sandbox.exec_command(f"cat > {quoted_path} << 'EOF'\n{payload}\nEOF")
+    if result.exit_code != 0:
+        raise ValueError(result.stderr or "failed to write workflow file")
 
 
 def prepare_tracked_workflow_file_run(

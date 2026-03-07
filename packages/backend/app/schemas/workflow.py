@@ -80,6 +80,22 @@ class WorkflowDraftResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class WorkflowDraftUpsertRequest(BaseModel):
+    draft_id: UUID | None = None
+    name: str | None = None
+    file_path: str | None = None
+    definition: dict[str, Any]
+
+
+class WorkflowQueuedRunResponse(BaseModel):
+    status: str
+    task_id: str | None = None
+    turn_id: UUID | None = None
+    draft_id: UUID | None = None
+    run_id: UUID | None = None
+    error: str | None = None
+
+
 class WorkflowArtifactResponse(BaseModel):
     id: UUID
     run_id: UUID

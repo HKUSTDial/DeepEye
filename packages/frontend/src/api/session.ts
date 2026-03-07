@@ -1,4 +1,4 @@
-import type { DataSource, Session, ToolStep, WorkspaceState } from '../types'
+import type { DataSource, Session, ToolStep, WorkflowDraft, WorkspaceState } from '../types'
 import { http } from './client'
 
 /**
@@ -38,6 +38,22 @@ export interface StoredMessage {
   steps?: ToolStep[]
 }
 
+export interface WorkflowDraftUpsertRequest {
+  draft_id?: string | null
+  name?: string | null
+  file_path?: string | null
+  definition: Record<string, unknown>
+}
+
+export interface WorkflowQueuedRunResponse {
+  status: string
+  task_id?: string | null
+  turn_id?: string | null
+  draft_id?: string | null
+  run_id?: string | null
+  error?: string | null
+}
+
 export const sessionApi = {
   create: (title?: string) => http.post<Session>('/sessions', { title: title || 'New conversation' }),
   list: () => http.get<Session[]>('/sessions'),
@@ -47,6 +63,11 @@ export const sessionApi = {
   getMessages: (id: string) => http.get<{ messages: StoredMessage[] }>(`/sessions/${id}/messages`),
   listAttachments: (id: string) => http.get<DataSource[]>(`/sessions/${id}/attachments`),
   getWorkspaceState: (id: string) => http.get<WorkspaceState>(`/sessions/${id}/workspace-state`),
+  listWorkflowDrafts: (id: string) => http.get<WorkflowDraft[]>(`/sessions/${id}/workflow-drafts`),
+  saveWorkflowDraft: (id: string, payload: WorkflowDraftUpsertRequest) =>
+    http.post<WorkflowDraft>(`/sessions/${id}/workflow-drafts`, payload),
+  runWorkflowDraft: (id: string, draftId: string) =>
+    http.post<WorkflowQueuedRunResponse>(`/sessions/${id}/workflow-drafts/${draftId}/run`),
   attachDatasource: (sessionId: string, datasourceId: string) =>
     http.post<DataSource>(`/sessions/${sessionId}/attachments/${datasourceId}`),
   detachDatasource: (sessionId: string, datasourceId: string) =>
