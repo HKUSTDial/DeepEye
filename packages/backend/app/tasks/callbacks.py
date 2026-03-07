@@ -158,7 +158,7 @@ class AgentCallback(AsyncCallbackHandler):
         self.collector = collector
         self.ignore_tags = set(ignore_tags or [])
         self._tool_stack: list[str] = []
-        self._workflow_active_file: str | None = None
+        self._workflow_display_file: str | None = None
         try:
             self._loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -196,12 +196,14 @@ class AgentCallback(AsyncCallbackHandler):
             self.session_id,
             phase,
             payload,
-            file_path=self._workflow_active_file,
+            file_path=self._workflow_display_file,
             turn_id=self.turn_id,
             draft_id=draft_id,
             run_id=run_id,
         )
-        logger.info(f"[_publish_workflow_event] phase={phase}, session={self.session_id}, file={self._workflow_active_file}")
+        logger.info(
+            f"[_publish_workflow_event] phase={phase}, session={self.session_id}, file={self._workflow_display_file}"
+        )
         await self._publish(
             AgentEvent(
                 type=AgentEventType.WORKFLOW_EVENT,
@@ -254,10 +256,10 @@ class AgentCallback(AsyncCallbackHandler):
                     fallback_name = payload["file_path"]
                 elif isinstance(payload.get("name"), str):
                     fallback_name = payload["name"]
-                self._workflow_active_file = draft.file_path or normalize_workflow_path(fallback_name or "workflow.json")
+                self._workflow_display_file = draft.file_path or normalize_workflow_path(fallback_name or "workflow.json")
                 await self._publish_workflow_event(
                     phase,
-                    {"path": self._workflow_active_file, "workflow": workflow},
+                    {"workflow": workflow},
                     draft_id=str(draft.id) if draft else None,
                 )
         if self.collector:

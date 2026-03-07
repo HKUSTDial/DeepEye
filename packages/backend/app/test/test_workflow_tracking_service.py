@@ -80,12 +80,13 @@ def test_workflow_tracking_persists_turn_draft_run_artifacts_and_workspace_state
             session_id=session.id,
             user_id=user.id,
             turn_id=turn.id,
-            file_path="/workspace/workflow/revenue.json",
+            file_path="/workspace/workflow/revenue_v2.json",
             definition={"root": {"nodes": {"report": {"id": "report"}}, "edges": {}}},
         )
 
         assert first_draft.id == second_draft.id
         assert second_draft.version == 2
+        assert second_draft.file_path == "/workspace/workflow/revenue_v2.json"
 
         run = create_tracked_workflow_run(
             db,

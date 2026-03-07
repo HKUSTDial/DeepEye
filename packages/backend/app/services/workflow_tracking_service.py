@@ -175,8 +175,8 @@ def upsert_workflow_draft(
 
     repo = WorkflowDraftRepository(db)
     existing = None
-    if turn_uuid and file_path:
-        existing = repo.get_latest_by_turn_and_path(turn_uuid, file_path)
+    if turn_uuid:
+        existing = repo.get_latest_by_turn(turn_uuid)
     elif session_uuid and file_path:
         existing = repo.get_latest_by_session_and_path(session_uuid, file_path)
 

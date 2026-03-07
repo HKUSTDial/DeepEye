@@ -280,7 +280,7 @@ async def service_run_workflow_definition(
         if not sandbox:
             raise ValueError("failed to get or create sandbox")
 
-        await _publish_workflow_event("run_start", {"path": workflow_path, "started_at": _timestamp()})
+        await _publish_workflow_event("run_start", {"started_at": _timestamp()})
 
         _workflow_to_session[core_workflow.id] = session_id
 

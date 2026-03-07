@@ -21,14 +21,17 @@ def build_workflow_event_data(
     draft_id: str | None = None,
     run_id: str | None = None,
 ) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    if file_path:
+        metadata["file_path"] = file_path
     return {
-        "version": 2,
+        "version": 3,
         "session_id": session_id,
         "turn_id": turn_id,
         "draft_id": draft_id,
         "run_id": run_id,
-        "file_path": file_path,
         "phase": phase,
+        "metadata": metadata,
         "payload": payload or {},
     }
 

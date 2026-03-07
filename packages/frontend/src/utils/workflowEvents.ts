@@ -5,6 +5,7 @@ type WorkflowEventLike = Pick<AgentEvent, 'type' | 'data'> | { type?: string; da
 
 export interface ParsedWorkflowEvent {
   data: Record<string, unknown>
+  metadata: Record<string, unknown>
   payload: Record<string, unknown>
   phase: string
   filePath: string | null
@@ -27,6 +28,7 @@ export function parseWorkflowEvent(event: WorkflowEventLike): ParsedWorkflowEven
   }
 
   const data = typeof event.data === 'object' && event.data ? event.data as Record<string, unknown> : {}
+  const metadata = typeof data.metadata === 'object' && data.metadata ? data.metadata as Record<string, unknown> : {}
   const payload = typeof data.payload === 'object' && data.payload ? data.payload as Record<string, unknown> : {}
   const artifact =
     typeof payload.artifact === 'object' && payload.artifact
@@ -35,9 +37,15 @@ export function parseWorkflowEvent(event: WorkflowEventLike): ParsedWorkflowEven
 
   return {
     data,
+    metadata,
     payload,
     phase: typeof data.phase === 'string' ? data.phase : '',
-    filePath: typeof data.file_path === 'string' ? data.file_path : null,
+    filePath:
+      typeof metadata.file_path === 'string'
+        ? metadata.file_path
+        : typeof data.file_path === 'string'
+          ? data.file_path
+          : null,
     runId: typeof data.run_id === 'string' ? data.run_id : null,
     draftId: typeof data.draft_id === 'string' ? data.draft_id : null,
     turnId: typeof data.turn_id === 'string' ? data.turn_id : null,
@@ -56,6 +64,15 @@ export function buildWorkflowRunFromEvent(
   },
 ): WorkflowRun {
   const data: Record<string, unknown> = isParsedWorkflowEvent(event) ? event.data : (event ?? {})
+  const metadata: Record<string, unknown> = isParsedWorkflowEvent(event)
+    ? event.metadata
+    : (typeof data.metadata === 'object' && data.metadata ? data.metadata as Record<string, unknown> : {})
+  const filePath =
+    typeof metadata.file_path === 'string'
+      ? metadata.file_path
+      : typeof data.file_path === 'string'
+        ? data.file_path
+        : null
 
   return {
     id: typeof data.run_id === 'string' ? data.run_id : `workflow-event:${sessionId}`,
@@ -64,7 +81,7 @@ export function buildWorkflowRunFromEvent(
     turn_id: typeof data.turn_id === 'string' ? data.turn_id : null,
     draft_id: typeof data.draft_id === 'string' ? data.draft_id : null,
     source: options?.source ?? 'chat_workflow',
-    file_path: typeof data.file_path === 'string' ? data.file_path : null,
+    file_path: filePath,
     status,
     error: options?.error || undefined,
     created_at: new Date().toISOString(),
