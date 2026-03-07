@@ -5,7 +5,12 @@ import { useReportStore } from '../stores/report'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { chatApi, datasourceApi, type AgentEvent } from '../api'
 import { extractVideoOutputParams } from '../api/video'
-import type { WorkflowRun } from '../types'
+import {
+  buildWorkflowRunFromEvent,
+  getWorkflowArtifacts,
+  getWorkflowOutputs,
+  parseWorkflowEvent,
+} from '../utils/workflowEvents'
 
 /**
  * Chat hook - handles SSE connection and message sending.
@@ -51,25 +56,6 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null)
   const esRef = useRef<EventSource | null>(null)
   const closedNormallyRef = useRef(false)
-
-  const buildWorkflowRunFromEvent = (
-    sessionId: string,
-    data: Record<string, unknown> | undefined,
-    status: string,
-    error: string | null = null,
-  ): WorkflowRun => ({
-    id: typeof data?.run_id === 'string' ? data.run_id : `workflow-event:${sessionId}`,
-    workflow_id: null,
-    session_id: sessionId,
-    turn_id: typeof data?.turn_id === 'string' ? data.turn_id : null,
-    draft_id: typeof data?.draft_id === 'string' ? data.draft_id : null,
-    source: 'chat_workflow',
-    file_path: typeof data?.file_path === 'string' ? data.file_path : null,
-    status,
-    error: error || undefined,
-    created_at: new Date().toISOString(),
-    finished_at: status === 'running' ? null : new Date().toISOString(),
-  })
 
   // Cleanup on unmount
   useEffect(() => {
@@ -193,10 +179,11 @@ export function useChat() {
         }
 
         if (agentEvent.type === 'workflow_event') {
-          const data = agentEvent.data as Record<string, unknown> | undefined
-          const filePath = typeof data?.file_path === 'string' ? data?.file_path : null
-          const phase = typeof data?.phase === 'string' ? data?.phase : ''
-          const payload = (data?.payload as Record<string, unknown>) || {}
+          const workflowEvent = parseWorkflowEvent(agentEvent)
+          if (!workflowEvent) {
+            return
+          }
+          const { filePath, phase, payload } = workflowEvent
 
           if (handleWorkflowArtifactEvent(sessionId, phase, payload)) {
             pushEvent(agentEvent)
@@ -276,7 +263,7 @@ export function useChat() {
           if (phase === 'run_start') {
             setRunStatus(sessionId, 'running', null)
             setViewState(sessionId, 'ready')
-            setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, data, 'running'))
+            setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, workflowEvent, 'running'))
             return
           }
           if (phase === 'node_status') {
@@ -298,18 +285,17 @@ export function useChat() {
             useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, false)
 
             setRunStatus(sessionId, status, error)
-            setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, data, status, error))
+            setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, workflowEvent, status, { error }))
 
-            const artifacts = Array.isArray(payload?.artifacts)
-              ? payload.artifacts.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
-              : []
+            const artifacts = getWorkflowArtifacts(payload)
             artifacts.forEach((artifact) => {
               handleWorkflowArtifactEvent(sessionId, 'artifact_ready', { artifact })
             })
 
-            if (payload?.outputs && typeof payload.outputs === 'object') {
-              setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
-              const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
+            const outputs = getWorkflowOutputs(payload)
+            if (outputs) {
+              setRunOutput(sessionId, JSON.stringify(outputs, null, 2))
+              const videoParams = extractVideoOutputParams(outputs)
               const taskIdToOpen = videoParams.taskId ?? null
               if (taskIdToOpen) {
                 openOrFocusTab('video-preview', { taskId: taskIdToOpen })

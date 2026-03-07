@@ -16,6 +16,12 @@ import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
 import type { WorkflowRun } from '../../../types'
+import {
+  buildWorkflowRunFromEvent,
+  getWorkflowOutputs,
+  matchesTrackedWorkflowEvent,
+  parseWorkflowEvent,
+} from '../../../utils/workflowEvents'
 
 const NODE_TYPES = { workflowNode: WorkflowNode }
 const WORKFLOW_DIR = '/workspace/workflow'
@@ -46,27 +52,6 @@ type WorkflowNodeData = {
 
 type WorkflowFlowNode = Node<WorkflowNodeData>
 type WorkflowFlowEdge = Edge
-
-function buildTrackedRunFromEvent(
-  sessionId: string,
-  data: Record<string, unknown>,
-  status: string,
-  error: string | null = null,
-): WorkflowRun {
-  return {
-    id: typeof data.run_id === 'string' ? data.run_id : `workflow-event:${sessionId}`,
-    workflow_id: null,
-    session_id: sessionId,
-    turn_id: typeof data.turn_id === 'string' ? data.turn_id : null,
-    draft_id: typeof data.draft_id === 'string' ? data.draft_id : null,
-    source: 'chat_workflow',
-    file_path: typeof data.file_path === 'string' ? data.file_path : null,
-    status,
-    error: error || undefined,
-    created_at: new Date().toISOString(),
-    finished_at: status === 'running' ? null : new Date().toISOString(),
-  }
-}
 
 function buildOptimisticRun(
   sessionId: string,
@@ -377,24 +362,13 @@ export function WorkflowLivePanel({
         if (agentEvent.type !== 'workflow_event') {
           return
         }
-        const data = agentEvent.data || {}
-        const filePath = typeof data.file_path === 'string' ? data.file_path : null
-        const phase = typeof data.phase === 'string' ? data.phase : ''
-        const payload = (data.payload as Record<string, unknown>) || {}
-        const artifact = typeof payload.artifact === 'object' && payload.artifact
-          ? (payload.artifact as Record<string, unknown>)
-          : null
-        const artifactKind = typeof artifact?.kind === 'string' ? artifact.kind : ''
+        const workflowEvent = parseWorkflowEvent(agentEvent)
+        if (!workflowEvent) {
+          return
+        }
+        const { filePath, phase, payload, artifact, artifactKind } = workflowEvent
         const currentTrackedRun = useWorkflowSessionsStore.getState().sessions[sessionId]?.activeRun
-        const incomingRunId = typeof data.run_id === 'string' ? data.run_id : null
-        const incomingDraftId = typeof data.draft_id === 'string' ? data.draft_id : null
-        if (currentTrackedRun?.id && incomingRunId && currentTrackedRun.id !== incomingRunId) {
-          return
-        }
-        if (!currentTrackedRun?.id && currentTrackedRun?.draft_id && incomingDraftId && currentTrackedRun.draft_id !== incomingDraftId) {
-          return
-        }
-        if (!currentTrackedRun?.id && !currentTrackedRun?.draft_id && filePath && activeFilePathRef.current && activeFilePathRef.current !== filePath) {
+        if (!matchesTrackedWorkflowEvent(currentTrackedRun, activeFilePathRef.current, workflowEvent)) {
           return
         }
         if (phase === 'artifact_ready') {
@@ -478,13 +452,13 @@ export function WorkflowLivePanel({
           const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
           const error = typeof payload?.error === 'string' ? payload?.error : null
           setRunStatus(sessionId, status, error)
-          setActiveRun(sessionId, buildTrackedRunFromEvent(sessionId, data, status, error))
-          if (payload?.outputs && typeof payload.outputs === 'object') {
-            const outputs = payload.outputs as Record<string, unknown>
-            setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
+          setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, workflowEvent, status, { error }))
+            const outputs = getWorkflowOutputs(payload)
+          if (outputs) {
+            setRunOutput(sessionId, JSON.stringify(outputs, null, 2))
             console.log('🎬 WorkflowLivePanel: run_end phase, checking for video output...')
-            console.log('📊 WorkflowLivePanel: Full outputs object:', JSON.stringify(payload.outputs, null, 2))
-            console.log('📊 WorkflowLivePanel: Output keys:', Object.keys(payload.outputs))
+            console.log('📊 WorkflowLivePanel: Full outputs object:', JSON.stringify(outputs, null, 2))
+            console.log('📊 WorkflowLivePanel: Output keys:', Object.keys(outputs))
             const videoParams = extractVideoOutputParams(outputs)
             console.log('🎬 WorkflowLivePanel: Extracted video params:', videoParams)
             if (!videoParams.taskId) {
