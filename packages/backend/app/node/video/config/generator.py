@@ -34,7 +34,7 @@ from .prompts import (
 )
 
 
-# MAX_TOKENS: from env/config LLM_MAX_TOKENS (default 16000)
+# MAX_TOKENS: from env/config LLM_MAX_TOKENS
 MAX_TOKENS = settings.LLM_MAX_TOKENS
 
 # ============================================================================

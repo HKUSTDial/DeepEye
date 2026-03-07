@@ -523,7 +523,7 @@ class DashboardEngineer:
                         messages,
                         model=self.llm_model,
                         temperature=0.0,
-                        max_tokens=8192
+                        max_tokens=settings.LLM_MAX_TOKENS
                     )
                     
                     response_content = response.content

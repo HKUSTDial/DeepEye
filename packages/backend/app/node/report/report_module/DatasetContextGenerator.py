@@ -8,26 +8,6 @@ from openai import OpenAI
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-_REPORT_CHAT_MAX_TOKENS_CAP = 8192
-
-
-def _normalize_report_max_tokens(max_tokens: int | None) -> int | None:
-    if max_tokens is None:
-        return None
-    try:
-        normalized = int(max_tokens)
-    except (TypeError, ValueError):
-        return None
-    if normalized <= 0:
-        return None
-    if normalized > _REPORT_CHAT_MAX_TOKENS_CAP:
-        logger.warning(
-            "Dataset context generator max_tokens=%s exceeds provider-safe cap %s, clamping.",
-            normalized,
-            _REPORT_CHAT_MAX_TOKENS_CAP,
-        )
-        return _REPORT_CHAT_MAX_TOKENS_CAP
-    return normalized
 
 
 # 自定义JSON编码器以处理pandas的Timestamp对象
@@ -69,7 +49,7 @@ class DatasetContextGenerator:
             raise ValueError("LLM_MODEL is required for report generation")
         self.model_name = resolved_model
         self.temperature = temperature
-        self.max_tokens = _normalize_report_max_tokens(max_tokens)
+        self.max_tokens = max_tokens
         client_kwargs: dict[str, Any] = {"api_key": api_key}
         if base_url:
             client_kwargs["base_url"] = base_url

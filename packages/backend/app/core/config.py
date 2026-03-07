@@ -106,7 +106,10 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str
     LLM_MODEL: str
     LLM_TEMPERATURE: float = 0.7
-    LLM_MAX_TOKENS: int = 32000  # max tokens for completion (video TSX, config, etc.)
+    LLM_MAX_TOKENS: int = 8192  # max tokens for completion across agent and artifact generation
+    STARTUP_WARMUP_ENABLED: bool = True
+    STARTUP_WARMUP_STRICT: bool = True
+    STARTUP_WARMUP_TIMEOUT_SECONDS: float = 15.0
     
     # Azure Speech TTS (optional, for data video narration)
     AZURE_SPEECH_KEY: str | None = None

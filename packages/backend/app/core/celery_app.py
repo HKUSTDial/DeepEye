@@ -1,5 +1,8 @@
 from celery import Celery
+from celery.signals import worker_init
+
 from app.core.config import settings
+from app.core.warmup import run_startup_warmup
 
 # Debug: Print Redis URL on import
 print(f"[Celery] Using broker: {settings.REDIS_URL}")
@@ -20,3 +23,8 @@ celery_app.conf.update(
 
 # Export for compatibility
 REDIS_URL = settings.REDIS_URL
+
+
+@worker_init.connect
+def _run_worker_warmup(**_: object) -> None:
+    run_startup_warmup(component="worker")

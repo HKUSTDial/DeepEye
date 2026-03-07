@@ -11,6 +11,7 @@ from app.api.public import router as public_router
 from app.api.v1 import router as v1_router
 from app.core.config import settings
 from app.core.middleware import auth_middleware
+from app.core.warmup import run_startup_warmup
 from app.db.session import engine
 from app.models import Base
 from app.sandbox import sandbox_manager
@@ -22,6 +23,8 @@ Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    run_startup_warmup(component="api")
+
     # Startup: 初始化 LangGraph Checkpointer
     try:
         async with AsyncPostgresSaver.from_conn_string(settings.POSTGRES_STATE_URL) as checkpointer:
