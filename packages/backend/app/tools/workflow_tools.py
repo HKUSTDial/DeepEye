@@ -4,6 +4,7 @@ import json
 import uuid
 from typing import Annotated, List
 
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId
 from langgraph.types import Command
@@ -11,12 +12,14 @@ from langgraph.types import Command
 from app.db.session import SessionLocal
 from app.repositories import SessionRepository
 from app.sandbox import sandbox_manager
+from app.services.agent_prompts import build_workflow_summary_prompt
 from app.services.workflow_file_service import (
     service_run_workflow_draft,
     service_run_workflow_from_file,
     write_workflow_definition_to_file,
 )
 from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft, resolve_workflow_target
+from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
 from deepeye.tools.planning_tools import mark_step_done, update_plan
@@ -70,6 +73,54 @@ async def _read_workflow_file(session_id: str, path: str) -> dict:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise ValueError(f"invalid workflow json: {exc}") from exc
+
+
+def _serialize_workspace_state(snapshot: dict) -> dict:
+    turn = snapshot.get("turn")
+    draft = snapshot.get("draft")
+    run = snapshot.get("run")
+    artifacts = snapshot.get("artifacts") or []
+    return {
+        "session_id": str(snapshot.get("session_id")) if snapshot.get("session_id") is not None else None,
+        "turn": (
+            {
+                "id": str(turn.id),
+                "status": turn.status,
+                "input_text": turn.input_text,
+                "error": turn.error,
+            }
+            if turn
+            else None
+        ),
+        "draft": (
+            {
+                "id": str(draft.id),
+                "status": draft.status,
+                "version": draft.version,
+                "source": draft.source,
+            }
+            if draft
+            else None
+        ),
+        "run": (
+            {
+                "id": str(run.id),
+                "status": run.status,
+                "error": run.error,
+                "result": run.result,
+            }
+            if run
+            else None
+        ),
+        "artifacts": [
+            {
+                "id": str(artifact.id),
+                "kind": artifact.kind,
+                "payload": artifact.payload,
+            }
+            for artifact in artifacts
+        ],
+    }
 
 
 def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | None = None) -> callable:
@@ -314,16 +365,17 @@ def create_design_workflow_tool(
     turn_id: str | None = None,
 ) -> callable:
     @tool
-    async def workflow_agent(goal: str) -> str:
+    async def workflow_agent(goal: str) -> dict:
         """
-        Workflow Designer Agent: design, iterate, and run data analysis workflows.
-        Pass a clear analysis goal and any relevant data context.
+        Workflow planner and executor.
+        Use this for tasks that need workflow planning and execution.
+        Returns structured execution metadata; call summarize_workflow_result before replying to the user.
         """
         db = SessionLocal()
         try:
             session = _get_session(db, session_id)
             if not session:
-                return "Session not found."
+                return {"status": "error", "error": "Session not found."}
             workflow_agent_inst = WorkflowAgent(
                 model=model,
                 system_prompt=system_prompt,
@@ -344,9 +396,68 @@ def create_design_workflow_tool(
                 thread_id=f"workflow_agent_{session_id}",
                 config={"callbacks": callbacks},
             )
-            messages = result.get("messages", [])
-            return messages[-1].content if messages else ""
+            try:
+                snapshot = (
+                    build_workspace_state_for_turn(db, turn_id)
+                    if turn_id
+                    else build_workspace_state(db, session_id)
+                )
+            except Exception as exc:
+                logger.warning("[workflow_agent tool] failed to build workspace state: %s", exc)
+                snapshot = None
+            serialized = _serialize_workspace_state(snapshot) if snapshot else {}
+            run = serialized.get("run") or {}
+            return {
+                "status": "success",
+                "next_action": "summarize_workflow_result",
+                "turn_id": turn_id,
+                "draft_id": (serialized.get("draft") or {}).get("id"),
+                "run_id": run.get("id"),
+                "run_status": run.get("status"),
+                "artifacts": [artifact.get("kind") for artifact in serialized.get("artifacts", [])],
+                "workspace_state": serialized,
+                "message_count": len(result.get("messages", [])),
+            }
         finally:
             db.close()
 
     return workflow_agent
+
+
+def create_summarize_workflow_result_tool(
+    model,
+    session_id: str,
+    turn_id: str | None = None,
+) -> callable:
+    @tool
+    async def summarize_workflow_result(question: str) -> str:
+        """
+        Summarize the latest workflow run for the current user request.
+        Always use this after workflow_agent before replying to the user.
+        """
+        db = SessionLocal()
+        try:
+            snapshot = (
+                build_workspace_state_for_turn(db, turn_id)
+                if turn_id
+                else build_workspace_state(db, session_id)
+            )
+        finally:
+            db.close()
+
+        serialized = _serialize_workspace_state(snapshot)
+        run = serialized.get("run")
+        if not run:
+            return "No workflow run is available to summarize yet."
+
+        prompt = build_workflow_summary_prompt(question, serialized)
+        response = await model.ainvoke(
+            [
+                SystemMessage(content=prompt),
+                HumanMessage(content=question),
+            ]
+        )
+        content = getattr(response, "content", "")
+        return content if isinstance(content, str) else str(content)
+
+    return summarize_workflow_result

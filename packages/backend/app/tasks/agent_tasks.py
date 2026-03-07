@@ -16,6 +16,7 @@ from app.repositories import DataSourceRepository, SessionAttachmentRepository, 
 from app.sandbox.manager import SandboxManager, _get_datasource_filename
 from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
 from app.services.workflow_engine import build_registry
+from app.services.agent_prompts import build_supervisor_prompt
 from app.services.workflow_prompts import build_workflow_prompt
 from app.services.workflow_tracking_service import (
     complete_chat_turn_record,
@@ -26,6 +27,7 @@ from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
 from deepeye.agents import AgentFactory
 from app.tools.workflow_tools import (
     create_design_workflow_tool,
+    create_summarize_workflow_result_tool,
 )
 from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
@@ -266,6 +268,13 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
             turn_id=turn_id,
         )
     )
+    tools.append(
+        create_summarize_workflow_result_tool(
+            model,
+            session_id,
+            turn_id=turn_id,
+        )
+    )
 
     user_input = agent_input.user_input
 
@@ -287,7 +296,10 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
 
         logger.info("[AgentTask] Creating supervisor agent...")
         factory = AgentFactory(model, checkpointer)
-        supervisor = factory.create_supervisor(tools)
+        supervisor = factory.create_supervisor(
+            tools,
+            system_prompt_template=build_supervisor_prompt(),
+        )
 
         try:
             logger.info("[AgentTask] Starting agent execution...")

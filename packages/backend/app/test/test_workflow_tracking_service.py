@@ -15,6 +15,7 @@ from app.repositories import MessageRepository
 from app.schemas import UserMessage
 from app.services.workflow_tracking_service import (
     build_workspace_state,
+    build_workspace_state_for_turn,
     create_chat_turn,
     create_tracked_workflow_run,
     finalize_tracked_workflow_run,
@@ -175,6 +176,53 @@ def test_workspace_state_falls_back_to_latest_session_run_without_turn():
         state = build_workspace_state(db, session.id)
 
         assert state["turn"] is None
+        assert state["draft"].id == draft.id
+        assert state["run"].id == run.id
+        assert len(state["artifacts"]) == 1
+        assert state["artifacts"][0].payload["kind"] == "dashboard"
+    finally:
+        db.close()
+
+
+def test_workspace_state_for_turn_uses_turn_scoped_run_and_artifacts():
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="dave@example.com")
+        session = _create_session(db, user)
+        turn = create_chat_turn(db, session.id, user.id, "Build a dashboard")
+
+        draft = upsert_workflow_draft(
+            db,
+            session_id=session.id,
+            user_id=user.id,
+            turn_id=turn.id,
+            file_path="/workspace/workflow/dashboard.json",
+            definition={"root": {"nodes": {"dash": {"id": "dash"}}, "edges": {}}},
+        )
+        run = create_tracked_workflow_run(
+            db,
+            user_id=user.id,
+            session_id=session.id,
+            turn_id=turn.id,
+            draft_id=draft.id,
+            file_path=draft.file_path,
+        )
+        artifacts = replace_workflow_artifacts(
+            db,
+            run,
+            [{"kind": "dashboard", "dashboard_url": "http://localhost:3000/dashboard/demo"}],
+        )
+        finalize_tracked_workflow_run(
+            db,
+            run,
+            status="success",
+            result={"status": "success", "outputs": {"dash": {"dashboard_url": "http://localhost:3000/dashboard/demo"}}},
+            artifacts=[artifact.payload for artifact in artifacts],
+        )
+
+        state = build_workspace_state_for_turn(db, turn.id)
+
+        assert state["turn"].id == turn.id
         assert state["draft"].id == draft.id
         assert state["run"].id == run.id
         assert len(state["artifacts"]) == 1

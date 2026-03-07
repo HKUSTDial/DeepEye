@@ -6,6 +6,7 @@ from deepeye.tools.base import tool
 
 from app.core.config import settings
 from app.services.knowledge_base_service import search_kb_chunks
+from app.services.agent_prompts import build_knowledge_base_prompt
 from app.db.session import SessionLocal
 from deepeye.agents import KnowledgeBaseAgent
 from sqlalchemy import text
@@ -121,6 +122,7 @@ def create_knowledge_base_agent_tool(
         kb_agent = KnowledgeBaseAgent(
             model=model,
             tools=[create_kb_sql_tool(user_id, kb_ids)],
+            system_prompt=build_knowledge_base_prompt(),
         )
         result = await kb_agent.ainvoke(
             question,
