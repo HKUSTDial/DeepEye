@@ -38,7 +38,7 @@ export interface WorkflowSessionState {
   runOutput: string
   dashboardRefreshKey: number
   videoProgress: VideoProgressState
-  /** URL of a ready video-preview container (set when video_preview_ready event fires) */
+  /** URL of a ready video-preview container (set from video artifacts or snapshot restore) */
   videoPreviewUrl: string | null
   lastUpdated: number | null
 }

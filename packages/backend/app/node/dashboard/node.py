@@ -440,7 +440,6 @@ class NL2DashboardHandler:
                                 },
                                 sync=True,
                             )
-                            self._emit_workflow_event("refresh", sync=True)
                         except Exception as e:
                             print(f"[ERROR] Background deployment failed: {e}")
                             self._emit_log(f"Dashboard deployment failed: {e}")

@@ -320,18 +320,6 @@ export function useChat() {
             setViewState(sessionId, 'error')
             return
           }
-          if (phase === 'video_preview_ready') {
-            const videoUrl = typeof payload?.video_url === 'string' ? payload.video_url : null
-            if (videoUrl) {
-              setVideoPreviewUrl(sessionId, videoUrl)
-              openOrFocusTab('video-preview', {})
-            }
-            return
-          }
-          if (phase === 'refresh') {
-            triggerDashboardRefresh(sessionId)
-            return
-          }
         }
 
         if (agentEvent.type === 'tool_end') {

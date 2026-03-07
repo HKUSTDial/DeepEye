@@ -646,17 +646,6 @@ class VideoGeneratorHandler:
                                         "artifact_ready",
                                         {"artifact": artifact},
                                     )
-                                    await publish_workflow_event(
-                                        f"session:{session_id}",
-                                        session_id,
-                                        "video_preview_ready",
-                                        {
-                                            "artifact": artifact,
-                                            "task_id": task_id,
-                                            "session_id": session_id,
-                                            "video_url": deploy_url,
-                                        },
-                                    )
 
                                 new_loop.run_until_complete(_emit())
                             except Exception as ee:
