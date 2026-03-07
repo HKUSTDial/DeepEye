@@ -104,7 +104,6 @@ def run_report_pipeline(
 
     def _push_step(line: str) -> None:
         steps_buffer.append(line)
-        _publish_sync(channel, {"type": "report_step", "source": "report", "content": line})
         publish_workflow_event_sync(
             channel,
             session_id,
@@ -138,14 +137,6 @@ def run_report_pipeline(
         error_detail = traceback.format_exc()
         logger.error("[ReportRuntime] Pipeline execution failed: %s", error_detail)
         _push_step(f"❌ Error: {exc}")
-        _publish_sync(
-            channel,
-            {
-                "type": "report_done",
-                "source": "report",
-                "data": {"report_html": None, "steps": steps_buffer, "error": str(exc)},
-            },
-        )
         publish_workflow_event_sync(
             channel,
             session_id,
@@ -237,19 +228,7 @@ def run_report_pipeline(
         logger.error("[ReportRuntime] Report HTML is empty")
         return None, "Generated report is empty"
 
-    logger.info("[ReportRuntime] Sending report_done event with %d bytes", len(report_html))
-    _publish_sync(
-        channel,
-        {
-            "type": "report_done",
-            "source": "report",
-            "data": {
-                "report_html": report_html,
-                "steps": steps_buffer,
-                "report_filename": report_filename,
-            },
-        },
-    )
+    logger.info("[ReportRuntime] Publishing report artifact with %d bytes", len(report_html))
     publish_workflow_event_sync(
         channel,
         session_id,
@@ -276,17 +255,13 @@ def run_report_in_thread(
     template_name: str = "template_1.html",
     tmp_dir: str | None = None,
 ) -> None:
-    """Run report pipeline in a background thread and emit agent_start/agent_end."""
+    """Run report pipeline in a background thread."""
     import shutil
-
-    channel = f"session:{session_id}"
-    _publish_sync(channel, {"type": "agent_start", "source": "report"})
 
     def work() -> None:
         try:
             run_report_pipeline(session_id, user_query, csv_paths, template_name=template_name)
         finally:
-            _publish_sync(channel, {"type": "agent_end", "source": "report"})
             if tmp_dir:
                 try:
                     shutil.rmtree(tmp_dir, ignore_errors=True)

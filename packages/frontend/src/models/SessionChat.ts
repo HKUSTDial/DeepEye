@@ -229,6 +229,26 @@ export class SessionChat {
           }
         }
       }
+      else if (type === 'workflow_event' && current) {
+        const phase = typeof d.phase === 'string' ? d.phase : ''
+        const payload = typeof d.payload === 'object' && d.payload ? d.payload as Record<string, unknown> : {}
+        const artifact =
+          typeof payload.artifact === 'object' && payload.artifact
+            ? payload.artifact as Record<string, unknown>
+            : null
+        const artifactKind = typeof artifact?.kind === 'string' ? artifact.kind : ''
+
+        if (artifactKind === 'report' && phase === 'artifact_progress') {
+          const messageText = typeof payload.message === 'string' ? payload.message.trim() : ''
+          if (messageText) {
+            const stageMatch = messageText.match(/\[(\d+)\/7\]/)
+            if (stageMatch) {
+              const stageIndex = Math.min(parseInt(stageMatch[1], 10), 6)
+              appendReportStepToTimeline(current, stageIndex)
+            }
+          }
+        }
+      }
       else if (type === 'tool_start' && current) {
         const step: ToolStep = { type: 'tool', name: String(data.name || ''), source, input: String(data.input || ''), status: 'running', subSteps: [] }
         if (source === 'supervisor') {

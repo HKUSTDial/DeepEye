@@ -341,39 +341,6 @@ export function useChat() {
           }
         }
 
-        // Legacy fallback for report runtime before unified artifact events.
-        if (agentEvent.type === 'report_step') {
-          const stepContent = agentEvent.content ?? ''
-          if (stepContent) {
-            // Read latest store state here to avoid stale closure resetting progress steps.
-            const currentlyGenerating = !!useReportStore.getState().sessions[sessionId]?.isGenerating
-            if (!currentlyGenerating) {
-              startReportGeneration(sessionId)
-              openOrFocusTab('report')
-              setRightPanelRatio(28)
-            }
-            addReportStep(sessionId, stepContent)
-          }
-        }
-
-        if (agentEvent.type === 'agent_start' && agentEvent.source === 'report') {
-          startReportGeneration(sessionId)
-          openOrFocusTab('report')
-          setRightPanelRatio(28)
-        }
-
-        if (agentEvent.type === 'agent_end' && agentEvent.source === 'report') {
-          stopReportGeneration(sessionId)
-        }
-
-        if (agentEvent.type === 'report_done') {
-          const data = agentEvent.data as { report_html?: string; steps?: string[]; report_filename?: string; error?: string } | undefined
-          setReportResult(sessionId, data?.report_html ?? null, data?.steps ?? [], data?.report_filename ?? null, data?.error ?? null)
-          // Open the Report panel and enlarge the right panel for better reading
-          openOrFocusTab('report')
-          setRightPanelRatio(28)
-        }
-
         if (agentEvent.type === 'token') {
           const data = (agentEvent.data || {}) as Record<string, unknown>
           if (data.source === 'workflow' && typeof data.content === 'string') {
