@@ -41,35 +41,18 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # 测试用学校数据库
-  school-db:
+  # 异构工作流手测样例数据库
+  retail-ops-db:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=${SCHOOL_DB_USER}
-      - POSTGRES_PASSWORD=${SCHOOL_DB_PASSWORD}
-      - POSTGRES_DB=${SCHOOL_DB_NAME}
+      - POSTGRES_USER=${RETAIL_OPS_DB_USER}
+      - POSTGRES_PASSWORD=${RETAIL_OPS_DB_PASSWORD}
+      - POSTGRES_DB=${RETAIL_OPS_DB_NAME}
     volumes:
-      - school_db_data:/var/lib/postgresql/data
-      - ./docker/test-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - retail_ops_db_data:/var/lib/postgresql/data
+      - ./docker/test-db/retail_ops_init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SCHOOL_DB_USER} -d ${SCHOOL_DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # DeepEye 测试数据库
-  deepeye-db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=${DEEPEYE_DEMO_DB_USER}
-      - POSTGRES_PASSWORD=${DEEPEYE_DEMO_DB_PASSWORD}
-      - POSTGRES_DB=${DEEPEYE_DEMO_DB_NAME}
-    volumes:
-      - deepeye_db_data:/var/lib/postgresql/data
-      - ./docker/test-db/deepeye_dataset_pg.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DEEPEYE_DEMO_DB_USER} -d ${DEEPEYE_DEMO_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${RETAIL_OPS_DB_USER} -d ${RETAIL_OPS_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -163,8 +146,7 @@ volumes:
   redis_data:
   postgres_data:
   minio_data:
-  school_db_data:
-  deepeye_db_data:
+  retail_ops_db_data:
   workspace_data:
 
 networks:

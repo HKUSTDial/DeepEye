@@ -1,0 +1,68 @@
+[
+  {
+    "city": "Hangzhou",
+    "region": "East",
+    "actual_revenue": 794673.36,
+    "target_revenue": 764109.0,
+    "achievement_rate": 1.04,
+    "marketing_budget": 158000,
+    "budget_roi": 5.0296,
+    "orders_count": 25119,
+    "member_orders_rate": 0.5364
+  },
+  {
+    "city": "Shenzhen",
+    "region": "South",
+    "actual_revenue": 736325.78,
+    "target_revenue": 681783.13,
+    "achievement_rate": 1.08,
+    "marketing_budget": 172000,
+    "budget_roi": 4.281,
+    "orders_count": 22541,
+    "member_orders_rate": 0.5656
+  },
+  {
+    "city": "Shanghai",
+    "region": "East",
+    "actual_revenue": 705395.86,
+    "target_revenue": 719791.69,
+    "achievement_rate": 0.98,
+    "marketing_budget": 165000,
+    "budget_roi": 4.2751,
+    "orders_count": 20948,
+    "member_orders_rate": 0.5966
+  },
+  {
+    "city": "Beijing",
+    "region": "North",
+    "actual_revenue": 658485.05,
+    "target_revenue": 700516.01,
+    "achievement_rate": 0.94,
+    "marketing_budget": 149000,
+    "budget_roi": 4.4194,
+    "orders_count": 20267,
+    "member_orders_rate": 0.5357
+  },
+  {
+    "city": "Guangzhou",
+    "region": "South",
+    "actual_revenue": 615803.89,
+    "target_revenue": 609706.82,
+    "achievement_rate": 1.01,
+    "marketing_budget": 136000,
+    "budget_roi": 4.528,
+    "orders_count": 19452,
+    "member_orders_rate": 0.5654
+  },
+  {
+    "city": "Chengdu",
+    "region": "West",
+    "actual_revenue": 544303.5,
+    "target_revenue": 591634.24,
+    "achievement_rate": 0.92,
+    "marketing_budget": 118000,
+    "budget_roi": 4.6127,
+    "orders_count": 16657,
+    "member_orders_rate": 0.5958
+  }
+]
