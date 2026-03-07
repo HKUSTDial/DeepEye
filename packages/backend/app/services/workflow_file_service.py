@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -10,6 +11,7 @@ from app.infra import RedisEventBus
 from app.sandbox import sandbox_manager
 from app.core.config import settings
 from app.schemas import AgentEvent, AgentEventType
+from app.repositories import WorkflowDraftRepository, WorkflowRunRepository
 from app.services.workflow_engine import build_engine
 from app.services.workflow_events import build_workflow_event_data, extract_workflow_artifacts
 from app.services.workflow_tracking_service import (
@@ -49,6 +51,89 @@ def get_session_id_by_workflow_id(workflow_id: str) -> str | None:
     return _workflow_to_session.get(workflow_id)
 
 
+def _as_uuid(value: str | uuid.UUID | None) -> uuid.UUID | None:
+    if value is None or isinstance(value, uuid.UUID):
+        return value
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+async def load_workflow_definition_from_file(session_id: str, path: str) -> dict[str, Any]:
+    sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
+    if not sandbox:
+        raise ValueError("failed to get or create sandbox")
+
+    result = await sandbox.exec_command(f"cat {path}")
+    if result.exit_code != 0:
+        raise ValueError(result.stderr or "failed to read workflow file")
+
+    return json.loads(result.stdout)
+
+
+def prepare_tracked_workflow_file_run(
+    db,
+    *,
+    user_id,
+    session_id: str,
+    path: str,
+    definition: dict[str, Any],
+    turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
+):
+    tracked_turn = get_chat_turn(db, turn_id) if turn_id else get_latest_active_turn(db, session_id)
+
+    draft_repo = WorkflowDraftRepository(db)
+    tracked_draft = draft_repo.get(_as_uuid(draft_id)) if draft_id else None
+    if tracked_draft:
+        tracked_draft.definition = definition
+        tracked_draft.file_path = path
+        tracked_draft.turn_id = tracked_turn.id if tracked_turn else None
+        tracked_draft.status = "draft"
+        tracked_draft.source = "workflow_file"
+        tracked_draft.version = max(1, tracked_draft.version)
+        tracked_draft = draft_repo.save(tracked_draft)
+    else:
+        tracked_draft = upsert_workflow_draft(
+            db,
+            session_id=session_id,
+            user_id=user_id,
+            definition=definition,
+            file_path=path,
+            turn_id=tracked_turn.id if tracked_turn else None,
+            source="workflow_file",
+        )
+
+    run_repo = WorkflowRunRepository(db)
+    tracked_run = run_repo.get(_as_uuid(run_id)) if run_id else None
+    if tracked_run:
+        tracked_run.session_id = tracked_draft.session_id
+        tracked_run.turn_id = tracked_turn.id if tracked_turn else None
+        tracked_run.draft_id = tracked_draft.id if tracked_draft else None
+        tracked_run.file_path = path
+        tracked_run.source = "workflow_file"
+        tracked_run.status = "running"
+        tracked_run.result = None
+        tracked_run.artifacts = None
+        tracked_run.error = None
+        tracked_run.finished_at = None
+        tracked_run = run_repo.save(tracked_run)
+    else:
+        tracked_run = create_tracked_workflow_run(
+            db,
+            user_id=user_id,
+            session_id=session_id,
+            turn_id=tracked_turn.id if tracked_turn else None,
+            draft_id=tracked_draft.id if tracked_draft else None,
+            file_path=path,
+            source="workflow_file",
+        )
+
+    return tracked_turn, tracked_draft, tracked_run
+
+
 async def service_run_workflow_from_file(
     db,
     user_id,
@@ -56,6 +141,8 @@ async def service_run_workflow_from_file(
     path: str,
     *,
     turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     channel = f"session:{session_id}"
     event_bus = RedisEventBus(settings.REDIS_URL)
@@ -85,36 +172,25 @@ async def service_run_workflow_from_file(
         )
 
     try:
-        sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-        if not sandbox:
-            raise ValueError("failed to get or create sandbox")
-
-        result = await sandbox.exec_command(f"cat {path}")
-        if result.exit_code != 0:
-            raise ValueError(result.stderr or "failed to read workflow file")
-
-        definition = json.loads(result.stdout)
+        definition = await load_workflow_definition_from_file(session_id, path)
         graph_data = definition.get("root", definition)
         graph = Graph.model_validate(graph_data)
         core_workflow = CoreWorkflow(id=f"file:{path}", root=graph)
 
-        tracked_turn = get_chat_turn(db, turn_id) if turn_id else get_latest_active_turn(db, session_id)
-        tracked_draft = upsert_workflow_draft(
+        tracked_turn, tracked_draft, tracked_run = prepare_tracked_workflow_file_run(
             db,
-            session_id=session_id,
             user_id=user_id,
+            session_id=session_id,
+            path=path,
             definition=definition,
-            file_path=path,
-            turn_id=tracked_turn.id if tracked_turn else None,
+            turn_id=turn_id,
+            draft_id=draft_id,
+            run_id=run_id,
         )
-        tracked_run = create_tracked_workflow_run(
-            db,
-            user_id=user_id,
-            session_id=session_id,
-            turn_id=tracked_turn.id if tracked_turn else None,
-            draft_id=tracked_draft.id if tracked_draft else None,
-            file_path=path,
-        )
+
+        sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
+        if not sandbox:
+            raise ValueError("failed to get or create sandbox")
 
         await _publish_workflow_event("run_start", {"path": path, "started_at": _timestamp()})
 

@@ -72,12 +72,20 @@ function buildOptimisticRun(
   sessionId: string,
   filePath: string,
   status: string,
-  options?: { error?: string | null; taskId?: string | null },
+  options?: {
+    error?: string | null
+    taskId?: string | null
+    turnId?: string | null
+    draftId?: string | null
+    runId?: string | null
+  },
 ): WorkflowRun {
   return {
-    id: options?.taskId || `pending:${sessionId}:${Date.now()}`,
+    id: options?.runId || options?.taskId || `pending:${sessionId}:${Date.now()}`,
     workflow_id: null,
     session_id: sessionId,
+    turn_id: options?.turnId || null,
+    draft_id: options?.draftId || null,
     file_path: filePath,
     source: 'workflow_file',
     status,
@@ -377,7 +385,16 @@ export function WorkflowLivePanel({
           ? (payload.artifact as Record<string, unknown>)
           : null
         const artifactKind = typeof artifact?.kind === 'string' ? artifact.kind : ''
-        if (filePath && activeFilePathRef.current && activeFilePathRef.current !== filePath) {
+        const currentTrackedRun = useWorkflowSessionsStore.getState().sessions[sessionId]?.activeRun
+        const incomingRunId = typeof data.run_id === 'string' ? data.run_id : null
+        const incomingDraftId = typeof data.draft_id === 'string' ? data.draft_id : null
+        if (currentTrackedRun?.id && incomingRunId && currentTrackedRun.id !== incomingRunId) {
+          return
+        }
+        if (!currentTrackedRun?.id && currentTrackedRun?.draft_id && incomingDraftId && currentTrackedRun.draft_id !== incomingDraftId) {
+          return
+        }
+        if (!currentTrackedRun?.id && !currentTrackedRun?.draft_id && filePath && activeFilePathRef.current && activeFilePathRef.current !== filePath) {
           return
         }
         if (phase === 'artifact_ready') {
@@ -1022,6 +1039,9 @@ export function WorkflowLivePanel({
                       sessionId,
                       buildOptimisticRun(sessionId, activeFilePathForControls, nextStatus, {
                         taskId: response.task_id ?? null,
+                        turnId: response.turn_id ?? null,
+                        draftId: response.draft_id ?? null,
+                        runId: response.run_id ?? null,
                       }),
                     )
                     if (response.outputs) {

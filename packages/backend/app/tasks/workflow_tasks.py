@@ -102,10 +102,28 @@ def run_workflow_task(self, run_id: str) -> dict:
 
 
 @celery_app.task(bind=True)
-def run_workflow_file_task(self, user_id: str, session_id: str, path: str) -> dict:
+def run_workflow_file_task(
+    self,
+    user_id: str,
+    session_id: str,
+    path: str,
+    turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
+) -> dict:
     db = SessionLocal()
     try:
-        result = asyncio.run(service_run_workflow_from_file(db, user_id, session_id, path))
+        result = asyncio.run(
+            service_run_workflow_from_file(
+                db,
+                user_id,
+                session_id,
+                path,
+                turn_id=turn_id,
+                draft_id=draft_id,
+                run_id=run_id,
+            )
+        )
         return {"status": "finished", "result": result}
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
