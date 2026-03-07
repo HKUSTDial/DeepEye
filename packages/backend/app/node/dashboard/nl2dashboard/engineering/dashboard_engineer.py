@@ -234,6 +234,7 @@ class DashboardEngineer:
         # 1.4 Copy dataset to va_app/public/data
         if dataset_path and os.path.exists(dataset_path):
             data_dest = os.path.join(va_app_path, 'public', 'data')
+            os.makedirs(data_dest, exist_ok=True)
             filename = os.path.basename(dataset_path)
             dst_file = os.path.join(data_dest, filename)
             shutil.copy2(dataset_path, dst_file)
