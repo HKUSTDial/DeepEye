@@ -75,22 +75,24 @@ export function buildWorkflowRunFromEvent(
 export function matchesTrackedWorkflowEvent(
   currentRun: WorkflowRun | null | undefined,
   currentDraftId: string | null | undefined,
-  activeFilePath: string | null | undefined,
   event: ParsedWorkflowEvent,
 ): boolean {
-  if (currentRun?.id && event.runId && currentRun.id !== event.runId) {
+  if (currentRun?.id) {
+    if (event.runId) {
+      return currentRun.id === event.runId
+    }
+    const trackedDraftId = currentRun.draft_id ?? currentDraftId ?? null
+    if (event.draftId && trackedDraftId) {
+      return trackedDraftId === event.draftId
+    }
     return false
   }
 
-  if (!currentRun?.id && currentRun?.draft_id && event.draftId && currentRun.draft_id !== event.draftId) {
-    return false
-  }
-
-  if (!currentRun?.id && !currentRun?.draft_id && currentDraftId && event.draftId && currentDraftId !== event.draftId) {
-    return false
-  }
-
-  if (!currentRun?.id && !currentRun?.draft_id && event.filePath && activeFilePath && activeFilePath !== event.filePath) {
+  const trackedDraftId = currentRun?.draft_id ?? currentDraftId ?? null
+  if (trackedDraftId) {
+    if (event.draftId) {
+      return trackedDraftId === event.draftId
+    }
     return false
   }
 

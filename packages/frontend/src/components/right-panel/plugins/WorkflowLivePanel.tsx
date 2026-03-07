@@ -394,7 +394,7 @@ export function WorkflowLivePanel({
         }
         const { filePath, phase, payload, artifact, artifactKind } = workflowEvent
         const currentTrackedRun = useWorkflowSessionsStore.getState().sessions[sessionId]?.activeRun
-        if (!matchesTrackedWorkflowEvent(currentTrackedRun, activeDraftIdRef.current, activeFilePathRef.current, workflowEvent)) {
+        if (!matchesTrackedWorkflowEvent(currentTrackedRun, activeDraftIdRef.current, workflowEvent)) {
           return
         }
         if (phase === 'artifact_ready') {

@@ -192,7 +192,6 @@ export function useChat() {
           }
 
           const workflowSession = useWorkflowSessionsStore.getState().sessions[sessionId]
-          const activeWorkflowFile = workflowSession?.activeFilePath
           const activeWorkflowDraftId = workflowSession?.activeDraftId
 
           if (workflowEvent.draftId && activeWorkflowDraftId && activeWorkflowDraftId !== workflowEvent.draftId) {
@@ -203,21 +202,6 @@ export function useChat() {
               setActiveWorkflowFile(sessionId, filePath)
             }
             setViewState(sessionId, 'switching')
-          } else if (!workflowEvent.draftId && filePath && activeWorkflowFile && activeWorkflowFile !== filePath) {
-            clearWorkflow(sessionId)
-            clearValidated(sessionId)
-            setActiveWorkflowFile(sessionId, filePath)
-            setViewState(sessionId, 'switching')
-          }
-          if (phase === 'create_file') {
-            clearWorkflow(sessionId)
-            clearValidated(sessionId)
-            setActiveDraftId(sessionId, null)
-            setActiveWorkflowFile(sessionId, filePath)
-            setViewState(sessionId, 'switching')
-            notifyFilesChanged()
-            openOrFocusTab('workflow')
-            return
           }
           if (phase === 'create_workflow' || phase === 'update_workflow') {
             const workflow = payload?.workflow || payload?.definition
@@ -232,7 +216,9 @@ export function useChat() {
               // Clear draft and validated graph
               clearWorkflow(sessionId)
               clearValidated(sessionId)
-              setActiveDraftId(sessionId, workflowEvent.draftId)
+              if (workflowEvent.draftId) {
+                setActiveDraftId(sessionId, workflowEvent.draftId)
+              }
               setActiveWorkflowFile(sessionId, filePath)
               setWorkflowDefinition(sessionId, workflow as Record<string, unknown>)
               setViewState(sessionId, 'switching')

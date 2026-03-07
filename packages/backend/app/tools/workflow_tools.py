@@ -46,7 +46,9 @@ def create_plan(
                 ToolMessage(
                     content=(
                         "Plan created. Next you MUST call create_workflow_and_run with workflow and an optional name, "
-                        "or create_workflow followed by run_workflow. Do not reply until a workflow run has returned."
+                        "or create_workflow followed by run_workflow. Reuse the returned draft_id for follow-up steps. "
+                        "Use file_path only for an explicit legacy sandbox workflow file. "
+                        "Do not reply until a workflow run has returned."
                     ),
                     tool_call_id=tool_call_id,
                 )
@@ -85,7 +87,7 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             workflow: The full workflow definition object.
             draft_id: Existing workflow draft id to update.
             name: Optional logical workflow name. Used to derive file path if needed.
-            file_path: Optional explicit workflow file path. Prefer name or draft_id.
+            file_path: Optional explicit legacy sandbox workflow file path. Prefer draft_id or name.
         """
         db = SessionLocal()
         try:
@@ -105,7 +107,7 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
 
         norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
         await write_workflow_definition_to_file(session_id, norm_path, workflow)
-        return {"status": "success", "draft_id": str(draft.id), "file_path": norm_path}
+        return {"status": "success", "draft_id": str(draft.id)}
 
     return create_workflow
 
@@ -118,10 +120,10 @@ def create_read_workflow_tool(session_id: str) -> callable:
 
         Args:
             draft_id: Workflow draft id. Preferred.
-            file_path: Workflow JSON file path. Fallback for existing file-based flows.
+            file_path: Explicit legacy sandbox workflow JSON file path. Fallback only.
         """
         if not draft_id and not file_path:
-            return {"status": "error", "error": "Provide draft_id or file_path."}
+            return {"status": "error", "error": "Provide draft_id. Use file_path only for an explicit legacy workflow file."}
 
         db = SessionLocal()
         try:
@@ -136,16 +138,15 @@ def create_read_workflow_tool(session_id: str) -> callable:
                     "status": "success",
                     "workflow": existing_draft.definition,
                     "draft_id": str(existing_draft.id),
-                    "file_path": existing_draft.file_path or norm_path,
                 }
         finally:
             db.close()
 
         try:
             workflow = await _read_workflow_file(session_id, norm_path)
-            return {"status": "success", "workflow": workflow, "draft_id": draft_id, "file_path": norm_path}
+            return {"status": "success", "workflow": workflow, "draft_id": draft_id}
         except Exception as exc:
-            return {"status": "error", "error": str(exc), "draft_id": draft_id, "file_path": norm_path}
+            return {"status": "error", "error": str(exc), "draft_id": draft_id}
 
     return read_workflow
 
@@ -165,7 +166,7 @@ def create_update_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             workflow: The full workflow definition object.
             draft_id: Existing workflow draft id to update.
             name: Optional logical workflow name. Used to derive file path if needed.
-            file_path: Optional explicit workflow file path. Prefer draft_id.
+            file_path: Optional explicit legacy sandbox workflow file path. Prefer draft_id.
         """
         db = SessionLocal()
         try:
@@ -185,7 +186,7 @@ def create_update_workflow_tool(session_id: str, user_id: str, turn_id: str | No
 
         norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
         await write_workflow_definition_to_file(session_id, norm_path, workflow)
-        return {"status": "success", "draft_id": str(draft.id), "file_path": norm_path}
+        return {"status": "success", "draft_id": str(draft.id)}
 
     return update_workflow
 
@@ -273,7 +274,7 @@ def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) ->
             workflow: Full workflow with root.nodes and root.edges.
             draft_id: Existing workflow draft id to update and execute.
             name: Optional logical workflow name. Used to derive file path if needed.
-            file_path: Optional explicit workflow file path. Prefer name or draft_id.
+            file_path: Optional explicit legacy sandbox workflow file path. Prefer name or draft_id.
         """
         db = SessionLocal()
         try:
@@ -298,8 +299,7 @@ def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) ->
                 str(draft.id),
                 turn_id=turn_id,
             )
-            norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
-            return {"status": "success", "draft_id": str(draft.id), "file_path": norm_path, "run": result}
+            return {"status": "success", "draft_id": str(draft.id), "run": result}
         finally:
             db.close()
 
