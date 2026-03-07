@@ -15,7 +15,9 @@ from deepeye.workflows.registry import NodeRegistry
 NODE_MODULES: tuple[str, ...] = (
     "app.node.data.datasource_read",
     "app.node.data.sql_execute",
+    "app.node.rows.basic",
     "app.node.knowledge.knowledge_search",
+    "app.node.llm.answer",
     "app.node.code.python_code",
     "app.node.dashboard.node",
     "app.node.video.node",
@@ -45,7 +47,7 @@ def register_node_specs(registry: NodeRegistry) -> None:
         registry.register(node_cls.spec())
 
 
-def register_node_handlers(engine: ExecutionEngine, db, user_id, sandbox=None, session_id: str | None = None) -> None:
+def register_node_handlers(engine: ExecutionEngine, db, user_id, sandbox=None, session_id: str | None = None, model=None) -> None:
     for node_cls in _iter_nodes():
         build_handler = node_cls.build_handler
         handler = None
@@ -56,6 +58,8 @@ def register_node_handlers(engine: ExecutionEngine, db, user_id, sandbox=None, s
                 kwargs["sandbox"] = sandbox
             if "session_id" in sig.parameters:
                 kwargs["session_id"] = session_id
+            if "model" in sig.parameters:
+                kwargs["model"] = model
             handler = build_handler(db, user_id, **kwargs)
         except TypeError:
             handler = build_handler(db, user_id)

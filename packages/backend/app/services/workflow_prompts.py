@@ -117,7 +117,7 @@ def build_workflow_prompt(
     schema_text = _truncate(_render_schema_context(tables), _MAX_SCHEMA_CHARS)
     return f"""You are a Workflow Designer for data analysis.
 Your job is to translate a user's analysis goal into a JSON workflow definition.
-You currently have a lean toolbox (primarily python.code) and should compose logic with it.
+You have a workflow-native toolbox with datasource, row-transform, artifact, and answer nodes. Prefer those nodes over python.code whenever possible.
 
 CRITICAL - For "生成数据视频" / "generate data video" goals use exactly 2 tool calls then reply:
 1. create_plan  (steps e.g. ["Read CSV", "Generate video"])
@@ -133,8 +133,10 @@ Rules (strict, structured JSON only):
 3) Port multiplicity: only ports with `multiple=true` may have more than one incoming edge; all other inputs must have at most one incoming edge.
 4) Keep the workflow minimal and logical. PREFER specialized nodes over python.code when available:
    - For reading data from datasources: Use `datasource.read` node (outputs `rows: list[dict]`) instead of python.code
+   - For lightweight tabular transforms: prefer `rows.select`, `rows.filter`, `rows.sort`, `rows.aggregate`, and `rows.profile`
    - For video generation: Use `video.generator` node directly with `rows` from datasource.read and `query` from user input
    - For SQL queries: Use `sql.execute` node instead of python.code
+   - For the final user-facing text answer grounded in workflow outputs: use `llm.answer`
    - Only use python.code when no specialized node exists for the task
 5) VIDEO GENERATION WORKFLOW PATTERN (required when user asks for "data video" / "生成数据视频"):
    - You MUST create exactly TWO nodes and ONE edge. Never create only the data node without the video node.

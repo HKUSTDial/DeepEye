@@ -18,3 +18,9 @@ def test_workflow_node_specs_include_version() -> None:
 
     assert specs
     assert all(spec.version for spec in specs)
+
+
+def test_workflow_node_specs_include_builtin_transform_and_answer_nodes() -> None:
+    node_types = {spec.type for spec in build_registry().all()}
+
+    assert {"rows.select", "rows.filter", "rows.sort", "rows.aggregate", "rows.profile", "llm.answer"} <= node_types
