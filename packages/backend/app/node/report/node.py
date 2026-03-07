@@ -227,32 +227,14 @@ class ReportGenerateNode(BaseNode):
         return NodeSpec(
             type=cls.node_type,
             description=(
-                "Generate a comprehensive data analysis report from CSV files. "
-                "Use this node when the user asks for a 'report', 'analysis report', "
-                "'data report', or wants a complete analysis with charts, KPIs, and insights. "
-                "The report includes: executive summary, key metrics (KPIs), "
-                "interactive charts, and business recommendations."
+                "Generate a comprehensive HTML data analysis report from one or more upstream datasets. "
+                "Use this node when the user explicitly asks for a report deliverable."
             ),
             params_schema={
-                "file_paths": {
-                    "type": "array",
-                    "required": False,
-                    "description": "List of CSV file paths in sandbox (e.g., ['/workspace/data/sales.csv']). Can also be comma-separated string.",
-                },
                 "query": {
                     "type": "string",
                     "required": False,
-                    "description": "User's analysis query or focus area (e.g., 'Analyze sales trends and customer behavior'). Default: 'Generate a comprehensive data analysis report.'",
-                },
-                "template": {
-                    "type": "string",
-                    "required": False,
-                    "description": "Report template name: 'template_0.html' (simple) or 'template_1.html' (detailed). Default: 'template_1.html'",
-                },
-                "output_path": {
-                    "type": "string",
-                    "required": False,
-                    "description": "Output filename for the report (e.g., 'analysis_report.html'). Default: 'analysis_report.html'",
+                    "description": "Report focus or analysis question, such as 'Analyze revenue trends and customer behavior'.",
                 },
             },
             inputs={
@@ -260,26 +242,26 @@ class ReportGenerateNode(BaseNode):
                     schema="dict",
                     required=False,
                     multiple=True,
-                    description="Optional dataset references from upstream nodes. Sandbox file paths will be consumed directly.",
+                    description="One or more dataset references to include in the report.",
                 ),
             },
             outputs={
                 "report_path": Port(
                     schema="string",
-                    description="Path to the generated report file in sandbox.",
+                    description="Sandbox path to the generated HTML report.",
                 ),
                 "report_html": Port(
                     schema="string",
                     required=False,
-                    description="HTML preview content of the generated report.",
+                    description="HTML preview snippet of the generated report.",
                 ),
                 "status": Port(
                     schema="string",
-                    description="Generation status: 'success' or 'error'.",
+                    description="Generation status: `success` or `error`.",
                 ),
                 "message": Port(
                     schema="string",
-                    description="Status message with details.",
+                    description="Status message with execution details.",
                 ),
             },
         )

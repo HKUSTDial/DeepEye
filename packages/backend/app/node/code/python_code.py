@@ -164,35 +164,35 @@ class PythonCodeNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Execute Python code inside the session sandbox (workdir defaults to /workspace). Stdin contains only lightweight parameters and dataset references. Large tabular inputs should be read from dataset_ref paths inside the sandbox.",
+            description="Execute custom Python code inside the sandbox. Use this for joins or custom transforms that specialized nodes cannot express cleanly.",
             params_schema={
-                "code": {"type": "string", "required": False, "description": "Python code snippet to run."},
-                "code_path": {"type": "string", "required": False, "description": "Path inside sandbox to read code from (e.g., /workspace/script.py)."},
-                "code_b64": {"type": "string", "required": False, "description": "Base64-encoded python code if escaping is an issue."},
-                "workdir": {"type": "string", "required": False, "description": "Working directory inside sandbox."},
+                "code": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Python code to run. Read stdin with `data = json.load(sys.stdin)`, use `data.get('input')` for small parameters, and read tabular inputs from `data.get('dataset_ref', [])` paths inside the sandbox.",
+                },
             },
             inputs={
                 "input": Port(
                     schema="any",
                     required=False,
                     multiple=True,
-                    description="Small JSON-serializable parameters. Access in code as: data = json.load(sys.stdin); value = data['input']",
+                    description="Small JSON-serializable parameters passed to stdin as `data['input']`.",
                 ),
                 "dataset_ref": Port(
                     schema="dict",
                     required=False,
                     multiple=True,
-                    description="Dataset reference(s). Read files from data['dataset_ref'][i]['path'] inside the sandbox.",
+                    description="Dataset reference(s). Read files from `data['dataset_ref'][i]['path']` inside the sandbox.",
                 ),
-                "code": Port(schema="string", required=False, description="Optional code override passed via edge."),
             },
             outputs={
                 "stdout": Port(schema="string", description="Standard output from the script."),
                 "stderr": Port(schema="string", description="Standard error from the script."),
                 "exit_code": Port(schema="int", description="Process exit code."),
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows for UI and summaries."),
-                "dataset_ref": Port(schema="dict", required=False, description="Dataset reference returned by the script for tabular outputs."),
-                "row_count": Port(schema="int", required=False, description="Row count for returned dataset_ref."),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows when the script returns tabular data."),
+                "dataset_ref": Port(schema="dict", required=False, description="Returned dataset reference when the script materializes tabular output."),
+                "row_count": Port(schema="int", required=False, description="Row count for the returned dataset, when available."),
                 "columns": Port(schema="list[string]", required=False, description="Detected output columns when available."),
             },
         )

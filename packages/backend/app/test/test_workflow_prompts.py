@@ -33,3 +33,34 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "Never bypass source nodes" in prompt
     assert "create_plan" not in prompt
     assert "update_plan" not in prompt
+
+
+def test_workflow_prompt_includes_preview_for_file_and_database_tables():
+    prompt = build_workflow_prompt(
+        NodeRegistry(),
+        datasource=[
+            {"id": "file-1", "name": "clients.csv", "type": "csv", "category": "file", "local_path": "/workspace/data/clients.csv"},
+            {"id": "db-1", "name": "sales_db", "type": "postgresql", "category": "database"},
+        ],
+        tables=[
+            {
+                "datasource_name": "clients.csv",
+                "name": "clients.csv",
+                "kind": "file",
+                "columns": [{"name": "client_id", "type": "int"}, {"name": "city", "type": "string"}],
+                "preview": [{"client_id": 1, "city": "Shanghai"}, {"client_id": 2, "city": "Hangzhou"}, {"client_id": 3, "city": "Shenzhen"}],
+            },
+            {
+                "datasource_name": "sales_db",
+                "name": "sales",
+                "kind": "table",
+                "columns": [{"name": "client_id", "type": "INTEGER"}, {"name": "revenue", "type": "FLOAT"}],
+                "preview": [{"client_id": 1, "revenue": 120.5}, {"client_id": 2, "revenue": 95.0}, {"client_id": 3, "revenue": 141.2}],
+            },
+        ],
+    )
+
+    assert "[clients.csv] clients.csv (file): client_id:int, city:string" in prompt
+    assert "[sales_db] sales (table): client_id:INTEGER, revenue:FLOAT" in prompt
+    assert "preview: [{'client_id': 1, 'city': 'Shanghai'}" in prompt
+    assert "preview: [{'client_id': 1, 'revenue': 120.5}" in prompt

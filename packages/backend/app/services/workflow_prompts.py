@@ -82,6 +82,7 @@ def _render_schema_context(tables: list[dict[str, object]] | None) -> str:
         name = table.get("name", "")
         kind = table.get("kind", "table")
         columns = table.get("columns", [])
+        preview = table.get("preview", [])
         col_text = ", ".join(
             [
                 f"{col.get('name', '')}:{col.get('type', '')}"
@@ -91,8 +92,8 @@ def _render_schema_context(tables: list[dict[str, object]] | None) -> str:
         )
         source_prefix = f"[{ds_name}] " if ds_name else ""
         lines.append(f"- {source_prefix}{name} ({kind}): {col_text}".strip())
-        if kind == "file" and "preview" in table:
-            lines.append(f"  preview: {table['preview']}")
+        if isinstance(preview, list) and preview:
+            lines.append(f"  preview: {preview[:3]}")
     return "\n".join(lines).strip()
 
 

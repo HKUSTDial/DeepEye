@@ -692,35 +692,35 @@ class VideoGeneratorNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Generate complete data video from a dataset_ref and user query. Includes configuration generation, audio synthesis, timeline alignment, and video component rendering.",
+            description="Generate a narrated data video from a dataset and an analysis goal.",
             inputs={
                 "dataset_ref": Port(
                     schema="dict",
                     required=True,
-                    description="Dataset reference. Video generation will use its preview/sample rows.",
+                    description="Dataset reference to analyze for the video.",
                 ),
                 "query": Port(
                     schema="string",
-                    required=False,  # Can also be provided via params.query
-                    description="User query or analytical goal (can also be set in params.query)",
+                    required=False,
+                    description="Analytical goal or story prompt for the video.",
                 )
             },
             outputs={
                 "video_path": Port(
                     schema="string",
-                    description="Path to generated video components directory",
+                    description="Sandbox path to the generated video workspace directory.",
                 ),
                 "video_info": Port(
                     schema="dict",
-                    description="Video generation information (status, task_id, etc.)",
+                    description="Video generation status and metadata.",
                 ),
                 "config": Port(
                     schema="dict",
-                    description="Generated video configuration JSON",
+                    description="Generated video configuration JSON.",
                 ),
                 "config_path": Port(
                     schema="string",
-                    description="Path to saved configuration file",
+                    description="Sandbox path to the saved configuration file.",
                 ),
                 "task_id": Port(
                     schema="string",
@@ -742,19 +742,13 @@ class VideoGeneratorNode(BaseNode):
                 "query": {
                     "type": "string",
                     "required": False,
-                    "description": "User query or analytical goal (alternative to inputs.query)",
+                    "description": "Fallback analytical goal if no `query` input edge is connected.",
                 },
                 "language": {
                     "type": "string",
                     "required": False,
-                    "description": "Output language (default: English)",
+                    "description": "Narration language, for example English or Chinese. Defaults to English.",
                     "default": "English",
-                },
-                "workers": {
-                    "type": "integer",
-                    "required": False,
-                    "description": "Number of workers for video rendering (default: 5)",
-                    "default": 5,
                 },
             },
         )

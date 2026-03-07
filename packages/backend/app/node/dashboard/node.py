@@ -498,21 +498,18 @@ class NL2DashboardNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Generate a full interactive dashboard from natural language.",
+            description="Generate an interactive dashboard from a dataset and an analysis question.",
             inputs={
-                "question": Port(schema="string", description="User query"),
-                "dataset_ref": Port(schema="dict", required=False, description="Dataset reference whose sandbox path can be analyzed directly."),
+                "question": Port(schema="string", required=False, description="Dashboard request or analysis goal."),
+                "dataset_ref": Port(schema="dict", required=False, description="Dataset reference to visualize."),
             },
             outputs={
-                "output_path": Port(schema="string", description="Path in sandbox"),
-                "dashboard_config": Port(schema="dict"),
-                "dashboard_url": Port(schema="string", description="The URL to access the generated dashboard"),
+                "output_path": Port(schema="string", description="Sandbox path to the generated dashboard app."),
+                "dashboard_config": Port(schema="dict", description="Generated dashboard configuration."),
+                "dashboard_url": Port(schema="string", description="URL for opening the generated dashboard."),
             },
             params_schema={
-                "model": {"type": "string", "default": settings.LLM_MODEL, "required": False},
-                "data": {"type": "any", "required": False},
-                "datasource_id": {"type": "string", "required": False},
-                "data_schema": {"type": "any", "required": False},
+                "question": {"type": "string", "required": False, "description": "Fallback dashboard request if no `question` input edge is connected."},
             },
         )
 

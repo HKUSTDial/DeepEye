@@ -50,15 +50,15 @@ class KnowledgeSearchNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Search knowledge base for relevant chunks.",
+            description="Search the selected knowledge bases for relevant chunks.",
             params_schema={
-                "kb_ids": {"type": "string", "required": False, "description": "Comma-separated Knowledge Base IDs"},
-                "query": {"type": "string", "required": False, "description": "Search query"},
-                "top_k": {"type": "integer", "required": False, "description": "Number of results to return (default: 5)"},
+                "kb_ids": {"type": "string", "required": False, "description": "Knowledge base ids as a comma-separated string. Prefer the `kb_ids` input edge when available."},
+                "query": {"type": "string", "required": False, "description": "Search query."},
+                "top_k": {"type": "integer", "required": False, "description": "Maximum number of chunks to return. Defaults to 5."},
             },
             inputs={
-                "kb_ids": Port(schema="list[string]", required=False),
-                "query": Port(schema="string", required=False)
+                "kb_ids": Port(schema="list[string]", required=False, description="Knowledge base ids to search."),
+                "query": Port(schema="string", required=False, description="Search query.")
             },
             outputs={"results": Port(schema="list[dict]", description="Search results with content and metadata.")},
         )

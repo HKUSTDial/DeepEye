@@ -6,7 +6,7 @@ import uuid
 
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, Table, create_engine, inspect, select
 from sqlalchemy.orm import sessionmaker
 
 from app.core.celery_app import celery_app
@@ -32,6 +32,8 @@ from app.tools.workflow_tools import (
 )
 from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
+
+_SCHEMA_PREVIEW_ROWS = 3
 
 
 def _get_datasources_info(datasource_ids: list[str] | None, user_id: uuid.UUID | None = None) -> list[dict[str, str]]:
@@ -61,7 +63,25 @@ def _get_datasources_info(datasource_ids: list[str] | None, user_id: uuid.UUID |
     return items
 
 
-def _get_datasources_schema(datasource_ids: list[str] | None, user_id: uuid.UUID | None = None, max_tables: int = 20, max_columns: int = 20) -> list[dict[str, object]]:
+def _get_database_table_preview(data_engine, table_name: str, limit: int = _SCHEMA_PREVIEW_ROWS) -> list[dict[str, object]]:
+    try:
+        metadata = MetaData()
+        table = Table(table_name, metadata, autoload_with=data_engine)
+        with data_engine.connect() as conn:
+            rows = conn.execute(select(table).limit(limit)).mappings().all()
+        return [dict(row) for row in rows]
+    except Exception as exc:
+        logger.warning("Failed to fetch preview rows for table %s: %s", table_name, exc)
+        return []
+
+
+def _get_datasources_schema(
+    datasource_ids: list[str] | None,
+    user_id: uuid.UUID | None = None,
+    max_tables: int = 20,
+    max_columns: int = 20,
+    preview_rows: int = _SCHEMA_PREVIEW_ROWS,
+) -> list[dict[str, object]]:
     if not datasource_ids:
         return []
     engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
@@ -84,20 +104,23 @@ def _get_datasources_schema(datasource_ids: list[str] | None, user_id: uuid.UUID
                 if not connection_string:
                     continue
                 try:
-                    from sqlalchemy import create_engine as sa_create_engine, inspect
                     from app.node.core.db_utils import normalize_connection_string
-                    data_engine = sa_create_engine(normalize_connection_string(connection_string))
+                    from app.node.core.db_utils import json_safe_row
+
+                    data_engine = create_engine(normalize_connection_string(connection_string))
                     inspector = inspect(data_engine)
                     tables = inspector.get_table_names()[:max_tables]
                     
                     for name in tables:
                         columns = inspector.get_columns(name)[:max_columns]
+                        preview = _get_database_table_preview(data_engine, name, limit=preview_rows)
                         all_schemas.append({
                             "datasource_id": str(ds.id),
                             "datasource_name": ds.name,
                             "name": name,
                             "kind": "table",
                             "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
+                            "preview": [json_safe_row(dict(row)) for row in preview],
                         })
                 except Exception as e:
                     logger.warning(f"Failed to get schema for DB {ds.name}: {e}")
@@ -111,7 +134,7 @@ def _get_datasources_schema(datasource_ids: list[str] | None, user_id: uuid.UUID
                         "kind": "file",
                         "local_path": f"/workspace/data/{_get_datasource_filename(ds)}",
                         "columns": metadata["columns"],
-                        "preview": metadata.get("preview", [])
+                        "preview": (metadata.get("preview", []) or [])[:preview_rows],
                     })
     return all_schemas
 

@@ -285,18 +285,18 @@ class RowsSelectNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Keep only the specified columns from tabular rows.",
+            description="Select a subset of columns from a tabular dataset.",
             params_schema={
-                "columns": {"type": "array[string]", "required": True, "description": "Columns to keep."},
+                "columns": {"type": "array[string]", "required": True, "description": "Columns to keep in the output dataset, in the same order."},
             },
             inputs={
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False),
-                "dataset_ref": Port(schema="dict", required=True),
-                "row_count": Port(schema="int", required=True),
-                "columns": Port(schema="list[string]", required=False),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after column selection."),
+                "dataset_ref": Port(schema="dict", required=True, description="Resulting dataset after column selection."),
+                "row_count": Port(schema="int", required=True, description="Row count of the resulting dataset."),
+                "columns": Port(schema="list[string]", required=False, description="Columns present in the resulting dataset."),
             },
         )
 
@@ -313,13 +313,13 @@ class RowsFilterNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Filter tabular rows by one column and operator.",
+            description="Filter rows by one column and one comparison operator.",
             params_schema={
                 "column": {"type": "string", "required": True, "description": "Column to filter on."},
                 "operator": {
                     "type": "string",
                     "required": True,
-                    "description": "One of eq, ne, gt, gte, lt, lte, contains, in, not_in, is_null, not_null.",
+                    "description": "Comparison operator. Supported values: eq, ne, gt, gte, lt, lte, contains, in, not_in, is_null, not_null.",
                 },
                 "value": {"type": "any", "required": False, "description": "Comparison value when required by the operator."},
                 "case_sensitive": {"type": "boolean", "required": False, "description": "Case-sensitive string matching."},
@@ -328,10 +328,10 @@ class RowsFilterNode(BaseNode):
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False),
-                "dataset_ref": Port(schema="dict", required=True),
-                "row_count": Port(schema="int", required=True),
-                "columns": Port(schema="list[string]", required=False),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after filtering."),
+                "dataset_ref": Port(schema="dict", required=True, description="Filtered dataset."),
+                "row_count": Port(schema="int", required=True, description="Row count after filtering."),
+                "columns": Port(schema="list[string]", required=False, description="Columns present in the filtered dataset."),
             },
         )
 
@@ -352,16 +352,15 @@ class RowsSortNode(BaseNode):
             params_schema={
                 "column": {"type": "string", "required": True, "description": "Column to sort by."},
                 "descending": {"type": "boolean", "required": False, "description": "Sort in descending order."},
-                "nulls_last": {"type": "boolean", "required": False, "description": "Place null values last."},
             },
             inputs={
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False),
-                "dataset_ref": Port(schema="dict", required=True),
-                "row_count": Port(schema="int", required=True),
-                "columns": Port(schema="list[string]", required=False),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after sorting."),
+                "dataset_ref": Port(schema="dict", required=True, description="Sorted dataset."),
+                "row_count": Port(schema="int", required=True, description="Row count after sorting."),
+                "columns": Port(schema="list[string]", required=False, description="Columns present in the sorted dataset."),
             },
         )
 
@@ -379,17 +378,15 @@ class RowsProfileNode(BaseNode):
         return NodeSpec(
             type=cls.node_type,
             description="Profile tabular rows and emit lightweight schema/statistics.",
-            params_schema={
-                "sample_size": {"type": "integer", "required": False, "description": "Distinct sample values to keep per column."},
-            },
+            params_schema={},
             inputs={
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False),
-                "dataset_ref": Port(schema="dict", required=True),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Input preview rows echoed for convenience."),
+                "dataset_ref": Port(schema="dict", required=True, description="Original dataset reference passed through."),
                 "row_count": Port(schema="int", required=True, description="Number of rows in the input."),
-                "columns": Port(schema="list[string]", required=False),
+                "columns": Port(schema="list[string]", required=False, description="Detected dataset columns."),
                 "profile": Port(schema="dict", required=True, description="Column-level schema and statistics summary."),
             },
         )
@@ -413,17 +410,17 @@ class RowsAggregateNode(BaseNode):
                 "metrics": {
                     "type": "array[object]",
                     "required": True,
-                    "description": "Metric list: {column, op, as}. Supported ops: count, count_distinct, sum, avg, min, max.",
+                    "description": "Metric definitions. Each metric object uses {column, op, as}. Supported ops: count, count_distinct, sum, avg, min, max.",
                 },
             },
             inputs={
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False),
-                "dataset_ref": Port(schema="dict", required=True),
-                "row_count": Port(schema="int", required=True),
-                "columns": Port(schema="list[string]", required=False),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after aggregation."),
+                "dataset_ref": Port(schema="dict", required=True, description="Aggregated dataset."),
+                "row_count": Port(schema="int", required=True, description="Row count after aggregation."),
+                "columns": Port(schema="list[string]", required=False, description="Columns present in the aggregated dataset."),
             },
         )
 

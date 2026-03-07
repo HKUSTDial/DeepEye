@@ -93,16 +93,15 @@ class LLMAnswerNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Generate the final user-facing answer from workflow outputs and artifacts.",
+            description="Generate the final user-facing text answer from workflow results.",
             params_schema={
-                "question": {"type": "string", "required": False, "description": "Fallback user question if no input edge is provided."},
-                "instructions": {"type": "string", "required": False, "description": "Optional extra answer constraints."},
+                "question": {"type": "string", "required": False, "description": "Fallback user question if no `question` input edge is connected."},
             },
             inputs={
-                "question": Port(schema="string", required=False),
-                "dataset_ref": Port(schema="dict", required=False),
-                "context": Port(schema="any", required=False, multiple=True),
-                "artifacts": Port(schema="list[dict]", required=False, multiple=True),
+                "question": Port(schema="string", required=False, description="User question or final answer target."),
+                "dataset_ref": Port(schema="dict", required=False, description="Primary dataset to ground the answer."),
+                "context": Port(schema="any", required=False, multiple=True, description="Optional structured context from upstream nodes."),
+                "artifacts": Port(schema="list[dict]", required=False, multiple=True, description="Optional artifact metadata to mention when relevant."),
             },
             outputs={"answer": Port(schema="string", required=True, description="Final grounded answer for the user.")},
         )

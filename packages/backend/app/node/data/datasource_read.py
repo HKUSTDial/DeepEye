@@ -174,18 +174,16 @@ class DataSourceReadNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Read a datasource, materialize it when needed, and return a dataset_ref plus lightweight preview metadata.",
+            description="Load one attached datasource into the workflow and return a dataset_ref plus lightweight preview metadata.",
             params_schema={
-                "datasource_id": {"type": "string", "required": False, "description": "Datasource ID"},
-                "datasource_url": {"type": "string", "required": False, "description": "Connection string"},
-                "datasource_type": {"type": "string", "required": False, "description": "postgres | mysql | sqlite"},
-                "table": {"type": "string", "required": False, "description": "Table name"},
-                "query": {"type": "string", "required": False, "description": "Optional SQL query"},
-                "limit": {"type": "integer", "required": False, "description": "Row limit"},
+                "datasource_id": {"type": "string", "required": True, "description": "Attached datasource id to read. Use the datasource id from prompt context."},
+                "table": {"type": "string", "required": False, "description": "Optional database table name to read when the datasource is a database and a full-table preview is enough."},
+                "query": {"type": "string", "required": False, "description": "Optional SQL query for database datasources when you need filtering or projection during the read step."},
+                "limit": {"type": "integer", "required": False, "description": "Preview row limit returned in `preview_rows`. Defaults to 100."},
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows for UI and summaries."),
-                "dataset_ref": Port(schema="dict", required=True, description="Reference to the materialized dataset in sandbox storage."),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Small row preview for planning, UI, and summaries."),
+                "dataset_ref": Port(schema="dict", required=True, description="Reference to the full materialized dataset for downstream nodes."),
                 "row_count": Port(schema="int", required=True, description="Materialized row count when available."),
                 "columns": Port(schema="list[string]", required=False, description="Detected dataset columns."),
             },

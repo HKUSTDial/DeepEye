@@ -78,18 +78,16 @@ class SqlExecuteNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Execute SQL, materialize the result, and return a dataset_ref plus lightweight preview metadata.",
+            description="Execute SQL against one attached database datasource, materialize the result, and return a dataset_ref plus preview metadata.",
             params_schema={
-                "datasource_id": {"type": "string", "required": False, "description": "Datasource ID"},
-                "datasource_url": {"type": "string", "required": False, "description": "Connection string"},
-                "datasource_type": {"type": "string", "required": False, "description": "postgres | mysql | sqlite"},
-                "query": {"type": "string", "required": False, "description": "SQL query"},
-                "limit": {"type": "integer", "required": False, "description": "Row limit"},
+                "datasource_id": {"type": "string", "required": True, "description": "Attached database datasource id to query."},
+                "query": {"type": "string", "required": True, "description": "SQL query to execute. Prefer returning only the rows needed downstream."},
+                "limit": {"type": "integer", "required": False, "description": "Preview row limit returned in `preview_rows`. Defaults to 500."},
             },
-            inputs={"query": Port(schema="string", required=False)},
+            inputs={"query": Port(schema="string", required=False, description="Optional query override from an upstream node.")},
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows for UI and summaries."),
-                "dataset_ref": Port(schema="dict", required=True, description="Reference to the materialized query result in sandbox storage."),
+                "preview_rows": Port(schema="list[dict]", required=False, description="Small row preview for UI and summaries."),
+                "dataset_ref": Port(schema="dict", required=True, description="Reference to the full materialized query result."),
                 "row_count": Port(schema="int", required=True, description="Materialized row count when available."),
                 "columns": Port(schema="list[string]", required=False, description="Detected query result columns."),
             },
