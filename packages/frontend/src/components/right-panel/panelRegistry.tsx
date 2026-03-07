@@ -44,7 +44,7 @@ export const panelRegistry: PanelPlugin[] = [
     title: 'Report',
     description: 'Read generated report content and steps.',
     icon: <FileText className="h-4 w-4" />,
-    render: () => <ReportPanel />,
+    render: (context) => <ReportPanel sessionId={context.sessionId} />,
   },
   {
     id: 'dashboard',

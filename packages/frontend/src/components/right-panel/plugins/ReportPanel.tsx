@@ -51,12 +51,15 @@ function parseStages(
   return { stageStatuses, maxStage }
 }
 
-export function ReportPanel() {
-  const reportHtml = useReportStore((state) => state.reportHtml)
-  const reportSteps = useReportStore((state) => state.reportSteps)
-  const reportFilename = useReportStore((state) => state.reportFilename)
-  const reportError = useReportStore((state) => state.reportError)
-  const isGenerating = useReportStore((state) => state.isGenerating)
+export function ReportPanel({ sessionId }: { sessionId: string | null }) {
+  const sessionReport = useReportStore((state) =>
+    sessionId ? state.sessions[sessionId] : undefined,
+  )
+  const reportHtml = sessionReport?.reportHtml ?? null
+  const reportSteps = sessionReport?.reportSteps ?? []
+  const reportFilename = sessionReport?.reportFilename ?? null
+  const reportError = sessionReport?.reportError ?? null
+  const isGenerating = sessionReport?.isGenerating ?? false
 
   const [displayPercent, setDisplayPercent] = useState(0)
   const committedStageRef = useRef(-1)

@@ -5,6 +5,7 @@ import { useReportStore } from '../stores/report'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { chatApi, datasourceApi, type AgentEvent } from '../api'
 import { extractVideoOutputParams } from '../api/video'
+import type { WorkflowRun } from '../types'
 
 /**
  * Chat hook - handles SSE connection and message sending.
@@ -51,6 +52,25 @@ export function useChat() {
   const esRef = useRef<EventSource | null>(null)
   const closedNormallyRef = useRef(false)
 
+  const buildWorkflowRunFromEvent = (
+    sessionId: string,
+    data: Record<string, unknown> | undefined,
+    status: string,
+    error: string | null = null,
+  ): WorkflowRun => ({
+    id: typeof data?.run_id === 'string' ? data.run_id : `file:${typeof data?.file_path === 'string' ? data.file_path : sessionId}`,
+    workflow_id: typeof data?.draft_id === 'string' ? data.draft_id : null,
+    session_id: sessionId,
+    turn_id: typeof data?.turn_id === 'string' ? data.turn_id : null,
+    draft_id: typeof data?.draft_id === 'string' ? data.draft_id : null,
+    source: 'chat_workflow',
+    file_path: typeof data?.file_path === 'string' ? data.file_path : null,
+    status,
+    error: error || undefined,
+    created_at: new Date().toISOString(),
+    finished_at: status === 'running' ? null : new Date().toISOString(),
+  })
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -66,9 +86,9 @@ export function useChat() {
     phase: string,
     payload: Record<string, unknown>,
   ) => {
-    const artifact = typeof payload.artifact === 'object' && payload.artifact
-      ? (payload.artifact as Record<string, unknown>)
-      : null
+        const artifact = typeof payload.artifact === 'object' && payload.artifact
+          ? (payload.artifact as Record<string, unknown>)
+          : null
     const kind = typeof artifact?.kind === 'string' ? artifact.kind : ''
 
     if (!kind) {
@@ -79,13 +99,13 @@ export function useChat() {
       if (phase === 'artifact_progress') {
         const stepContent = typeof payload.message === 'string' ? payload.message : ''
         if (stepContent) {
-          const currentlyGenerating = useReportStore.getState().isGenerating
+          const currentlyGenerating = !!useReportStore.getState().sessions[sessionId]?.isGenerating
           if (!currentlyGenerating) {
-            startReportGeneration()
+            startReportGeneration(sessionId)
             openOrFocusTab('report')
             setRightPanelRatio(28)
           }
-          addReportStep(stepContent)
+          addReportStep(sessionId, stepContent)
         }
         return true
       }
@@ -112,10 +132,10 @@ export function useChat() {
             : phase === 'artifact_failed'
               ? 'Report generation failed'
               : null
-        setReportResult(reportHtml, steps, reportFilename, error)
+        setReportResult(sessionId, reportHtml, steps, reportFilename, error)
         openOrFocusTab('report')
         setRightPanelRatio(28)
-        stopReportGeneration()
+        stopReportGeneration(sessionId)
         return true
       }
     }
@@ -257,13 +277,7 @@ export function useChat() {
             useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, true)
             setRunStatus(sessionId, 'running', null)
             setViewState(sessionId, 'ready')
-            setActiveRun(sessionId, {
-              id: `file:${filePath || ''}`,
-              workflow_id: `file:${filePath || ''}`,
-              status: 'running',
-              created_at: new Date().toISOString(),
-              finished_at: null,
-            })
+            setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, data, 'running'))
             // 仅数据视频生成工作流（file_path 含 data_video）才在开始时打开 Video Preview，便于看进度
             if (filePath?.includes('data_video')) {
               openOrFocusTab('video-preview', {})
@@ -293,14 +307,7 @@ export function useChat() {
             }
 
             setRunStatus(sessionId, status, error)
-            setActiveRun(sessionId, {
-              id: `file:${filePath || ''}`,
-              workflow_id: `file:${filePath || ''}`,
-              status,
-              error: error || undefined,
-              created_at: new Date().toISOString(),
-              finished_at: new Date().toISOString(),
-            })
+            setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, data, status, error))
 
             const artifacts = Array.isArray(payload?.artifacts)
               ? payload.artifacts.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
@@ -368,29 +375,29 @@ export function useChat() {
           const stepContent = agentEvent.content ?? ''
           if (stepContent) {
             // Read latest store state here to avoid stale closure resetting progress steps.
-            const currentlyGenerating = useReportStore.getState().isGenerating
+            const currentlyGenerating = !!useReportStore.getState().sessions[sessionId]?.isGenerating
             if (!currentlyGenerating) {
-              startReportGeneration()
+              startReportGeneration(sessionId)
               openOrFocusTab('report')
               setRightPanelRatio(28)
             }
-            addReportStep(stepContent)
+            addReportStep(sessionId, stepContent)
           }
         }
 
         if (agentEvent.type === 'agent_start' && agentEvent.source === 'report') {
-          startReportGeneration()
+          startReportGeneration(sessionId)
           openOrFocusTab('report')
           setRightPanelRatio(28)
         }
 
         if (agentEvent.type === 'agent_end' && agentEvent.source === 'report') {
-          stopReportGeneration()
+          stopReportGeneration(sessionId)
         }
 
         if (agentEvent.type === 'report_done') {
           const data = agentEvent.data as { report_html?: string; steps?: string[]; report_filename?: string; error?: string } | undefined
-          setReportResult(data?.report_html ?? null, data?.steps ?? [], data?.report_filename ?? null, data?.error ?? null)
+          setReportResult(sessionId, data?.report_html ?? null, data?.steps ?? [], data?.report_filename ?? null, data?.error ?? null)
           // Open the Report panel and enlarge the right panel for better reading
           openOrFocusTab('report')
           setRightPanelRatio(28)

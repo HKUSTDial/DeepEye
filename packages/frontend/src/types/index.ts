@@ -83,12 +83,70 @@ export interface Workflow {
 
 export interface WorkflowRun {
   id: string
-  workflow_id: string
+  workflow_id?: string | null
+  session_id?: string | null
+  turn_id?: string | null
+  draft_id?: string | null
+  source?: string | null
+  file_path?: string | null
   status: string
   result?: Record<string, unknown> | null
+  artifacts?: WorkflowArtifactPayload[] | null
   error?: string | null
   created_at: string
   finished_at?: string | null
+}
+
+export interface ChatTurn {
+  id: string
+  session_id: string
+  user_id: string
+  user_message_id?: number | null
+  assistant_message_id?: number | null
+  status: string
+  intent_type?: string | null
+  input_text: string
+  error?: string | null
+  created_at: string
+  finished_at?: string | null
+}
+
+export interface WorkflowDraft {
+  id: string
+  session_id: string
+  turn_id?: string | null
+  user_id: string
+  source: string
+  status: string
+  file_path?: string | null
+  definition: Record<string, unknown>
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkflowArtifactPayload {
+  kind: string
+  [key: string]: unknown
+}
+
+export interface WorkflowArtifact {
+  id: string
+  run_id: string
+  session_id?: string | null
+  turn_id?: string | null
+  draft_id?: string | null
+  kind: string
+  payload: WorkflowArtifactPayload
+  created_at: string
+}
+
+export interface WorkspaceState {
+  session_id: string
+  turn: ChatTurn | null
+  draft: WorkflowDraft | null
+  run: WorkflowRun | null
+  artifacts: WorkflowArtifact[]
 }
 
 export interface KnowledgeBase {

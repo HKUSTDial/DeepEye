@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useChatStore } from './stores/chat'
 import { useAuthStore } from './stores/auth'
 import { useRightPanelStore } from './stores/rightPanel'
+import { useReportStore } from './stores/report'
+import { useWorkflowSessionsStore } from './stores/workflowSessions'
 import { sessionApi } from './api'
+import type { WorkspaceState, WorkflowArtifactPayload } from './types'
 import Sidebar from './components/Sidebar'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
@@ -33,6 +36,10 @@ function App() {
   const logout = useAuthStore((state) => state.logout)
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
   const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
+  const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
+  const hydrateWorkspaceState = useWorkflowSessionsStore((state) => state.hydrateWorkspaceState)
+  const setReportResult = useReportStore((state) => state.setReportResult)
+  const clearReport = useReportStore((state) => state.clear)
 
   const chatTitle = useMemo(() => {
     const title = currentSession?.title?.trim()
@@ -142,6 +149,87 @@ function App() {
       window.removeEventListener('datasources:updated', onUpdated)
     }
   }, [sessionId])
+
+  const restoreReportState = useCallback((activeSessionId: string, workspaceState: WorkspaceState) => {
+    const reportPayloads = workspaceState.artifacts
+      .filter((artifact) => artifact.kind === 'report')
+      .map((artifact) => artifact.payload)
+
+    if (reportPayloads.length === 0) {
+      clearReport(activeSessionId)
+      return
+    }
+
+    const latestReport = reportPayloads[reportPayloads.length - 1]
+    const reportHtml = typeof latestReport.report_html === 'string' ? latestReport.report_html : null
+    const reportFilename = typeof latestReport.report_filename === 'string' ? latestReport.report_filename : null
+    const reportError = typeof latestReport.error === 'string' ? latestReport.error : null
+    const steps = Array.isArray(latestReport.steps)
+      ? latestReport.steps.filter((item): item is string => typeof item === 'string')
+      : []
+
+    setReportResult(activeSessionId, reportHtml, steps, reportFilename, reportError)
+  }, [clearReport, setReportResult])
+
+  const restoreWorkspaceTabs = useCallback((workspaceState: WorkspaceState) => {
+    const existingPanes = useRightPanelStore.getState().panes
+    if (existingPanes.length > 0) {
+      return
+    }
+
+    const artifactPayloads = workspaceState.artifacts.map((artifact) => artifact.payload)
+    const hasWorkflowState = !!workspaceState.draft || !!workspaceState.run
+
+    if (hasWorkflowState) {
+      openOrFocusTab('workflow')
+    }
+    if (artifactPayloads.some((artifact) => artifact.kind === 'report')) {
+      openOrFocusTab('report')
+    }
+    if (artifactPayloads.some((artifact) => artifact.kind === 'dashboard')) {
+      openOrFocusTab('dashboard')
+    }
+
+    const latestVideo = [...artifactPayloads]
+      .reverse()
+      .find((artifact): artifact is WorkflowArtifactPayload => artifact.kind === 'video')
+    if (latestVideo) {
+      const taskId = typeof latestVideo.task_id === 'string' ? latestVideo.task_id : undefined
+      openOrFocusTab('video-preview', taskId ? { taskId } : {})
+    }
+  }, [openOrFocusTab])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadWorkspaceState = async () => {
+      if (!sessionId || sessionId === 'draft') {
+        return
+      }
+
+      try {
+        const workspaceState = await sessionApi.getWorkspaceState(sessionId)
+        if (cancelled) {
+          return
+        }
+        hydrateWorkspaceState(sessionId, workspaceState)
+        restoreReportState(sessionId, workspaceState)
+        restoreWorkspaceTabs(workspaceState)
+      } catch (e) {
+        console.error('Failed to load workspace state', e)
+        if (!cancelled) {
+          hydrateWorkspaceState(sessionId, null)
+          clearReport(sessionId)
+        }
+      }
+    }
+
+    void loadWorkspaceState()
+
+    return () => {
+      cancelled = true
+    }
+  }, [sessionId, hydrateWorkspaceState, restoreReportState, restoreWorkspaceTabs, clearReport])
 
   const workspaceStyle = useMemo(
     () => ({

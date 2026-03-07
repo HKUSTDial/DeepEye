@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { WorkflowRun } from '../types'
+import type { WorkflowArtifact, WorkflowDraft, WorkflowRun, WorkspaceState } from '../types'
 
 export type WorkflowDefinition = Record<string, unknown> | null
 export type WorkflowNode = Record<string, unknown>
@@ -47,6 +47,7 @@ interface WorkflowSessionsStore {
   sessions: Record<string, WorkflowSessionState>
   ensureSession: (sessionId: string) => WorkflowSessionState
   resetSession: (sessionId: string) => void
+  hydrateWorkspaceState: (sessionId: string, snapshot: WorkspaceState | null) => void
   setViewState: (sessionId: string, state: WorkflowViewState) => void
   setFiles: (sessionId: string, files: string[]) => void
   setFileError: (sessionId: string, error: string | null) => void
@@ -103,6 +104,79 @@ const createEmptySession = (): WorkflowSessionState => ({
 const withSession = (state: WorkflowSessionsStore['sessions'], sessionId: string) =>
   state[sessionId] ?? createEmptySession()
 
+const asObjectRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+
+const getDraftDefinition = (draft: WorkflowDraft | null): WorkflowDefinition => {
+  if (!draft) return null
+  return asObjectRecord(draft.definition)
+}
+
+const deriveNodeStatus = (run: WorkflowRun | null) => {
+  const result = asObjectRecord(run?.result)
+  const outputs = asObjectRecord(result?.outputs)
+  if (!outputs) {
+    return {}
+  }
+
+  return Object.fromEntries(
+    Object.entries(outputs)
+      .filter(([, value]) => !!asObjectRecord(value))
+      .map(([nodeId, value]) => {
+        const outputsForNode = asObjectRecord(value) || {}
+        const nodeStatus =
+          typeof outputsForNode.status === 'string' && outputsForNode.status
+            ? outputsForNode.status
+            : 'completed'
+        return [nodeId, { status: nodeStatus, outputs: outputsForNode }]
+      }),
+  )
+}
+
+const deriveRunOutput = (run: WorkflowRun | null) => {
+  const result = asObjectRecord(run?.result)
+  const outputs = asObjectRecord(result?.outputs)
+  if (outputs) {
+    return JSON.stringify(outputs, null, 2)
+  }
+  if (result) {
+    return JSON.stringify(result, null, 2)
+  }
+  return run?.error || ''
+}
+
+const deriveVideoPreviewUrl = (run: WorkflowRun | null, artifacts: WorkflowArtifact[]) => {
+  const videoArtifact = [...artifacts]
+    .reverse()
+    .find((artifact) => artifact.kind === 'video' && typeof artifact.payload?.video_url === 'string')
+  if (videoArtifact && typeof videoArtifact.payload.video_url === 'string') {
+    return videoArtifact.payload.video_url
+  }
+
+  const outputs = asObjectRecord(asObjectRecord(run?.result)?.outputs)
+  if (!outputs) {
+    return null
+  }
+
+  for (const value of Object.values(outputs)) {
+    const nodeOutputs = asObjectRecord(value)
+    if (typeof nodeOutputs?.video_url === 'string' && nodeOutputs.video_url) {
+      return nodeOutputs.video_url
+    }
+  }
+
+  return null
+}
+
+const deriveViewState = (definition: WorkflowDefinition, run: WorkflowRun | null): WorkflowViewState => {
+  if (definition || run) {
+    return 'ready'
+  }
+  return 'empty'
+}
+
 export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get) => ({
   sessions: {},
   ensureSession: (sessionId) => {
@@ -116,6 +190,53 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
     set((state) => ({
       sessions: { ...state.sessions, [sessionId]: createEmptySession() },
     })),
+  hydrateWorkspaceState: (sessionId, snapshot) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      if (!snapshot?.turn) {
+        return {
+          sessions: {
+            ...state.sessions,
+            [sessionId]: {
+              ...createEmptySession(),
+              files: current.files,
+              fileError: current.fileError,
+              dashboardRefreshKey: current.dashboardRefreshKey,
+              viewState: 'empty',
+              lastUpdated: Date.now(),
+            },
+          },
+        }
+      }
+
+      const draft = snapshot.draft ?? null
+      const run = snapshot.run ?? null
+      const artifacts = Array.isArray(snapshot.artifacts) ? snapshot.artifacts : []
+      const definition = getDraftDefinition(draft)
+
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...createEmptySession(),
+            files: current.files,
+            fileError: current.fileError,
+            dashboardRefreshKey: current.dashboardRefreshKey,
+            viewState: deriveViewState(definition, run),
+            activeFilePath: draft?.file_path ?? run?.file_path ?? null,
+            definition,
+            nodeStatus: deriveNodeStatus(run),
+            runStatus: run?.status ?? null,
+            runError: run?.error ?? null,
+            error: run?.status === 'failed' ? run?.error ?? null : null,
+            activeRun: run,
+            runOutput: deriveRunOutput(run),
+            videoPreviewUrl: deriveVideoPreviewUrl(run, artifacts),
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
   setViewState: (sessionId, viewState) =>
     set((state) => {
       const current = withSession(state.sessions, sessionId)

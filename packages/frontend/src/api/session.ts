@@ -1,4 +1,4 @@
-import type { DataSource, Session, ToolStep } from '../types'
+import type { DataSource, Session, ToolStep, WorkspaceState } from '../types'
 import { http } from './client'
 
 /**
@@ -48,6 +48,7 @@ export const sessionApi = {
   delete: (id: string) => http.delete<void>(`/sessions/${id}`),
   getMessages: (id: string) => http.get<{ messages: StoredMessage[] }>(`/sessions/${id}/messages`),
   listAttachments: (id: string) => http.get<DataSource[]>(`/sessions/${id}/attachments`),
+  getWorkspaceState: (id: string) => http.get<WorkspaceState>(`/sessions/${id}/workspace-state`),
   attachDatasource: (sessionId: string, datasourceId: string) =>
     http.post<DataSource>(`/sessions/${sessionId}/attachments/${datasourceId}`),
   detachDatasource: (sessionId: string, datasourceId: string) =>
