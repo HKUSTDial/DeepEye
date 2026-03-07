@@ -22,6 +22,8 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "prefer `create_workflow_and_run`" in prompt
     assert "Do NOT call `read_workflow`, `update_workflow`, or `run_workflow` before the first run" in prompt
     assert "File + database joint analysis" in prompt
+    assert "Use `datasource.read` only for attached files." in prompt
+    assert "Use `sql.execute` only for attached databases." in prompt
     assert "single business answer" in prompt
     assert "run_workflow_from_file" not in prompt
     assert "rows.select" in prompt
@@ -65,6 +67,8 @@ def test_workflow_prompt_includes_preview_for_file_and_database_tables():
 
     assert "[clients.csv] clients.csv (file): client_id:int, city:string" in prompt
     assert "[sales_db] sales (table): client_id:INTEGER, revenue:FLOAT" in prompt
+    assert "Use this id in params.datasource_id for datasource.read." in prompt
+    assert "Use this id in params.datasource_id for sql.execute." in prompt
     assert "preview: [{'client_id': 1, 'city': 'Shanghai'}" in prompt
     assert "preview: [{'client_id': 1, 'revenue': 120.5}" in prompt
 

@@ -267,7 +267,7 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     datasources_schema = _get_datasources_schema(datasource_ids, user_id)
     
     # Prepare datasource context for Supervisor. Include id/path so workflow
-    # node params (e.g. datasource.read, report.generate file_paths) can be filled precisely.
+    # node params (e.g. datasource ids and schema-aware workflow params) can be filled precisely.
     ds_context_lines = []
     for ds in datasources_info:
         line = f"- id: {ds['id']}, name: {ds['name']} ({ds['category']})"

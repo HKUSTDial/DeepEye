@@ -232,6 +232,16 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
         )
         conn.commit()
         conn.close()
+        datasource = DataSource(
+            user_id=user.id,
+            name="sales.db",
+            type="sqlite",
+            category="database",
+            connection_string=f"sqlite:///{sqlite_path}",
+        )
+        db.add(datasource)
+        db.commit()
+        db.refresh(datasource)
 
         sql_handler = SqlExecuteHandler(db, user.id, sandbox=sandbox)
         sql_result = sql_handler.execute(
@@ -239,8 +249,7 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
                 id="sql_sales",
                 type="sql.execute",
                 params={
-                    "datasource_url": f"sqlite:///{sqlite_path}",
-                    "datasource_type": "sqlite",
+                    "datasource_id": str(datasource.id),
                     "query": "select city, revenue from sales order by revenue desc",
                 },
             ),
@@ -343,6 +352,16 @@ def test_sql_execute_materializes_preview_and_dataset_in_single_query(tmp_path, 
             query_count["value"] += 1
 
         monkeypatch.setattr("app.services.workflow_datasets.create_engine", lambda connection_string: engine)
+        datasource = DataSource(
+            user_id=user.id,
+            name="sales.db",
+            type="sqlite",
+            category="database",
+            connection_string=f"sqlite:///{sqlite_path}",
+        )
+        db.add(datasource)
+        db.commit()
+        db.refresh(datasource)
 
         sandbox = _FakeSandbox()
         handler = SqlExecuteHandler(db, user.id, sandbox=sandbox)
@@ -351,8 +370,7 @@ def test_sql_execute_materializes_preview_and_dataset_in_single_query(tmp_path, 
                 id="sql",
                 type="sql.execute",
                 params={
-                    "datasource_url": f"sqlite:///{sqlite_path}",
-                    "datasource_type": "sqlite",
+                    "datasource_id": str(datasource.id),
                     "query": "select city, revenue from sales order by revenue desc",
                     "limit": 2,
                 },
@@ -369,10 +387,10 @@ def test_sql_execute_materializes_preview_and_dataset_in_single_query(tmp_path, 
         db.close()
 
 
-def test_datasource_read_database_materializes_in_single_query(tmp_path, monkeypatch) -> None:
+def test_datasource_read_rejects_database_datasource(tmp_path) -> None:
     db = _build_test_db()
     try:
-        user = _create_user(db, email="datasource-read-single-query@example.com")
+        user = _create_user(db, email="datasource-read-reject-db@example.com")
         _create_session(db, user)
         sqlite_path = tmp_path / "customers.db"
         conn = sqlite3.connect(sqlite_path)
@@ -383,37 +401,32 @@ def test_datasource_read_database_materializes_in_single_query(tmp_path, monkeyp
         )
         conn.commit()
         conn.close()
-
-        engine = create_engine(f"sqlite:///{sqlite_path}")
-        query_count = {"value": 0}
-
-        @event.listens_for(engine, "before_cursor_execute")
-        def _count_queries(*args, **kwargs):
-            del args, kwargs
-            query_count["value"] += 1
-
-        monkeypatch.setattr("app.services.workflow_datasets.create_engine", lambda connection_string: engine)
+        datasource = DataSource(
+            user_id=user.id,
+            name="customers.db",
+            type="sqlite",
+            category="database",
+            connection_string=f"sqlite:///{sqlite_path}",
+        )
+        db.add(datasource)
+        db.commit()
+        db.refresh(datasource)
 
         sandbox = _FakeSandbox()
         handler = DataSourceReadHandler(db, user.id, sandbox=sandbox)
-        result = handler.execute(
-            Node(
-                id="read_db",
-                type="datasource.read",
-                params={
-                    "datasource_url": f"sqlite:///{sqlite_path}",
-                    "datasource_type": "sqlite",
-                    "query": "select city, revenue from customers order by revenue desc",
-                    "limit": 2,
-                },
-            ),
-            {},
-            context=None,
-        )
-
-        assert query_count["value"] == 1
-        assert result["dataset_ref"]["row_count"] == 3
-        assert len(result["dataset_ref"]["preview_rows"]) == 2
-        assert result["dataset_ref"]["path"].startswith("/workspace/.datasets/")
+        try:
+            handler.execute(
+                Node(
+                    id="read_db",
+                    type="datasource.read",
+                    params={"datasource_id": str(datasource.id), "limit": 2},
+                ),
+                {},
+                context=None,
+            )
+        except ValueError as exc:
+            assert "only supports file datasources" in str(exc)
+        else:
+            raise AssertionError("datasource.read should reject database datasources")
     finally:
         db.close()

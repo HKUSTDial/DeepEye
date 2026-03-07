@@ -122,6 +122,8 @@ workflow agent 的提示词由 NodeSpec 自动生成，确保 AI 只使用已注
 - 领域包统一使用 `node.py` 作为节点入口，内部实现放在子目录
 - handler 逻辑单一、可测试
 - 节点之间传递表格数据时，统一使用 `dataset_ref`。`preview_rows` 仅用于界面展示和摘要。
+- `datasource.read` 只用于已附加的文件数据源。
+- `sql.execute` 只用于已附加的数据库数据源。
 
 ## 现有核心节点
 

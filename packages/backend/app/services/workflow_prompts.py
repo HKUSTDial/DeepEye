@@ -82,7 +82,7 @@ def _render_datasource_context(datasource: dict[str, str] | list[dict[str, str]]
             lines.append(f"  local_path: {ds.get('local_path', '')}")
             lines.append("  note: This file is already in the sandbox. Use this id in params.datasource_id for datasource.read.")
         else:
-            lines.append("  note: Use this id in params.datasource_id for datasource.read or sql.execute.")
+            lines.append("  note: This is a database datasource. Use this id in params.datasource_id for sql.execute.")
     
     return "\n".join(lines).strip()
 
@@ -138,6 +138,8 @@ Core planning priorities:
 - Prefer specialized nodes over `python.code` whenever a specialized node cleanly fits the task.
 - Use `rows.select`, `rows.filter`, `rows.sort`, `rows.aggregate`, and `rows.profile` for lightweight declarative transforms.
 - Use `python.code` for multi-source joins, custom reshaping, non-trivial calculations, or logic that specialized nodes cannot express cleanly.
+- Use `datasource.read` only for attached files.
+- Use `sql.execute` only for attached databases.
 - For database-backed analysis, push filtering, aggregation, and projection into `sql.execute` before using downstream nodes.
 - Use `dataset_ref` as the ONLY tabular data edge between workflow nodes. Do not connect `rows` ports between nodes.
 
@@ -145,7 +147,7 @@ Mandatory workflow construction rules:
 1) Use only node types and exact port ids from the registry specification. Do NOT invent node types, ports, or schemas.
 2) The registry spec is authoritative. `inputs` and `outputs` blocks are optional in workflow JSON. If you include them, they MUST match the registered spec exactly and must not invent extra ports.
 3) Port multiplicity still applies: only ports with `multiple=true` may have more than one incoming edge.
-4) If the task depends on attached files or databases, the workflow MUST include source nodes (`datasource.read` and/or `sql.execute`) before any transform, artifact, or answer nodes. Do NOT create python.code-only or llm.answer-only workflows for external data analysis tasks.
+4) If the task depends on attached files or databases, the workflow MUST include source nodes first: `datasource.read` for files, `sql.execute` for databases. Do NOT create python.code-only or llm.answer-only workflows for external data analysis tasks.
 5) Use `llm.answer` for the final user-facing text answer grounded in workflow outputs.
 6) For report requests, use `report.generate`.
 7) For dashboard requests, use `data.generate_dashboard`.
@@ -163,7 +165,8 @@ Tool discipline:
 7) Do NOT output bash commands.
 
 High-frequency workflow patterns:
-- Single attached file or database -> `datasource.read` or `sql.execute` -> optional `rows.*` / `python.code` -> `llm.answer`
+- Single attached file -> `datasource.read` -> optional `rows.*` / `python.code` -> `llm.answer`
+- Single attached database -> `sql.execute` -> optional `rows.*` / `python.code` -> `llm.answer`
 - File + database joint analysis -> `datasource.read` + `sql.execute` -> `python.code` -> `llm.answer`
 - Analysis report -> source node(s) -> optional transform -> `report.generate`
 - Dashboard -> source node(s) -> optional transform -> `data.generate_dashboard`

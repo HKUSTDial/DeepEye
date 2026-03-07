@@ -71,9 +71,6 @@ class MyNode(BaseNode):
             inputs={"dataset_ref": Port(schema="dict", required=True)},
             outputs={
                 "dataset_ref": Port(schema="dict", required=True),
-                "preview_rows": Port(schema="list[dict]"),
-                "row_count": Port(schema="int"),
-                "columns": Port(schema="list[string]"),
             },
             params_schema={
                 "limit": {"type": "integer", "required": False, "description": "Preview row limit"},
@@ -124,6 +121,8 @@ This ensures any new node automatically appears in the AI prompt.
 - Domain packages use `node.py` as the node entrypoint, and keep internals under subpackages
 - Handlers are small and single-purpose
 - Use `dataset_ref` as the primary tabular data edge between nodes. `preview_rows` is only for UI and summaries.
+- `datasource.read` is for attached file datasources only.
+- `sql.execute` is for attached database datasources only.
 
 ## Current Core Nodes
 

@@ -33,6 +33,8 @@ def test_workflow_node_specs_hide_internal_or_legacy_params() -> None:
 
     assert "datasource_url" not in (specs["datasource.read"].params_schema or {})
     assert "datasource_type" not in (specs["datasource.read"].params_schema or {})
+    assert "table" not in (specs["datasource.read"].params_schema or {})
+    assert "query" not in (specs["datasource.read"].params_schema or {})
     assert "datasource_url" not in (specs["sql.execute"].params_schema or {})
     assert "datasource_type" not in (specs["sql.execute"].params_schema or {})
     assert "code_path" not in (specs["python.code"].params_schema or {})
@@ -93,6 +95,7 @@ def test_workflow_validation_rejects_missing_required_params_and_inputs() -> Non
     registry = build_registry()
     graph = Graph(
         nodes={
+            "read": Node(id="read", type="datasource.read"),
             "answer": Node(id="answer", type="llm.answer"),
             "dashboard": Node(id="dashboard", type="data.generate_dashboard"),
             "report": Node(id="report", type="report.generate"),
@@ -105,6 +108,7 @@ def test_workflow_validation_rejects_missing_required_params_and_inputs() -> Non
     issues = validate_workflow_graph(graph, registry=registry)
 
     issue_codes = {(issue.code, issue.location) for issue in issues}
+    assert ("param.required.missing", "nodes.read.params.datasource_id") in issue_codes
     assert ("param.required.missing", "nodes.answer.params.question") in issue_codes
     assert ("param.required.missing", "nodes.dashboard.params.question") in issue_codes
     assert ("input.required.missing", "nodes.dashboard.inputs.dataset_ref") in issue_codes

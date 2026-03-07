@@ -9,16 +9,14 @@ from typing import Any
 TEMPLATES = [
     {
         "id": "datasource_summary",
-        "name": "Datasource Summary",
-        "description": "Read rows from a datasource and compute summary statistics.",
+        "name": "File Datasource Profile",
+        "description": "Read one attached file datasource and compute a lightweight profile.",
         "params": [
             {
-                "key": "datasource_url",
+                "key": "datasource_id",
                 "required": True,
-                "placeholder": "postgresql://user:pass@host:port/db",
+                "placeholder": "attached file datasource id",
             },
-            {"key": "datasource_type", "required": True, "default": "postgres"},
-            {"key": "table", "required": True, "placeholder": "table name"},
             {"key": "limit", "required": False, "default": 100},
         ],
         "definition": {
@@ -26,21 +24,15 @@ TEMPLATES = [
                 "read": {
                     "id": "read",
                     "type": "datasource.read",
-                    "inputs": {},
-                    "outputs": {"rows": {"schema": "list[dict]"}},
                     "params": {
-                        "datasource_url": "{{datasource_url}}",
-                        "datasource_type": "{{datasource_type}}",
-                        "table": "{{table}}",
+                        "datasource_id": "{{datasource_id}}",
                         "limit": "{{limit}}",
                     },
                     "metadata": {"position": {"x": 120, "y": 120}},
                 },
-                "summary": {
-                    "id": "summary",
-                    "type": "stats.summary",
-                    "inputs": {"rows": {"schema": "list[dict]", "required": True}},
-                    "outputs": {"summary": {"schema": "dict"}},
+                "profile": {
+                    "id": "profile",
+                    "type": "rows.profile",
                     "params": {},
                     "metadata": {"position": {"x": 420, "y": 120}},
                 },
@@ -48,8 +40,8 @@ TEMPLATES = [
             "edges": {
                 "e1": {
                     "id": "e1",
-                    "source": {"node_id": "read", "port_id": "rows"},
-                    "target": {"node_id": "summary", "port_id": "rows"},
+                    "source": {"node_id": "read", "port_id": "dataset_ref"},
+                    "target": {"node_id": "profile", "port_id": "dataset_ref"},
                 }
             },
         },

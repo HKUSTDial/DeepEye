@@ -19,24 +19,26 @@ class SqlExecuteHandler:
         self.sandbox = sandbox
 
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
+        del inputs, context
         datasource_id = node.params.get("datasource_id")
-        datasource_url = node.params.get("datasource_url")
-        datasource_type = node.params.get("datasource_type")
         query = node.params.get("query")
         limit = int(node.params.get("limit") or 500)
         if not query:
             raise ValueError("query is required")
-        if not datasource_id and not datasource_url:
-            raise ValueError("datasource_id or datasource_url is required")
-        validate_datasource_type(datasource_type)
+        if not datasource_id:
+            raise ValueError("datasource_id is required")
 
-        connection_string = datasource_url
-        if datasource_id:
-            ds = DataSourceRepository(self.db).get_by_id_and_user(datasource_id, self.user_id)
-            if not ds:
-                raise ValueError("datasource not found")
-            connection_string = ds.connection_string
-            datasource_type = getattr(ds, "type", None)
+        ds = DataSourceRepository(self.db).get_by_id_and_user(datasource_id, self.user_id)
+        if not ds:
+            raise ValueError("datasource not found")
+        if getattr(ds, "category", "database") != "database":
+            raise ValueError("sql.execute only supports database datasources")
+
+        connection_string = ds.connection_string
+        datasource_type = getattr(ds, "type", None)
+        validate_datasource_type(datasource_type)
+        if not connection_string:
+            raise ValueError("database datasource is missing connection_string")
 
         engine = create_engine(connection_string)
         if self.sandbox:
@@ -74,7 +76,7 @@ class SqlExecuteNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Execute SQL against one attached database datasource, materialize the result, and return a dataset_ref plus preview metadata.",
+            description="Execute SQL against one attached database datasource, materialize the result, and return a dataset_ref.",
             params_schema={
                 "datasource_id": {"type": "string", "required": True, "description": "Attached database datasource id to query."},
                 "query": {"type": "string", "required": True, "description": "SQL query to execute. Prefer returning only the rows needed downstream."},

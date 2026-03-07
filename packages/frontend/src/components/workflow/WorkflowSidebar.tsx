@@ -2,7 +2,6 @@ import { useState, type DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import {
-  Database,
   Code2,
   BarChart3,
   FileText,
@@ -17,7 +16,7 @@ import { useWorkflowStore } from '../../stores/workflow'
 import { Modal } from '../ui/Modal'
 
 const nodeIcons: Record<string, LucideIcon> = {
-  'datasource.read': Database,
+  'datasource.read': FileText,
   'sql.execute': Code2,
   'stats.summary': FileText,
   'viz.bar': BarChart3,
