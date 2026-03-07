@@ -7,7 +7,8 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.workflow_prompts import build_workflow_prompt
+from app.services.workflow_engine import build_registry
+from app.services.workflow_prompts import build_workflow_prompt, render_node_specs
 from deepeye.workflows.registry import NodeRegistry
 
 
@@ -31,6 +32,8 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "MUST include source nodes" in prompt
     assert "Do NOT create python.code-only" in prompt
     assert "Never bypass source nodes" in prompt
+    assert "analysis-ready dataset" in prompt
+    assert "required transform when the source is large/raw" in prompt
     assert "create_plan" not in prompt
     assert "update_plan" not in prompt
 
@@ -64,3 +67,14 @@ def test_workflow_prompt_includes_preview_for_file_and_database_tables():
     assert "[sales_db] sales (table): client_id:INTEGER, revenue:FLOAT" in prompt
     assert "preview: [{'client_id': 1, 'city': 'Shanghai'}" in prompt
     assert "preview: [{'client_id': 1, 'revenue': 120.5}" in prompt
+
+
+def test_render_node_specs_hides_internal_and_derived_outputs_from_planner() -> None:
+    rendered = render_node_specs(build_registry().all())
+
+    assert "- stdout:" not in rendered
+    assert "- stderr:" not in rendered
+    assert "- exit_code:" not in rendered
+    assert "- dashboard_config:" not in rendered
+    assert "- config:" not in rendered
+    assert "- config_path:" not in rendered

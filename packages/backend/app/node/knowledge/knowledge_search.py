@@ -17,8 +17,8 @@ class KnowledgeSearchHandler:
         self.user_id = user_id
 
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
-        kb_ids_raw = inputs.get("kb_ids") or node.params.get("kb_ids")
-        query = inputs.get("query") or node.params.get("query")
+        kb_ids_raw = node.params.get("kb_ids")
+        query = node.params.get("query")
         top_k = int(node.params.get("top_k") or 5)
 
         if not kb_ids_raw:
@@ -52,13 +52,9 @@ class KnowledgeSearchNode(BaseNode):
             type=cls.node_type,
             description="Search the selected knowledge bases for relevant chunks.",
             params_schema={
-                "kb_ids": {"type": "string", "required": False, "description": "Knowledge base ids as a comma-separated string. Prefer the `kb_ids` input edge when available."},
-                "query": {"type": "string", "required": False, "description": "Search query."},
+                "kb_ids": {"type": "array[string]", "required": True, "description": "Knowledge base ids to search."},
+                "query": {"type": "string", "required": True, "description": "Search query."},
                 "top_k": {"type": "integer", "required": False, "description": "Maximum number of chunks to return. Defaults to 5."},
-            },
-            inputs={
-                "kb_ids": Port(schema="list[string]", required=False, description="Knowledge base ids to search."),
-                "query": Port(schema="string", required=False, description="Search query.")
             },
             outputs={"results": Port(schema="list[dict]", description="Search results with content and metadata.")},
         )

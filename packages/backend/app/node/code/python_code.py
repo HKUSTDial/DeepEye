@@ -8,9 +8,7 @@ from app.node.core.base import BaseNode
 from app.sandbox.docker_sandbox import DockerSandbox
 from app.services.workflow_datasets import (
     compact_dataset_ref,
-    compact_rows_preview,
     compact_value_for_transport,
-    dataset_ref_columns,
     is_dataset_ref,
     build_tabular_node_result,
 )
@@ -127,13 +125,15 @@ class PythonCodeHandler:
         stdout = output[0].decode("utf-8") if output[0] else ""
         stderr = output[1].decode("utf-8") if output[1] else ""
         if exit_code != 0:
+            details = stderr or stdout or f"python.code failed with exit_code={exit_code}"
             if input_data:
                 preview_lines = input_data.splitlines()[:10]
                 preview = "\n".join(preview_lines)
-                stderr = f"{stderr}\nINPUT_PREVIEW (first 10 lines):\n{preview}\n"
+                details = f"{details}\nINPUT_PREVIEW (first 10 lines):\n{preview}\n"
             else:
-                stderr = f"{stderr}\nINPUT_PREVIEW: <empty>\n"
-        result = {"stdout": stdout, "stderr": stderr, "exit_code": int(exit_code)}
+                details = f"{details}\nINPUT_PREVIEW: <empty>\n"
+            raise RuntimeError(details)
+        result: dict[str, Any] = {}
         # Small tabular stdout is materialized into a dataset_ref for downstream workflow nodes.
         try:
             parsed = json.loads(stdout.strip())
@@ -148,10 +148,6 @@ class PythonCodeHandler:
                 )
             elif is_dataset_ref(parsed):
                 result["dataset_ref"] = parsed
-                result["preview_rows"] = compact_rows_preview(parsed.get("preview_rows"), limit=20)
-                result["columns"] = dataset_ref_columns(parsed)
-                if parsed.get("row_count") is not None:
-                    result["row_count"] = parsed.get("row_count")
         except (json.JSONDecodeError, TypeError):
             pass
         return result
@@ -187,13 +183,7 @@ class PythonCodeNode(BaseNode):
                 ),
             },
             outputs={
-                "stdout": Port(schema="string", description="Standard output from the script."),
-                "stderr": Port(schema="string", description="Standard error from the script."),
-                "exit_code": Port(schema="int", description="Process exit code."),
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows when the script returns tabular data."),
                 "dataset_ref": Port(schema="dict", required=False, description="Returned dataset reference when the script materializes tabular output."),
-                "row_count": Port(schema="int", required=False, description="Row count for the returned dataset, when available."),
-                "columns": Port(schema="list[string]", required=False, description="Detected output columns when available."),
             },
         )
 

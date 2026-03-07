@@ -293,10 +293,7 @@ class RowsSelectNode(BaseNode):
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after column selection."),
                 "dataset_ref": Port(schema="dict", required=True, description="Resulting dataset after column selection."),
-                "row_count": Port(schema="int", required=True, description="Row count of the resulting dataset."),
-                "columns": Port(schema="list[string]", required=False, description="Columns present in the resulting dataset."),
             },
         )
 
@@ -328,10 +325,7 @@ class RowsFilterNode(BaseNode):
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after filtering."),
                 "dataset_ref": Port(schema="dict", required=True, description="Filtered dataset."),
-                "row_count": Port(schema="int", required=True, description="Row count after filtering."),
-                "columns": Port(schema="list[string]", required=False, description="Columns present in the filtered dataset."),
             },
         )
 
@@ -357,10 +351,7 @@ class RowsSortNode(BaseNode):
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after sorting."),
                 "dataset_ref": Port(schema="dict", required=True, description="Sorted dataset."),
-                "row_count": Port(schema="int", required=True, description="Row count after sorting."),
-                "columns": Port(schema="list[string]", required=False, description="Columns present in the sorted dataset."),
             },
         )
 
@@ -383,10 +374,7 @@ class RowsProfileNode(BaseNode):
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Input preview rows echoed for convenience."),
                 "dataset_ref": Port(schema="dict", required=True, description="Original dataset reference passed through."),
-                "row_count": Port(schema="int", required=True, description="Number of rows in the input."),
-                "columns": Port(schema="list[string]", required=False, description="Detected dataset columns."),
                 "profile": Port(schema="dict", required=True, description="Column-level schema and statistics summary."),
             },
         )
@@ -417,10 +405,7 @@ class RowsAggregateNode(BaseNode):
                 "dataset_ref": Port(schema="dict", required=True, description="Dataset reference for tabular input."),
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Preview rows after aggregation."),
                 "dataset_ref": Port(schema="dict", required=True, description="Aggregated dataset."),
-                "row_count": Port(schema="int", required=True, description="Row count after aggregation."),
-                "columns": Port(schema="list[string]", required=False, description="Columns present in the aggregated dataset."),
             },
         )
 

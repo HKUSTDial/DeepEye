@@ -495,7 +495,7 @@ class VideoGeneratorHandler:
             publish_progress = get_progress_publisher_by_workflow_id(context.workflow_id)
             session_id = get_session_id_by_workflow_id(context.workflow_id)
         
-        # 从 inputs 获取数据和查询
+        # 从 inputs 获取数据
         dataset_ref = inputs.get("dataset_ref")
         rows = []
         if is_dataset_ref(dataset_ref):
@@ -505,10 +505,9 @@ class VideoGeneratorHandler:
         if not rows:
             raise ValueError("dataset_ref input is required")
 
-        # Query can come from inputs or params (for simpler workflows)
-        query = inputs.get("query") or node.params.get("query")
+        query = node.params.get("query")
         if not query:
-            raise ValueError("query input or params.query is required")
+            raise ValueError("query is required")
 
         # 从 params 获取配置参数
         language = node.params.get("language", "English")
@@ -675,8 +674,6 @@ class VideoGeneratorHandler:
         return {
             "video_path": video_result.get("video_path"),
             "video_info": video_info,
-            "config": config,  # 也返回配置，以便需要时使用
-            "config_path": str(config_path),
             "task_id": task_id,  # 显式返回 task_id，方便前端使用
             "session_id": session_id,
             "video_url": video_url,  # iframe URL，容器就绪后可直接嵌入
@@ -684,7 +681,7 @@ class VideoGeneratorHandler:
 
 
 class VideoGeneratorNode(BaseNode):
-    """Node for generating complete data video from dataset references."""
+    """Node for generating a data video from an analysis-ready dataset reference."""
 
     node_type = "video.generator"
 
@@ -692,17 +689,12 @@ class VideoGeneratorNode(BaseNode):
     def spec(cls) -> NodeSpec:
         return NodeSpec(
             type=cls.node_type,
-            description="Generate a narrated data video from a dataset and an analysis goal.",
+            description="Generate a narrated data video from an analysis-ready dataset and an analysis goal. Upstream nodes should already filter, aggregate, or otherwise reduce large raw tables before this node.",
             inputs={
                 "dataset_ref": Port(
                     schema="dict",
                     required=True,
-                    description="Dataset reference to analyze for the video.",
-                ),
-                "query": Port(
-                    schema="string",
-                    required=False,
-                    description="Analytical goal or story prompt for the video.",
+                    description="Analysis-ready dataset reference for the video. This node uses preview/sample rows from the dataset_ref and should not receive an unfiltered raw large table directly.",
                 )
             },
             outputs={
@@ -713,14 +705,6 @@ class VideoGeneratorNode(BaseNode):
                 "video_info": Port(
                     schema="dict",
                     description="Video generation status and metadata.",
-                ),
-                "config": Port(
-                    schema="dict",
-                    description="Generated video configuration JSON.",
-                ),
-                "config_path": Port(
-                    schema="string",
-                    description="Sandbox path to the saved configuration file.",
                 ),
                 "task_id": Port(
                     schema="string",
@@ -741,8 +725,8 @@ class VideoGeneratorNode(BaseNode):
             params_schema={
                 "query": {
                     "type": "string",
-                    "required": False,
-                    "description": "Fallback analytical goal if no `query` input edge is connected.",
+                    "required": True,
+                    "description": "Narrative goal for the already-prepared dataset, such as 'Explain the top regional revenue drivers'.",
                 },
                 "language": {
                     "type": "string",

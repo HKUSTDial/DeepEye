@@ -37,15 +37,13 @@ class LLMAnswerHandler:
 
     def execute(self, node: Node, inputs: dict[str, Any], context: object) -> dict[str, Any]:
         del context
-        question = inputs.get("question") or node.params.get("question")
+        question = node.params.get("question")
         if not question:
             raise ValueError("question is required")
 
         context_input = inputs.get("context")
         artifacts = inputs.get("artifacts")
         dataset_ref = inputs.get("dataset_ref")
-        instructions = node.params.get("instructions") or ""
-
         rows = dataset_ref_preview(dataset_ref, limit=_MAX_ROWS) if is_dataset_ref(dataset_ref) else None
 
         prompt = (
@@ -54,8 +52,6 @@ class LLMAnswerHandler:
             "If evidence is missing, say so clearly and briefly.\n"
             "Keep the answer concise and in the user's language.\n"
         )
-        if instructions:
-            prompt += f"Additional instructions:\n{instructions}\n"
 
         payload = {
             "question": question,
@@ -95,10 +91,9 @@ class LLMAnswerNode(BaseNode):
             type=cls.node_type,
             description="Generate the final user-facing text answer from workflow results.",
             params_schema={
-                "question": {"type": "string", "required": False, "description": "Fallback user question if no `question` input edge is connected."},
+                "question": {"type": "string", "required": True, "description": "User question or final answer target."},
             },
             inputs={
-                "question": Port(schema="string", required=False, description="User question or final answer target."),
                 "dataset_ref": Port(schema="dict", required=False, description="Primary dataset to ground the answer."),
                 "context": Port(schema="any", required=False, multiple=True, description="Optional structured context from upstream nodes."),
                 "artifacts": Port(schema="list[dict]", required=False, multiple=True, description="Optional artifact metadata to mention when relevant."),

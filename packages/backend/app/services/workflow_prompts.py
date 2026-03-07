@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from deepeye.workflows.registry import NodeRegistry, NodeSpec
 
+_DERIVED_TABULAR_OUTPUTS = {"preview_rows", "row_count", "columns"}
+_INTERNAL_OUTPUTS = {"stdout", "stderr", "exit_code", "dashboard_config", "config", "config_path", "video_info"}
+
 
 def _render_port(port) -> str:
     schema = getattr(port, "schema_", None)
@@ -28,6 +31,16 @@ def _render_params(params_schema: dict[str, object] | None) -> list[str]:
     return lines
 
 
+def _planner_outputs(spec: NodeSpec) -> dict[str, object]:
+    outputs = dict(spec.outputs or {})
+    if "dataset_ref" in outputs:
+        for port_id in _DERIVED_TABULAR_OUTPUTS:
+            outputs.pop(port_id, None)
+    for port_id in _INTERNAL_OUTPUTS:
+        outputs.pop(port_id, None)
+    return outputs
+
+
 def render_node_specs(specs: list[NodeSpec]) -> str:
     lines: list[str] = ["Node Specifications:"]
     for spec in specs:
@@ -36,9 +49,10 @@ def render_node_specs(specs: list[NodeSpec]) -> str:
             lines.append("  inputs:")
             for port_id, port in spec.inputs.items():
                 lines.append(f"  - {port_id}: {_render_port(port)}")
-        if spec.outputs:
+        outputs = _planner_outputs(spec)
+        if outputs:
             lines.append("  outputs:")
-            for port_id, port in spec.outputs.items():
+            for port_id, port in outputs.items():
                 lines.append(f"  - {port_id}: {_render_port(port)}")
         param_lines = _render_params(spec.params_schema or {})
         if param_lines:
@@ -135,7 +149,7 @@ Mandatory workflow construction rules:
 5) Use `llm.answer` for the final user-facing text answer grounded in workflow outputs.
 6) For report requests, use `report.generate`.
 7) For dashboard requests, use `data.generate_dashboard`.
-8) For video requests, the workflow MUST end with `video.generator` receiving `dataset_ref`. The default simple pattern is `source -> video.generator`. Add transform nodes only when they materially change the dataset.
+8) For video requests, the workflow MUST end with `video.generator` receiving `dataset_ref`. Feed it an analysis-ready dataset. For large or raw source tables, add transform nodes first so the video node receives filtered, grouped, or otherwise reduced data instead of the raw dataset.
 9) Layout: include positions ONLY under `node.metadata.position` with `x` and `y`. Do NOT use a top-level `position` field.
 10) Do NOT guess categorical values, table names, or columns. Use only what the user, datasource context, or schema context provides.
 
@@ -153,12 +167,13 @@ High-frequency workflow patterns:
 - File + database joint analysis -> `datasource.read` + `sql.execute` -> `python.code` -> `llm.answer`
 - Analysis report -> source node(s) -> optional transform -> `report.generate`
 - Dashboard -> source node(s) -> optional transform -> `data.generate_dashboard`
-- Data video -> source node(s) -> optional transform -> `video.generator`
+- Data video -> source node(s) -> required transform when the source is large/raw -> `video.generator`
 
 Default planning heuristics:
 - If the user asks for a single business answer such as "highest", "lowest", "top", "trend", "ratio", "distribution", or "which city/customer/product", default to a minimal answer workflow ending in `llm.answer`, not an artifact node.
 - If both file and database sources are attached and the task requires joining or cross-source comparison, default to `datasource.read` + `sql.execute` + `python.code` + optional `llm.answer` / artifact node.
 - If the user explicitly asks for a deliverable artifact (report, dashboard, video), end the workflow with that artifact node. Do not also add `llm.answer` unless the user also asked for a textual answer.
+- For `video.generator`, prefer to hand it an already summarized or analysis-ready dataset_ref, not a raw wide fact table.
 - Prefer one source node per datasource actually needed. Do not read every attached datasource if the task only needs one.
 - If one SQL query can already produce the needed grouped or filtered result, prefer that over fetching raw rows into `python.code`.
 - After a successful run, stop. Do not call `read_workflow` or `update_workflow` just to inspect or restate the same workflow.

@@ -190,11 +190,15 @@ def compact_node_outputs(
 ) -> dict[str, Any] | None:
     if not isinstance(outputs, dict):
         return outputs
-    return compact_value_for_transport(
+    compacted = compact_value_for_transport(
         outputs,
         row_limit=row_limit,
         text_limit=text_limit,
     )
+    if isinstance(compacted, dict) and is_dataset_ref(compacted.get("dataset_ref")):
+        for key in ("preview_rows", "row_count", "columns"):
+            compacted.pop(key, None)
+    return compacted
 
 
 def compact_workflow_outputs(
@@ -318,18 +322,15 @@ def build_tabular_node_result(
 ) -> dict[str, Any]:
     resolved_columns = columns or sorted({key for row in rows for key in row.keys()})
     preview_rows = compact_rows_preview(rows, limit=preview_limit)
-    result: dict[str, Any] = {
-        "preview_rows": preview_rows,
-        "row_count": row_count if row_count is not None else len(rows),
-        "columns": resolved_columns,
-    }
+    resolved_row_count = row_count if row_count is not None else len(rows)
+    result: dict[str, Any] = {}
     if sandbox:
         result["dataset_ref"] = materialize_rows_to_sandbox_dataset(
             rows,
             sandbox=sandbox,
             name_hint=name_hint,
             source=source,
-            row_count=result["row_count"],
+            row_count=resolved_row_count,
             columns=resolved_columns,
             preview_limit=preview_limit,
         )
@@ -339,7 +340,7 @@ def build_tabular_node_result(
             dataset_format="jsonl",
             source=source,
             preview_rows=preview_rows,
-            row_count=result["row_count"],
+            row_count=resolved_row_count,
             columns=resolved_columns,
             name=Path(name_hint or "dataset").stem,
         )
@@ -438,12 +439,7 @@ def materialize_sql_query_to_sandbox_result(
         columns=columns,
         name=Path(dest_path).stem,
     )
-    return {
-        "preview_rows": preview_rows,
-        "dataset_ref": dataset_ref,
-        "row_count": row_count,
-        "columns": columns,
-    }
+    return {"dataset_ref": dataset_ref}
 
 
 def read_dataset_ref_rows(dataset_ref: dict[str, Any], *, sandbox, limit: int | None = None) -> list[dict[str, Any]]:

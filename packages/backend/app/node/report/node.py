@@ -136,8 +136,9 @@ class ReportGenerateHandler:
         user_query = (
             node.params.get("query")
             or node.params.get("user_query")
-            or "Generate a comprehensive data analysis report."
         )
+        if not user_query:
+            raise ValueError("query is required")
         template_name = node.params.get("template") or node.params.get("template_name") or "template_1.html"
         output_filename = node.params.get("output_path") or node.params.get("output_filename") or "analysis_report.html"
 
@@ -146,11 +147,7 @@ class ReportGenerateHandler:
         dataset_refs = dataset_input if isinstance(dataset_input, list) else [dataset_input] if dataset_input else []
         dataset_refs = [ref for ref in dataset_refs if is_dataset_ref(ref)]
         if not file_paths and not dataset_refs:
-            return {
-                "report_path": "",
-                "status": "error",
-                "message": "No data source provided. Please specify file_paths in params or connect dataset_ref input.",
-            }
+            raise ValueError("dataset_ref input is required")
 
         session_id = self.session_id or f"workflow_{self.user_id}"
         tmp_dir: str | None = None
@@ -173,11 +170,7 @@ class ReportGenerateHandler:
             file_paths = local_paths
 
             if not file_paths:
-                return {
-                    "report_path": "",
-                    "status": "error",
-                    "message": "No valid CSV data found for report generation.",
-                }
+                raise RuntimeError("No valid CSV data found for report generation.")
 
             logger.info("Starting report generation with query=%s, files=%s", user_query, file_paths)
             report_html, error = run_report_pipeline(
@@ -188,25 +181,15 @@ class ReportGenerateHandler:
                 output_filename=str(output_filename),
             )
             if error:
-                return {
-                    "report_path": "",
-                    "status": "error",
-                    "message": f"Report generation failed: {error}",
-                }
+                raise RuntimeError(f"Report generation failed: {error}")
 
             return {
                 "report_path": f"/workspace/{output_filename}",
-                "status": "success",
-                "message": f"Report generated successfully. Check {output_filename} in workspace.",
                 "report_html": report_html[:500] + "..." if report_html and len(report_html) > 500 else report_html,
             }
         except Exception as exc:
             logger.exception("Report generation failed")
-            return {
-                "report_path": "",
-                "status": "error",
-                "message": f"Report generation error: {str(exc)}",
-            }
+            raise RuntimeError(f"Report generation error: {str(exc)}") from exc
         finally:
             if tmp_dir:
                 import shutil
@@ -233,14 +216,14 @@ class ReportGenerateNode(BaseNode):
             params_schema={
                 "query": {
                     "type": "string",
-                    "required": False,
+                    "required": True,
                     "description": "Report focus or analysis question, such as 'Analyze revenue trends and customer behavior'.",
                 },
             },
             inputs={
                 "dataset_ref": Port(
                     schema="dict",
-                    required=False,
+                    required=True,
                     multiple=True,
                     description="One or more dataset references to include in the report.",
                 ),
@@ -254,14 +237,6 @@ class ReportGenerateNode(BaseNode):
                     schema="string",
                     required=False,
                     description="HTML preview snippet of the generated report.",
-                ),
-                "status": Port(
-                    schema="string",
-                    description="Generation status: `success` or `error`.",
-                ),
-                "message": Port(
-                    schema="string",
-                    description="Status message with execution details.",
                 ),
             },
         )

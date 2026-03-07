@@ -1,4 +1,6 @@
 from app.services.workflow_engine import build_registry
+from deepeye.workflows.models import Graph, Node
+from deepeye.workflows.validation import validate_workflow_graph
 
 
 def test_workflow_node_specs_serialize_schema_with_public_alias() -> None:
@@ -47,3 +49,68 @@ def test_workflow_node_specs_hide_internal_or_legacy_params() -> None:
     assert "data_schema" not in (specs["data.generate_dashboard"].params_schema or {})
     assert "workers" not in (specs["video.generator"].params_schema or {})
     assert "instructions" not in (specs["llm.answer"].params_schema or {})
+    assert "query" not in specs["sql.execute"].inputs
+    assert "kb_ids" not in specs["knowledge.search"].inputs
+    assert "query" not in specs["knowledge.search"].inputs
+    assert "question" not in specs["llm.answer"].inputs
+    assert "question" not in specs["data.generate_dashboard"].inputs
+    assert "query" not in specs["video.generator"].inputs
+    assert "preview_rows" not in specs["datasource.read"].outputs
+    assert "row_count" not in specs["datasource.read"].outputs
+    assert "columns" not in specs["datasource.read"].outputs
+    assert "preview_rows" not in specs["sql.execute"].outputs
+    assert "row_count" not in specs["sql.execute"].outputs
+    assert "columns" not in specs["sql.execute"].outputs
+    assert "preview_rows" not in specs["python.code"].outputs
+    assert "row_count" not in specs["python.code"].outputs
+    assert "columns" not in specs["python.code"].outputs
+    assert "preview_rows" not in specs["rows.select"].outputs
+    assert "row_count" not in specs["rows.select"].outputs
+    assert "columns" not in specs["rows.select"].outputs
+    assert "preview_rows" not in specs["rows.filter"].outputs
+    assert "row_count" not in specs["rows.filter"].outputs
+    assert "columns" not in specs["rows.filter"].outputs
+    assert "preview_rows" not in specs["rows.sort"].outputs
+    assert "row_count" not in specs["rows.sort"].outputs
+    assert "columns" not in specs["rows.sort"].outputs
+    assert "preview_rows" not in specs["rows.profile"].outputs
+    assert "row_count" not in specs["rows.profile"].outputs
+    assert "columns" not in specs["rows.profile"].outputs
+    assert "preview_rows" not in specs["rows.aggregate"].outputs
+    assert "row_count" not in specs["rows.aggregate"].outputs
+    assert "columns" not in specs["rows.aggregate"].outputs
+    assert "status" not in specs["report.generate"].outputs
+    assert "message" not in specs["report.generate"].outputs
+    assert "stdout" not in specs["python.code"].outputs
+    assert "stderr" not in specs["python.code"].outputs
+    assert "exit_code" not in specs["python.code"].outputs
+    assert "dashboard_config" not in specs["data.generate_dashboard"].outputs
+    assert "config" not in specs["video.generator"].outputs
+    assert "config_path" not in specs["video.generator"].outputs
+
+
+def test_workflow_validation_rejects_missing_required_params_and_inputs() -> None:
+    registry = build_registry()
+    graph = Graph(
+        nodes={
+            "answer": Node(id="answer", type="llm.answer"),
+            "dashboard": Node(id="dashboard", type="data.generate_dashboard"),
+            "report": Node(id="report", type="report.generate"),
+            "video": Node(id="video", type="video.generator"),
+            "kb": Node(id="kb", type="knowledge.search"),
+        },
+        edges={},
+    )
+
+    issues = validate_workflow_graph(graph, registry=registry)
+
+    issue_codes = {(issue.code, issue.location) for issue in issues}
+    assert ("param.required.missing", "nodes.answer.params.question") in issue_codes
+    assert ("param.required.missing", "nodes.dashboard.params.question") in issue_codes
+    assert ("input.required.missing", "nodes.dashboard.inputs.dataset_ref") in issue_codes
+    assert ("param.required.missing", "nodes.report.params.query") in issue_codes
+    assert ("input.required.missing", "nodes.report.inputs.dataset_ref") in issue_codes
+    assert ("param.required.missing", "nodes.video.params.query") in issue_codes
+    assert ("input.required.missing", "nodes.video.inputs.dataset_ref") in issue_codes
+    assert ("param.required.missing", "nodes.kb.params.kb_ids") in issue_codes
+    assert ("param.required.missing", "nodes.kb.params.query") in issue_codes

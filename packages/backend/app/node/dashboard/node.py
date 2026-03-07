@@ -190,8 +190,10 @@ class NL2DashboardHandler:
     def execute(self, node: Any, inputs: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print("\n" + "="*30 + " NL2DASHBOARD (SANDBOX MODE) " + "="*30)
         params = node.params
-        question = inputs.get("question") or params.get("question")
-        datasource_id = inputs.get("datasource_id") or params.get("datasource_id")
+        question = params.get("question")
+        datasource_id = params.get("datasource_id")
+        if not question:
+            raise ValueError("question is required")
         
         # 1. Path logic alignment with PythonCodeHandler
         safe_id = "".join(ch if str(ch).isalnum() or ch in ("-", "_") else "_" for ch in str(node.id)) or "dashboard"
@@ -314,6 +316,10 @@ class NL2DashboardHandler:
                         dataset_path = data_input
         except Exception as e:
             print(f"[ERROR] Data transportation failed: {e}")
+            raise RuntimeError(f"Failed to prepare dashboard dataset: {e}") from e
+
+        if not dataset_path and not data_input:
+            raise ValueError("dataset_ref input is required")
 
         # 3. Determine local output path
         local_output_path = os.path.join(local_tmp_dir, "output")
@@ -337,11 +343,6 @@ class NL2DashboardHandler:
                 model = settings.LLM_MODEL
                 
             print(f"[DEBUG] Using model: {model}")
-            
-            # Default question if empty
-            if not question:
-                question = "Analyze and present key information from the data"
-                print(f"[DEBUG] Question is empty, using default value: {question}")
             
             llm_client = LLMClient(api_key=api_key, base_url=base_url)
             
@@ -485,7 +486,6 @@ class NL2DashboardHandler:
             return {
                 "output_path": final_sandbox_path,
                 "dashboard_url": full_url,
-                "dashboard_config": design_result
             }
         except Exception as e:
             traceback.print_exc()
@@ -500,16 +500,14 @@ class NL2DashboardNode(BaseNode):
             type=cls.node_type,
             description="Generate an interactive dashboard from a dataset and an analysis question.",
             inputs={
-                "question": Port(schema="string", required=False, description="Dashboard request or analysis goal."),
-                "dataset_ref": Port(schema="dict", required=False, description="Dataset reference to visualize."),
+                "dataset_ref": Port(schema="dict", required=True, description="Dataset reference to visualize."),
             },
             outputs={
                 "output_path": Port(schema="string", description="Sandbox path to the generated dashboard app."),
-                "dashboard_config": Port(schema="dict", description="Generated dashboard configuration."),
                 "dashboard_url": Port(schema="string", description="URL for opening the generated dashboard."),
             },
             params_schema={
-                "question": {"type": "string", "required": False, "description": "Fallback dashboard request if no `question` input edge is connected."},
+                "question": {"type": "string", "required": True, "description": "Dashboard request or analysis goal."},
             },
         )
 

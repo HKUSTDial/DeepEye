@@ -16,8 +16,12 @@ class DataSourceRepository(SQLAlchemyRepository[DataSource, uuid.UUID]):
         """Find all datasources for a specific user."""
         return self.db.query(self.model_class).filter(DataSource.user_id == user_id).all()
     
-    def get_by_id_and_user(self, datasource_id: uuid.UUID, user_id: uuid.UUID) -> DataSource | None:
+    def get_by_id_and_user(self, datasource_id: uuid.UUID | str, user_id: uuid.UUID | str) -> DataSource | None:
         """Get a datasource by ID, but only if it belongs to the specified user."""
+        if isinstance(datasource_id, str):
+            datasource_id = uuid.UUID(datasource_id)
+        if isinstance(user_id, str):
+            user_id = uuid.UUID(user_id)
         return (
             self.db.query(self.model_class)
             .filter(DataSource.id == datasource_id, DataSource.user_id == user_id)

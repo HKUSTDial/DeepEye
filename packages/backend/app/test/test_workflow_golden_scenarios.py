@@ -66,7 +66,7 @@ def test_golden_file_profile_workflow_answers_with_grounded_context() -> None:
                     "read": Node(
                         id="read",
                         type="datasource.read",
-                        params={"datasource_id": datasource.id, "limit": 20},
+                        params={"datasource_id": str(datasource.id), "limit": 20},
                     ),
                     "profile": Node(
                         id="profile",
@@ -102,7 +102,7 @@ def test_golden_file_profile_workflow_answers_with_grounded_context() -> None:
         context = engine.run(workflow)
 
         assert context.status == "success"
-        assert context.runs["read"].outputs["row_count"] == 3
+        assert context.runs["read"].outputs["dataset_ref"]["row_count"] == 3
         assert context.runs["profile"].outputs["profile"]["column_count"] == 3
         assert context.runs["answer"].outputs["answer"] == "Shenzhen has the highest revenue."
         assert model.messages is not None
@@ -142,6 +142,16 @@ def test_golden_cross_source_python_analysis_feeds_report_and_video(tmp_path, mo
         )
         conn.commit()
         conn.close()
+        sales_datasource = DataSource(
+            user_id=user.id,
+            name="sales.db",
+            type="sqlite",
+            category="database",
+            connection_string=f"sqlite:///{sqlite_path}",
+        )
+        db.add(sales_datasource)
+        db.commit()
+        db.refresh(sales_datasource)
 
         merged_dataset_ref = materialize_rows_to_sandbox_dataset(
             [
@@ -190,14 +200,13 @@ def test_golden_cross_source_python_analysis_feeds_report_and_video(tmp_path, mo
                     "file": Node(
                         id="file",
                         type="datasource.read",
-                        params={"datasource_id": datasource.id, "limit": 20},
+                        params={"datasource_id": str(datasource.id), "limit": 20},
                     ),
                     "sql": Node(
                         id="sql",
                         type="sql.execute",
                         params={
-                            "datasource_url": f"sqlite:///{sqlite_path}",
-                            "datasource_type": "sqlite",
+                            "datasource_id": str(sales_datasource.id),
                             "query": "select client_id, revenue from sales order by revenue desc",
                         },
                     ),
@@ -256,7 +265,7 @@ def test_golden_cross_source_python_analysis_feeds_report_and_video(tmp_path, mo
         payload = json.loads(sandbox.container.files[sandbox.container.last_python_input_path].decode("utf-8"))
         assert len(payload["dataset_ref"]) == 2
         assert captured_report_csvs and all(Path(path).suffix == ".csv" for path in captured_report_csvs)
-        assert context.runs["report"].outputs["status"] == "success"
+        assert context.runs["report"].outputs["report_path"].endswith("analysis_report.html")
         assert context.runs["video"].outputs["video_info"]["status"] == "success"
     finally:
         db.close()
@@ -277,6 +286,16 @@ def test_golden_sql_to_dashboard_workflow(tmp_path, monkeypatch) -> None:
         )
         conn.commit()
         conn.close()
+        sales_datasource = DataSource(
+            user_id=user.id,
+            name="sales.db",
+            type="sqlite",
+            category="database",
+            connection_string=f"sqlite:///{sqlite_path}",
+        )
+        db.add(sales_datasource)
+        db.commit()
+        db.refresh(sales_datasource)
 
         class _DummyDesigner:
             def __init__(self, llm_client=None, model=None) -> None:
@@ -322,8 +341,7 @@ def test_golden_sql_to_dashboard_workflow(tmp_path, monkeypatch) -> None:
                         id="sql",
                         type="sql.execute",
                         params={
-                            "datasource_url": f"sqlite:///{sqlite_path}",
-                            "datasource_type": "sqlite",
+                            "datasource_id": str(sales_datasource.id),
                             "query": "select city, revenue from sales order by revenue desc",
                         },
                     ),

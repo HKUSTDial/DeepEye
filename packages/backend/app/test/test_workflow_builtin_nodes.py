@@ -22,7 +22,7 @@ from app.node.rows.basic import (
     RowsSelectHandler,
     RowsSortHandler,
 )
-from app.services.workflow_datasets import materialize_rows_to_sandbox_dataset
+from app.services.workflow_datasets import dataset_ref_preview, materialize_rows_to_sandbox_dataset
 from deepeye.workflows.models import Edge, EdgeEndpoint, Graph, Node, Port, Workflow
 from deepeye.workflows.registry import NodeSpec
 
@@ -140,7 +140,7 @@ def test_rows_select_filter_sort_and_profile_handlers() -> None:
         {"dataset_ref": dataset_ref},
         context=None,
     )
-    assert selected["preview_rows"] == [
+    assert dataset_ref_preview(selected["dataset_ref"]) == [
         {"city": "Shanghai", "revenue": 120},
         {"city": "Beijing", "revenue": 80},
         {"city": "Shenzhen", "revenue": 150},
@@ -151,21 +151,21 @@ def test_rows_select_filter_sort_and_profile_handlers() -> None:
         {"dataset_ref": dataset_ref},
         context=None,
     )
-    assert [row["city"] for row in filtered["preview_rows"]] == ["Shanghai", "Shenzhen"]
+    assert [row["city"] for row in dataset_ref_preview(filtered["dataset_ref"])] == ["Shanghai", "Shenzhen"]
 
     sorted_rows = RowsSortHandler(sandbox=sandbox).execute(
         Node(id="sort", type="rows.sort", params={"column": "revenue", "descending": True}),
         {"dataset_ref": dataset_ref},
         context=None,
     )
-    assert [row["city"] for row in sorted_rows["preview_rows"]] == ["Shenzhen", "Shanghai", "Beijing"]
+    assert [row["city"] for row in dataset_ref_preview(sorted_rows["dataset_ref"])] == ["Shenzhen", "Shanghai", "Beijing"]
 
     profile = RowsProfileHandler(sandbox=sandbox).execute(
         Node(id="profile", type="rows.profile", params={"sample_size": 2}),
         {"dataset_ref": dataset_ref},
         context=None,
     )
-    assert profile["row_count"] == 3
+    assert profile["dataset_ref"]["row_count"] == 3
     assert profile["profile"]["column_count"] == 3
     revenue_profile = next(column for column in profile["profile"]["columns"] if column["name"] == "revenue")
     assert revenue_profile["numeric_summary"]["max"] == 150
@@ -186,7 +186,7 @@ def test_rows_select_filter_sort_and_profile_handlers() -> None:
         {"dataset_ref": dataset_ref},
         context=None,
     )
-    assert aggregated["preview_rows"] == [
+    assert dataset_ref_preview(aggregated["dataset_ref"]) == [
         {"segment": "A", "total_revenue": 270, "avg_revenue": 135.0, "row_count": 2},
         {"segment": "B", "total_revenue": 80, "avg_revenue": 80.0, "row_count": 1},
     ]
@@ -197,9 +197,8 @@ def test_llm_answer_handler_uses_grounded_payload() -> None:
     handler = LLMAnswerHandler(model=model)
 
     result = handler.execute(
-        Node(id="answer", type="llm.answer", params={"instructions": "Answer in Chinese."}),
+        Node(id="answer", type="llm.answer", params={"question": "哪个城市收入最高？"}),
         {
-            "question": "哪个城市收入最高？",
             "dataset_ref": {
                 "kind": "dataset_ref",
                 "path": "/workspace/.datasets/cities.jsonl",
@@ -220,6 +219,31 @@ def test_llm_answer_handler_uses_grounded_payload() -> None:
     assert "Shenzhen" in model.messages[1].content
 
 
+def test_python_code_handler_raises_on_script_failure() -> None:
+    sandbox = _FakeSandbox()
+
+    def _failing_exec_run(cmd, demux=False, workdir=None):
+        if isinstance(cmd, list) and cmd[:2] == ["bash", "-c"] and "&& python " in cmd[2]:
+            if demux:
+                return 1, (b"", b"boom")
+            return _FakeExecResult(1, b"boom")
+        return sandbox.container.__class__.exec_run(sandbox.container, cmd, demux=demux, workdir=workdir)
+
+    sandbox.container.exec_run = _failing_exec_run
+    handler = PythonCodeHandler(sandbox)
+
+    try:
+        handler.execute(
+            Node(id="py_fail", type="python.code", params={"code": "raise SystemExit(1)"}),
+            {"input": {"task": "fail-fast"}},
+            context=None,
+        )
+    except RuntimeError as exc:
+        assert "INPUT_PREVIEW" in str(exc)
+    else:
+        raise AssertionError("python.code should raise on non-zero exit code")
+
+
 def test_rows_handlers_accept_dataset_ref_inputs() -> None:
     sandbox = _FakeSandbox()
     rows = [{"city": f"City {idx}", "revenue": idx, "segment": "A" if idx % 2 == 0 else "B"} for idx in range(30)]
@@ -231,9 +255,9 @@ def test_rows_handlers_accept_dataset_ref_inputs() -> None:
         context=None,
     )
 
-    assert selected["row_count"] == 30
-    assert len(selected["preview_rows"]) == 20
-    assert selected["preview_rows"][0] == {"city": "City 0", "revenue": 0}
+    assert selected["dataset_ref"]["row_count"] == 30
+    assert len(selected["dataset_ref"]["preview_rows"]) == 20
+    assert selected["dataset_ref"]["preview_rows"][0] == {"city": "City 0", "revenue": 0}
     assert selected["dataset_ref"]["kind"] == "dataset_ref"
 
 
@@ -263,7 +287,7 @@ def test_python_code_handler_passes_dataset_refs_instead_of_full_rows() -> None:
     assert isinstance(payload["dataset_ref"], list)
     assert payload["dataset_ref"][0]["kind"] == "dataset_ref"
     assert payload["dataset_ref"][0]["row_count"] == 30
-    assert result["row_count"] == 1
+    assert result["dataset_ref"]["row_count"] == 1
     assert result["dataset_ref"]["kind"] == "dataset_ref"
 
 
@@ -323,6 +347,6 @@ def test_workflow_engine_runs_rows_pipeline_with_llm_answer() -> None:
     context = engine.run(workflow)
 
     assert context.status == "success"
-    assert context.runs["aggregate"].outputs["preview_rows"] == [{"total_revenue": 270}]
     assert context.runs["aggregate"].outputs["dataset_ref"]["kind"] == "dataset_ref"
+    assert context.runs["aggregate"].outputs["dataset_ref"]["preview_rows"] == [{"total_revenue": 270}]
     assert context.runs["answer"].outputs["answer"] == "Grounded answer."

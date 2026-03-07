@@ -172,13 +172,13 @@ def test_file_datasource_dataset_ref_flows_to_report_and_video(tmp_path, monkeyp
 
         ds_handler = DataSourceReadHandler(db, user.id, sandbox=sandbox)
         ds_result = ds_handler.execute(
-            Node(id="read_clients", type="datasource.read", params={"datasource_id": datasource.id, "limit": 10}),
+            Node(id="read_clients", type="datasource.read", params={"datasource_id": str(datasource.id), "limit": 10}),
             {},
             context=None,
         )
 
         assert ds_result["dataset_ref"]["kind"] == "dataset_ref"
-        assert ds_result["row_count"] == 3
+        assert ds_result["dataset_ref"]["row_count"] == 3
 
         captured_report_csvs: list[str] = []
 
@@ -196,7 +196,8 @@ def test_file_datasource_dataset_ref_flows_to_report_and_video(tmp_path, monkeyp
             context=None,
         )
 
-        assert report_result["status"] == "success"
+        assert report_result["report_path"].endswith("analysis_report.html")
+        assert report_result["report_html"] == "<html>report</html>"
         assert captured_report_csvs
 
         video_handler = VideoGeneratorHandler(db, str(user.id), sandbox=sandbox)
@@ -248,7 +249,7 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
         )
 
         assert sql_result["dataset_ref"]["kind"] == "dataset_ref"
-        assert sql_result["row_count"] == 3
+        assert sql_result["dataset_ref"]["row_count"] == 3
 
         python_output_ref = materialize_rows_to_sandbox_dataset(
             [{"city": "Shenzhen", "top_revenue": 150}],
@@ -308,7 +309,7 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
         dashboard_handler._emit_workflow_event = lambda *args, **kwargs: None
         dashboard_result = dashboard_handler.execute(
             Node(id="dashboard", type="data.generate_dashboard", params={"question": "Show top city revenue"}),
-            {"dataset_ref": sql_result["dataset_ref"], "question": "Show top city revenue"},
+            {"dataset_ref": sql_result["dataset_ref"]},
             context=None,
         )
 
@@ -361,8 +362,8 @@ def test_sql_execute_materializes_preview_and_dataset_in_single_query(tmp_path, 
         )
 
         assert query_count["value"] == 1
-        assert result["row_count"] == 3
-        assert len(result["preview_rows"]) == 2
+        assert result["dataset_ref"]["row_count"] == 3
+        assert len(result["dataset_ref"]["preview_rows"]) == 2
         assert result["dataset_ref"]["path"].startswith("/workspace/.datasets/")
     finally:
         db.close()
@@ -411,8 +412,8 @@ def test_datasource_read_database_materializes_in_single_query(tmp_path, monkeyp
         )
 
         assert query_count["value"] == 1
-        assert result["row_count"] == 3
-        assert len(result["preview_rows"]) == 2
+        assert result["dataset_ref"]["row_count"] == 3
+        assert len(result["dataset_ref"]["preview_rows"]) == 2
         assert result["dataset_ref"]["path"].startswith("/workspace/.datasets/")
     finally:
         db.close()

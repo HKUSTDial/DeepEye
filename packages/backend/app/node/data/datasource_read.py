@@ -114,14 +114,10 @@ class DataSourceReadHandler:
                 if not isinstance(rows, list):
                     raise RuntimeError("Failed to parse file rows: expected JSON array")
                 dataset_ref = datasource_file_dataset_ref(datasource=ds, preview_rows=rows)
-                return {
-                    "preview_rows": rows,
-                    "dataset_ref": dataset_ref,
-                    "row_count": dataset_ref.get("row_count", len(rows)),
-                    "columns": dataset_ref.get("columns", []),
-                }
+                return {"dataset_ref": dataset_ref}
 
             connection_string = ds.connection_string
+            datasource_type = getattr(ds, "type", None)
         else:
             connection_string = datasource_url
 
@@ -139,7 +135,7 @@ class DataSourceReadHandler:
                 db=self.db,
                 user_id=self.user_id,
                 sandbox=self.sandbox,
-                datasource_id=str(datasource_id) if datasource_id else None,
+                datasource_id=datasource_id,
                 datasource_url=connection_string,
                 datasource_type=datasource_type,
                 query=str(query),
@@ -147,7 +143,7 @@ class DataSourceReadHandler:
                 source="datasource.read",
                 preview_limit=limit,
             )
-            return result
+            return {"dataset_ref": result["dataset_ref"]}
 
         rows = fetch_rows(engine, str(query), limit)
         dataset_ref = build_dataset_ref(
@@ -159,12 +155,7 @@ class DataSourceReadHandler:
             columns=sorted({key for row in rows for key in row.keys()}),
             name=f"{node.id}_rows",
         )
-        return {
-            "preview_rows": rows,
-            "dataset_ref": dataset_ref,
-            "row_count": dataset_ref.get("row_count"),
-            "columns": dataset_ref.get("columns"),
-        }
+        return {"dataset_ref": dataset_ref}
 
 
 class DataSourceReadNode(BaseNode):
@@ -179,13 +170,10 @@ class DataSourceReadNode(BaseNode):
                 "datasource_id": {"type": "string", "required": True, "description": "Attached datasource id to read. Use the datasource id from prompt context."},
                 "table": {"type": "string", "required": False, "description": "Optional database table name to read when the datasource is a database and a full-table preview is enough."},
                 "query": {"type": "string", "required": False, "description": "Optional SQL query for database datasources when you need filtering or projection during the read step."},
-                "limit": {"type": "integer", "required": False, "description": "Preview row limit returned in `preview_rows`. Defaults to 100."},
+                "limit": {"type": "integer", "required": False, "description": "Preview row limit stored inside the returned `dataset_ref`. Defaults to 100."},
             },
             outputs={
-                "preview_rows": Port(schema="list[dict]", required=False, description="Small row preview for planning, UI, and summaries."),
-                "dataset_ref": Port(schema="dict", required=True, description="Reference to the full materialized dataset for downstream nodes."),
-                "row_count": Port(schema="int", required=True, description="Materialized row count when available."),
-                "columns": Port(schema="list[string]", required=False, description="Detected dataset columns."),
+                "dataset_ref": Port(schema="dict", required=True, description="Reference to the materialized dataset for downstream nodes. Preview rows and detected columns live inside this object."),
             },
         )
 

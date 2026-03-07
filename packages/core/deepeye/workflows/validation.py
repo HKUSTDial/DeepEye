@@ -66,11 +66,40 @@ def validate_workflow_graph(
         return f"{location_prefix}{path}" if location_prefix else path
 
     issues.extend(_validate_nodes(graph, registry, _loc))
+    issues.extend(_validate_required_params(graph, registry, _loc))
     issues.extend(_validate_edges(graph, registry, schema_check, _loc))
     issues.extend(_validate_required_inputs(graph, registry, _loc))
     issues.extend(_validate_group_nodes(graph, registry, schema_check, _loc))
     issues.extend(_validate_dag(graph, _loc))
 
+    return issues
+
+
+def _validate_required_params(
+    graph: Graph,
+    registry: NodeRegistry | None,
+    loc: Callable[[str], str],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    if not registry:
+        return issues
+
+    for node in graph.nodes.values():
+        spec = registry.get(node.type)
+        if not spec or not spec.params_schema:
+            continue
+        for param_id, meta in spec.params_schema.items():
+            if not isinstance(meta, dict) or not meta.get("required"):
+                continue
+            value = node.params.get(param_id)
+            if value in (None, "", [], {}):
+                issues.append(
+                    ValidationIssue(
+                        code="param.required.missing",
+                        message=f"Required param missing: {node.id}.{param_id}",
+                        location=loc(f"nodes.{node.id}.params.{param_id}"),
+                    )
+                )
     return issues
 
 

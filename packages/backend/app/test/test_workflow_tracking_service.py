@@ -278,3 +278,62 @@ def test_finalize_tracked_workflow_run_compacts_large_row_outputs():
         assert finalized.result["outputs"]["aggregate"]["preview_rows"][0]["city"] == "City 0"
     finally:
         db.close()
+
+
+def test_finalize_tracked_workflow_run_drops_duplicate_tabular_metadata_when_dataset_ref_exists():
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="frank@example.com")
+        session = _create_session(db, user)
+        turn = create_chat_turn(db, session.id, user.id, "Analyze compact dataset outputs")
+        draft = upsert_workflow_draft(
+            db,
+            session_id=session.id,
+            user_id=user.id,
+            turn_id=turn.id,
+            file_path="/workspace/workflow/compact.json",
+            definition={"root": {"nodes": {"sql": {"id": "sql"}}, "edges": {}}},
+        )
+        run = create_tracked_workflow_run(
+            db,
+            user_id=user.id,
+            session_id=session.id,
+            turn_id=turn.id,
+            draft_id=draft.id,
+            file_path=draft.file_path,
+        )
+
+        finalized = finalize_tracked_workflow_run(
+            db,
+            run,
+            status="success",
+            result={
+                "status": "success",
+                "outputs": {
+                    "sql": {
+                        "dataset_ref": {
+                            "kind": "dataset_ref",
+                            "path": "/workspace/.datasets/sql.jsonl",
+                            "format": "jsonl",
+                            "row_count": 50,
+                            "columns": ["city", "revenue"],
+                            "preview_rows": [{"city": "City 0", "revenue": 0}],
+                        },
+                        "row_count": 50,
+                        "columns": ["city", "revenue"],
+                        "preview_rows": [{"city": "City 0", "revenue": 0}],
+                    }
+                },
+            },
+            artifacts=[],
+        )
+
+        stored = finalized.result["outputs"]["sql"]
+        assert "row_count" not in stored
+        assert "columns" not in stored
+        assert "preview_rows" not in stored
+        assert stored["dataset_ref"]["row_count"] == 50
+        assert stored["dataset_ref"]["columns"] == ["city", "revenue"]
+        assert stored["dataset_ref"]["preview_rows"][0]["city"] == "City 0"
+    finally:
+        db.close()
