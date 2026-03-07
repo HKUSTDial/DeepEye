@@ -2,11 +2,13 @@ FROM docker.m.daocloud.io/library/node:20-slim
 
 WORKDIR /app
 
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+
 # Copy package files and install all dependencies in advance.
 # node_modules are baked into the image so containers start fast (no npm install at runtime).
-COPY docker/video-preview-app/package.json ./
-RUN npm config set registry https://registry.npmmirror.com && \
-    npm install && \
+COPY docker/video-preview-app/package*.json ./
+RUN npm config set registry ${NPM_REGISTRY} && \
+    npm install --no-audit --no-fund && \
     npm cache clean --force
 
 # Copy template application source (placeholder config.json + scene_registry.ts)

@@ -47,6 +47,25 @@ def repair_unterminated_filter_strings(source: str) -> str:
     )
 
 
+def repair_invalid_keyof_indexing(source: str) -> str:
+    """Downgrade LLM-generated TS keyof index assertions to plain runtime indexing.
+
+    Some generated TSX uses expressions like:
+      d[k as keyof typeof d]
+      filter[k as keyof typeof filter]
+      a.target_data!.data_filter[k as keyof typeof a.target_data!.data_filter]
+
+    These are fragile in generated code and can break Vite/Babel parsing when
+    combined with non-null assertions or nested expressions. Runtime logic only
+    needs dynamic property access, so rewrite them to plain [k].
+    """
+    return re.sub(
+        r"\[\s*([A-Za-z_$][\w$]*)\s+as\s+keyof\s+typeof\s+[^\]]+\]",
+        r"[\1]",
+        source,
+    )
+
+
 def _balance_brackets(code: str, open_c: str, close_c: str) -> int:
     """Return final depth (0 = balanced). Skip inside strings and block comments."""
     depth = 0
@@ -151,4 +170,5 @@ def sanitize_tsx_for_browser(tsx_code: str) -> str:
     """Apply all sanitizations so TSX can be compiled in the browser."""
     code = strip_declare_module_blocks(tsx_code)
     code = repair_unterminated_filter_strings(code)
+    code = repair_invalid_keyof_indexing(code)
     return code

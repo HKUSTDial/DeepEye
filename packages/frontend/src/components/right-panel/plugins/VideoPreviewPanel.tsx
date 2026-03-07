@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Film, Loader2, PlayCircle, Sparkles, TriangleAlert } from 'lucide-react'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
-import { config } from '../../../config'
 
 interface VideoPreviewPanelProps {
   taskId?: string
@@ -101,26 +100,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const [isCheckingPreview, setIsCheckingPreview] = useState(false)
   const previewCheckIntervalRef = useRef<number | null>(null)
 
-  const videoUrlsFromNode = useMemo(() => {
-    if (!sessionState?.nodeStatus) return []
-    const urls: { nodeId: string; url: string }[] = []
-    Object.entries(sessionState.nodeStatus).forEach(([nodeId, statusInfo]) => {
-      const info = statusInfo as { outputs?: Record<string, unknown> }
-      const value = info.outputs?.video_url
-      if (typeof value === 'string' && value) {
-        urls.push({ nodeId, url: value })
-      }
-    })
-    return urls
-  }, [sessionState?.nodeStatus])
-
-  const latestVideoUrlFromNode = videoUrlsFromNode[videoUrlsFromNode.length - 1]?.url
-  const fullPreviewUrlFromNode = useMemo(() => {
-    if (!latestVideoUrlFromNode) return ''
-    if (latestVideoUrlFromNode.startsWith('http')) return latestVideoUrlFromNode
-    const base = config.api.baseUrl.replace('/api/v1', '')
-    return `${base}${latestVideoUrlFromNode.startsWith('/') ? '' : '/'}${latestVideoUrlFromNode}`
-  }, [latestVideoUrlFromNode])
+  const previewDeclaredReady = Boolean(videoPreviewUrl)
 
   const pastedNormalized = normalizePastedTaskId(pastedTaskId)
   const displayTaskId = taskId || extractTaskIdFromOutput(runOutput) || manualTaskId || undefined
@@ -130,7 +110,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
       ? `${window.location.origin}/video-previews/deepeye-video-${displayTaskId}/`
       : null
 
-  const effectivePreviewUrl = videoPreviewUrl || fullPreviewUrlFromNode || constructedPreviewUrl || null
+  const effectivePreviewUrl = videoPreviewUrl || constructedPreviewUrl || null
   const effectivePreviewUrlWithSession = useMemo(() => {
     if (!effectivePreviewUrl) return null
     let next = effectivePreviewUrl
@@ -143,14 +123,26 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
       setIsPreviewReady(false)
       return
     }
+
+    if (previewDeclaredReady) {
+      setIsPreviewReady(true)
+      if (previewCheckIntervalRef.current) {
+        window.clearInterval(previewCheckIntervalRef.current)
+        previewCheckIntervalRef.current = null
+      }
+      return
+    }
+
     setIsPreviewReady(false)
 
     const checkReady = async () => {
       setIsCheckingPreview(true)
       try {
-        const response = await fetch(effectivePreviewUrlWithSession, { method: 'GET', cache: 'no-store' })
+        const response = await fetch(effectivePreviewUrlWithSession, { method: 'HEAD', cache: 'no-store' })
         const fromPreviewRoute = response.headers.get('X-Video-Preview') === '1'
-        if (response.ok && fromPreviewRoute) {
+        const contentType = response.headers.get('content-type') ?? ''
+        const looksLikePreviewDocument = contentType.includes('text/html')
+        if (response.ok && (fromPreviewRoute || looksLikePreviewDocument)) {
           setIsPreviewReady(true)
           if (previewCheckIntervalRef.current) {
             window.clearInterval(previewCheckIntervalRef.current)
@@ -176,13 +168,13 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         previewCheckIntervalRef.current = null
       }
     }
-  }, [effectivePreviewUrlWithSession])
+  }, [effectivePreviewUrlWithSession, previewDeclaredReady])
 
   useEffect(() => {
     const prefix = '[VideoPreview]'
     if (effectivePreviewUrlWithSession) {
       console.info(prefix, 'Preview URL (will poll until ready):', {
-        source: videoPreviewUrl ? 'event' : fullPreviewUrlFromNode ? 'node output' : 'constructed',
+        source: videoPreviewUrl ? 'event' : 'constructed',
         url: effectivePreviewUrlWithSession,
       })
       return
@@ -196,7 +188,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         runOutputLength: runOutput?.length ?? 0,
       })
     }
-  }, [effectivePreviewUrlWithSession, videoPreviewUrl, fullPreviewUrlFromNode, sessionId, taskId, pastedNormalized, pastedTaskId, runOutput])
+  }, [effectivePreviewUrlWithSession, videoPreviewUrl, sessionId, taskId, pastedNormalized, pastedTaskId, runOutput])
 
   useEffect(() => {
     if (videoProgress.visible && videoProgress.logs.length > 0 && videoProgressLogsRef.current) {
@@ -245,6 +237,15 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         </div>
 
         <div className="panel-frame">
+          {isPreviewReady ? (
+            <iframe
+              key={effectivePreviewUrlWithSession}
+              src={effectivePreviewUrlWithSession}
+              className="h-full w-full border-none"
+              title="Video Preview"
+              allow="autoplay"
+            />
+          ) : null}
           {!isPreviewReady ? (
             <div className="panel-frame-overlay">
               <Loader2 className="h-7 w-7 animate-spin text-[var(--accent)]" />
@@ -256,14 +257,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
                 If it stays blank for more than a minute, build the preview image first: <code>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code>
               </p>
             </div>
-          ) : (
-            <iframe
-              src={effectivePreviewUrlWithSession}
-              className="h-full w-full border-none"
-              title="Video Preview"
-              allow="autoplay"
-            />
-          )}
+          ) : null}
         </div>
       </div>
     )

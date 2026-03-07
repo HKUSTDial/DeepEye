@@ -157,19 +157,6 @@ const deriveVideoPreviewUrl = (run: WorkflowRun | null, artifacts: WorkflowArtif
   if (videoArtifact && typeof videoArtifact.payload.video_url === 'string') {
     return videoArtifact.payload.video_url
   }
-
-  const outputs = asObjectRecord(asObjectRecord(run?.result)?.outputs)
-  if (!outputs) {
-    return null
-  }
-
-  for (const value of Object.values(outputs)) {
-    const nodeOutputs = asObjectRecord(value)
-    if (typeof nodeOutputs?.video_url === 'string' && nodeOutputs.video_url) {
-      return nodeOutputs.video_url
-    }
-  }
-
   return null
 }
 

@@ -34,6 +34,7 @@ import docker
 from docker.errors import ImageNotFound, NotFound
 
 from app.core.config import get_video_session_root, settings
+from app.services.docker_build_paths import resolve_docker_build_target
 from deepeye.utils.logger import logger
 
 
@@ -136,15 +137,23 @@ class VideoDeployService:
         self._build_preview_image(image_name)
 
     def _build_preview_image(self, image_name: str) -> None:
+        build_context, dockerfile_name, dockerfile_path = resolve_docker_build_target(
+            dockerfile_setting=settings.VIDEO_PREVIEW_DOCKERFILE,
+            default_context_root=settings.SANDBOX_BUILD_CONTEXT,
+            anchor_file=__file__,
+        )
+        if not dockerfile_path.exists():
+            raise RuntimeError(f"Video preview Dockerfile not found: {dockerfile_path}")
         logger.info(
-            "[VideoDeployService] Building image %s from %s",
+            "[VideoDeployService] Building image %s from %s (context=%s)",
             image_name,
-            settings.VIDEO_PREVIEW_DOCKERFILE,
+            dockerfile_path,
+            build_context,
         )
         try:
             self.docker_client.images.build(
-                path=settings.SANDBOX_BUILD_CONTEXT,
-                dockerfile=settings.VIDEO_PREVIEW_DOCKERFILE,
+                path=build_context,
+                dockerfile=dockerfile_name,
                 tag=image_name,
                 rm=True,
             )

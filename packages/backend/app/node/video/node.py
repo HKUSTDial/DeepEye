@@ -663,8 +663,6 @@ class VideoGeneratorHandler:
 
                 t = threading.Thread(target=_do_deploy, daemon=True)
                 t.start()
-                # Pre-calculate the URL to return immediately (container naming is deterministic)
-                video_url = f"/video-previews/deepeye-video-{task_id}/"
                 if publish_progress:
                     publish_progress(f"🚀 Starting preview container (deepeye-video-{task_id})...")
             except Exception as deploy_err:
@@ -676,7 +674,7 @@ class VideoGeneratorHandler:
             "video_info": video_info,
             "task_id": task_id,  # 显式返回 task_id，方便前端使用
             "session_id": session_id,
-            "video_url": video_url,  # iframe URL，容器就绪后可直接嵌入
+            "video_url": video_url,  # 仅在 preview container 真正 ready 后通过 artifact_ready 事件发布
         }
 
 

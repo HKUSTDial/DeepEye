@@ -34,6 +34,57 @@ export interface VideoPlayerProps {
   sceneComponents: Record<string, React.FC<any>>
 }
 
+class SceneErrorBoundary extends React.Component<
+  { sceneId: string; title?: string; children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('[VideoPreview] Scene render failed', {
+      sceneId: this.props.sceneId,
+      title: this.props.title,
+      error,
+    })
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <AbsoluteFill
+          style={{
+            justifyContent: 'center',
+            alignItems: 'center',
+            color: '#e5e7eb',
+            background: '#0f1419',
+            padding: 48,
+          }}
+        >
+          <div style={{ textAlign: 'center', maxWidth: 860 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>
+              Scene render failed
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, fontFamily: 'monospace', marginBottom: 8 }}>
+              {this.props.sceneId}
+            </div>
+            {this.props.title ? (
+              <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 8 }}>{this.props.title}</div>
+            ) : null}
+            <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.45 }}>
+              {this.state.error.message || String(this.state.error)}
+            </div>
+          </div>
+        </AbsoluteFill>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function withPreviewAuthQuery(src: string): string {
   if (typeof window === 'undefined') return src
   try {
@@ -140,17 +191,22 @@ export function VideoPlayer({ config, sceneComponents }: VideoPlayerProps) {
             durationInFrames={durationInFrames}
             name={scene.id}
           >
-            {SceneComp ? (
-              <SceneComp
-                sceneStartOffset={startTime}
-                narrations={scene.narration}
-                animations={scene.animations}
-                sceneContent={scene.content}
-                scene={scene}
-              />
-            ) : (
-              <MissingSceneComponent scene={scene} />
-            )}
+            <SceneErrorBoundary
+              sceneId={scene.id}
+              title={String((scene.content as any)?.title ?? (scene.content as any)?.headline ?? '')}
+            >
+              {SceneComp ? (
+                <SceneComp
+                  sceneStartOffset={startTime}
+                  narrations={scene.narration}
+                  animations={scene.animations}
+                  sceneContent={scene.content}
+                  scene={scene}
+                />
+              ) : (
+                <MissingSceneComponent scene={scene} />
+              )}
+            </SceneErrorBoundary>
           </Sequence>
         )
       })}
