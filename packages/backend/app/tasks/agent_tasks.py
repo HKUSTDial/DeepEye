@@ -13,7 +13,8 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.infra import RedisEventBus
 from app.repositories import DataSourceRepository, SessionAttachmentRepository, SessionRepository
-from app.sandbox.manager import SandboxManager, _get_datasource_filename
+from app.sandbox import sandbox_manager
+from app.sandbox.manager import _get_datasource_filename
 from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
 from app.services.workflow_engine import build_registry
 from app.services.agent_prompts import build_supervisor_prompt
@@ -152,7 +153,6 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     session_id = agent_input.session_id
     model = _create_model()
     event_bus = RedisEventBus(settings.REDIS_URL)
-    sandbox_manager = SandboxManager()
     user_id = _get_user_id(session_id)
 
     # Persist user message first

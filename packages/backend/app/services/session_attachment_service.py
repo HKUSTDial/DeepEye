@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shlex
 import uuid
 from datetime import datetime, timezone
 
@@ -14,7 +13,6 @@ from app.models import ChatSession, DataSource
 from app.repositories import SessionAttachmentRepository
 from app.sandbox import sandbox_manager
 from app.schemas import SandboxEvent, SandboxEventType
-from app.services.datasource_specs import get_datasource_filename, workspace_data_path
 from deepeye.utils.logger import logger
 
 
@@ -76,10 +74,7 @@ async def _remove_file_datasource(session_id: uuid.UUID, datasource: DataSource)
     if not getattr(datasource, "storage_path", None):
         return
     try:
-        sandbox = await sandbox_manager.get_or_create_sandbox(str(session_id))
-        filename = get_datasource_filename(getattr(datasource, "name", None), getattr(datasource, "storage_path", None))
-        dest_path = workspace_data_path(filename)
-        await sandbox.exec_command(f"rm -f -- {shlex.quote(dest_path)}")
+        await sandbox_manager.remove_datasource_file(str(session_id), datasource)
         await _publish_files_changed(session_id)
     except Exception as exc:
         logger.error(

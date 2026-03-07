@@ -22,7 +22,7 @@ from app.services.datasource_specs import (
 from app.services.workflow_datasets import (
     build_dataset_ref,
     datasource_file_dataset_ref,
-    materialize_sql_query_to_sandbox_dataset,
+    materialize_sql_query_to_sandbox_result,
 )
 from app.sandbox.docker_sandbox import DockerSandbox
 from deepeye.workflows.models import Node, Port
@@ -37,20 +37,20 @@ limit = int(sys.argv[2])
 file_type = sys.argv[3].lower()
 
 if file_type == "csv":
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, nrows=limit)
 elif file_type in ("xlsx", "xls"):
-    df = pd.read_excel(path)
+    df = pd.read_excel(path, nrows=limit)
 elif file_type == "json":
     try:
-        df = pd.read_json(path, lines=True)
+        df = pd.read_json(path, lines=True, nrows=limit)
     except ValueError:
         df = pd.read_json(path)
 elif file_type == "parquet":
-    df = pd.read_parquet(path)
+    df = pd.read_parquet(path).head(limit)
 else:
     raise ValueError(f"Unsupported file type: {file_type}")
 
-print(df.head(limit).to_json(orient="records"))
+print(df.to_json(orient="records"))
 """
 
 
@@ -134,10 +134,8 @@ class DataSourceReadHandler:
             validate_table_name(str(table))
             query = f"SELECT * FROM {table} LIMIT {limit}"
 
-        rows = fetch_rows(engine, str(query), limit)
-        dataset_ref = None
         if self.sandbox:
-            dataset_ref = materialize_sql_query_to_sandbox_dataset(
+            result = materialize_sql_query_to_sandbox_result(
                 db=self.db,
                 user_id=self.user_id,
                 sandbox=self.sandbox,
@@ -149,16 +147,18 @@ class DataSourceReadHandler:
                 source="datasource.read",
                 preview_limit=limit,
             )
-        else:
-            dataset_ref = build_dataset_ref(
-                path=f"/virtual/{node.id}_rows.jsonl",
-                dataset_format="jsonl",
-                source="datasource.read",
-                preview_rows=rows,
-                row_count=len(rows),
-                columns=sorted({key for row in rows for key in row.keys()}),
-                name=f"{node.id}_rows",
-            )
+            return result
+
+        rows = fetch_rows(engine, str(query), limit)
+        dataset_ref = build_dataset_ref(
+            path=f"/virtual/{node.id}_rows.jsonl",
+            dataset_format="jsonl",
+            source="datasource.read",
+            preview_rows=rows,
+            row_count=len(rows),
+            columns=sorted({key for row in rows for key in row.keys()}),
+            name=f"{node.id}_rows",
+        )
         return {
             "preview_rows": rows,
             "dataset_ref": dataset_ref,

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.repositories import DataSourceRepository
 from app.node.core.base import BaseNode
 from app.node.core.db_utils import create_engine, fetch_rows, validate_datasource_type
-from app.services.workflow_datasets import build_dataset_ref, materialize_sql_query_to_sandbox_dataset
+from app.services.workflow_datasets import build_dataset_ref, materialize_sql_query_to_sandbox_result
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 
@@ -38,10 +38,8 @@ class SqlExecuteHandler:
             connection_string = ds.connection_string
 
         engine = create_engine(connection_string)
-        rows = fetch_rows(engine, str(query), limit)
-        dataset_ref = None
         if self.sandbox:
-            dataset_ref = materialize_sql_query_to_sandbox_dataset(
+            result = materialize_sql_query_to_sandbox_result(
                 db=self.db,
                 user_id=self.user_id,
                 sandbox=self.sandbox,
@@ -53,16 +51,18 @@ class SqlExecuteHandler:
                 source="sql.execute",
                 preview_limit=limit,
             )
-        else:
-            dataset_ref = build_dataset_ref(
-                path=f"/virtual/{node.id}_query.jsonl",
-                dataset_format="jsonl",
-                source="sql.execute",
-                preview_rows=rows,
-                row_count=len(rows),
-                columns=sorted({key for row in rows for key in row.keys()}),
-                name=f"{node.id}_query",
-            )
+            return result
+
+        rows = fetch_rows(engine, str(query), limit)
+        dataset_ref = build_dataset_ref(
+            path=f"/virtual/{node.id}_query.jsonl",
+            dataset_format="jsonl",
+            source="sql.execute",
+            preview_rows=rows,
+            row_count=len(rows),
+            columns=sorted({key for row in rows for key in row.keys()}),
+            name=f"{node.id}_query",
+        )
         return {
             "preview_rows": rows,
             "dataset_ref": dataset_ref,

@@ -17,6 +17,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from sqlalchemy import create_engine
+from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, DataSource, User
@@ -313,5 +314,105 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
 
         assert dashboard_result["dashboard_url"].startswith("/dashboards/")
         assert dashboard_result["output_path"].startswith("/workspace/.workflow_scripts/")
+    finally:
+        db.close()
+
+
+def test_sql_execute_materializes_preview_and_dataset_in_single_query(tmp_path, monkeypatch) -> None:
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="sql-single-query@example.com")
+        _create_session(db, user)
+        sqlite_path = tmp_path / "sales.db"
+        conn = sqlite3.connect(sqlite_path)
+        conn.execute("create table sales(city text, revenue integer)")
+        conn.executemany(
+            "insert into sales(city, revenue) values(?, ?)",
+            [("Shanghai", 120), ("Beijing", 80), ("Shenzhen", 150)],
+        )
+        conn.commit()
+        conn.close()
+
+        engine = create_engine(f"sqlite:///{sqlite_path}")
+        query_count = {"value": 0}
+
+        @event.listens_for(engine, "before_cursor_execute")
+        def _count_queries(*args, **kwargs):
+            del args, kwargs
+            query_count["value"] += 1
+
+        monkeypatch.setattr("app.services.workflow_datasets.create_engine", lambda connection_string: engine)
+
+        sandbox = _FakeSandbox()
+        handler = SqlExecuteHandler(db, user.id, sandbox=sandbox)
+        result = handler.execute(
+            Node(
+                id="sql",
+                type="sql.execute",
+                params={
+                    "datasource_url": f"sqlite:///{sqlite_path}",
+                    "datasource_type": "sqlite",
+                    "query": "select city, revenue from sales order by revenue desc",
+                    "limit": 2,
+                },
+            ),
+            {},
+            context=None,
+        )
+
+        assert query_count["value"] == 1
+        assert result["row_count"] == 3
+        assert len(result["preview_rows"]) == 2
+        assert result["dataset_ref"]["path"].startswith("/workspace/.datasets/")
+    finally:
+        db.close()
+
+
+def test_datasource_read_database_materializes_in_single_query(tmp_path, monkeypatch) -> None:
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="datasource-read-single-query@example.com")
+        _create_session(db, user)
+        sqlite_path = tmp_path / "customers.db"
+        conn = sqlite3.connect(sqlite_path)
+        conn.execute("create table customers(city text, revenue integer)")
+        conn.executemany(
+            "insert into customers(city, revenue) values(?, ?)",
+            [("Shanghai", 120), ("Beijing", 80), ("Shenzhen", 150)],
+        )
+        conn.commit()
+        conn.close()
+
+        engine = create_engine(f"sqlite:///{sqlite_path}")
+        query_count = {"value": 0}
+
+        @event.listens_for(engine, "before_cursor_execute")
+        def _count_queries(*args, **kwargs):
+            del args, kwargs
+            query_count["value"] += 1
+
+        monkeypatch.setattr("app.services.workflow_datasets.create_engine", lambda connection_string: engine)
+
+        sandbox = _FakeSandbox()
+        handler = DataSourceReadHandler(db, user.id, sandbox=sandbox)
+        result = handler.execute(
+            Node(
+                id="read_db",
+                type="datasource.read",
+                params={
+                    "datasource_url": f"sqlite:///{sqlite_path}",
+                    "datasource_type": "sqlite",
+                    "query": "select city, revenue from customers order by revenue desc",
+                    "limit": 2,
+                },
+            ),
+            {},
+            context=None,
+        )
+
+        assert query_count["value"] == 1
+        assert result["row_count"] == 3
+        assert len(result["preview_rows"]) == 2
+        assert result["dataset_ref"]["path"].startswith("/workspace/.datasets/")
     finally:
         db.close()

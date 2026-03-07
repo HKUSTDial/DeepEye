@@ -74,7 +74,8 @@ def run_workflow_task(self, run_id: str) -> dict:
             return {"status": "error", "error": "workflow not found"}
 
         _publish_run(run)
-        sandbox = asyncio.run(sandbox_manager.get_or_create_sandbox(str(run.id)))
+        sandbox_session_key = str(run.session_id or run.id)
+        sandbox = asyncio.run(sandbox_manager.get_or_create_sandbox(sandbox_session_key))
         result = run_workflow(
             db,
             workflow,

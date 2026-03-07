@@ -359,6 +359,33 @@ def materialize_sql_query_to_sandbox_dataset(
     source: str,
     preview_limit: int = DEFAULT_PREVIEW_LIMIT,
 ) -> dict[str, Any]:
+    return materialize_sql_query_to_sandbox_result(
+        db=db,
+        user_id=user_id,
+        sandbox=sandbox,
+        datasource_id=datasource_id,
+        datasource_url=datasource_url,
+        datasource_type=datasource_type,
+        query=query,
+        name_hint=name_hint,
+        source=source,
+        preview_limit=preview_limit,
+    )["dataset_ref"]
+
+
+def materialize_sql_query_to_sandbox_result(
+    *,
+    db,
+    user_id,
+    sandbox,
+    datasource_id: str | None,
+    datasource_url: str | None,
+    datasource_type: str | None,
+    query: str,
+    name_hint: str,
+    source: str,
+    preview_limit: int = DEFAULT_PREVIEW_LIMIT,
+) -> dict[str, Any]:
     connection_string = datasource_url
     if datasource_id:
         ds = DataSourceRepository(db).get_by_id_and_user(datasource_id, user_id)
@@ -402,7 +429,7 @@ def materialize_sql_query_to_sandbox_dataset(
         except FileNotFoundError:
             pass
 
-    return build_dataset_ref(
+    dataset_ref = build_dataset_ref(
         path=dest_path,
         dataset_format="jsonl",
         source=source,
@@ -411,6 +438,12 @@ def materialize_sql_query_to_sandbox_dataset(
         columns=columns,
         name=Path(dest_path).stem,
     )
+    return {
+        "preview_rows": preview_rows,
+        "dataset_ref": dataset_ref,
+        "row_count": row_count,
+        "columns": columns,
+    }
 
 
 def read_dataset_ref_rows(dataset_ref: dict[str, Any], *, sandbox, limit: int | None = None) -> list[dict[str, Any]]:

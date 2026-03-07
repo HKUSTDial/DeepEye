@@ -1,8 +1,10 @@
 """Sandbox Manager - Manage sandbox lifecycle with persistence"""
 
 import asyncio
-from typing import Dict, List
+import json
+import shlex
 from collections import defaultdict
+from typing import Any, Dict, List
 
 import docker
 from docker.errors import NotFound
@@ -19,6 +21,9 @@ from app.services.minio_service import download_bytes
 
 def _get_datasource_filename(ds) -> str:
     return get_datasource_filename(getattr(ds, "name", None), getattr(ds, "storage_path", None))
+
+
+_DATASOURCE_SYNC_MANIFEST_PATH = "/workspace/.deepeye/datasource_sync_manifest.json"
 
 
 class SandboxManager:
@@ -140,6 +145,8 @@ class SandboxManager:
             file_datasources: List of DataSource objects (category='file')
         """
         sandbox = await self.get_or_create_sandbox(session_id)
+        manifest = await self._load_datasource_sync_manifest(sandbox)
+        manifest_updated = False
         
         for ds in file_datasources:
             if ds.category != 'file' or not ds.storage_path:
@@ -150,6 +157,22 @@ class SandboxManager:
             logger.info(f"[SandboxManager] Storage path: {ds.storage_path}, Name: {ds.name}")
             
             try:
+                manifest_key = str(ds.id)
+                manifest_entry = self._build_datasource_manifest_entry(ds)
+
+                if await self._is_datasource_sync_current(
+                    sandbox=sandbox,
+                    manifest=manifest,
+                    manifest_key=manifest_key,
+                    manifest_entry=manifest_entry,
+                ):
+                    logger.info(
+                        "[SandboxManager] Skipping sync for %s (id=%s): sandbox copy is up to date",
+                        ds.name,
+                        ds.id,
+                    )
+                    continue
+
                 # Download from MinIO
                 logger.info(f"[SandboxManager] Downloading from MinIO bucket: {settings.MINIO_DATA_BUCKET}, path: {ds.storage_path}")
                 data = download_bytes(settings.MINIO_DATA_BUCKET, ds.storage_path)
@@ -165,6 +188,8 @@ class SandboxManager:
                 result = await sandbox.exec_command(f"test -f {dest_path} && echo 'EXISTS' || echo 'NOT_FOUND'")
                 if 'EXISTS' in result.stdout:
                     logger.info(f"[SandboxManager] ✅ Successfully synced {ds.name} to {dest_path} ({len(data)} bytes)")
+                    manifest[manifest_key] = manifest_entry
+                    manifest_updated = True
                 else:
                     logger.error(f"[SandboxManager] ❌ File write appeared to succeed but file not found at {dest_path}")
                     logger.error(f"[SandboxManager] Command result: stdout={result.stdout}, stderr={result.stderr}, exit_code={result.exit_code}")
@@ -173,6 +198,22 @@ class SandboxManager:
                 logger.error(f"[SandboxManager] ❌ Failed to sync file datasource {ds.name} (id={ds.id}): {e}", exc_info=True)
                 # Re-raise to prevent silent failures
                 raise RuntimeError(f"Failed to sync datasource {ds.name} to sandbox: {e}") from e
+
+        if manifest_updated:
+            await self._write_datasource_sync_manifest(sandbox, manifest)
+        self._activity.record_activity(session_id)
+
+    async def remove_datasource_file(self, session_id: str, datasource) -> None:
+        """Remove a synced datasource file and clear its manifest entry."""
+        sandbox = await self.get_or_create_sandbox(session_id)
+        filename = _get_datasource_filename(datasource)
+        dest_path = workspace_data_path(filename)
+        await sandbox.exec_command(f"rm -f -- {shlex.quote(dest_path)}")
+
+        manifest = await self._load_datasource_sync_manifest(sandbox)
+        if manifest.pop(str(datasource.id), None) is not None:
+            await self._write_datasource_sync_manifest(sandbox, manifest)
+        self._activity.record_activity(session_id)
     
     async def get_sandbox(self, session_id: str, index: int = 0) -> DockerSandbox | None:
         """
@@ -615,7 +656,62 @@ class SandboxManager:
                 self._activity.record_activity(session_id)
                 logger.info(f"[SandboxManager] Synced {reconnected} sandboxes for {session_id}")
             
-            return reconnected
+        return reconnected
+
+    def _build_datasource_manifest_entry(self, datasource) -> dict[str, Any]:
+        filename = _get_datasource_filename(datasource)
+        return {
+            "storage_path": getattr(datasource, "storage_path", None),
+            "filename": filename,
+            "dest_path": workspace_data_path(filename),
+        }
+
+    async def _is_datasource_sync_current(
+        self,
+        *,
+        sandbox: DockerSandbox,
+        manifest: dict[str, dict[str, Any]],
+        manifest_key: str,
+        manifest_entry: dict[str, Any],
+    ) -> bool:
+        if manifest.get(manifest_key) != manifest_entry:
+            return False
+        dest_path = manifest_entry.get("dest_path")
+        if not isinstance(dest_path, str) or not dest_path:
+            return False
+        result = await sandbox.exec_command(f"test -f {shlex.quote(dest_path)} && echo 'EXISTS' || echo 'NOT_FOUND'")
+        return result.exit_code == 0 and "EXISTS" in result.stdout
+
+    async def _load_datasource_sync_manifest(self, sandbox: DockerSandbox) -> dict[str, dict[str, Any]]:
+        result = await sandbox.exec_command(f"cat {shlex.quote(_DATASOURCE_SYNC_MANIFEST_PATH)}")
+        if result.exit_code != 0 or not result.stdout.strip():
+            return {}
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            logger.warning("[SandboxManager] Failed to parse datasource sync manifest, ignoring it")
+            return {}
+        if not isinstance(payload, dict):
+            return {}
+        return {
+            str(key): value
+            for key, value in payload.items()
+            if isinstance(value, dict)
+        }
+
+    async def _write_datasource_sync_manifest(
+        self,
+        sandbox: DockerSandbox,
+        manifest: dict[str, dict[str, Any]],
+    ) -> None:
+        payload = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
+        command = (
+            f"mkdir -p {shlex.quote('/workspace/.deepeye')} && "
+            f"cat > {shlex.quote(_DATASOURCE_SYNC_MANIFEST_PATH)} <<'EOF'\n{payload}\nEOF"
+        )
+        result = await sandbox.exec_command(command)
+        if result.exit_code != 0:
+            raise RuntimeError(result.stderr or result.stdout or "failed to write datasource sync manifest")
 
     async def _cleanup_idle_sessions(self) -> None:
         """
