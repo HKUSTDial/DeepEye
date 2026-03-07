@@ -7,7 +7,6 @@ import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { chatApi, sessionApi } from '../../../api'
 import { extractVideoOutputParams } from '../../../api/video'
 import { workflowsApi } from '../../../api/workflows'
-import { sandboxApi } from '../../../api/sandbox'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { useChatStore } from '../../../stores/chat'
 import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNodes'
@@ -54,7 +53,7 @@ type WorkflowFlowEdge = Edge
 
 function buildOptimisticRun(
   sessionId: string,
-  filePath: string,
+  filePath: string | null,
   status: string,
   options?: {
     error?: string | null
@@ -70,8 +69,8 @@ function buildOptimisticRun(
     session_id: sessionId,
     turn_id: options?.turnId || null,
     draft_id: options?.draftId || null,
-    file_path: filePath,
-    source: 'workflow_file',
+    file_path: filePath ?? null,
+    source: 'workflow_editor',
     status,
     error: options?.error || undefined,
     created_at: new Date().toISOString(),
@@ -90,6 +89,12 @@ function typeToLabel(type: string) {
 
 function dedupeFilePaths(paths: Array<string | null | undefined>) {
   return [...new Set(paths.filter((path): path is string => typeof path === 'string' && path.length > 0))]
+}
+
+function getDraftDisplayName(draft: WorkflowDraft) {
+  const fileName = draft.file_path?.split('/').pop()?.replace(/\.json$/i, '')
+  if (fileName) return fileName
+  return `draft-${draft.id.slice(0, 8)}`
 }
 
 function validateGraph(
@@ -237,7 +242,6 @@ export function WorkflowLivePanel({
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
-  const sandboxReadySessionId = useChatStore((state) => state.sandboxReadySessionId)
   const sessionIdFromStore = useChatStore((state) => state.sessionId)
   const sessionMessages = useChatStore((state) => state.messages)
 
@@ -438,6 +442,7 @@ export function WorkflowLivePanel({
         if (phase === 'create_workflow' || phase === 'update_workflow') {
           const workflow = payload?.workflow || payload?.definition
           if (workflow && typeof workflow === 'object') {
+            const draftId = workflowEvent.draftId
             const root = (workflow as Record<string, unknown>).root as Record<string, unknown> | undefined
             const nodes = (root?.nodes as Record<string, unknown>) || {}
             const edges = (root?.edges as Record<string, unknown>) || {}
@@ -447,8 +452,35 @@ export function WorkflowLivePanel({
 
             clearWorkflow(sessionId)
             clearValidated(sessionId)
+            setActiveDraftId(sessionId, draftId)
             if (filePath) {
               setActiveFilePath(sessionId, filePath)
+            }
+            if (draftId) {
+              setAvailableDrafts((prev) => {
+                const current = prev.find((draft) => draft.id === draftId)
+                const nextDraft: WorkflowDraft = current
+                  ? {
+                      ...current,
+                      definition: workflow as Record<string, unknown>,
+                      file_path: filePath ?? current.file_path ?? null,
+                      updated_at: new Date().toISOString(),
+                    }
+                  : {
+                      id: draftId,
+                      session_id: sessionId,
+                      turn_id: workflowEvent.turnId ?? null,
+                      user_id: '',
+                      source: 'workflow_agent',
+                      status: 'draft',
+                      file_path: filePath,
+                      definition: workflow as Record<string, unknown>,
+                      version: 1,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    }
+                return [nextDraft, ...prev.filter((draft) => draft.id !== nextDraft.id)]
+              })
             }
             setWorkflowDefinition(sessionId, workflow as Record<string, unknown>)
             setViewState(sessionId, 'switching')
@@ -526,6 +558,7 @@ export function WorkflowLivePanel({
     setVideoPreviewUrl,
     clearWorkflow,
     clearValidated,
+    setActiveDraftId,
     setActiveFilePath,
     setWorkflowDefinition,
     setViewState,
@@ -541,20 +574,17 @@ export function WorkflowLivePanel({
     }
   }, [sessionId, loadNodeDefs])
 
-  const loadWorkflowFile = useCallback(
-    async (path: string) => {
+  const loadWorkflowDraft = useCallback(
+    async (draftId: string) => {
       if (!sessionId) return
       setIsLoadingFile(true)
       setFileError(sessionId, null)
       try {
-        const matchingDraft = availableDrafts.find((draft) => draft.file_path === path) || null
-        let parsed: Record<string, unknown>
-        if (matchingDraft?.definition && typeof matchingDraft.definition === 'object') {
-          parsed = matchingDraft.definition
-        } else {
-          const response = await sandboxApi.getFileContent(sessionId, path)
-          parsed = JSON.parse(response.content) as Record<string, unknown>
+        const matchingDraft = availableDrafts.find((draft) => draft.id === draftId) || null
+        if (!matchingDraft || typeof matchingDraft.definition !== 'object') {
+          throw new Error('Workflow draft is not available.')
         }
+        const parsed = matchingDraft.definition
         const root = (parsed.root as Record<string, unknown>) || parsed
         const nodes = (root.nodes as Record<string, DefinitionNode>) || {}
         const edges = (root.edges as Record<string, DefinitionEdge>) || {}
@@ -562,8 +592,8 @@ export function WorkflowLivePanel({
         Object.values(nodes).forEach((node) => addWorkflowNode(sessionId, node))
         Object.values(edges).forEach((edge) => addWorkflowEdge(sessionId, edge))
         setWorkflowDefinition(sessionId, parsed)
-        setActiveFilePath(sessionId, path)
-        setActiveDraftId(sessionId, matchingDraft?.id ?? null)
+        setActiveDraftId(sessionId, matchingDraft.id)
+        setActiveFilePath(sessionId, matchingDraft.file_path ?? null)
         const validationError = validateGraph(nodes, edges, nodeDefs)
         if (validationError) {
           setWorkflowError(sessionId, validationError)
@@ -587,43 +617,37 @@ export function WorkflowLivePanel({
       addWorkflowNode,
       addWorkflowEdge,
       setWorkflowDefinition,
-      setActiveFilePath,
       setWorkflowError,
       setValidatedGraph,
       setViewState,
       setFileError,
       setActiveDraftId,
+      setActiveFilePath,
       nodeDefs,
       availableDrafts,
     ],
   )
 
-  const refreshFiles = useCallback(
+  const refreshDrafts = useCallback(
     async (shouldLoadFile: boolean) => {
-      if (!sessionId || sandboxReadySessionId !== sessionId) return
+      if (!sessionId) return
       if (isLoadingFilesRef.current) return
       setIsLoadingFiles(true)
       setFileError(sessionId, null)
       try {
         const drafts = await sessionApi.listWorkflowDrafts(sessionId)
         setAvailableDrafts(drafts)
-        let jsonFiles = dedupeFilePaths(drafts.map((draft) => draft.file_path))
-        if (jsonFiles.length === 0) {
-          const response = await sandboxApi.listFiles(sessionId, WORKFLOW_DIR)
-          jsonFiles = response.files
-            .filter((file) => file.type === 'file' && file.name.endsWith('.json'))
-            .map((file) => file.path)
-            .sort((a, b) => a.localeCompare(b))
-        }
+        const draftPaths = dedupeFilePaths(drafts.map((draft) => draft.file_path))
         const currentActiveFilePath = activeFilePathRef.current
-        let nextFiles = jsonFiles
-        if (currentActiveFilePath && !jsonFiles.includes(currentActiveFilePath)) {
-          nextFiles = [currentActiveFilePath, ...jsonFiles]
+        let nextFiles = draftPaths
+        if (currentActiveFilePath && !draftPaths.includes(currentActiveFilePath)) {
+          nextFiles = [currentActiveFilePath, ...draftPaths]
         }
         setFiles(sessionId, nextFiles)
         if (!shouldLoadFile || isStreaming) return
-        if (jsonFiles.length === 0) {
+        if (drafts.length === 0) {
           setActiveFilePath(sessionId, null)
+          setActiveDraftId(sessionId, null)
           clearWorkflow(sessionId)
           setWorkflowDefinition(sessionId, null)
           setWorkflowError(sessionId, null)
@@ -634,13 +658,15 @@ export function WorkflowLivePanel({
           setViewState(sessionId, 'empty')
           return
         }
-        if (!currentActiveFilePath || !jsonFiles.includes(currentActiveFilePath)) {
-          await loadWorkflowFile(jsonFiles[0])
+        const activeDraftExists = !!activeDraftIdRef.current && drafts.some((draft) => draft.id === activeDraftIdRef.current)
+        if (!activeDraftExists) {
+          await loadWorkflowDraft(drafts[0].id)
         }
         setViewState(sessionId, 'ready')
       } catch (err) {
         setFiles(sessionId, [])
-        setFileError(sessionId, err instanceof Error ? err.message : 'Failed to list workflow files.')
+        setAvailableDrafts([])
+        setFileError(sessionId, err instanceof Error ? err.message : 'Failed to list workflow drafts.')
         setViewState(sessionId, 'error')
       } finally {
         setIsLoadingFiles(false)
@@ -648,11 +674,11 @@ export function WorkflowLivePanel({
     },
     [
       sessionId,
-      loadWorkflowFile,
-      setActiveFilePath,
+      loadWorkflowDraft,
       isStreaming,
-      sandboxReadySessionId,
       setAvailableDrafts,
+      setActiveFilePath,
+      setActiveDraftId,
       clearWorkflow,
       setWorkflowDefinition,
       setWorkflowError,
@@ -668,9 +694,8 @@ export function WorkflowLivePanel({
 
   useEffect(() => {
     if (!sessionId) return
-    if (sandboxReadySessionId !== sessionId) return
-    refreshFiles(true)
-  }, [sessionId, sandboxReadySessionId, refreshFiles])
+    refreshDrafts(true)
+  }, [sessionId, refreshDrafts])
 
   useEffect(() => {
     if (!sessionId) return
@@ -696,7 +721,6 @@ export function WorkflowLivePanel({
 
   useEffect(() => {
     if (!sessionId) return
-    if (sandboxReadySessionId !== sessionId) return
     if (isLoadingFiles || isStreaming) return
     if (activeFiles.length > 0) return
     if (hasTrackedWorkspaceState) return
@@ -708,7 +732,6 @@ export function WorkflowLivePanel({
     setIsViewSwitching(false)
   }, [
     sessionId,
-    sandboxReadySessionId,
     isLoadingFiles,
     isStreaming,
     activeFiles.length,
@@ -721,7 +744,6 @@ export function WorkflowLivePanel({
 
   useEffect(() => {
     if (!sessionId) return
-    if (sandboxReadySessionId !== sessionId) return
     if (activeFiles.length > 0) return
     if (hasTrackedWorkspaceState) return
     if (activeViewState === 'empty') {
@@ -731,14 +753,13 @@ export function WorkflowLivePanel({
       setIsViewSwitching(false)
       return
     }
-    refreshFiles(true)
+    refreshDrafts(true)
   }, [
     sessionId,
-    sandboxReadySessionId,
     activeFiles.length,
     activeViewState,
     hasTrackedWorkspaceState,
-    refreshFiles,
+    refreshDrafts,
     clearValidated,
     setWorkflowDefinition,
   ])
@@ -966,17 +987,17 @@ export function WorkflowLivePanel({
         </div>
         <div className="panel-toolbar-actions">
           <select
-            value={activeFilePathForControls || ''}
-            disabled={!sessionId || isLoadingFiles || activeFiles.length === 0 || isStreaming}
-            onChange={(event) => loadWorkflowFile(event.target.value)}
+            value={activeDraftIdForSession || ''}
+            disabled={!sessionId || isLoadingFiles || availableDrafts.length === 0 || isStreaming}
+            onChange={(event) => loadWorkflowDraft(event.target.value)}
             className="panel-toolbar-select"
           >
-            {activeFiles.length === 0 ? (
-              <option value="">No workflow files</option>
+            {availableDrafts.length === 0 ? (
+              <option value="">No workflow drafts</option>
             ) : (
-              activeFiles.map((file) => (
-                <option key={file} value={file}>
-                  {file.replace(`${WORKFLOW_DIR}/`, '')}
+              availableDrafts.map((draft) => (
+                <option key={draft.id} value={draft.id}>
+                  {getDraftDisplayName(draft)}
                 </option>
               ))
             )}
@@ -1001,21 +1022,22 @@ export function WorkflowLivePanel({
             type="button"
             disabled={
               !sessionId ||
-              !activeFilePathForControls ||
               Object.keys(nodeDefs).length === 0 ||
               isStreaming ||
               isUploading
             }
             onClick={async () => {
-              if (!sessionId || !activeFilePathForControls) return
+              if (!sessionId) return
               if (Object.keys(nodeDefs).length === 0) {
                 setWorkflowError(sessionId, 'Node definitions are not loaded yet.')
                 return
               }
               setIsUploading(true)
               try {
-                const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
-                const filename = activeFilePathForControls.split('/').pop() || 'workflow.json'
+                const saved = await persistWorkflowDraft()
+                if (!saved) return
+                const definition = saved.definition
+                const filename = saved.filePath.split('/').pop() || 'workflow.json'
                 const name = filename.replace(/\.json$/i, '') || 'Untitled workflow'
                 await workflowsApi.create({ name, description: '', definition })
                 setWorkflowError(sessionId, null)
@@ -1125,7 +1147,7 @@ export function WorkflowLivePanel({
                   setWorkflowError(sessionId, message)
                   setActiveRun(
                     sessionId,
-                    buildOptimisticRun(sessionId, activeFilePathForControls || `${WORKFLOW_DIR}/workflow.json`, 'failed', {
+                    buildOptimisticRun(sessionId, activeFilePathForControls, 'failed', {
                       error: message,
                       draftId: activeDraftIdForSession || null,
                     }),
