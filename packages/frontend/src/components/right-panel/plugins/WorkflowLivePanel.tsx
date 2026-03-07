@@ -15,6 +15,7 @@ import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNod
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
+import type { WorkflowRun } from '../../../types'
 
 const NODE_TYPES = { workflowNode: WorkflowNode }
 const WORKFLOW_DIR = '/workspace/workflow'
@@ -45,6 +46,46 @@ type WorkflowNodeData = {
 
 type WorkflowFlowNode = Node<WorkflowNodeData>
 type WorkflowFlowEdge = Edge
+
+function buildTrackedRunFromEvent(
+  sessionId: string,
+  data: Record<string, unknown>,
+  status: string,
+  error: string | null = null,
+): WorkflowRun {
+  return {
+    id: typeof data.run_id === 'string' ? data.run_id : `workflow-event:${sessionId}`,
+    workflow_id: null,
+    session_id: sessionId,
+    turn_id: typeof data.turn_id === 'string' ? data.turn_id : null,
+    draft_id: typeof data.draft_id === 'string' ? data.draft_id : null,
+    source: 'chat_workflow',
+    file_path: typeof data.file_path === 'string' ? data.file_path : null,
+    status,
+    error: error || undefined,
+    created_at: new Date().toISOString(),
+    finished_at: status === 'running' ? null : new Date().toISOString(),
+  }
+}
+
+function buildOptimisticRun(
+  sessionId: string,
+  filePath: string,
+  status: string,
+  options?: { error?: string | null; taskId?: string | null },
+): WorkflowRun {
+  return {
+    id: options?.taskId || `pending:${sessionId}:${Date.now()}`,
+    workflow_id: null,
+    session_id: sessionId,
+    file_path: filePath,
+    source: 'workflow_file',
+    status,
+    error: options?.error || undefined,
+    created_at: new Date().toISOString(),
+    finished_at: status === 'running' ? null : new Date().toISOString(),
+  }
+}
 
 function typeToLabel(type: string) {
   return type
@@ -359,8 +400,6 @@ export function WorkflowLivePanel({
           return
         }
         if (phase === 'run_start') {
-          setVideoProgressVisible(sessionId, true)
-          openOrFocusTab('video-preview', {})
           return
         }
         if (phase === 'node_status') {
@@ -422,14 +461,7 @@ export function WorkflowLivePanel({
           const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
           const error = typeof payload?.error === 'string' ? payload?.error : null
           setRunStatus(sessionId, status, error)
-          setActiveRun(sessionId, {
-            id: `file:${filePath || ''}`,
-            workflow_id: `file:${filePath || ''}`,
-            status,
-            error: error || undefined,
-            created_at: new Date().toISOString(),
-            finished_at: new Date().toISOString(),
-          })
+          setActiveRun(sessionId, buildTrackedRunFromEvent(sessionId, data, status, error))
           if (payload?.outputs && typeof payload.outputs === 'object') {
             const outputs = payload.outputs as Record<string, unknown>
             setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
@@ -969,13 +1001,7 @@ export function WorkflowLivePanel({
                 setIsRunning(true)
                 setVideoProgressVisible(sessionId, false)
                 setRunStatus(sessionId, 'running', null)
-                setActiveRun(sessionId, {
-                  id: `file:${activeFilePathForControls}`,
-                  workflow_id: `file:${activeFilePathForControls}`,
-                  status: 'running',
-                  created_at: new Date().toISOString(),
-                  finished_at: null,
-                })
+                setActiveRun(sessionId, buildOptimisticRun(sessionId, activeFilePathForControls, 'running'))
                 setRunOutput(sessionId, '')
                 try {
                   ensureRunEventStream()
@@ -983,26 +1009,21 @@ export function WorkflowLivePanel({
                   if (response.error) {
                     setRunStatus(sessionId, 'failed', response.error)
                     setWorkflowError(sessionId, response.error)
-                    setActiveRun(sessionId, {
-                      id: `file:${activeFilePathForControls}`,
-                      workflow_id: `file:${activeFilePathForControls}`,
-                      status: 'failed',
-                      error: response.error,
-                      created_at: new Date().toISOString(),
-                      finished_at: new Date().toISOString(),
-                    })
+                    setActiveRun(
+                      sessionId,
+                      buildOptimisticRun(sessionId, activeFilePathForControls, 'failed', { error: response.error }),
+                    )
                     setRunOutput(sessionId, response.error)
                   } else {
                     const nextStatus = response.status === 'queued' ? 'running' : response.status
                     setRunStatus(sessionId, nextStatus, null)
                     setWorkflowError(sessionId, null)
-                    setActiveRun(sessionId, {
-                      id: `file:${activeFilePathForControls}`,
-                      workflow_id: `file:${activeFilePathForControls}`,
-                      status: nextStatus,
-                      created_at: new Date().toISOString(),
-                      finished_at: response.status === 'queued' ? null : new Date().toISOString(),
-                    })
+                    setActiveRun(
+                      sessionId,
+                      buildOptimisticRun(sessionId, activeFilePathForControls, nextStatus, {
+                        taskId: response.task_id ?? null,
+                      }),
+                    )
                     if (response.outputs) {
                       setRunOutput(sessionId, JSON.stringify(response.outputs, null, 2))
                       const videoParams = extractVideoOutputParams(response.outputs as Record<string, unknown>)
@@ -1017,14 +1038,10 @@ export function WorkflowLivePanel({
                   const message = err instanceof Error ? err.message : 'Failed to run workflow.'
                   setRunStatus(sessionId, 'failed', message)
                   setWorkflowError(sessionId, message)
-                  setActiveRun(sessionId, {
-                    id: `file:${activeFilePathForControls}`,
-                    workflow_id: `file:${activeFilePathForControls}`,
-                    status: 'failed',
-                    error: message,
-                    created_at: new Date().toISOString(),
-                    finished_at: new Date().toISOString(),
-                  })
+                  setActiveRun(
+                    sessionId,
+                    buildOptimisticRun(sessionId, activeFilePathForControls, 'failed', { error: message }),
+                  )
                   setRunOutput(sessionId, message)
                 } finally {
                   setIsRunning(false)

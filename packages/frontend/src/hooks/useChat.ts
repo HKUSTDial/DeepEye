@@ -58,8 +58,8 @@ export function useChat() {
     status: string,
     error: string | null = null,
   ): WorkflowRun => ({
-    id: typeof data?.run_id === 'string' ? data.run_id : `file:${typeof data?.file_path === 'string' ? data.file_path : sessionId}`,
-    workflow_id: typeof data?.draft_id === 'string' ? data.draft_id : null,
+    id: typeof data?.run_id === 'string' ? data.run_id : `workflow-event:${sessionId}`,
+    workflow_id: null,
     session_id: sessionId,
     turn_id: typeof data?.turn_id === 'string' ? data.turn_id : null,
     draft_id: typeof data?.draft_id === 'string' ? data.draft_id : null,
@@ -86,9 +86,9 @@ export function useChat() {
     phase: string,
     payload: Record<string, unknown>,
   ) => {
-        const artifact = typeof payload.artifact === 'object' && payload.artifact
-          ? (payload.artifact as Record<string, unknown>)
-          : null
+    const artifact = typeof payload.artifact === 'object' && payload.artifact
+      ? (payload.artifact as Record<string, unknown>)
+      : null
     const kind = typeof artifact?.kind === 'string' ? artifact.kind : ''
 
     if (!kind) {
@@ -252,9 +252,9 @@ export function useChat() {
               })
               const totalDelay = (nodeList.length + edgeList.length) * stepDelayMs
               setTimeout(() => setViewState(sessionId, 'ready'), totalDelay)
-            }
-            return
           }
+          return
+        }
           if (phase === 'node') {
             const node = payload?.node
             if (node && typeof node === 'object') {
@@ -274,14 +274,9 @@ export function useChat() {
             return
           }
           if (phase === 'run_start') {
-            useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, true)
             setRunStatus(sessionId, 'running', null)
             setViewState(sessionId, 'ready')
             setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, data, 'running'))
-            // 仅数据视频生成工作流（file_path 含 data_video）才在开始时打开 Video Preview，便于看进度
-            if (filePath?.includes('data_video')) {
-              openOrFocusTab('video-preview', {})
-            }
             return
           }
           if (phase === 'node_status') {
@@ -300,11 +295,7 @@ export function useChat() {
           if (phase === 'run_end') {
             const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
             const error = typeof payload?.error === 'string' ? payload?.error : null
-            const isDataVideoWorkflow = filePath?.includes('data_video')
-            const runSucceeded = status === 'finished' || status === 'success'
-            if (!isDataVideoWorkflow || runSucceeded) {
-              useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, false)
-            }
+            useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, false)
 
             setRunStatus(sessionId, status, error)
             setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, data, status, error))
@@ -331,15 +322,9 @@ export function useChat() {
                     const currentRunOutput = useWorkflowSessionsStore.getState().sessions[sessionId]?.runOutput || ''
                     setRunOutput(sessionId, currentRunOutput + `\nTask ID: ${extractedTaskId}`)
                     openOrFocusTab('video-preview', { taskId: extractedTaskId })
-                  } else if (isDataVideoWorkflow) {
-                    openOrFocusTab('video-preview', {})
                   }
-                } else if (isDataVideoWorkflow) {
-                  openOrFocusTab('video-preview', {})
                 }
               }
-            } else if (isDataVideoWorkflow) {
-              openOrFocusTab('video-preview', {})
             }
             return
           }
