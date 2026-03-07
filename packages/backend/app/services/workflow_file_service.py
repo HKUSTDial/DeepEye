@@ -23,6 +23,7 @@ from app.services.workflow_tracking_service import (
     replace_workflow_artifacts,
     upsert_workflow_draft,
 )
+from app.services.workflow_targets import resolve_workflow_target
 from pydantic import ValidationError
 from deepeye.workflows.models import Graph, Workflow as CoreWorkflow
 from deepeye.workflows.runtime import ExecutionContext
@@ -97,6 +98,33 @@ def prepare_tracked_workflow_file_run(
     draft_id: str | None = None,
     run_id: str | None = None,
 ):
+    return prepare_tracked_workflow_run(
+        db,
+        user_id=user_id,
+        session_id=session_id,
+        path=path,
+        definition=definition,
+        turn_id=turn_id,
+        draft_id=draft_id,
+        run_id=run_id,
+        draft_source="workflow_file",
+        run_source="workflow_file",
+    )
+
+
+def prepare_tracked_workflow_run(
+    db,
+    *,
+    user_id,
+    session_id: str,
+    definition: dict[str, Any],
+    path: str | None = None,
+    turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
+    draft_source: str | None = None,
+    run_source: str = "workflow_file",
+):
     tracked_turn = get_chat_turn(db, turn_id) if turn_id else get_latest_active_turn(db, session_id)
 
     draft_repo = WorkflowDraftRepository(db)
@@ -106,7 +134,8 @@ def prepare_tracked_workflow_file_run(
         tracked_draft.file_path = path
         tracked_draft.turn_id = tracked_turn.id if tracked_turn else None
         tracked_draft.status = "draft"
-        tracked_draft.source = "workflow_file"
+        if draft_source:
+            tracked_draft.source = draft_source
         tracked_draft.version = max(1, tracked_draft.version)
         tracked_draft = draft_repo.save(tracked_draft)
     else:
@@ -117,7 +146,7 @@ def prepare_tracked_workflow_file_run(
             definition=definition,
             file_path=path,
             turn_id=tracked_turn.id if tracked_turn else None,
-            source="workflow_file",
+            source=draft_source or run_source,
         )
 
     run_repo = WorkflowRunRepository(db)
@@ -127,7 +156,7 @@ def prepare_tracked_workflow_file_run(
         tracked_run.turn_id = tracked_turn.id if tracked_turn else None
         tracked_run.draft_id = tracked_draft.id if tracked_draft else None
         tracked_run.file_path = path
-        tracked_run.source = "workflow_file"
+        tracked_run.source = run_source
         tracked_run.status = "running"
         tracked_run.result = None
         tracked_run.artifacts = None
@@ -142,27 +171,63 @@ def prepare_tracked_workflow_file_run(
             turn_id=tracked_turn.id if tracked_turn else None,
             draft_id=tracked_draft.id if tracked_draft else None,
             file_path=path,
-            source="workflow_file",
+            source=run_source,
         )
 
     return tracked_turn, tracked_draft, tracked_run
 
 
-async def service_run_workflow_from_file(
+def prepare_tracked_workflow_draft_run(
+    db,
+    *,
+    user_id,
+    session_id: str,
+    draft_id: str,
+    turn_id: str | None = None,
+    run_id: str | None = None,
+):
+    tracked_draft, path = resolve_workflow_target(
+        db,
+        session_id,
+        draft_id=draft_id,
+    )
+    if not tracked_draft or not isinstance(tracked_draft.definition, dict):
+        raise ValueError("Workflow draft not found.")
+    tracked_turn, tracked_draft, tracked_run = prepare_tracked_workflow_run(
+        db,
+        user_id=user_id,
+        session_id=session_id,
+        definition=tracked_draft.definition,
+        path=path,
+        turn_id=turn_id,
+        draft_id=str(tracked_draft.id),
+        run_id=run_id,
+        draft_source=None,
+        run_source="workflow_draft",
+    )
+    return tracked_turn, tracked_draft, tracked_run, path
+
+
+async def service_run_workflow_definition(
     db,
     user_id,
     session_id: str,
-    path: str,
+    definition: dict[str, Any],
     *,
+    path: str | None = None,
+    workflow_ref: str | None = None,
     turn_id: str | None = None,
     draft_id: str | None = None,
     run_id: str | None = None,
+    draft_source: str | None = None,
+    run_source: str = "workflow_file",
 ) -> dict[str, Any]:
     channel = f"session:{session_id}"
     event_bus = RedisEventBus(settings.REDIS_URL)
     tracked_turn = None
     tracked_draft = None
     tracked_run = None
+    workflow_path = path
 
     def _timestamp() -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -178,7 +243,7 @@ async def service_run_workflow_from_file(
                 session_id,
                 phase,
                 payload,
-                file_path=path,
+                file_path=workflow_path,
                 turn_id=str(tracked_turn.id) if tracked_turn else turn_id,
                 draft_id=str(tracked_draft.id) if tracked_draft else None,
                 run_id=str(tracked_run.id) if tracked_run else None,
@@ -186,27 +251,36 @@ async def service_run_workflow_from_file(
         )
 
     try:
-        definition = await load_workflow_definition_from_file(session_id, path)
         graph_data = definition.get("root", definition)
         graph = Graph.model_validate(graph_data)
-        core_workflow = CoreWorkflow(id=f"file:{path}", root=graph)
-
-        tracked_turn, tracked_draft, tracked_run = prepare_tracked_workflow_file_run(
+        tracked_turn, tracked_draft, tracked_run = prepare_tracked_workflow_run(
             db,
             user_id=user_id,
             session_id=session_id,
-            path=path,
             definition=definition,
+            path=workflow_path,
             turn_id=turn_id,
             draft_id=draft_id,
             run_id=run_id,
+            draft_source=draft_source,
+            run_source=run_source,
         )
+        workflow_path = workflow_path or (tracked_draft.file_path if tracked_draft else None)
+        workflow_identity = workflow_ref
+        if not workflow_identity:
+            if tracked_draft:
+                workflow_identity = f"draft:{tracked_draft.id}"
+            elif workflow_path:
+                workflow_identity = f"file:{workflow_path}"
+            else:
+                workflow_identity = f"session:{session_id}"
+        core_workflow = CoreWorkflow(id=workflow_identity, root=graph)
 
         sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
         if not sandbox:
             raise ValueError("failed to get or create sandbox")
 
-        await _publish_workflow_event("run_start", {"path": path, "started_at": _timestamp()})
+        await _publish_workflow_event("run_start", {"path": workflow_path, "started_at": _timestamp()})
 
         _workflow_to_session[core_workflow.id] = session_id
 
@@ -402,6 +476,64 @@ async def service_run_workflow_from_file(
         for wid in workflows_to_remove:
             _workflow_to_session.pop(wid, None)
         await event_bus.close()
+
+
+async def service_run_workflow_from_file(
+    db,
+    user_id,
+    session_id: str,
+    path: str,
+    *,
+    turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, Any]:
+    definition = await load_workflow_definition_from_file(session_id, path)
+    return await service_run_workflow_definition(
+        db,
+        user_id,
+        session_id,
+        definition,
+        path=path,
+        workflow_ref=f"file:{path}",
+        turn_id=turn_id,
+        draft_id=draft_id,
+        run_id=run_id,
+        draft_source="workflow_file",
+        run_source="workflow_file",
+    )
+
+
+async def service_run_workflow_draft(
+    db,
+    user_id,
+    session_id: str,
+    draft_id: str,
+    *,
+    turn_id: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, Any]:
+    tracked_draft, path = resolve_workflow_target(
+        db,
+        session_id,
+        draft_id=draft_id,
+    )
+    if not tracked_draft or not isinstance(tracked_draft.definition, dict):
+        raise ValueError("Workflow draft not found.")
+    await write_workflow_definition_to_file(session_id, path, tracked_draft.definition)
+    return await service_run_workflow_definition(
+        db,
+        user_id,
+        session_id,
+        tracked_draft.definition,
+        path=path,
+        workflow_ref=f"draft:{tracked_draft.id}",
+        turn_id=turn_id,
+        draft_id=str(tracked_draft.id),
+        run_id=run_id,
+        draft_source=None,
+        run_source="workflow_draft",
+    )
 
 
 def _collect_final_outputs(graph: Graph, context: ExecutionContext) -> dict[str, Any]:

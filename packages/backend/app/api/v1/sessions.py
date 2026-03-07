@@ -28,10 +28,13 @@ from app.schemas import (
 )
 from app.sandbox import sandbox_manager
 from app.services import attach_datasource_to_session, detach_datasource_from_session, list_session_attachments
-from app.services.workflow_file_service import prepare_tracked_workflow_file_run, write_workflow_definition_to_file
-from app.services.workflow_targets import resolve_workflow_target, save_workflow_draft
+from app.services.workflow_file_service import (
+    prepare_tracked_workflow_draft_run,
+    write_workflow_definition_to_file,
+)
+from app.services.workflow_targets import save_workflow_draft
 from app.services.workflow_tracking_service import build_workspace_state
-from app.tasks.workflow_tasks import run_workflow_file_task
+from app.tasks.workflow_tasks import run_workflow_draft_task
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -239,32 +242,24 @@ async def run_session_workflow_draft(
     """Queue execution for a tracked workflow draft."""
     session = _get_owned_session_or_404(db, session_id, user_id)
     try:
-        draft, path = resolve_workflow_target(
+        tracked_turn, tracked_draft, tracked_run, path = prepare_tracked_workflow_draft_run(
             db,
-            session.id,
-            draft_id=draft_id,
+            user_id=session.user_id,
+            session_id=str(session.id),
+            draft_id=str(draft_id),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    if not draft or not isinstance(draft.definition, dict):
+    if not tracked_draft or not isinstance(tracked_draft.definition, dict):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow draft not found")
 
-    await write_workflow_definition_to_file(str(session.id), path, draft.definition)
-    tracked_turn, tracked_draft, tracked_run = prepare_tracked_workflow_file_run(
-        db,
-        user_id=session.user_id,
-        session_id=str(session.id),
-        path=path,
-        definition=draft.definition,
-        draft_id=str(draft.id),
-    )
-    task = run_workflow_file_task.delay(
+    await write_workflow_definition_to_file(str(session.id), path, tracked_draft.definition)
+    task = run_workflow_draft_task.delay(
         str(session.user_id),
         str(session.id),
-        path,
+        str(tracked_draft.id),
         str(tracked_turn.id) if tracked_turn else None,
-        str(tracked_draft.id) if tracked_draft else None,
         str(tracked_run.id) if tracked_run else None,
     )
     return WorkflowQueuedRunResponse(

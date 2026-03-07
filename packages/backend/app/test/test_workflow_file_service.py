@@ -11,7 +11,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, User
-from app.services.workflow_file_service import prepare_tracked_workflow_file_run
+from app.services.workflow_file_service import (
+    prepare_tracked_workflow_draft_run,
+    prepare_tracked_workflow_file_run,
+)
 from app.services.workflow_tracking_service import create_chat_turn
 
 
@@ -87,5 +90,42 @@ def test_prepare_tracked_workflow_file_run_reuses_existing_ids():
         assert tracked_draft_2.definition == next_definition
         assert tracked_run_2.draft_id == tracked_draft.id
         assert tracked_run_2.turn_id == turn.id
+    finally:
+        db.close()
+
+
+def test_prepare_tracked_workflow_draft_run_reuses_existing_draft():
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="draft@example.com")
+        session = _create_session(db, user)
+        turn = create_chat_turn(db, session.id, user.id, "Run tracked draft")
+
+        _, tracked_draft, tracked_run = prepare_tracked_workflow_file_run(
+            db,
+            user_id=user.id,
+            session_id=str(session.id),
+            path="/workspace/workflow/draft-demo.json",
+            definition={"root": {"nodes": {"n1": {"id": "n1"}}, "edges": {}}},
+            turn_id=str(turn.id),
+        )
+
+        next_turn = create_chat_turn(db, session.id, user.id, "Run draft again")
+        tracked_turn_2, tracked_draft_2, tracked_run_2, path = prepare_tracked_workflow_draft_run(
+            db,
+            user_id=user.id,
+            session_id=str(session.id),
+            draft_id=str(tracked_draft.id),
+            turn_id=str(next_turn.id),
+        )
+
+        assert tracked_turn_2.id == next_turn.id
+        assert tracked_draft_2.id == tracked_draft.id
+        assert tracked_draft_2.source == "workflow_file"
+        assert tracked_run_2.id != tracked_run.id
+        assert tracked_run_2.draft_id == tracked_draft.id
+        assert tracked_run_2.turn_id == next_turn.id
+        assert tracked_run_2.source == "workflow_draft"
+        assert path == tracked_draft.file_path
     finally:
         db.close()

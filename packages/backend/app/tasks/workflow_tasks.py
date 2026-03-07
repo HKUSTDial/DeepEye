@@ -15,7 +15,7 @@ from app.repositories import WorkflowRepository, WorkflowRunRepository
 from app.infra import RedisEventBus
 from app.services.workflow_service import run_workflow, update_workflow_run
 from app.sandbox import sandbox_manager
-from app.services.workflow_file_service import service_run_workflow_from_file
+from app.services.workflow_file_service import service_run_workflow_draft, service_run_workflow_from_file
 
 
 async def _publish(channel: str, payload: dict) -> None:
@@ -121,6 +121,34 @@ def run_workflow_file_task(
                 path,
                 turn_id=turn_id,
                 draft_id=draft_id,
+                run_id=run_id,
+            )
+        )
+        return {"status": "finished", "result": result}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True)
+def run_workflow_draft_task(
+    self,
+    user_id: str,
+    session_id: str,
+    draft_id: str,
+    turn_id: str | None = None,
+    run_id: str | None = None,
+) -> dict:
+    db = SessionLocal()
+    try:
+        result = asyncio.run(
+            service_run_workflow_draft(
+                db,
+                user_id,
+                session_id,
+                draft_id,
+                turn_id=turn_id,
                 run_id=run_id,
             )
         )

@@ -11,7 +11,11 @@ from langgraph.types import Command
 from app.db.session import SessionLocal
 from app.repositories import SessionRepository
 from app.sandbox import sandbox_manager
-from app.services.workflow_file_service import service_run_workflow_from_file, write_workflow_definition_to_file
+from app.services.workflow_file_service import (
+    service_run_workflow_draft,
+    service_run_workflow_from_file,
+    write_workflow_definition_to_file,
+)
 from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft, resolve_workflow_target
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
@@ -211,14 +215,20 @@ def create_run_workflow_from_file_tool(session_id: str, turn_id: str | None = No
                 file_path=file_path,
             )
             if existing_draft and isinstance(existing_draft.definition, dict):
-                await write_workflow_definition_to_file(session_id, norm_path, existing_draft.definition)
+                return await service_run_workflow_draft(
+                    db,
+                    session.user_id,
+                    session_id,
+                    str(existing_draft.id),
+                    turn_id=turn_id,
+                )
             return await service_run_workflow_from_file(
                 db,
                 session.user_id,
                 session_id,
                 norm_path,
                 turn_id=turn_id,
-                draft_id=str(existing_draft.id) if existing_draft else draft_id,
+                draft_id=draft_id,
             )
         finally:
             db.close()
@@ -247,14 +257,12 @@ def create_run_workflow_tool(session_id: str, turn_id: str | None = None) -> cal
             )
             if not existing_draft or not isinstance(existing_draft.definition, dict):
                 return {"status": "error", "error": "Workflow draft not found."}
-            await write_workflow_definition_to_file(session_id, norm_path, existing_draft.definition)
-            return await service_run_workflow_from_file(
+            return await service_run_workflow_draft(
                 db,
                 session.user_id,
                 session_id,
-                norm_path,
+                str(existing_draft.id),
                 turn_id=turn_id,
-                draft_id=str(existing_draft.id),
             )
         finally:
             db.close()
@@ -297,16 +305,14 @@ def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) ->
                 name=name,
                 source="workflow_agent",
             )
-            norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
-            await write_workflow_definition_to_file(session_id, norm_path, workflow)
-            result = await service_run_workflow_from_file(
+            result = await service_run_workflow_draft(
                 db,
                 session.user_id,
                 session_id,
-                norm_path,
+                str(draft.id),
                 turn_id=turn_id,
-                draft_id=str(draft.id),
             )
+            norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
             return {"status": "success", "draft_id": str(draft.id), "file_path": norm_path, "run": result}
         finally:
             db.close()
