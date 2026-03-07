@@ -239,6 +239,8 @@ class DashboardEngineer:
             dst_file = os.path.join(data_dest, filename)
             shutil.copy2(dataset_path, dst_file)
             print(f"✓ Copied dataset to {dst_file}")
+            if config_file:
+                self._ensure_config_dataset_path(config_file, filename)
         
         # 1.5 Update schema_path configuration in app.py to point to the config file
         if dashboard_config_filename:
@@ -275,6 +277,29 @@ class DashboardEngineer:
             self._update_page_template_config(config_file)
         
         return va_app_path
+
+    def _ensure_config_dataset_path(self, config_file_path: str, dataset_filename: str) -> None:
+        if not config_file_path or not os.path.exists(config_file_path):
+            return
+        try:
+            with open(config_file_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except Exception as e:
+            print(f"⚠️ Failed to read dashboard config for dataset path update: {e}")
+            return
+
+        data_source = config.get("dataSource")
+        if not isinstance(data_source, dict):
+            data_source = {}
+            config["dataSource"] = data_source
+
+        data_source["path"] = f"/data/{dataset_filename}"
+
+        try:
+            with open(config_file_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️ Failed to write dashboard config dataset path: {e}")
     
     def _generate_dashboard_config(
         self,
@@ -370,6 +395,19 @@ class DashboardEngineer:
             # Read configuration file
             with open(config_file_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
+
+            original_view_block_assets = {}
+            for block in config.get('blocks', []):
+                if block.get('blockType') != 'view':
+                    continue
+                block_id = block.get('id') or block.get('blockId')
+                block_content = block.get('blockContent', {}) or {}
+                if not block_id:
+                    continue
+                original_view_block_assets[block_id] = {
+                    'python_code_name': block_content.get('python_code_name'),
+                    'html_code_name': block_content.get('html_code_name'),
+                }
             
             # 1. Generate Options and Range for Filter components
             if dataset_path and os.path.exists(dataset_path):
@@ -603,7 +641,22 @@ class DashboardEngineer:
                         if col > 3:
                             col = 1
                             row += 1
-            
+
+                for block in updated_config['blocks']:
+                    if block.get('blockType') != 'view':
+                        continue
+                    block_id = block.get('id') or block.get('blockId')
+                    if not block_id:
+                        continue
+                    previous_assets = original_view_block_assets.get(block_id)
+                    if not previous_assets:
+                        continue
+                    block_content = block.setdefault('blockContent', {})
+                    if previous_assets.get('python_code_name') and not block_content.get('python_code_name'):
+                        block_content['python_code_name'] = previous_assets['python_code_name']
+                    if previous_assets.get('html_code_name') and not block_content.get('html_code_name'):
+                        block_content['html_code_name'] = previous_assets['html_code_name']
+
             # Save updated configuration
             with open(config_file_path, 'w', encoding='utf-8') as f:
                 json.dump(updated_config, f, ensure_ascii=False, indent=2)
@@ -1414,12 +1467,84 @@ for var_name in dir():
             if not os.path.exists(charts_dir):
                 print(f"⚠️  Charts directory not found: {charts_dir}")
                 return
+
+            python_files = sorted(
+                [name for name in os.listdir(charts_dir) if name.endswith('.py')]
+            )
+            html_files = sorted(
+                [name for name in os.listdir(charts_dir) if name.endswith('.html')]
+            )
+            python_file_set = set(python_files)
+            html_file_set = set(html_files)
+
+            def infer_python_from_html(html_name: str) -> str:
+                if not html_name:
+                    return ''
+                base = os.path.basename(html_name)
+                stem, _ = os.path.splitext(base)
+                stem = re.sub(r'_iteration\d+$', '', stem)
+                candidates = [
+                    f'{stem}_echarts.py',
+                    f'{stem}.py',
+                ]
+                for candidate in candidates:
+                    if candidate in python_file_set:
+                        return candidate
+                return ''
+
+            def infer_html_from_python(python_name: str) -> str:
+                if not python_name:
+                    return ''
+                base = os.path.basename(python_name)
+                stem, _ = os.path.splitext(base)
+                prefixes = [stem]
+                if stem.endswith('_echarts'):
+                    prefixes.insert(0, stem[:-8])
+                for prefix in prefixes:
+                    candidates = [
+                        name for name in html_files
+                        if name == f'{prefix}.html' or name.startswith(f'{prefix}_iteration')
+                    ]
+                    if candidates:
+                        candidates.sort()
+                        return candidates[-1]
+                return ''
+
+            def infer_python_from_block_id(block_id: str) -> str:
+                if not block_id:
+                    return ''
+                variants = []
+                raw = block_id.strip()
+                variants.append(raw)
+
+                no_intent = re.sub(r'^intent_\d+_', '', raw)
+                if no_intent != raw:
+                    variants.append(no_intent)
+
+                compact_goal = re.sub(r'goal_(\d+)', r'goal\1', no_intent)
+                if compact_goal not in variants:
+                    variants.append(compact_goal)
+
+                compact_all = compact_goal.replace('_', '')
+                if compact_all not in variants:
+                    variants.append(compact_all)
+
+                for prefix in variants:
+                    candidates = [
+                        name for name in python_files
+                        if name.startswith(prefix)
+                    ]
+                    if candidates:
+                        candidates.sort()
+                        return candidates[0]
+                return ''
             
             updated_count = 0
             
             # Traverse all blocks
             for block in config.get('blocks', []):
                 if block.get('blockType') == 'view':
+                    block_id = block.get('id', '')
                     block_content = block.get('blockContent', {})
                     
                     # Check if python_code_name and html_code_name already exist
@@ -1432,13 +1557,23 @@ for var_name in dir():
                         if layers and 'code_file' in layers[0]:
                             code_file = layers[0].get('code_file', '')
                             python_name = os.path.basename(code_file) if code_file else ''
-                            html_name = python_name.replace('.py', '.html') if python_name else ''
+                            html_name = html_name or infer_html_from_python(python_name)
+
+                    if not python_name and html_name:
+                        python_name = infer_python_from_html(html_name)
+
+                    if not python_name and block_id:
+                        python_name = infer_python_from_block_id(block_id)
+
+                    if python_name and not html_name:
+                        html_name = infer_html_from_python(python_name)
                     
                     # Verify file existence
-                    if python_name:
+                    if python_name and python_name in python_file_set:
                         # Update fields
                         block_content['python_code_name'] = python_name
-                        block_content['html_code_name'] = html_name
+                        if html_name:
+                            block_content['html_code_name'] = html_name
                         
                         updated_count += 1
             

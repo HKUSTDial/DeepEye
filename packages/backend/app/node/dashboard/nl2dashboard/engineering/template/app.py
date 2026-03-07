@@ -25,9 +25,33 @@ def load_schema() -> Dict[str, Any]:
 
 def resolve_data_path(schema: Dict[str, Any]) -> str:
     raw_path = schema.get("dataSource", {}).get("path", "")
-    filename = os.path.basename(raw_path)
-    local_path = os.path.join(PUBLIC_DIR, "data", filename)
-    return local_path if os.path.exists(local_path) else raw_path 
+    data_dir = os.path.join(PUBLIC_DIR, "data")
+
+    if isinstance(raw_path, str) and raw_path:
+        normalized = raw_path.rstrip("/\\")
+        filename = os.path.basename(normalized)
+        if filename:
+            local_path = os.path.join(data_dir, filename)
+            if os.path.isfile(local_path):
+                return local_path
+        if os.path.isfile(raw_path):
+            return raw_path
+
+    if os.path.isdir(data_dir):
+        candidates = sorted(
+            [
+                os.path.join(data_dir, name)
+                for name in os.listdir(data_dir)
+                if os.path.isfile(os.path.join(data_dir, name))
+            ]
+        )
+        if len(candidates) == 1:
+            return candidates[0]
+        csv_candidates = [path for path in candidates if path.lower().endswith(".csv")]
+        if len(csv_candidates) == 1:
+            return csv_candidates[0]
+
+    return ""
 
 def load_dataset(csv_path: str) -> pd.DataFrame:
     if not os.path.exists(csv_path): return pd.DataFrame()
@@ -45,6 +69,8 @@ def load_dataset(csv_path: str) -> pd.DataFrame:
     return df
 
 def dynamic_import_plot(py_filename: str):
+    if not py_filename:
+        raise ValueError("Missing python_code_name for dashboard view block")
     module_path = os.path.join(CHARTS_DIR, py_filename)
     if not os.path.exists(module_path): raise FileNotFoundError(f"Script not found: {module_path}")
     spec = importlib.util.spec_from_file_location("chart_module", module_path)
@@ -311,6 +337,8 @@ class DashboardEngine:
             bid = block.get("id")
             py_name = block.get("blockContent", {}).get("python_code_name")
             try:
+                if not py_name:
+                    raise ValueError(f"Missing python_code_name for block {bid}")
                 print(f"[compute_charts] loading plot for block {bid} from {py_name}")
                 plot_fn = dynamic_import_plot(py_name)
                 # Backend only provides data, styling is handled by frontend Theme

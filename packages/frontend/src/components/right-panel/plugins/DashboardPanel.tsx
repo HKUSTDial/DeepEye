@@ -58,7 +58,7 @@ export function DashboardPanel({
     const checkReady = async () => {
       setIsChecking(true)
       try {
-        const res = await fetch(fullDashboardUrl, { method: 'HEAD' })
+        const res = await fetch(fullDashboardUrl, { method: 'HEAD', cache: 'no-store' })
         if (res.ok) {
           setIsReady(true)
           if (checkIntervalRef.current) {
@@ -160,15 +160,17 @@ export function DashboardPanel({
             <RefreshCw />
             Refresh
           </button>
-          <a
-            href={fullDashboardUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="panel-toolbar-link"
-          >
-            <ExternalLink />
-            Open
-          </a>
+          {isReady ? (
+            <a
+              href={fullDashboardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="panel-toolbar-link"
+            >
+              <ExternalLink />
+              Open
+            </a>
+          ) : null}
         </div>
       </div>
 
@@ -183,22 +185,24 @@ export function DashboardPanel({
           </div>
         ) : null}
 
-        <div
-          className="absolute top-0 left-0"
-          style={{
-            width: '1280px',
-            height: `${100 / scale}%`,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
-          }}
-        >
-          <iframe
-            key={`${fullDashboardUrl}-${refreshKey}`}
-            src={fullDashboardUrl}
-            className="h-full w-full border-none"
-            title="Dashboard Preview"
-          />
-        </div>
+        {isReady ? (
+          <div
+            className="absolute top-0 left-0"
+            style={{
+              width: '1280px',
+              height: `${100 / scale}%`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+            }}
+          >
+            <iframe
+              key={`${fullDashboardUrl}-${refreshKey}`}
+              src={fullDashboardUrl}
+              className="h-full w-full border-none"
+              title="Dashboard Preview"
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   )

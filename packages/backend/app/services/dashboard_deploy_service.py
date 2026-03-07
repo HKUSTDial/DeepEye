@@ -9,6 +9,7 @@ import docker
 from docker.errors import ImageNotFound, NotFound
 
 from app.core.config import settings
+from app.services.docker_build_paths import resolve_docker_build_target
 from deepeye.utils.logger import logger
 
 
@@ -143,15 +144,23 @@ class DashboardDeployService:
         self._build_dashboard_image()
 
     def _build_dashboard_image(self) -> None:
+        build_context, dockerfile_name, dockerfile_path = resolve_docker_build_target(
+            dockerfile_setting=settings.DASHBOARD_DOCKERFILE,
+            default_context_root=settings.SANDBOX_BUILD_CONTEXT,
+            anchor_file=__file__,
+        )
+        if not dockerfile_path.exists():
+            raise RuntimeError(f"Dashboard Dockerfile not found: {dockerfile_path}")
         logger.info(
-            "[DashboardDeployService] Building image %s from %s",
+            "[DashboardDeployService] Building image %s from %s (context=%s)",
             settings.DASHBOARD_IMAGE,
-            settings.DASHBOARD_DOCKERFILE,
+            dockerfile_path,
+            build_context,
         )
         try:
             self.docker_client.images.build(
-                path=settings.SANDBOX_BUILD_CONTEXT,
-                dockerfile=settings.DASHBOARD_DOCKERFILE,
+                path=build_context,
+                dockerfile=dockerfile_name,
                 tag=settings.DASHBOARD_IMAGE,
                 rm=True,
             )
