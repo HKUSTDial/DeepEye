@@ -12,6 +12,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.services.agent_prompts import build_supervisor_prompt
+from app.tasks.callbacks import MessageCollector
 from deepeye.agents.factory import AgentFactory
 from deepeye.tools.base import tool
 
@@ -88,3 +89,17 @@ async def test_supervisor_routes_workflow_requests_through_summary_step():
         ("summarize_workflow_result", "Analyze sales.csv and summarize the trend"),
     ]
     assert result["messages"][-1].content == "The workflow summary is ready."
+
+
+def test_message_collector_prefers_summary_tool_output() -> None:
+    collector = MessageCollector()
+    collector.add_token("supervisor", "I will analyze this for you. ")
+    collector.start_tool("supervisor", "workflow_agent", "{}")
+    collector.end_tool("supervisor", '{"status":"success"}')
+    collector.start_tool("supervisor", "summarize_workflow_result", '{"question":"Analyze"}')
+    collector.end_tool("supervisor", "Final concise answer.")
+    collector.add_token("supervisor", "I will analyze this for you. Final concise answer.")
+
+    message = collector.build()
+
+    assert message.content == "Final concise answer."

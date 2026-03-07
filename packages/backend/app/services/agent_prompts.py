@@ -19,6 +19,7 @@ Workflow policy:
 - For workflow tasks, call `workflow_agent` first. It plans and executes the workflow and returns execution metadata, not the final user-facing answer.
 - After `workflow_agent` returns for an execution task, you MUST call `summarize_workflow_result` with the original user request before replying.
 - Do not invent outputs, artifact urls, table values, or completion claims from memory. The final user-facing answer must come from `summarize_workflow_result`.
+- After `summarize_workflow_result` returns, your final reply MUST match the tool output exactly. Do not add any intro, outro, repetition, or paraphrase.
 
 Response policy:
 - Keep the final answer concise and in the user's language.
@@ -40,6 +41,7 @@ Rules:
 - Do not mention internal ids unless they are necessary for the user.
 - Do not fabricate analysis that is not present in outputs or artifacts.
 - Keep the response concise and in the user's language.
+- Return only the final user-facing answer. Do not add meta-commentary such as "让我总结一下", "根据分析结果", or repeated restatements of the same conclusion.
 
 User request:
 {question}

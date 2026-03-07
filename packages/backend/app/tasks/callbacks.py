@@ -121,13 +121,23 @@ class MessageCollector:
             if self._step_stack and self._step_stack[-1] is tool:
                 self._step_stack.pop()
 
+    def _find_top_level_tool_output(self, name: str) -> str | None:
+        for step in reversed(self._steps):
+            if step.type == "tool" and step.name == name and step.output:
+                return step.output.strip()
+        return None
+
     def build(self) -> AssistantMessage:
         """Build the final AssistantMessage."""
         # Mark any remaining tools as completed
         for tool_list in self._pending_tool.values():
             for tool in tool_list:
                 tool.status = "completed"
-        return AssistantMessage(content=self._content, steps=self._steps)
+        # For workflow tasks, the summary tool output is the final user-facing answer.
+        # Prefer it over the supervisor's free-form completion to avoid duplicated or
+        # rephrased endings after summarize_workflow_result has already produced the answer.
+        final_content = self._find_top_level_tool_output("summarize_workflow_result") or self._content
+        return AssistantMessage(content=final_content, steps=self._steps)
 
     def reset(self) -> None:
         self._content = ""
