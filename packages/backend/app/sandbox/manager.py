@@ -713,6 +713,63 @@ class SandboxManager:
         if result.exit_code != 0:
             raise RuntimeError(result.stderr or result.stdout or "failed to write datasource sync manifest")
 
+    def _discover_docker_sessions(self) -> list[str]:
+        """Discover sandbox sessions directly from Docker labels."""
+        try:
+            all_containers = self._docker.containers.list(
+                all=True,
+                filters={"label": ["app=deepeye", "component=sandbox"]},
+            )
+        except Exception as e:
+            logger.error(f"[SandboxManager] Error discovering Docker sessions: {e}")
+            return []
+
+        discovered_sessions: list[str] = []
+        for container in all_containers:
+            session_id = container.labels.get("session_id")
+            if session_id and session_id not in discovered_sessions:
+                discovered_sessions.append(session_id)
+        return discovered_sessions
+
+    async def _run_cleanup_cycle(self) -> None:
+        """Run one cleanup cycle for idle or orphaned sessions."""
+        async with self._lock:
+            sessions = list(self._sandboxes.keys())
+
+        for session_id in self._discover_docker_sessions():
+            if session_id in sessions:
+                continue
+            sessions.append(session_id)
+            last_active = self._activity.get_last_active(session_id)
+            if last_active is None:
+                self._activity.record_activity(session_id)
+                logger.info(
+                    "[SandboxManager] Discovered orphaned session from Docker without activity state; marking active now: %s",
+                    session_id,
+                )
+            else:
+                logger.info(f"[SandboxManager] Discovered orphaned session from Docker: {session_id}")
+
+        for session_id in sessions:
+            try:
+                if self._activity.should_stop(session_id, settings.SANDBOX_DESTROY_TIMEOUT):
+                    await self.destroy_session(session_id, delete_data=False)
+                    logger.info(
+                        f"[SandboxManager] Auto-destroyed idle {session_id} (idle > {settings.SANDBOX_DESTROY_TIMEOUT}s)"
+                    )
+                    continue
+
+                if self._activity.should_stop(session_id, settings.SANDBOX_IDLE_TIMEOUT):
+                    sandboxes = self._sandboxes.get(session_id, [])
+                    for sandbox in sandboxes:
+                        if sandbox.is_created and sandbox.is_running():
+                            await sandbox.stop()
+                            logger.info(
+                                f"[SandboxManager] Auto-stopped idle {session_id} (idle > {settings.SANDBOX_IDLE_TIMEOUT}s)"
+                            )
+            except Exception as e:
+                logger.error(f"[SandboxManager] Error processing {session_id}: {e}")
+
     async def _cleanup_idle_sessions(self) -> None:
         """
         Background task to cleanup idle sessions.
@@ -729,51 +786,7 @@ class SandboxManager:
         while self._running:
             try:
                 await asyncio.sleep(settings.SANDBOX_CLEANUP_INTERVAL)
-                
-                # Get all active sessions from memory
-                async with self._lock:
-                    sessions = list(self._sandboxes.keys())
-                
-                # Also discover sessions from Docker (handles restart scenario)
-                try:
-                    all_containers = self._docker.containers.list(
-                        all=True,
-                        filters={"label": ["app=deepeye", "component=sandbox"]}
-                    )
-                    docker_sessions = set()
-                    for container in all_containers:
-                        sid = container.labels.get("session_id")
-                        if sid:
-                            docker_sessions.add(sid)
-                    
-                    # Add Docker sessions not in memory
-                    for sid in docker_sessions:
-                        if sid not in sessions:
-                            sessions.append(sid)
-                            logger.info(f"[SandboxManager] Discovered orphaned session from Docker: {sid}")
-                except Exception as e:
-                    logger.error(f"[SandboxManager] Error discovering Docker sessions: {e}")
-                
-                # Process all sessions
-                for session_id in sessions:
-                    try:
-                        # Check if should destroy (very idle)
-                        if self._activity.should_stop(session_id, settings.SANDBOX_DESTROY_TIMEOUT):
-                            await self.destroy_session(session_id, delete_data=False)
-                            logger.info(f"[SandboxManager] Auto-destroyed idle {session_id} (idle > {settings.SANDBOX_DESTROY_TIMEOUT}s)")
-                            continue
-                        
-                        # Check if should stop (idle)
-                        if self._activity.should_stop(session_id, settings.SANDBOX_IDLE_TIMEOUT):
-                            sandboxes = self._sandboxes.get(session_id, [])
-                            for sandbox in sandboxes:
-                                if sandbox.is_created and sandbox.is_running():
-                                    await sandbox.stop()
-                                    logger.info(f"[SandboxManager] Auto-stopped idle {session_id} (idle > {settings.SANDBOX_IDLE_TIMEOUT}s)")
-                                    
-                    except Exception as e:
-                        logger.error(f"[SandboxManager] Error processing {session_id}: {e}")
-                        
+                await self._run_cleanup_cycle()
             except Exception as e:
                 logger.error(f"[SandboxManager] Cleanup error: {e}")
         
