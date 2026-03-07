@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -20,6 +21,8 @@ from app.services.workflow_tracking_service import build_workspace_state, build_
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
 from deepeye.utils.logger import logger
+
+_MAX_REPAIR_ATTEMPTS = 2
 
 
 def _get_session(db, session_id: str):
@@ -115,6 +118,176 @@ def _extract_final_answer(workspace_state: dict | None) -> str | None:
     return None
 
 
+def _summarize_issue(issue: Any) -> str:
+    if isinstance(issue, dict):
+        code = issue.get("code")
+        message = issue.get("message")
+        location = issue.get("location") or issue.get("loc")
+        location_text = ""
+        if isinstance(location, list) and location:
+            location_text = ".".join(str(part) for part in location)
+        elif isinstance(location, str) and location:
+            location_text = location
+        parts = [str(part) for part in (code, message) if isinstance(part, str) and part]
+        summary = ": ".join(parts) if parts else json.dumps(issue, ensure_ascii=False)
+        return f"{location_text}: {summary}" if location_text else summary
+    return str(issue)
+
+
+def _summarize_issues(issues: list[Any] | None, *, limit: int = 3) -> list[str]:
+    if not isinstance(issues, list):
+        return []
+    return [_summarize_issue(issue) for issue in issues[:limit]]
+
+
+def _build_tool_failure(
+    *,
+    draft_id: str | None = None,
+    run_id: str | None = None,
+    error_type: str,
+    error_summary: str,
+    repairable: bool,
+    validation_errors: list[Any] | None = None,
+    details: list[Any] | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    issues = _summarize_issues(validation_errors) or _summarize_issues(details)
+    return {
+        "status": "failed",
+        "draft_id": draft_id,
+        "run_id": run_id,
+        "repairable": repairable,
+        "error_type": error_type,
+        "error_summary": error_summary,
+        "validation_errors": validation_errors,
+        "details": details,
+        "error": error,
+        "issues": issues,
+    }
+
+
+def _normalize_workflow_run_result(run_result: dict[str, Any], *, draft_id: str | None) -> dict[str, Any]:
+    status = run_result.get("status") or "failed"
+    run_id = run_result.get("run_id")
+    artifacts = run_result.get("artifacts") if isinstance(run_result.get("artifacts"), list) else []
+    if status == "success":
+        return {
+            "status": "success",
+            "draft_id": draft_id,
+            "run_id": run_id,
+            "repairable": False,
+            "error_type": None,
+            "error_summary": None,
+            "validation_errors": None,
+            "details": None,
+            "error": None,
+            "issues": [],
+            "artifacts": artifacts,
+            "final_answer_present": _extract_final_answer(
+                {"run": {"result": {"outputs": run_result.get("outputs", {})}}}
+            )
+            is not None,
+        }
+
+    validation_errors = run_result.get("validation_errors")
+    details = run_result.get("details")
+    error = run_result.get("error")
+    if isinstance(validation_errors, list) and validation_errors:
+        return {
+            **_build_tool_failure(
+                draft_id=draft_id,
+                run_id=run_id,
+                error_type="workflow_validation_failed",
+                error_summary="Workflow validation failed. Reuse the same draft_id and fix only the reported issues.",
+                repairable=True,
+                validation_errors=validation_errors,
+                error=error,
+            ),
+            "artifacts": artifacts,
+        }
+    if isinstance(details, list) and details:
+        return {
+            **_build_tool_failure(
+                draft_id=draft_id,
+                run_id=run_id,
+                error_type="workflow_definition_invalid",
+                error_summary="Workflow definition is invalid. Reuse the same draft_id and fix the invalid fields only.",
+                repairable=True,
+                details=details,
+                error=error,
+            ),
+            "artifacts": artifacts,
+        }
+    return {
+        **_build_tool_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            error_type="workflow_execution_failed",
+            error_summary=(error or "Workflow execution failed."),
+            repairable=False,
+            error=error,
+        ),
+        "artifacts": artifacts,
+    }
+
+
+def _new_repair_state() -> dict[str, Any]:
+    return {
+        "repair_failures": 0,
+        "max_repair_failures": _MAX_REPAIR_ATTEMPTS,
+        "active_draft_id": None,
+        "limit_exhausted": False,
+    }
+
+
+def _repair_limit_failure(state: dict[str, Any]) -> dict[str, Any]:
+    draft_id = state.get("active_draft_id")
+    return _build_tool_failure(
+        draft_id=draft_id,
+        error_type="repair_limit_exceeded",
+        error_summary=f"Workflow repair limit reached for draft {draft_id}. Stop editing and explain the failure to the user.",
+        repairable=False,
+        error="Workflow repair limit exceeded.",
+    )
+
+
+def _guard_repair_limit(state: dict[str, Any]) -> dict[str, Any] | None:
+    if state.get("limit_exhausted"):
+        return _repair_limit_failure(state)
+    return None
+
+
+def _register_repairable_failure(state: dict[str, Any], draft_id: str | None) -> dict[str, Any] | None:
+    state["repair_failures"] = int(state.get("repair_failures", 0)) + 1
+    if draft_id:
+        state["active_draft_id"] = draft_id
+    if state["repair_failures"] >= int(state.get("max_repair_failures", _MAX_REPAIR_ATTEMPTS)):
+        state["limit_exhausted"] = True
+        return _repair_limit_failure(state)
+    return None
+
+
+def _note_successful_run(state: dict[str, Any], draft_id: str | None) -> None:
+    if draft_id:
+        state["active_draft_id"] = draft_id
+
+
+def _require_reuse_after_failure(state: dict[str, Any], draft_id: str | None) -> dict[str, Any] | None:
+    active_draft_id = state.get("active_draft_id")
+    repair_failures = int(state.get("repair_failures", 0))
+    if repair_failures <= 0 or not active_draft_id:
+        return None
+    if draft_id == active_draft_id:
+        return None
+    return _build_tool_failure(
+        draft_id=active_draft_id,
+        error_type="draft_reuse_required",
+        error_summary=f"Reuse the existing draft_id {active_draft_id} after a failed run instead of creating a new workflow.",
+        repairable=True,
+        error="Draft reuse required after a failed workflow run.",
+    )
+
+
 def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | None = None) -> callable:
     @tool
     async def create_workflow(
@@ -194,7 +367,12 @@ def create_read_workflow_tool(session_id: str) -> callable:
     return read_workflow
 
 
-def create_update_workflow_tool(session_id: str, user_id: str, turn_id: str | None = None) -> callable:
+def create_update_workflow_tool(
+    session_id: str,
+    user_id: str,
+    turn_id: str | None = None,
+    repair_state: dict[str, Any] | None = None,
+) -> callable:
     @tool
     async def update_workflow(
         workflow: dict,
@@ -211,6 +389,13 @@ def create_update_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             name: Optional logical workflow name. Used to derive file path if needed.
             file_path: Optional explicit legacy sandbox workflow file path. Prefer draft_id.
         """
+        if repair_state:
+            blocked = _guard_repair_limit(repair_state)
+            if blocked:
+                return blocked
+            reuse_failure = _require_reuse_after_failure(repair_state, draft_id)
+            if reuse_failure:
+                return reuse_failure
         db = SessionLocal()
         try:
             draft = save_workflow_draft(
@@ -266,7 +451,11 @@ def create_run_workflow_from_file_tool(session_id: str, turn_id: str | None = No
     return run_workflow_from_file
 
 
-def create_run_workflow_tool(session_id: str, turn_id: str | None = None) -> callable:
+def create_run_workflow_tool(
+    session_id: str,
+    turn_id: str | None = None,
+    repair_state: dict[str, Any] | None = None,
+) -> callable:
     @tool
     async def run_workflow(draft_id: str) -> dict:
         """
@@ -275,32 +464,64 @@ def create_run_workflow_tool(session_id: str, turn_id: str | None = None) -> cal
         Args:
             draft_id: Workflow draft id to execute.
         """
+        if repair_state:
+            blocked = _guard_repair_limit(repair_state)
+            if blocked:
+                return blocked
+            reuse_failure = _require_reuse_after_failure(repair_state, draft_id)
+            if reuse_failure:
+                return reuse_failure
         db = SessionLocal()
         try:
             session = _get_session(db, session_id)
             if not session:
-                return {"status": "error", "error": "Session not found."}
+                return _build_tool_failure(
+                    draft_id=draft_id,
+                    error_type="session_not_found",
+                    error_summary="Session not found.",
+                    repairable=False,
+                    error="Session not found.",
+                )
             existing_draft, norm_path = resolve_workflow_target(
                 db,
                 session_id,
                 draft_id=draft_id,
             )
             if not existing_draft or not isinstance(existing_draft.definition, dict):
-                return {"status": "error", "error": "Workflow draft not found."}
-            return await service_run_workflow_draft(
+                return _build_tool_failure(
+                    draft_id=draft_id,
+                    error_type="draft_not_found",
+                    error_summary="Workflow draft not found.",
+                    repairable=False,
+                    error="Workflow draft not found.",
+                )
+            result = await service_run_workflow_draft(
                 db,
                 session.user_id,
                 session_id,
                 str(existing_draft.id),
                 turn_id=turn_id,
             )
+            normalized = _normalize_workflow_run_result(result, draft_id=str(existing_draft.id))
+            if repair_state:
+                if normalized["status"] == "success":
+                    _note_successful_run(repair_state, str(existing_draft.id))
+                elif normalized["repairable"]:
+                    limit_failure = _register_repairable_failure(repair_state, str(existing_draft.id))
+                    if limit_failure:
+                        return limit_failure
+            return normalized
         finally:
             db.close()
 
     return run_workflow
 
 
-def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) -> callable:
+def create_workflow_and_run_tool(
+    session_id: str,
+    turn_id: str | None = None,
+    repair_state: dict[str, Any] | None = None,
+) -> callable:
     """Single tool: create/update a workflow draft and run it immediately."""
 
     @tool
@@ -319,11 +540,24 @@ def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) ->
             name: Optional logical workflow name. Used to derive file path if needed.
             file_path: Optional explicit legacy sandbox workflow file path. Prefer name or draft_id.
         """
+        if repair_state:
+            blocked = _guard_repair_limit(repair_state)
+            if blocked:
+                return blocked
+            reuse_failure = _require_reuse_after_failure(repair_state, draft_id)
+            if reuse_failure:
+                return reuse_failure
         db = SessionLocal()
         try:
             session = _get_session(db, session_id)
             if not session:
-                return {"status": "error", "error": "Session not found."}
+                return _build_tool_failure(
+                    draft_id=draft_id,
+                    error_type="session_not_found",
+                    error_summary="Session not found.",
+                    repairable=False,
+                    error="Session not found.",
+                )
             draft = save_workflow_draft(
                 db,
                 session_id=session_id,
@@ -342,7 +576,15 @@ def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) ->
                 str(draft.id),
                 turn_id=turn_id,
             )
-            return {"status": "success", "draft_id": str(draft.id), "run": result}
+            normalized = _normalize_workflow_run_result(result, draft_id=str(draft.id))
+            if repair_state:
+                if normalized["status"] == "success":
+                    _note_successful_run(repair_state, str(draft.id))
+                elif normalized["repairable"]:
+                    limit_failure = _register_repairable_failure(repair_state, str(draft.id))
+                    if limit_failure:
+                        return limit_failure
+            return normalized
         finally:
             db.close()
 
@@ -368,14 +610,20 @@ def create_design_workflow_tool(
             session = _get_session(db, session_id)
             if not session:
                 return {"status": "error", "error": "Session not found."}
+            repair_state = _new_repair_state()
             workflow_agent_inst = WorkflowAgent(
                 model=model,
                 system_prompt=system_prompt,
                 tools=[
-                    create_workflow_and_run_tool(session_id, turn_id=turn_id),
+                    create_workflow_and_run_tool(session_id, turn_id=turn_id, repair_state=repair_state),
                     create_read_workflow_tool(session_id),
-                    create_update_workflow_tool(session_id, str(session.user_id), turn_id=turn_id),
-                    create_run_workflow_tool(session_id, turn_id=turn_id),
+                    create_update_workflow_tool(
+                        session_id,
+                        str(session.user_id),
+                        turn_id=turn_id,
+                        repair_state=repair_state,
+                    ),
+                    create_run_workflow_tool(session_id, turn_id=turn_id, repair_state=repair_state),
                 ],
                 max_steps=24,
             )

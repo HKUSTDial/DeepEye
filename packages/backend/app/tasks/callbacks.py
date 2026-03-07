@@ -140,9 +140,13 @@ def _workflow_tool_trace_summary(
             "status": run_payload.get("status"),
             "draft_id": payload.get("draft_id") or run_payload.get("draft_id"),
             "run_id": run_payload.get("run_id"),
+            "repairable": run_payload.get("repairable"),
+            "error_type": run_payload.get("error_type"),
+            "error_summary": _truncate_for_log(run_payload.get("error_summary")),
             "error": _truncate_for_log(run_payload.get("error")),
             "validation_error_count": len(validation_errors) if isinstance(validation_errors, list) else 0,
             "details_count": len(details) if isinstance(details, list) else 0,
+            "issues": run_payload.get("issues")[:3] if isinstance(run_payload.get("issues"), list) else [],
             "artifact_kinds": [
                 artifact.get("kind")
                 for artifact in artifacts

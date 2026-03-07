@@ -13,7 +13,13 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.services.agent_prompts import build_supervisor_prompt
 from app.tasks.callbacks import MessageCollector, _workflow_tool_trace_summary
-from app.tools.workflow_tools import _extract_final_answer, create_design_workflow_tool
+from app.tools.workflow_tools import (
+    _extract_final_answer,
+    _new_repair_state,
+    _normalize_workflow_run_result,
+    _require_reuse_after_failure,
+    create_design_workflow_tool,
+)
 from deepeye.agents.factory import AgentFactory
 from deepeye.tools.base import tool
 
@@ -199,6 +205,39 @@ def test_workflow_tool_trace_summary_compacts_run_metadata() -> None:
     assert summary["validation_error_count"] == 1
     assert summary["details_count"] == 1
     assert summary["artifact_kinds"] == ["report"]
+
+
+def test_normalize_workflow_run_result_marks_repairable_definition_failures() -> None:
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "details": [
+                {"loc": ["root", "nodes", 0, "id"], "msg": "Field required"},
+                {"loc": ["root", "edges"], "msg": "Invalid value"},
+            ],
+        },
+        draft_id="draft-1",
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_definition_invalid"
+    assert normalized["draft_id"] == "draft-1"
+    assert len(normalized["issues"]) == 2
+
+
+def test_repair_state_requires_reusing_existing_draft_after_failure() -> None:
+    state = _new_repair_state()
+    state["repair_failures"] = 1
+    state["active_draft_id"] = "draft-123"
+
+    failure = _require_reuse_after_failure(state, draft_id=None)
+
+    assert failure is not None
+    assert failure["status"] == "failed"
+    assert failure["repairable"] is True
+    assert failure["error_type"] == "draft_reuse_required"
+    assert failure["draft_id"] == "draft-123"
 
 
 def test_extract_final_answer_prefers_workflow_answer_output() -> None:
