@@ -78,7 +78,10 @@ function buildOptimisticRun(
   }
 }
 
-function typeToLabel(type: string) {
+function typeToLabel(type: unknown) {
+  if (typeof type !== 'string' || !type.trim()) {
+    return 'Unknown Node'
+  }
   return type
     .replace(/[._]/g, ' ')
     .split(' ')

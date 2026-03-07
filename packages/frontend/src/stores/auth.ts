@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { authHttp } from '../api/client'
+import { config } from '../config'
 
 interface User {
   id: string
@@ -29,6 +29,35 @@ interface AuthState {
   setUser: (user: User) => void
 }
 
+async function authRequest<T>(path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  const res = await fetch(`${config.api.authBaseUrl}${path}`, {
+    method: 'POST',
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: 'include',
+  })
+
+  if (!res.ok) {
+    let message = `Request failed: ${res.statusText}`
+    try {
+      const errorData = await res.json()
+      if (typeof errorData?.detail === 'string') {
+        message = errorData.detail
+      } else if (typeof errorData?.message === 'string') {
+        message = errorData.message
+      }
+    } catch {
+      // ignore parse error
+    }
+    throw new Error(message)
+  }
+
+  return res.status === 204 ? (undefined as T) : res.json()
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -40,7 +69,7 @@ export const useAuthStore = create<AuthState>()(
       // 登录
       login: async (email: string, password: string) => {
         try {
-          const response = await authHttp.post<{
+          const response = await authRequest<{
             access_token: string
             user: User
           }>('/login', { email, password })
@@ -59,7 +88,7 @@ export const useAuthStore = create<AuthState>()(
       // 注册
       register: async (email: string, username: string, password: string) => {
         try {
-          const response = await authHttp.post<{
+          const response = await authRequest<{
             access_token: string
             user: User
           }>('/register', { email, username, password })
@@ -77,7 +106,7 @@ export const useAuthStore = create<AuthState>()(
       
       // 登出
       logout: () => {
-        void authHttp.post<void>('/logout').catch((error) => {
+        void authRequest<void>('/logout').catch((error) => {
           console.warn('[Auth] Logout request failed:', error)
         })
 
@@ -95,7 +124,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: async () => {
         try {
           // 通过 HttpOnly refresh cookie 刷新
-          const response = await authHttp.post<{
+          const response = await authRequest<{
             access_token: string
           }>('/refresh')
           
