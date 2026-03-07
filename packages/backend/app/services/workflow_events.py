@@ -17,10 +17,16 @@ def build_workflow_event_data(
     payload: dict[str, Any] | None = None,
     *,
     file_path: str | None = None,
+    turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     return {
         "version": 2,
         "session_id": session_id,
+        "turn_id": turn_id,
+        "draft_id": draft_id,
+        "run_id": run_id,
         "file_path": file_path,
         "phase": phase,
         "payload": payload or {},
@@ -34,6 +40,9 @@ async def publish_workflow_event(
     payload: dict[str, Any] | None = None,
     *,
     file_path: str | None = None,
+    turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
     source: str = "workflow",
 ) -> None:
     bus = RedisEventBus(settings.REDIS_URL)
@@ -41,7 +50,15 @@ async def publish_workflow_event(
         event = AgentEvent(
             type=AgentEventType.WORKFLOW_EVENT,
             source=source,
-            data=build_workflow_event_data(session_id, phase, payload, file_path=file_path),
+            data=build_workflow_event_data(
+                session_id,
+                phase,
+                payload,
+                file_path=file_path,
+                turn_id=turn_id,
+                draft_id=draft_id,
+                run_id=run_id,
+            ),
         )
         await bus.publish(channel, event.model_dump_json())
     finally:
@@ -55,6 +72,9 @@ def publish_workflow_event_sync(
     payload: dict[str, Any] | None = None,
     *,
     file_path: str | None = None,
+    turn_id: str | None = None,
+    draft_id: str | None = None,
+    run_id: str | None = None,
     source: str = "workflow",
 ) -> None:
     import redis
@@ -62,7 +82,15 @@ def publish_workflow_event_sync(
     event = AgentEvent(
         type=AgentEventType.WORKFLOW_EVENT,
         source=source,
-        data=build_workflow_event_data(session_id, phase, payload, file_path=file_path),
+        data=build_workflow_event_data(
+            session_id,
+            phase,
+            payload,
+            file_path=file_path,
+            turn_id=turn_id,
+            draft_id=draft_id,
+            run_id=run_id,
+        ),
     )
     redis_client = redis.Redis.from_url(settings.REDIS_URL)
     try:

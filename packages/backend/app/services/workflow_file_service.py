@@ -12,6 +12,14 @@ from app.core.config import settings
 from app.schemas import AgentEvent, AgentEventType
 from app.services.workflow_engine import build_engine
 from app.services.workflow_events import build_workflow_event_data, extract_workflow_artifacts
+from app.services.workflow_tracking_service import (
+    create_tracked_workflow_run,
+    finalize_tracked_workflow_run,
+    get_chat_turn,
+    get_latest_active_turn,
+    replace_workflow_artifacts,
+    upsert_workflow_draft,
+)
 from pydantic import ValidationError
 from deepeye.workflows.models import Graph, Workflow as CoreWorkflow
 from deepeye.workflows.runtime import ExecutionContext
@@ -46,9 +54,14 @@ async def service_run_workflow_from_file(
     user_id,
     session_id: str,
     path: str,
+    *,
+    turn_id: str | None = None,
 ) -> dict[str, Any]:
     channel = f"session:{session_id}"
     event_bus = RedisEventBus(settings.REDIS_URL)
+    tracked_turn = None
+    tracked_draft = None
+    tracked_run = None
 
     def _timestamp() -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -60,13 +73,18 @@ async def service_run_workflow_from_file(
     async def _publish_workflow_event(phase: str, payload: dict | None = None):
         await _publish(
             AgentEventType.WORKFLOW_EVENT,
-            build_workflow_event_data(session_id, phase, payload, file_path=path),
+            build_workflow_event_data(
+                session_id,
+                phase,
+                payload,
+                file_path=path,
+                turn_id=str(tracked_turn.id) if tracked_turn else turn_id,
+                draft_id=str(tracked_draft.id) if tracked_draft else None,
+                run_id=str(tracked_run.id) if tracked_run else None,
+            ),
         )
 
     try:
-        await _publish_workflow_event("run_start", {"path": path, "started_at": _timestamp()})
-
-        # Use get_or_create to ensure container exists
         sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
         if not sandbox:
             raise ValueError("failed to get or create sandbox")
@@ -79,8 +97,27 @@ async def service_run_workflow_from_file(
         graph_data = definition.get("root", definition)
         graph = Graph.model_validate(graph_data)
         core_workflow = CoreWorkflow(id=f"file:{path}", root=graph)
-        
-        # 注册 workflow_id -> session_id 映射
+
+        tracked_turn = get_chat_turn(db, turn_id) if turn_id else get_latest_active_turn(db, session_id)
+        tracked_draft = upsert_workflow_draft(
+            db,
+            session_id=session_id,
+            user_id=user_id,
+            definition=definition,
+            file_path=path,
+            turn_id=tracked_turn.id if tracked_turn else None,
+        )
+        tracked_run = create_tracked_workflow_run(
+            db,
+            user_id=user_id,
+            session_id=session_id,
+            turn_id=tracked_turn.id if tracked_turn else None,
+            draft_id=tracked_draft.id if tracked_draft else None,
+            file_path=path,
+        )
+
+        await _publish_workflow_event("run_start", {"path": path, "started_at": _timestamp()})
+
         _workflow_to_session[core_workflow.id] = session_id
 
         engine = build_engine(db, user_id, sandbox=sandbox, session_id=session_id)
@@ -136,6 +173,15 @@ async def service_run_workflow_from_file(
         context = result_holder[0]
         outputs = _collect_final_outputs(graph, context)
         artifacts = extract_workflow_artifacts(outputs)
+        if tracked_run:
+            replace_workflow_artifacts(db, tracked_run, artifacts)
+            finalize_tracked_workflow_run(
+                db,
+                tracked_run,
+                status=context.status,
+                result={"status": context.status, "outputs": outputs, "artifacts": artifacts},
+                artifacts=artifacts,
+            )
         await _publish_workflow_event(
             "run_end",
             {
@@ -145,7 +191,14 @@ async def service_run_workflow_from_file(
                 "artifacts": artifacts,
             },
         )
-        return {"status": context.status, "outputs": outputs, "artifacts": artifacts}
+        return {
+            "status": context.status,
+            "outputs": outputs,
+            "artifacts": artifacts,
+            "turn_id": str(tracked_turn.id) if tracked_turn else turn_id,
+            "draft_id": str(tracked_draft.id) if tracked_draft else None,
+            "run_id": str(tracked_run.id) if tracked_run else None,
+        }
     except WorkflowValidationError as exc:
         issues = [
             {
@@ -156,6 +209,15 @@ async def service_run_workflow_from_file(
             for issue in exc.issues
         ]
         error = "Workflow validation failed"
+        if tracked_run:
+            finalize_tracked_workflow_run(
+                db,
+                tracked_run,
+                status="failed",
+                result={"status": "failed", "validation_errors": issues},
+                error=error,
+                artifacts=[],
+            )
         await _publish_workflow_event(
             "error",
             {
@@ -172,9 +234,25 @@ async def service_run_workflow_from_file(
                 "finished_at": _timestamp(),
             },
         )
-        return {"status": "failed", "error": error, "validation_errors": issues}
+        return {
+            "status": "failed",
+            "error": error,
+            "validation_errors": issues,
+            "turn_id": str(tracked_turn.id) if tracked_turn else turn_id,
+            "draft_id": str(tracked_draft.id) if tracked_draft else None,
+            "run_id": str(tracked_run.id) if tracked_run else None,
+        }
     except ValidationError as exc:
         error = "Workflow definition is invalid"
+        if tracked_run:
+            finalize_tracked_workflow_run(
+                db,
+                tracked_run,
+                status="failed",
+                result={"status": "failed", "details": exc.errors()},
+                error=error,
+                artifacts=[],
+            )
         await _publish_workflow_event(
             "error",
             {
@@ -191,8 +269,24 @@ async def service_run_workflow_from_file(
                 "finished_at": _timestamp(),
             },
         )
-        return {"status": "failed", "error": error, "details": exc.errors()}
+        return {
+            "status": "failed",
+            "error": error,
+            "details": exc.errors(),
+            "turn_id": str(tracked_turn.id) if tracked_turn else turn_id,
+            "draft_id": str(tracked_draft.id) if tracked_draft else None,
+            "run_id": str(tracked_run.id) if tracked_run else None,
+        }
     except Exception as exc:
+        if tracked_run:
+            finalize_tracked_workflow_run(
+                db,
+                tracked_run,
+                status="failed",
+                result={"status": "failed", "error": str(exc)},
+                error=str(exc),
+                artifacts=[],
+            )
         await _publish_workflow_event(
             "error",
             {
@@ -203,7 +297,13 @@ async def service_run_workflow_from_file(
             "run_end",
             {"status": "failed", "error": str(exc), "finished_at": _timestamp()},
         )
-        return {"status": "failed", "error": str(exc)}
+        return {
+            "status": "failed",
+            "error": str(exc),
+            "turn_id": str(tracked_turn.id) if tracked_turn else turn_id,
+            "draft_id": str(tracked_draft.id) if tracked_draft else None,
+            "run_id": str(tracked_run.id) if tracked_run else None,
+        }
     finally:
         # 清理进度发布函数和映射
         _progress_publishers.pop(session_id, None)

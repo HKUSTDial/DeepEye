@@ -15,6 +15,7 @@ from app.infra import EventBus
 from app.repositories import MessageRepository
 from app.schemas import AgentEvent, AgentEventType, AssistantMessage, Message, ToolStep
 from app.services.workflow_events import build_workflow_event_data
+from app.services.workflow_tracking_service import upsert_workflow_draft_record
 from deepeye.utils.logger import logger
 
 _WORKFLOW_DIR = "/workspace/workflow"
@@ -165,6 +166,8 @@ class AgentCallback(AsyncCallbackHandler):
         event_bus: EventBus,
         session_id: str,
         source: str,
+        user_id: str | None = None,
+        turn_id: str | None = None,
         collector: MessageCollector | None = None,
         ignore_tags: list[str] | None = None,
     ):
@@ -172,6 +175,8 @@ class AgentCallback(AsyncCallbackHandler):
         self.session_id = session_id
         self.channel = f"session:{session_id}"
         self.source = source
+        self.user_id = user_id
+        self.turn_id = turn_id
         self.collector = collector
         self.ignore_tags = set(ignore_tags or [])
         self._tool_stack: list[str] = []
@@ -201,12 +206,22 @@ class AgentCallback(AsyncCallbackHandler):
         else:
             await self.event_bus.publish(self.channel, event.model_dump_json())
 
-    async def _publish_workflow_event(self, phase: str, payload: dict[str, Any] | None = None) -> None:
+    async def _publish_workflow_event(
+        self,
+        phase: str,
+        payload: dict[str, Any] | None = None,
+        *,
+        draft_id: str | None = None,
+        run_id: str | None = None,
+    ) -> None:
         event_data = build_workflow_event_data(
             self.session_id,
             phase,
             payload,
             file_path=self._workflow_active_file,
+            turn_id=self.turn_id,
+            draft_id=draft_id,
+            run_id=run_id,
         )
         logger.info(f"[_publish_workflow_event] phase={phase}, session={self.session_id}, file={self._workflow_active_file}")
         await self._publish(
@@ -244,9 +259,17 @@ class AgentCallback(AsyncCallbackHandler):
             workflow = payload.get("workflow") or payload.get("definition")
             if isinstance(workflow, dict):
                 phase = "create_workflow" if name == "create_workflow" else "update_workflow"
+                draft = upsert_workflow_draft_record(
+                    session_id=self.session_id,
+                    user_id=self.user_id,
+                    turn_id=self.turn_id,
+                    file_path=self._workflow_active_file,
+                    definition=workflow,
+                )
                 await self._publish_workflow_event(
                     phase,
                     {"path": self._workflow_active_file, "workflow": workflow},
+                    draft_id=str(draft.id) if draft else None,
                 )
         if self.collector:
             self.collector.start_tool(self.source, name, input_str)
@@ -264,14 +287,16 @@ class AgentCallback(AsyncCallbackHandler):
 
 
 
-def persist_message(session_id: str, message: Message) -> None:
+def persist_message(session_id: str, message: Message):
     """Persist a message (user or assistant) to session_messages table."""
     try:
         db = _get_db_session()
         try:
-            MessageRepository(db).append(session_id, message)
+            record = MessageRepository(db).append(session_id, message)
             logger.debug(f"[persist_message] Persisted {message.role} message for session {session_id}")
+            return record
         finally:
             db.close()
     except Exception as e:
         logger.error(f"[persist_message] Failed to persist message for session {session_id}: {e}")
+        return None

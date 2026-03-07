@@ -17,6 +17,11 @@ from app.sandbox.manager import SandboxManager, _get_datasource_filename
 from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
 from app.services.workflow_engine import build_registry
 from app.services.workflow_prompts import build_workflow_prompt
+from app.services.workflow_tracking_service import (
+    complete_chat_turn_record,
+    create_chat_turn_record,
+    fail_chat_turn_record,
+)
 from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
 from deepeye.agents import AgentFactory
 from app.tools.workflow_tools import (
@@ -147,17 +152,48 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     model = _create_model()
     event_bus = RedisEventBus(settings.REDIS_URL)
     sandbox_manager = SandboxManager()
+    user_id = _get_user_id(session_id)
 
     # Persist user message first
-    persist_message(session_id, UserMessage(content=agent_input.user_input))
+    user_message = persist_message(session_id, UserMessage(content=agent_input.user_input))
+    turn = create_chat_turn_record(
+        session_id,
+        user_id,
+        agent_input.user_input,
+        user_message_id=user_message.id if user_message else None,
+    )
+    turn_id = str(turn.id) if turn else None
 
     # Shared collector for all callbacks
     collector = MessageCollector()
 
     # Callbacks for different sources - all share the same collector
-    cb_supervisor = AgentCallback(event_bus, session_id, "supervisor", collector, ignore_tags=["sub_agent"])
-    cb_workflow = AgentCallback(event_bus, session_id, "workflow_agent", collector)
-    cb_kb = AgentCallback(event_bus, session_id, "knowledge_base_agent", collector)
+    user_id_str = str(user_id) if user_id else None
+    cb_supervisor = AgentCallback(
+        event_bus,
+        session_id,
+        "supervisor",
+        user_id=user_id_str,
+        turn_id=turn_id,
+        collector=collector,
+        ignore_tags=["sub_agent"],
+    )
+    cb_workflow = AgentCallback(
+        event_bus,
+        session_id,
+        "workflow_agent",
+        user_id=user_id_str,
+        turn_id=turn_id,
+        collector=collector,
+    )
+    cb_kb = AgentCallback(
+        event_bus,
+        session_id,
+        "knowledge_base_agent",
+        user_id=user_id_str,
+        turn_id=turn_id,
+        collector=collector,
+    )
 
     # Get existing sandbox or create new one (reuse within session)
     channel = f"session:{session_id}"
@@ -171,8 +207,6 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         SandboxEvent(type=SandboxEventType.STARTED, source="sandbox").model_dump_json()
     )
     
-    user_id = _get_user_id(session_id)
-
     # Build tool - handle data sources
     datasource_ids = (
         list(dict.fromkeys(agent_input.datasource_ids))
@@ -224,8 +258,16 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         datasource=datasources_info,  # Now a list
         tables=datasources_schema,    # Now includes datasource_id/name
     )
-    tools.append(create_design_workflow_tool(model, session_id, workflow_prompt, callbacks=[cb_workflow]))
-    tools.append(create_run_workflow_from_file_tool(session_id))
+    tools.append(
+        create_design_workflow_tool(
+            model,
+            session_id,
+            workflow_prompt,
+            callbacks=[cb_workflow],
+            turn_id=turn_id,
+        )
+    )
+    tools.append(create_run_workflow_from_file_tool(session_id, turn_id=turn_id))
 
     user_input = agent_input.user_input
 
@@ -265,11 +307,16 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
             logger.info("[AgentTask] Agent execution finished successfully")
             # Build and persist the complete assistant message
             assistant_message = collector.build()
-            persist_message(session_id, assistant_message)
+            assistant_record = persist_message(session_id, assistant_message)
+            complete_chat_turn_record(
+                turn_id,
+                assistant_message_id=assistant_record.id if assistant_record else None,
+            )
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_END))
         except Exception as e:
             tb = traceback.format_exc()
             logger.error(f"[AgentTask] Error: {tb}")
+            fail_chat_turn_record(turn_id, str(e))
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.ERROR, content=str(e), data={"traceback": tb}))
         finally:
             await event_bus.close()

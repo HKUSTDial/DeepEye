@@ -1,6 +1,7 @@
 """Workflow run repository."""
 
 import uuid
+from sqlalchemy import desc
 
 from sqlalchemy.orm import Session
 
@@ -19,5 +20,13 @@ class WorkflowRunRepository(SQLAlchemyRepository[WorkflowRun, uuid.UUID]):
         return (
             self.db.query(self.model_class)
             .filter(WorkflowRun.id == run_id, WorkflowRun.user_id == user_id)
+            .first()
+        )
+
+    def get_latest_by_turn(self, turn_id: uuid.UUID) -> WorkflowRun | None:
+        return (
+            self.db.query(self.model_class)
+            .filter(WorkflowRun.turn_id == turn_id)
+            .order_by(desc(WorkflowRun.created_at))
             .first()
         )

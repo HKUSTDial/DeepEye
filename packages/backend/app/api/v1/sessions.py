@@ -12,9 +12,10 @@ from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.models import ChatSession
 from app.repositories import DataSourceRepository, MessageRepository, SessionAttachmentRepository, SessionRepository
-from app.schemas import ChatSessionResponse, DataSourceResponse
+from app.schemas import ChatSessionResponse, DataSourceResponse, WorkspaceStateResponse
 from app.sandbox import sandbox_manager
 from app.services import attach_datasource_to_session, detach_datasource_from_session, list_session_attachments
+from app.services.workflow_tracking_service import build_workspace_state
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -158,3 +159,14 @@ def get_session_messages(
     _get_owned_session_or_404(db, session_uuid, user_id)
     
     return {"messages": MessageRepository(db).get_messages(session_id)}
+
+
+@router.get("/{session_id}/workspace-state", response_model=WorkspaceStateResponse)
+def get_session_workspace_state(
+    session_id: uuid.UUID,
+    user_id: CurrentUserId,
+    db: Session = Depends(get_db),
+):
+    """Return the latest turn/draft/run/artifact snapshot for the session workspace."""
+    _get_owned_session_or_404(db, session_id, user_id)
+    return build_workspace_state(db, session_id)

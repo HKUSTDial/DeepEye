@@ -30,7 +30,16 @@ from app.schemas.knowledge_base import (
     KnowledgeBaseSearchResult,
     KnowledgeBaseUpdate,
 )
-from app.schemas.workflow import WorkflowCreate, WorkflowResponse, WorkflowRunResponse, WorkflowUpdate
+from app.schemas.workflow import (
+    ChatTurnResponse,
+    WorkflowArtifactResponse,
+    WorkflowCreate,
+    WorkflowDraftResponse,
+    WorkflowResponse,
+    WorkflowRunResponse,
+    WorkflowUpdate,
+    WorkspaceStateResponse,
+)
 from app.schemas.workflow import (
     WorkflowTemplateParam,
     WorkflowTemplateResponse,
@@ -63,6 +72,10 @@ __all__ = [
     "WorkflowResponse",
     "WorkflowRunResponse",
     "WorkflowUpdate",
+    "ChatTurnResponse",
+    "WorkflowDraftResponse",
+    "WorkflowArtifactResponse",
+    "WorkspaceStateResponse",
     "KnowledgeBaseCreate",
     "KnowledgeBaseUpdate",
     "KnowledgeBaseResponse",

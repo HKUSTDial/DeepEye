@@ -16,10 +16,16 @@ def test_build_workflow_event_data_includes_standard_fields():
         "artifact_ready",
         {"artifact": {"kind": "report"}},
         file_path="/workspace/workflow/report.json",
+        turn_id="turn-1",
+        draft_id="draft-1",
+        run_id="run-1",
     )
 
     assert data["version"] == 2
     assert data["session_id"] == "session-1"
+    assert data["turn_id"] == "turn-1"
+    assert data["draft_id"] == "draft-1"
+    assert data["run_id"] == "run-1"
     assert data["file_path"] == "/workspace/workflow/report.json"
     assert data["phase"] == "artifact_ready"
     assert data["payload"] == {"artifact": {"kind": "report"}}

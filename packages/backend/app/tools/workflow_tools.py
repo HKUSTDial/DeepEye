@@ -149,7 +149,7 @@ def create_update_workflow_tool(session_id: str) -> callable:
     return update_workflow
 
 
-def create_run_workflow_from_file_tool(session_id: str) -> callable:
+def create_run_workflow_from_file_tool(session_id: str, turn_id: str | None = None) -> callable:
     @tool
     async def run_workflow_from_file(file_path: str) -> dict:
         """
@@ -164,7 +164,13 @@ def create_run_workflow_from_file_tool(session_id: str) -> callable:
             session = _get_session(db, session_id)
             if not session:
                 return {"status": "error", "error": "Session not found."}
-            result = await service_run_workflow_from_file(db, session.user_id, session_id, norm_path)
+            result = await service_run_workflow_from_file(
+                db,
+                session.user_id,
+                session_id,
+                norm_path,
+                turn_id=turn_id,
+            )
             return result
         finally:
             db.close()
@@ -172,7 +178,7 @@ def create_run_workflow_from_file_tool(session_id: str) -> callable:
     return run_workflow_from_file
 
 
-def create_workflow_and_run_tool(session_id: str) -> callable:
+def create_workflow_and_run_tool(session_id: str, turn_id: str | None = None) -> callable:
     """Single tool: write workflow JSON and run it. Use this for data video so the agent cannot reply before running."""
 
     @tool
@@ -190,7 +196,13 @@ def create_workflow_and_run_tool(session_id: str) -> callable:
             session = _get_session(db, session_id)
             if not session:
                 return {"status": "error", "error": "Session not found."}
-            result = await service_run_workflow_from_file(db, session.user_id, session_id, norm_path)
+            result = await service_run_workflow_from_file(
+                db,
+                session.user_id,
+                session_id,
+                norm_path,
+                turn_id=turn_id,
+            )
             return {"status": "success", "file_path": norm_path, "run": result}
         finally:
             db.close()
@@ -198,7 +210,13 @@ def create_workflow_and_run_tool(session_id: str) -> callable:
     return create_workflow_and_run
 
 
-def create_design_workflow_tool(model, session_id: str, system_prompt: str, callbacks: list | None = None) -> callable:
+def create_design_workflow_tool(
+    model,
+    session_id: str,
+    system_prompt: str,
+    callbacks: list | None = None,
+    turn_id: str | None = None,
+) -> callable:
     @tool
     async def workflow_agent(goal: str) -> str:
         """
@@ -217,11 +235,11 @@ def create_design_workflow_tool(model, session_id: str, system_prompt: str, call
                     create_plan,
                     update_plan,
                     mark_step_done,
-                    create_workflow_and_run_tool(session_id),
+                    create_workflow_and_run_tool(session_id, turn_id=turn_id),
                     create_create_workflow_tool(session_id),
                     create_read_workflow_tool(session_id),
                     create_update_workflow_tool(session_id),
-                    create_run_workflow_from_file_tool(session_id),
+                    create_run_workflow_from_file_tool(session_id, turn_id=turn_id),
                 ],
             )
             result = await workflow_agent_inst.ainvoke(
