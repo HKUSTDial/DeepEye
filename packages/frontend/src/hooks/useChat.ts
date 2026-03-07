@@ -39,6 +39,7 @@ export function useChat() {
   const setActiveWorkflowFile = useWorkflowSessionsStore((state) => state.setActiveFilePath)
   const setActiveRun = useWorkflowSessionsStore((state) => state.setActiveRun)
   const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
+  const setVideoPreviewUrl = useWorkflowSessionsStore((state) => state.setVideoPreviewUrl)
   const triggerDashboardRefresh = useWorkflowSessionsStore((state) => state.triggerDashboardRefresh)
   const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
   const setReportResult = useReportStore((state) => state.setReportResult)
@@ -59,6 +60,92 @@ export function useChat() {
       }
     }
   }, [])
+
+  const handleWorkflowArtifactEvent = (
+    sessionId: string,
+    phase: string,
+    payload: Record<string, unknown>,
+  ) => {
+    const artifact = typeof payload.artifact === 'object' && payload.artifact
+      ? (payload.artifact as Record<string, unknown>)
+      : null
+    const kind = typeof artifact?.kind === 'string' ? artifact.kind : ''
+
+    if (!kind) {
+      return false
+    }
+
+    if (kind === 'report') {
+      if (phase === 'artifact_progress') {
+        const stepContent = typeof payload.message === 'string' ? payload.message : ''
+        if (stepContent) {
+          const currentlyGenerating = useReportStore.getState().isGenerating
+          if (!currentlyGenerating) {
+            startReportGeneration()
+            openOrFocusTab('report')
+            setRightPanelRatio(28)
+          }
+          addReportStep(stepContent)
+        }
+        return true
+      }
+
+      if (phase === 'artifact_ready' || phase === 'artifact_failed') {
+        const steps = Array.isArray(payload.steps)
+          ? payload.steps.filter((item): item is string => typeof item === 'string')
+          : []
+        const reportHtml =
+          typeof payload.report_html === 'string'
+            ? payload.report_html
+            : typeof artifact?.report_html === 'string'
+              ? artifact.report_html
+              : null
+        const reportFilename =
+          typeof payload.report_filename === 'string'
+            ? payload.report_filename
+            : typeof artifact?.report_filename === 'string'
+              ? artifact.report_filename
+              : null
+        const error =
+          typeof payload.error === 'string'
+            ? payload.error
+            : phase === 'artifact_failed'
+              ? 'Report generation failed'
+              : null
+        setReportResult(reportHtml, steps, reportFilename, error)
+        openOrFocusTab('report')
+        setRightPanelRatio(28)
+        stopReportGeneration()
+        return true
+      }
+    }
+
+    if (kind === 'dashboard') {
+      if (phase === 'artifact_ready') {
+        openOrFocusTab('dashboard')
+        return true
+      }
+      if (phase === 'artifact_refresh') {
+        triggerDashboardRefresh(sessionId)
+        openOrFocusTab('dashboard')
+        return true
+      }
+    }
+
+    if (kind === 'video') {
+      const taskId = typeof artifact?.task_id === 'string' ? artifact.task_id : null
+      const videoUrl = typeof artifact?.video_url === 'string' ? artifact.video_url : null
+      if (videoUrl) {
+        setVideoPreviewUrl(sessionId, videoUrl)
+      }
+      if (phase === 'artifact_ready') {
+        openOrFocusTab('video-preview', taskId ? { taskId } : {})
+        return true
+      }
+    }
+
+    return false
+  }
 
   const connectToSSE = (sessionId: string) => {
     closedNormallyRef.current = false
@@ -90,6 +177,12 @@ export function useChat() {
           const filePath = typeof data?.file_path === 'string' ? data?.file_path : null
           const phase = typeof data?.phase === 'string' ? data?.phase : ''
           const payload = (data?.payload as Record<string, unknown>) || {}
+
+          if (handleWorkflowArtifactEvent(sessionId, phase, payload)) {
+            pushEvent(agentEvent)
+            return
+          }
+
           const activeWorkflowFile = useWorkflowSessionsStore.getState().sessions[sessionId]?.activeFilePath
           if (filePath && activeWorkflowFile && activeWorkflowFile !== filePath) {
             clearWorkflow(sessionId)
@@ -195,11 +288,10 @@ export function useChat() {
             const error = typeof payload?.error === 'string' ? payload?.error : null
             const isDataVideoWorkflow = filePath?.includes('data_video')
             const runSucceeded = status === 'finished' || status === 'success'
-            // 非数据视频：立即隐藏进度。数据视频且成功：隐藏进度以便面板显示播放器；数据视频且失败：保留进度以显示错误
             if (!isDataVideoWorkflow || runSucceeded) {
               useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, false)
             }
-            
+
             setRunStatus(sessionId, status, error)
             setActiveRun(sessionId, {
               id: `file:${filePath || ''}`,
@@ -209,34 +301,37 @@ export function useChat() {
               created_at: new Date().toISOString(),
               finished_at: new Date().toISOString(),
             })
+
+            const artifacts = Array.isArray(payload?.artifacts)
+              ? payload.artifacts.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+              : []
+            artifacts.forEach((artifact) => {
+              handleWorkflowArtifactEvent(sessionId, 'artifact_ready', { artifact })
+            })
+
             if (payload?.outputs && typeof payload.outputs === 'object') {
-	              setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
-	              const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
-	              const taskIdToOpen = videoParams.taskId ?? null
-	              if (taskIdToOpen) {
-	                const openVideoPanel = () => openOrFocusTab('video-preview', taskIdToOpen ? { taskId: taskIdToOpen } : {})
-	                openVideoPanel()
-	              } else {
-	                // 如果 outputs 中没有找到，尝试从消息文本中提取 taskId
-	                const lastMessage = messages[messages.length - 1]
-	                if (lastMessage?.role === 'assistant' && lastMessage.content) {
-	                  const taskIdMatch = String(lastMessage.content).match(/Task ID:\s*(\d{8}_\d{6})/i)
-	                  if (taskIdMatch) {
-	                    const extractedTaskId = taskIdMatch[1]
-	                    const currentRunOutput = useWorkflowSessionsStore.getState().sessions[sessionId]?.runOutput || ''
-	                    setRunOutput(sessionId, currentRunOutput + `\nTask ID: ${extractedTaskId}`)
-	                    openOrFocusTab('video-preview', { taskId: extractedTaskId })
-	                  } else if (isDataVideoWorkflow) {
-	                    // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
-	                    openOrFocusTab('video-preview', {})
-	                  }
-	                } else if (isDataVideoWorkflow) {
-	                  // 数据视频工作流失败时，确保 Video Preview 面板已打开（显示进度和错误）
-	                  openOrFocusTab('video-preview', {})
-	                }
+              setRunOutput(sessionId, JSON.stringify(payload.outputs, null, 2))
+              const videoParams = extractVideoOutputParams(payload.outputs as Record<string, unknown>)
+              const taskIdToOpen = videoParams.taskId ?? null
+              if (taskIdToOpen) {
+                openOrFocusTab('video-preview', { taskId: taskIdToOpen })
+              } else {
+                const lastMessage = messages[messages.length - 1]
+                if (lastMessage?.role === 'assistant' && lastMessage.content) {
+                  const taskIdMatch = String(lastMessage.content).match(/Task ID:\s*(\d{8}_\d{6})/i)
+                  if (taskIdMatch) {
+                    const extractedTaskId = taskIdMatch[1]
+                    const currentRunOutput = useWorkflowSessionsStore.getState().sessions[sessionId]?.runOutput || ''
+                    setRunOutput(sessionId, currentRunOutput + `\nTask ID: ${extractedTaskId}`)
+                    openOrFocusTab('video-preview', { taskId: extractedTaskId })
+                  } else if (isDataVideoWorkflow) {
+                    openOrFocusTab('video-preview', {})
+                  }
+                } else if (isDataVideoWorkflow) {
+                  openOrFocusTab('video-preview', {})
+                }
               }
             } else if (isDataVideoWorkflow) {
-              // 数据视频工作流失败时，即使没有 outputs，也确保 Video Preview 面板已打开
               openOrFocusTab('video-preview', {})
             }
             return
@@ -247,18 +342,18 @@ export function useChat() {
             setViewState(sessionId, 'error')
             return
           }
-	          if (phase === 'video_preview_ready') {
-	            const videoUrl = typeof payload?.video_url === 'string' ? payload.video_url : null
-	            if (videoUrl) {
-	              useWorkflowSessionsStore.getState().setVideoPreviewUrl(sessionId, videoUrl)
-	              openOrFocusTab('video-preview', {})
-	            }
-	            return
-	          }
-	          if (phase === 'refresh') {
-	            triggerDashboardRefresh(sessionId)
-	            return
-	          }
+          if (phase === 'video_preview_ready') {
+            const videoUrl = typeof payload?.video_url === 'string' ? payload.video_url : null
+            if (videoUrl) {
+              setVideoPreviewUrl(sessionId, videoUrl)
+              openOrFocusTab('video-preview', {})
+            }
+            return
+          }
+          if (phase === 'refresh') {
+            triggerDashboardRefresh(sessionId)
+            return
+          }
         }
 
         if (agentEvent.type === 'tool_end') {
@@ -268,7 +363,7 @@ export function useChat() {
           }
         }
 
-        // Real-time report step: update panel progress immediately
+        // Legacy fallback for report runtime before unified artifact events.
         if (agentEvent.type === 'report_step') {
           const stepContent = agentEvent.content ?? ''
           if (stepContent) {

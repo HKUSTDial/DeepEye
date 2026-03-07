@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.infra import EventBus
 from app.repositories import MessageRepository
 from app.schemas import AgentEvent, AgentEventType, AssistantMessage, Message, ToolStep
+from app.services.workflow_events import build_workflow_event_data
 from deepeye.utils.logger import logger
 
 _WORKFLOW_DIR = "/workspace/workflow"
@@ -201,12 +202,12 @@ class AgentCallback(AsyncCallbackHandler):
             await self.event_bus.publish(self.channel, event.model_dump_json())
 
     async def _publish_workflow_event(self, phase: str, payload: dict[str, Any] | None = None) -> None:
-        event_data = {
-            "session_id": self.session_id,
-            "file_path": self._workflow_active_file,
-            "phase": phase,
-            "payload": payload or {},
-        }
+        event_data = build_workflow_event_data(
+            self.session_id,
+            phase,
+            payload,
+            file_path=self._workflow_active_file,
+        )
         logger.info(f"[_publish_workflow_event] phase={phase}, session={self.session_id}, file={self._workflow_active_file}")
         await self._publish(
             AgentEvent(

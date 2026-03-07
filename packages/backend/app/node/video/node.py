@@ -18,6 +18,7 @@ from app.services.workflow_file_service import (
     get_progress_publisher_by_workflow_id,
     get_session_id_by_workflow_id,
 )
+from app.services.workflow_events import build_workflow_artifact, publish_workflow_event
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.runtime import ExecutionContext
@@ -632,26 +633,30 @@ class VideoGeneratorHandler:
                         # Publish video_url via workflow event so frontend can show iframe
                         if deploy_url:
                             try:
-                                from app.infra import RedisEventBus
-                                from app.schemas import AgentEvent, AgentEventType
-                                from app.core.config import settings as _s
-
                                 async def _emit():
-                                    bus = RedisEventBus(_s.REDIS_URL)
-                                    event = AgentEvent(
-                                        type=AgentEventType.WORKFLOW_EVENT,
-                                        source="workflow",
-                                        data={
-                                            "phase": "video_preview_ready",
-                                            "payload": {
-                                                "task_id": task_id,
-                                                "session_id": session_id,
-                                                "video_url": deploy_url,
-                                            },
+                                    artifact = build_workflow_artifact(
+                                        "video",
+                                        task_id=task_id,
+                                        session_id=session_id,
+                                        video_url=deploy_url,
+                                    )
+                                    await publish_workflow_event(
+                                        f"session:{session_id}",
+                                        session_id,
+                                        "artifact_ready",
+                                        {"artifact": artifact},
+                                    )
+                                    await publish_workflow_event(
+                                        f"session:{session_id}",
+                                        session_id,
+                                        "video_preview_ready",
+                                        {
+                                            "artifact": artifact,
+                                            "task_id": task_id,
+                                            "session_id": session_id,
+                                            "video_url": deploy_url,
                                         },
                                     )
-                                    await bus.publish(f"session:{session_id}", event.model_dump_json())
-                                    await bus.close()
 
                                 new_loop.run_until_complete(_emit())
                             except Exception as ee:

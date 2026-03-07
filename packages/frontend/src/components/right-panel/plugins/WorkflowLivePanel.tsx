@@ -195,6 +195,7 @@ export function WorkflowLivePanel({
   const appendVideoProgressLog = useWorkflowSessionsStore((state) => state.appendVideoProgressLog)
   const setVideoProgressStep = useWorkflowSessionsStore((state) => state.setVideoProgressStep)
   const setVideoProgressPercent = useWorkflowSessionsStore((state) => state.setVideoProgressPercent)
+  const setVideoPreviewUrl = useWorkflowSessionsStore((state) => state.setVideoPreviewUrl)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
@@ -331,7 +332,30 @@ export function WorkflowLivePanel({
         const filePath = typeof data.file_path === 'string' ? data.file_path : null
         const phase = typeof data.phase === 'string' ? data.phase : ''
         const payload = (data.payload as Record<string, unknown>) || {}
+        const artifact = typeof payload.artifact === 'object' && payload.artifact
+          ? (payload.artifact as Record<string, unknown>)
+          : null
+        const artifactKind = typeof artifact?.kind === 'string' ? artifact.kind : ''
         if (filePath && activeFilePathRef.current && activeFilePathRef.current !== filePath) {
+          return
+        }
+        if (phase === 'artifact_ready') {
+          if (artifactKind === 'dashboard') {
+            openOrFocusTab('dashboard')
+            return
+          }
+          if (artifactKind === 'video') {
+            const taskId = typeof artifact?.task_id === 'string' ? artifact.task_id : null
+            const videoUrl = typeof artifact?.video_url === 'string' ? artifact.video_url : null
+            if (videoUrl) {
+              setVideoPreviewUrl(sessionId, videoUrl)
+            }
+            openOrFocusTab('video-preview', taskId ? { taskId } : {})
+            return
+          }
+        }
+        if (phase === 'artifact_refresh' && artifactKind === 'dashboard') {
+          openOrFocusTab('dashboard')
           return
         }
         if (phase === 'run_start') {
@@ -454,6 +478,7 @@ export function WorkflowLivePanel({
     appendVideoProgressLog,
     setVideoProgressStep,
     setVideoProgressPercent,
+    setVideoPreviewUrl,
     clearWorkflow,
     clearValidated,
     setActiveFilePath,

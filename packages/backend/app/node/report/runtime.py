@@ -15,6 +15,7 @@ from pathlib import Path
 
 from app.core.config import get_report_session_root, settings
 from app.sandbox.manager import SandboxManager
+from app.services.workflow_events import build_workflow_artifact, publish_workflow_event_sync
 
 from .report_module.pipeline import AutoReportPipeline
 
@@ -99,10 +100,21 @@ def run_report_pipeline(
     channel = f"session:{session_id}"
     out_path = create_report_temp_file(session_id, suffix=".html", prefix="deepeye_report_")
     steps_buffer: list[str] = []
+    report_artifact = build_workflow_artifact("report")
 
     def _push_step(line: str) -> None:
         steps_buffer.append(line)
         _publish_sync(channel, {"type": "report_step", "source": "report", "content": line})
+        publish_workflow_event_sync(
+            channel,
+            session_id,
+            "artifact_progress",
+            {
+                "artifact": report_artifact,
+                "message": line,
+                "steps": steps_buffer,
+            },
+        )
 
     logger.info("[ReportRuntime] Starting report generation, output path: %s", out_path)
     try:
@@ -132,6 +144,16 @@ def run_report_pipeline(
                 "type": "report_done",
                 "source": "report",
                 "data": {"report_html": None, "steps": steps_buffer, "error": str(exc)},
+            },
+        )
+        publish_workflow_event_sync(
+            channel,
+            session_id,
+            "artifact_failed",
+            {
+                "artifact": report_artifact,
+                "steps": steps_buffer,
+                "error": str(exc),
             },
         )
         return None, error_detail
@@ -226,6 +248,22 @@ def run_report_pipeline(
                 "steps": steps_buffer,
                 "report_filename": report_filename,
             },
+        },
+    )
+    publish_workflow_event_sync(
+        channel,
+        session_id,
+        "artifact_ready",
+        {
+            "artifact": build_workflow_artifact(
+                "report",
+                report_path=f"/workspace/{report_filename}",
+                report_filename=report_filename,
+                report_html=report_html,
+            ),
+            "steps": steps_buffer,
+            "report_html": report_html,
+            "report_filename": report_filename,
         },
     )
     return report_html, None

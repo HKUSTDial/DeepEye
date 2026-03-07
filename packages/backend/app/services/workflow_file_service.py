@@ -11,6 +11,7 @@ from app.sandbox import sandbox_manager
 from app.core.config import settings
 from app.schemas import AgentEvent, AgentEventType
 from app.services.workflow_engine import build_engine
+from app.services.workflow_events import build_workflow_event_data, extract_workflow_artifacts
 from pydantic import ValidationError
 from deepeye.workflows.models import Graph, Workflow as CoreWorkflow
 from deepeye.workflows.runtime import ExecutionContext
@@ -59,12 +60,7 @@ async def service_run_workflow_from_file(
     async def _publish_workflow_event(phase: str, payload: dict | None = None):
         await _publish(
             AgentEventType.WORKFLOW_EVENT,
-            {
-                "session_id": session_id,
-                "file_path": path,
-                "phase": phase,
-                "payload": payload or {},
-            },
+            build_workflow_event_data(session_id, phase, payload, file_path=path),
         )
 
     try:
@@ -139,11 +135,17 @@ async def service_run_workflow_from_file(
             raise result_holder[0]
         context = result_holder[0]
         outputs = _collect_final_outputs(graph, context)
+        artifacts = extract_workflow_artifacts(outputs)
         await _publish_workflow_event(
             "run_end",
-            {"status": context.status, "finished_at": _timestamp(), "outputs": outputs},
+            {
+                "status": context.status,
+                "finished_at": _timestamp(),
+                "outputs": outputs,
+                "artifacts": artifacts,
+            },
         )
-        return {"status": context.status, "outputs": outputs}
+        return {"status": context.status, "outputs": outputs, "artifacts": artifacts}
     except WorkflowValidationError as exc:
         issues = [
             {

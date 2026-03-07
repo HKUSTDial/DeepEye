@@ -26,6 +26,7 @@ from app.node.dashboard.nl2dashboard.design import DashboardDesigner
 from app.node.dashboard.nl2dashboard.engineering import DashboardEngineer
 from app.node.dashboard.nl2dashboard.llm_compat import LLMClient
 from app.core.config import settings
+from app.services.workflow_events import build_workflow_artifact, publish_workflow_event_sync
 
 logger = logging.getLogger(__name__)
 
@@ -78,32 +79,15 @@ class NL2DashboardHandler:
         """Send workflow events to frontend"""
         if not self.sandbox or not getattr(self.sandbox, "session_id", None):
             return
-        
-        import threading
-        from app.infra import RedisEventBus
-        from app.schemas import AgentEvent, AgentEventType
-        from app.core.config import settings
 
         def _sync_publish():
             try:
-                temp_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(temp_loop)
-                
-                async def _task():
-                    bus = RedisEventBus(settings.REDIS_URL)
-                    event = AgentEvent(
-                        type=AgentEventType.WORKFLOW_EVENT,
-                        source="workflow",
-                        data={
-                            "phase": phase,
-                            "payload": payload or {}
-                        }
-                    )
-                    await bus.publish(f"session:{self.sandbox.session_id}", event.model_dump_json())
-                    await bus.close()
-                
-                temp_loop.run_until_complete(_task())
-                temp_loop.close()
+                publish_workflow_event_sync(
+                    f"session:{self.sandbox.session_id}",
+                    self.sandbox.session_id,
+                    phase,
+                    payload or {},
+                )
             except:
                 pass
 
@@ -445,6 +429,17 @@ class NL2DashboardHandler:
                             # Sequential send in sync mode to prevent frontend conflicts
                             self._emit_log("Dashboard deployment complete!\n", sync=True)
                             print(f"Dashboard deployment complete! Access it here: {full_url}\n")
+                            self._emit_workflow_event(
+                                "artifact_refresh",
+                                {
+                                    "artifact": build_workflow_artifact(
+                                        "dashboard",
+                                        dashboard_url=full_url,
+                                        output_path=final_sandbox_path,
+                                    ),
+                                },
+                                sync=True,
+                            )
                             self._emit_workflow_event("refresh", sync=True)
                         except Exception as e:
                             print(f"[ERROR] Background deployment failed: {e}")
@@ -468,6 +463,17 @@ class NL2DashboardHandler:
                     print(f"[WARN] Failed to submit deployment task: {de}")
                     traceback.print_exc()
 
+            self._emit_workflow_event(
+                "artifact_ready",
+                {
+                    "artifact": build_workflow_artifact(
+                        "dashboard",
+                        dashboard_url=full_url,
+                        output_path=final_sandbox_path,
+                    ),
+                },
+                sync=True,
+            )
             return {
                 "output_path": final_sandbox_path,
                 "dashboard_url": full_url,
