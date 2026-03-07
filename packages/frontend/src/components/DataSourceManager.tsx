@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ApiError } from '../api/client'
 import { datasourceApi, sessionApi, type DatasourceTablesResponse } from '../api'
 import { useChatStore } from '../stores/chat'
-import type { DataSource } from '../types'
+import type { DataSource, DataSourceConnectionTestResponse } from '../types'
 import './DataSourceManager.css'
 
 interface DataSourceManagerProps {
@@ -126,6 +127,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   const sessionId = useChatStore((state) => state.sessionId)
   const createSession = useChatStore((state) => state.createSession)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const onDataSourcesChangeRef = useRef(onDataSourcesChange)
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [newDs, setNewDs] = useState({ name: '', type: 'postgres', connection_string: '' })
@@ -138,17 +140,42 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   const [editingDsId, setEditingDsId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', type: 'mysql', connection_string: '' })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [isTestingCreate, setIsTestingCreate] = useState(false)
+  const [isTestingEdit, setIsTestingEdit] = useState(false)
+  const [createConnectionStatus, setCreateConnectionStatus] = useState<string | null>(null)
+  const [editConnectionStatus, setEditConnectionStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    onDataSourcesChangeRef.current = onDataSourcesChange
+  }, [onDataSourcesChange])
+
+  useEffect(() => {
+    onDataSourcesChangeRef.current?.(dataSources)
+  }, [dataSources])
+
+  const getApiErrorDetail = (error: unknown, fallback: string) => {
+    if (error instanceof ApiError) {
+      const detail = (error.response as { detail?: unknown } | undefined)?.detail
+      if (typeof detail === 'string') return detail
+      return error.message || fallback
+    }
+    return error instanceof Error ? error.message : fallback
+  }
+
+  const formatConnectionSuccess = (result: DataSourceConnectionTestResponse) => {
+    const sample = result.sample_tables.slice(0, 3).join(', ')
+    return result.table_count > 0
+      ? `连接成功，可访问 ${result.table_count} 张表。示例：${sample || '无'}`
+      : '连接成功，但当前库中未发现可访问的数据表。'
+  }
 
   const applyDataSources = useCallback(
     (next: DataSource[] | ((current: DataSource[]) => DataSource[])) => {
-      setDataSources((current) => {
-        const resolved =
-          typeof next === 'function' ? (next as (value: DataSource[]) => DataSource[])(current) : next
-        onDataSourcesChange?.(resolved)
-        return resolved
-      })
+      setDataSources((current) =>
+        typeof next === 'function' ? (next as (value: DataSource[]) => DataSource[])(current) : next,
+      )
     },
-    [onDataSourcesChange],
+    [],
   )
 
   const loadDataSources = useCallback(async (targetSessionId?: string | null) => {
@@ -225,6 +252,8 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     }
     try {
       setError(null)
+      const tested = await runCreateConnectionTest()
+      if (!tested) return
       const targetSessionId = await ensureSessionId()
       await datasourceApi.create({
         name: newDs.name.trim() || newDs.type,
@@ -234,11 +263,34 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       await loadDataSources(targetSessionId)
       setIsCreating(false)
       setNewDs({ name: '', type: 'postgres', connection_string: '' })
+      setCreateConnectionStatus(null)
       emitDatasourceUpdated()
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to create'
-      const detail = (e as { response?: { detail?: string } })?.response?.detail
-      setError(detail && typeof detail === 'string' ? detail : msg)
+      setError(getApiErrorDetail(e, 'Failed to create'))
+    }
+  }
+
+  const runCreateConnectionTest = async () => {
+    const conn = newDs.connection_string.trim()
+    if (!conn) {
+      setError('请填写连接字符串 (Connection URI)')
+      return false
+    }
+    setIsTestingCreate(true)
+    setError(null)
+    setCreateConnectionStatus(null)
+    try {
+      const result = await datasourceApi.testConnection({
+        type: newDs.type,
+        connection_string: conn,
+      })
+      setCreateConnectionStatus(formatConnectionSuccess(result))
+      return true
+    } catch (e: unknown) {
+      setError(getApiErrorDetail(e, '数据库连接失败'))
+      return false
+    } finally {
+      setIsTestingCreate(false)
     }
   }
 
@@ -266,6 +318,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       type: ds.type || 'mysql',
       connection_string: ds.connection_string || '',
     })
+    setEditConnectionStatus(null)
     setError(null)
   }
 
@@ -279,6 +332,8 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     setIsSavingEdit(true)
     setError(null)
     try {
+      const tested = await runEditConnectionTest()
+      if (!tested) return
       const updated = await datasourceApi.update(editingDsId, {
         name: editForm.name.trim() || editForm.type,
         type: editForm.type,
@@ -291,17 +346,42 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         return next
       })
       setEditingDsId(null)
+      setEditConnectionStatus(null)
       emitDatasourceUpdated()
     } catch (e: unknown) {
-      const msg = (e as { response?: { detail?: string } })?.response?.detail ?? (e instanceof Error ? e.message : 'Update failed')
-      setError(String(msg))
+      setError(getApiErrorDetail(e, 'Update failed'))
     } finally {
       setIsSavingEdit(false)
     }
   }
 
+  const runEditConnectionTest = async () => {
+    const conn = editForm.connection_string.trim()
+    if (!conn) {
+      setError('请填写连接字符串')
+      return false
+    }
+    setIsTestingEdit(true)
+    setError(null)
+    setEditConnectionStatus(null)
+    try {
+      const result = await datasourceApi.testConnection({
+        type: editForm.type,
+        connection_string: conn,
+      })
+      setEditConnectionStatus(formatConnectionSuccess(result))
+      return true
+    } catch (e: unknown) {
+      setError(getApiErrorDetail(e, '数据库连接失败'))
+      return false
+    } finally {
+      setIsTestingEdit(false)
+    }
+  }
+
   const cancelEdit = () => {
     setEditingDsId(null)
+    setEditConnectionStatus(null)
     setError(null)
   }
 
@@ -470,7 +550,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
               <span className="data-source-field-label">Display name</span>
               <input
                 value={newDs.name}
-                onChange={(event) => setNewDs({ ...newDs, name: event.target.value })}
+                onChange={(event) => {
+                  setNewDs({ ...newDs, name: event.target.value })
+                  setCreateConnectionStatus(null)
+                }}
                 placeholder="Revenue warehouse"
                 className="data-source-field"
               />
@@ -479,7 +562,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
               <span className="data-source-field-label">Engine</span>
               <EngineSelect
                 value={newDs.type}
-                onChange={(nextType) => setNewDs({ ...newDs, type: nextType })}
+                onChange={(nextType) => {
+                  setNewDs({ ...newDs, type: nextType })
+                  setCreateConnectionStatus(null)
+                }}
               />
             </label>
           </div>
@@ -487,7 +573,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
             <span className="data-source-field-label">Connection URI</span>
             <textarea
               value={newDs.connection_string}
-              onChange={(event) => setNewDs({ ...newDs, connection_string: event.target.value })}
+              onChange={(event) => {
+                setNewDs({ ...newDs, connection_string: event.target.value })
+                setCreateConnectionStatus(null)
+              }}
               placeholder={URI_EXAMPLES[newDs.type] || 'Connection URI'}
               className="data-source-field data-source-field-mono data-source-textarea"
               rows={3}
@@ -497,7 +586,20 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
             <span className="data-source-uri-label">Example</span>
             <code className="data-source-uri-example">{URI_EXAMPLES[newDs.type] || 'Connection URI'}</code>
           </div>
+          {createConnectionStatus && (
+            <div className="data-source-success">
+              <span>{createConnectionStatus}</span>
+            </div>
+          )}
           <div className="data-source-form-footer">
+            <button
+              type="button"
+              onClick={() => void runCreateConnectionTest()}
+              disabled={isTestingCreate}
+              className="data-source-secondary-btn"
+            >
+              {isTestingCreate ? '测试中...' : '测试连接'}
+            </button>
             <button type="button" onClick={createDataSource} className="data-source-submit-btn">
               Connect database
             </button>
@@ -596,7 +698,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                       <span className="data-source-field-label">Display name</span>
                       <input
                         value={editForm.name}
-                        onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+                        onChange={(event) => {
+                          setEditForm((current) => ({ ...current, name: event.target.value }))
+                          setEditConnectionStatus(null)
+                        }}
                         placeholder="Revenue warehouse"
                         className="data-source-field"
                       />
@@ -605,7 +710,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                       <span className="data-source-field-label">Engine</span>
                       <EngineSelect
                         value={editForm.type}
-                        onChange={(nextType) => setEditForm((current) => ({ ...current, type: nextType }))}
+                        onChange={(nextType) => {
+                          setEditForm((current) => ({ ...current, type: nextType }))
+                          setEditConnectionStatus(null)
+                        }}
                       />
                     </label>
                   </div>
@@ -613,7 +721,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                     <span className="data-source-field-label">Connection URI</span>
                     <textarea
                       value={editForm.connection_string}
-                      onChange={(event) => setEditForm((current) => ({ ...current, connection_string: event.target.value }))}
+                      onChange={(event) => {
+                        setEditForm((current) => ({ ...current, connection_string: event.target.value }))
+                        setEditConnectionStatus(null)
+                      }}
                       placeholder={URI_EXAMPLES[editForm.type] || 'Connection URI'}
                       className="data-source-field data-source-field-mono data-source-textarea"
                       rows={3}
@@ -623,7 +734,20 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                     <span className="data-source-uri-label">Example</span>
                     <code className="data-source-uri-example">{URI_EXAMPLES[editForm.type] || 'Connection URI'}</code>
                   </div>
+                  {editConnectionStatus && (
+                    <div className="data-source-success">
+                      <span>{editConnectionStatus}</span>
+                    </div>
+                  )}
                   <div className="data-source-subpanel-actions">
+                    <button
+                      type="button"
+                      onClick={() => void runEditConnectionTest()}
+                      disabled={isTestingEdit || isSavingEdit}
+                      className="data-source-secondary-btn"
+                    >
+                      {isTestingEdit ? '测试中...' : '测试连接'}
+                    </button>
                     <button
                       type="button"
                       onClick={saveEdit}

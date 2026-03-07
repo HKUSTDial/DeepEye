@@ -175,6 +175,18 @@
   font-size: 12px;
 }
 
+.data-source-success {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--success) 10%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
+  color: color-mix(in srgb, var(--success) 88%, var(--main-text));
+  font-size: 12px;
+}
+
 .data-source-link-btn {
   height: 27px;
   padding: 0 9px;

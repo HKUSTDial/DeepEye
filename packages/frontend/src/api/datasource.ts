@@ -1,4 +1,4 @@
-import type { DataSource, DataSourceCreate, DataSourceUpdate } from '../types'
+import type { DataSource, DataSourceConnectionTestResponse, DataSourceCreate, DataSourceUpdate } from '../types'
 import { http } from './client'
 
 export interface DatasourceTable {
@@ -18,6 +18,8 @@ export const datasourceApi = {
     const url = sessionId ? `/datasources?session_id=${sessionId}` : '/datasources'
     return http.post<DataSource>(url, data)
   },
+  testConnection: (data: Pick<DataSourceCreate, 'type' | 'connection_string'>) =>
+    http.post<DataSourceConnectionTestResponse>('/datasources/test-connection', data),
   update: (id: string, data: DataSourceUpdate) => http.patch<DataSource>(`/datasources/${id}`, data),
   tables: (id: string) => http.get<DatasourceTablesResponse>(`/datasources/${id}/tables`),
   delete: (id: string, sessionId?: string | null) => {

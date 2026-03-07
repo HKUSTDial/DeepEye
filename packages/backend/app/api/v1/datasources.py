@@ -10,8 +10,17 @@ from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.models import DataSource
 from app.repositories import DataSourceRepository, SessionAttachmentRepository, SessionRepository
-from app.schemas import DataSourceCreate, DataSourceResponse, DataSourceUpdate, SandboxEvent, SandboxEventType
+from app.schemas import (
+    DataSourceConnectionTestRequest,
+    DataSourceConnectionTestResponse,
+    DataSourceCreate,
+    DataSourceResponse,
+    DataSourceUpdate,
+    SandboxEvent,
+    SandboxEventType,
+)
 from app.services import attach_datasource_to_session
+from app.services.datasource_connection_service import validate_database_connection
 from app.services.datasource_file_service import create_file_datasource
 from app.services.datasource_specs import (
     DataSourceCategory,
@@ -49,6 +58,23 @@ def list_datasources(
     return DataSourceRepository(db).find_by_user(user_id)
 
 
+@router.post("/test-connection", response_model=DataSourceConnectionTestResponse)
+def test_datasource_connection(
+    data: DataSourceConnectionTestRequest,
+    user_id: CurrentUserId,
+):
+    """Test a database datasource connection before saving it."""
+    del user_id
+    try:
+        result = validate_database_connection(
+            connection_string=data.connection_string,
+            datasource_type=data.type,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return DataSourceConnectionTestResponse(**result)
+
+
 @router.post("", response_model=DataSourceResponse)
 async def create_datasource(
     data: DataSourceCreate,
@@ -63,6 +89,10 @@ async def create_datasource(
     ds_type = normalize_datasource_type(data.type or "mysql")
     try:
         validate_database_datasource_type(ds_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        validate_database_connection(connection_string=conn, datasource_type=ds_type)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     entity = DataSource(
@@ -155,6 +185,10 @@ def update_datasource(
         conn = data.connection_string.strip()
         if not conn and getattr(entity, "category", None) == "database":
             raise HTTPException(status_code=400, detail="connection_string cannot be empty for database datasource")
+        try:
+            validate_database_connection(connection_string=conn or entity.connection_string or "", datasource_type=entity.type)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         entity.connection_string = conn if conn else entity.connection_string
     db.add(entity)
     db.commit()

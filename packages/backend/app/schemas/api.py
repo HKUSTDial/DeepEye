@@ -40,6 +40,18 @@ class DataSourceCreate(BaseModel):
     connection_string: str
 
 
+class DataSourceConnectionTestRequest(BaseModel):
+    type: str
+    connection_string: str
+
+
+class DataSourceConnectionTestResponse(BaseModel):
+    ok: bool
+    type: str
+    table_count: int
+    sample_tables: list[str]
+
+
 class DataSourceUpdate(BaseModel):
     name: str | None = None
     type: str | None = None

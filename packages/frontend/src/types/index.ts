@@ -57,6 +57,13 @@ export interface DataSourceUpdate {
   connection_string?: string | null
 }
 
+export interface DataSourceConnectionTestResponse {
+  ok: boolean
+  type: string
+  table_count: number
+  sample_tables: string[]
+}
+
 // API types
 export interface ChatPayload {
   message: string
