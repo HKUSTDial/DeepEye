@@ -1,0 +1,125 @@
+<svg width="888" height="761" viewBox="0 0 888 761" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="modalShadow" x="-8%" y="-8%" width="116%" height="116%">
+      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#111827" flood-opacity="0.12"/>
+    </filter>
+    <filter id="softShadow" x="-8%" y="-8%" width="116%" height="116%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#111827" flood-opacity="0.04"/>
+    </filter>
+  </defs>
+
+  <rect width="888" height="761" fill="#E6E8EC"/>
+
+  <g opacity="0.42">
+    <rect x="0" y="0" width="888" height="761" fill="#EFF1F4"/>
+    <rect x="4" y="22" width="880" height="26" rx="13" fill="#F7F7F8"/>
+    <rect x="670" y="24" width="104" height="22" rx="11" fill="#1F232B"/>
+    <rect x="776" y="24" width="76" height="22" rx="11" fill="#111827"/>
+    <rect x="802" y="188" width="74" height="250" rx="18" fill="#EFF1F4"/>
+    <rect x="20" y="703" width="404" height="34" rx="17" fill="#F5F6F8"/>
+    <rect x="434" y="703" width="312" height="34" rx="17" fill="#F5F6F8"/>
+  </g>
+
+  <g filter="url(#modalShadow)">
+    <rect x="6" y="6" width="876" height="749" rx="28" fill="#F7F7F8" stroke="#DADDE3"/>
+  </g>
+
+  <g id="header">
+    <text x="30" y="39" fill="#3A414C" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="800" letter-spacing="1.15">ATTACHED DATA</text>
+    <text x="30" y="66" fill="#858B97" font-family="'Segoe UI', Arial, sans-serif" font-size="13">Everything attached here is available to the assistant automatically.</text>
+
+    <g filter="url(#softShadow)">
+      <rect x="557" y="24" width="106" height="36" rx="18" fill="#FFFFFF" stroke="#D9DDE3"/>
+    </g>
+    <path d="M580 33V47M576 44L580 48L584 44M572.5 51H587.5" stroke="#4B5563" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="592" y="47" fill="#3A414C" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="700">Upload file</text>
+
+    <g filter="url(#softShadow)">
+      <rect x="669" y="24" width="110" height="36" rx="18" fill="#FFFFFF" stroke="#D9DDE3"/>
+    </g>
+    <path d="M686 36L694 44M694 36L686 44" stroke="#4B5563" stroke-width="1.7" stroke-linecap="round"/>
+    <text x="702" y="47" fill="#3A414C" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="700">Database</text>
+
+    <rect x="787" y="30" width="24" height="24" rx="12" fill="#E7E9ED"/>
+    <text x="799" y="46" text-anchor="middle" fill="#757C88" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="800">2</text>
+
+    <rect x="823" y="24" width="36" height="36" rx="18" fill="#F5F6F8" stroke="#D9DDE3"/>
+    <path d="M836 37L846 47M846 37L836 47" stroke="#444C57" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+
+  <g id="dropzone" filter="url(#softShadow)">
+    <rect x="31" y="84" width="822" height="78" rx="22" fill="#F7F7F8" stroke="#D9DDE3" stroke-dasharray="3 4"/>
+    <rect x="47" y="99" width="42" height="42" rx="16" fill="#F1F3F6"/>
+    <path d="M68 109.5V123.5" stroke="#434B56" stroke-width="2" stroke-linecap="round"/>
+    <path d="M61.8 115.7L68 109.5L74.2 115.7" stroke="#434B56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M57.8 128V125.6C57.8 124.053 59.053 122.8 60.6 122.8H64.2" stroke="#434B56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M78.2 128V125.6C78.2 124.053 76.947 122.8 75.4 122.8H71.8" stroke="#434B56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="108" y="122" fill="#313842" font-family="'Segoe UI', Arial, sans-serif" font-size="15" font-weight="700">Drag files here or click to browse</text>
+    <text x="108" y="140" fill="#8D94A0" font-family="'Segoe UI', Arial, sans-serif" font-size="11">CSV, JSON, Excel, and Parquet are supported.</text>
+  </g>
+
+  <g id="db-panel" filter="url(#softShadow)">
+    <rect x="31" y="180" width="822" height="395" rx="22" fill="#F5F6F8" stroke="#D9DDE3"/>
+    <text x="46" y="204" fill="#848C98" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="800" letter-spacing="1.2">DATABASE CONNECTION</text>
+    <text x="46" y="228" fill="#7E8592" font-family="'Segoe UI', Arial, sans-serif" font-size="13">Create a reusable live source for reports, dashboards, and follow-up analysis.</text>
+
+    <text x="46" y="257" fill="#3B424D" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Display name</text>
+    <text x="448" y="257" fill="#3B424D" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Engine</text>
+
+    <rect x="46" y="269" width="391" height="38" rx="14" fill="#FAFAFB" stroke="#D6DAE1"/>
+    <text x="59" y="293" fill="#B2B7C0" font-family="'Segoe UI', Arial, sans-serif" font-size="13">Revenue warehouse</text>
+
+    <rect x="448" y="269" width="391" height="38" rx="14" fill="#FAFAFB" stroke="#D6DAE1"/>
+    <text x="462" y="293" fill="#49515B" font-family="'Segoe UI', Arial, sans-serif" font-size="13">PostgreSQL</text>
+    <path d="M814 284L820 290L826 284" stroke="#717885" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <text x="46" y="330" fill="#3B424D" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Connection URI</text>
+    <rect x="46" y="343" width="793" height="94" rx="16" fill="#FAFAFB" stroke="#D6DAE1"/>
+    <text x="59" y="370" fill="#B2B7C0" font-family="'Cascadia Code', 'Courier New', monospace" font-size="12">postgresql://user:password@localhost:5432/analytics</text>
+
+    <text x="46" y="460" fill="#7E8592" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="800" letter-spacing="0.8">EXAMPLE</text>
+    <rect x="46" y="472" width="793" height="40" rx="14" fill="#F7F7F9" stroke="#D6DAE1"/>
+    <text x="60" y="496" fill="#49515B" font-family="'Cascadia Code', 'Courier New', monospace" font-size="12" font-weight="600">postgresql://user:password@localhost:5432/analytics</text>
+
+    <rect x="46" y="524" width="96" height="38" rx="14" fill="#FFFFFF" stroke="#D5D9E0"/>
+    <text x="94" y="548" text-anchor="middle" fill="#3A414C" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Test connection</text>
+
+    <rect x="150" y="524" width="136" height="38" rx="14" fill="#1F232B"/>
+    <text x="218" y="548" text-anchor="middle" fill="#FFFFFF" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Connect database</text>
+  </g>
+
+  <g id="source-card-db" filter="url(#softShadow)">
+    <rect x="31" y="592" width="822" height="67" rx="20" fill="#F7F7F8" stroke="#D9DDE3"/>
+    <g stroke="#8E95A1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <ellipse cx="60" cy="625" rx="6.5" ry="3.5"/>
+      <path d="M53.5 625V631.5C53.5 633.4 56.4 635 60 635C63.6 635 66.5 633.4 66.5 631.5V625"/>
+      <path d="M53.5 628.2C53.5 630.1 56.4 631.7 60 631.7C63.6 631.7 66.5 630.1 66.5 628.2"/>
+    </g>
+    <text x="89" y="625" fill="#353C46" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">retail_ops</text>
+    <text x="89" y="641" fill="#8D94A0" font-family="'Segoe UI', Arial, sans-serif" font-size="11">POSTGRES</text>
+
+    <rect x="734" y="607" width="31" height="31" rx="11.5" fill="#FBFBFC" stroke="#D8DCE3"/>
+    <path d="M747.1 626.6L752.9 620.8" stroke="#4A525D" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M748.8 628.3L754.6 622.5" stroke="#4A525D" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M751.8 619.7L755.7 623.6" stroke="#4A525D" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M745 629.7L748.8 628.8L747 627L746.2 625.2L745 629.7Z" stroke="#4A525D" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="772" y="607" width="31" height="31" rx="11.5" fill="#FBFBFC" stroke="#D8DCE3"/>
+    <path d="M782.7 617.8H792.3M782.7 622.5H792.3M782.7 627.2H792.3" stroke="#4A525D" stroke-width="1.45" stroke-linecap="round"/>
+
+    <rect x="810" y="607" width="31" height="31" rx="11.5" fill="#FBFBFC" stroke="#D8DCE3"/>
+    <path d="M820.8 617.8L830.2 627.2M830.2 617.8L820.8 627.2" stroke="#4A525D" stroke-width="1.55" stroke-linecap="round"/>
+  </g>
+
+  <g id="source-card-file" filter="url(#softShadow)">
+    <rect x="31" y="668" width="822" height="67" rx="20" fill="#F7F7F8" stroke="#D9DDE3"/>
+    <path d="M58 693H64L67 696V706C67 707.1 66.1 708 65 708H58C56.9 708 56 707.1 56 706V695C56 693.9 56.9 693 58 693Z" stroke="#8E95A1" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M64 693V697H68" stroke="#8E95A1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M59 701.5H64" stroke="#8E95A1" stroke-width="1.4" stroke-linecap="round"/>
+    <text x="89" y="696" fill="#353C46" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">retail_city_targets_q4_2025.csv</text>
+    <text x="89" y="716" fill="#8D94A0" font-family="'Segoe UI', Arial, sans-serif" font-size="11">FILE</text>
+
+    <rect x="810" y="686" width="31" height="31" rx="11.5" fill="#FBFBFC" stroke="#D8DCE3"/>
+    <path d="M820.8 696.8L830.2 706.2M830.2 696.8L820.8 706.2" stroke="#4A525D" stroke-width="1.55" stroke-linecap="round"/>
+  </g>
+</svg>

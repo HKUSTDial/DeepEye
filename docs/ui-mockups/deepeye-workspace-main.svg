@@ -1,0 +1,306 @@
+<svg width="1365" height="768" viewBox="0 0 1365 768" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="shadowShell" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#111827" flood-opacity="0.06"/>
+    </filter>
+    <filter id="shadowCard" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#111827" flood-opacity="0.05"/>
+    </filter>
+    <pattern id="canvasDots" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="1.4" cy="1.4" r="0.9" fill="#E7E7EA"/>
+    </pattern>
+    <clipPath id="threadClip">
+      <rect x="188" y="30" width="528" height="20" rx="10"/>
+    </clipPath>
+    <clipPath id="videoTabClipA">
+      <rect x="268" y="84" width="162" height="18" rx="9"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1365" height="768" fill="#F7F7F8"/>
+  <rect x="0.5" y="0.5" width="1364" height="767" stroke="#E6E6E8"/>
+
+  <g id="workspace" filter="url(#shadowShell)">
+    <rect x="12" y="20" width="958" height="730" rx="24" fill="#FBFBFC" stroke="#E8E8EB"/>
+
+    <g id="workspace-topbar">
+      <rect x="22" y="26" width="938" height="38" rx="19" fill="#FFFFFF" stroke="#ECECEF"/>
+      <rect x="22" y="26" width="72" height="38" rx="19" fill="#F3F4F6" stroke="#E9EAEC"/>
+      <path d="M29 39H36M29 43H36M29 47H36" stroke="#4B5563" stroke-width="1.5" stroke-linecap="round"/>
+      <text x="47" y="47" fill="#374151" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" font-weight="600">Menu</text>
+      <text x="107" y="47" fill="#30323A" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="15" font-weight="700">Workspace</text>
+      <g clip-path="url(#threadClip)">
+        <text x="188" y="47" fill="#8A8F98" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="11.5" font-weight="600">Thread: Uploaded the 2025 Q4 city targets and marketing budget sheet, and connected the store sales database. Please generate a dashboard and video...</text>
+      </g>
+
+      <rect x="730" y="26" width="126" height="38" rx="19" fill="#FFFFFF" stroke="#E7E8EB"/>
+      <path d="M744 39H758M744 44H754M744 49H758" stroke="#4B5563" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M762 41V47" stroke="#4B5563" stroke-width="1.5" stroke-linecap="round"/>
+      <text x="771" y="47" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Hide assistant</text>
+
+      <rect x="864" y="26" width="96" height="38" rx="19" fill="#1F232B"/>
+      <path d="M882 39.5V50.5M876.5 45H887.5" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round"/>
+      <text x="897" y="48" fill="#FFFFFF" font-family="'Segoe UI', Arial, sans-serif" font-size="12.5" font-weight="700">New chat</text>
+    </g>
+
+    <g id="workspace-tabs">
+      <rect x="22" y="78" width="74" height="34" rx="17" fill="#F4F4F5"/>
+      <path d="M33 90.5H39L41.5 93H49C50.1 93 51 93.9 51 95V100C51 101.1 50.1 102 49 102H33C31.9 102 31 101.1 31 100V92.5C31 91.4 31.9 90.5 33 90.5Z" stroke="#9CA3AF" stroke-width="1.4" stroke-linejoin="round"/>
+      <text x="56" y="100" fill="#6B7280" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Files</text>
+
+      <rect x="102" y="78" width="126" height="34" rx="17" fill="#F2F2F3" stroke="#E3E4E8"/>
+      <circle cx="119" cy="90" r="2.5" stroke="#6B7280" stroke-width="1.4"/>
+      <circle cx="119" cy="100" r="2.5" stroke="#6B7280" stroke-width="1.4"/>
+      <circle cx="129" cy="95" r="2.5" stroke="#6B7280" stroke-width="1.4"/>
+      <path d="M121 91.5L127 94M121 98.5L127 96" stroke="#6B7280" stroke-width="1.3" stroke-linecap="round"/>
+      <text x="139" y="100" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Workflow</text>
+      <path d="M208 90L214 96M214 90L208 96" stroke="#9CA3AF" stroke-width="1.4" stroke-linecap="round"/>
+
+      <rect x="234" y="78" width="220" height="34" rx="17" fill="#F4F4F5"/>
+      <rect x="252" y="89" width="10" height="12" rx="2" stroke="#9CA3AF" stroke-width="1.4"/>
+      <path d="M262 93L267 90V100L262 97" stroke="#9CA3AF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <g clip-path="url(#videoTabClipA)">
+        <text x="272" y="100" fill="#7C818B" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="600">Video: 20260307_224035</text>
+      </g>
+
+      <rect x="460" y="78" width="94" height="34" rx="17" fill="#F4F4F5"/>
+      <path d="M477 89H485L488 92V101C488 102.1 487.1 103 486 103H477C475.9 103 475 102.1 475 101V91C475 89.9 475.9 89 477 89Z" stroke="#9CA3AF" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M485 89V93H489" stroke="#9CA3AF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="496" y="100" fill="#7C818B" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Report</text>
+
+      <rect x="560" y="78" width="112" height="34" rx="17" fill="#F4F4F5"/>
+      <rect x="576" y="89" width="5" height="5" rx="1.2" stroke="#9CA3AF" stroke-width="1.2"/>
+      <rect x="584" y="89" width="5" height="5" rx="1.2" stroke="#9CA3AF" stroke-width="1.2"/>
+      <rect x="576" y="97" width="5" height="5" rx="1.2" stroke="#9CA3AF" stroke-width="1.2"/>
+      <rect x="584" y="97" width="5" height="5" rx="1.2" stroke="#9CA3AF" stroke-width="1.2"/>
+      <text x="596" y="100" fill="#7C818B" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Dashboard</text>
+
+      <rect x="926" y="78" width="34" height="34" rx="17" fill="#F4F4F5"/>
+      <path d="M943 88V102M936 95H950" stroke="#9CA3AF" stroke-width="1.6" stroke-linecap="round"/>
+    </g>
+
+    <g id="workflow-panel">
+      <rect x="22" y="122" width="948" height="628" rx="22" fill="#FFFFFF" stroke="#E8E8EB"/>
+
+      <g id="workflow-toolbar">
+        <path d="M22 190H970" stroke="#EAECEF"/>
+        <text x="50" y="144" fill="#8B919A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="800" letter-spacing="1.2">WORKFLOW</text>
+        <text x="50" y="167" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">Live graph</text>
+        <text x="50" y="184" fill="#8B919A" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="600">Run: success</text>
+
+        <rect x="525" y="142" width="203" height="26" rx="13" fill="#FAFAFB" stroke="#E7E8EB"/>
+        <text x="534" y="159" fill="#959AA3" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="600">q4_2025_retail_video_analysis</text>
+
+        <rect x="736" y="142" width="48" height="26" rx="13" fill="#FAFAFB" stroke="#E7E8EB"/>
+        <text x="760" y="159" text-anchor="middle" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Save</text>
+        <rect x="788" y="142" width="60" height="26" rx="13" fill="#FAFAFB" stroke="#E7E8EB"/>
+        <text x="818" y="159" text-anchor="middle" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Upload</text>
+        <rect x="852" y="142" width="56" height="26" rx="13" fill="#FAFAFB" stroke="#E7E8EB"/>
+        <text x="880" y="159" text-anchor="middle" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Export</text>
+        <rect x="914" y="140" width="40" height="30" rx="15" fill="#1F232B"/>
+        <text x="934" y="159" text-anchor="middle" fill="#FFFFFF" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Run</text>
+      </g>
+
+      <g id="graph-area">
+        <rect x="22" y="190" width="643" height="560" rx="0" fill="url(#canvasDots)"/>
+        <path d="M664.5 190V750" stroke="#EAECEF"/>
+
+        <g filter="url(#shadowCard)">
+          <rect x="61" y="386" width="112" height="50" rx="8" fill="#FCFCFD" stroke="#DEDFE3"/>
+          <text x="70" y="406" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Datasource Read</text>
+          <text x="129" y="428" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">dataset_ref</text>
+          <circle cx="173" cy="421" r="3" fill="#B592FF"/>
+        </g>
+
+        <g filter="url(#shadowCard)">
+          <rect x="61" y="511" width="112" height="50" rx="8" fill="#FCFCFD" stroke="#DEDFE3"/>
+          <text x="70" y="531" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Sql Execute</text>
+          <text x="129" y="553" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">dataset_ref</text>
+          <circle cx="173" cy="546" r="3" fill="#B592FF"/>
+        </g>
+
+        <g filter="url(#shadowCard)">
+          <rect x="278" y="449" width="114" height="68" rx="8" fill="#FCFCFD" stroke="#DEDFE3"/>
+          <text x="287" y="468" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Python Code</text>
+          <circle cx="281" cy="482" r="3" fill="#111827"/>
+          <circle cx="281" cy="500" r="3" fill="#111827"/>
+          <text x="287" y="484" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">input</text>
+          <text x="287" y="502" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">dataset_ref</text>
+          <text x="349" y="486" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">dataset_ref</text>
+          <circle cx="392" cy="484" r="3" fill="#B592FF"/>
+        </g>
+
+        <g filter="url(#shadowCard)">
+          <rect x="498" y="449" width="114" height="119" rx="8" fill="#FCFCFD" stroke="#DEDFE3"/>
+          <text x="507" y="468" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Video Generator</text>
+          <circle cx="501" cy="483" r="3" fill="#111827"/>
+          <text x="507" y="486" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">dataset_ref</text>
+          <text x="569" y="487" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">video_path</text>
+          <text x="569" y="505" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">video_info</text>
+          <text x="579" y="523" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">task_id</text>
+          <text x="575" y="541" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">session_id</text>
+          <text x="579" y="559" fill="#A1A5AD" font-family="'Segoe UI', Arial, sans-serif" font-size="8">video_url</text>
+          <circle cx="609" cy="483" r="3" fill="#B592FF"/>
+          <circle cx="609" cy="501" r="3" fill="#B592FF"/>
+          <circle cx="609" cy="519" r="3" fill="#B592FF"/>
+          <circle cx="609" cy="537" r="3" fill="#B592FF"/>
+          <circle cx="609" cy="555" r="3" fill="#B592FF"/>
+        </g>
+
+        <path d="M173 421C222 421 225 500 281 500" stroke="#6D6DF6" stroke-width="2.2" fill="none"/>
+        <path d="M173 546C222 546 225 500 281 500" stroke="#6D6DF6" stroke-width="2.2" fill="none"/>
+        <path d="M392 484C438 484 451 484 501 484" stroke="#6D6DF6" stroke-width="2.2" fill="none"/>
+
+        <g id="zoom-controls" filter="url(#shadowCard)">
+          <rect x="20" y="623" width="42" height="112" rx="14" fill="#FFFFFF" stroke="#E3E5E8"/>
+          <path d="M31 640H43M37 634V646" stroke="#30323A" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M31 677H43" stroke="#30323A" stroke-width="1.8" stroke-linecap="round"/>
+          <rect x="33" y="708" width="10" height="8" rx="1.5" stroke="#30323A" stroke-width="1.5"/>
+          <path d="M21 660H61M21 697H61" stroke="#ECEDEF"/>
+        </g>
+
+        <text x="613" y="744" fill="#8F949D" font-family="'Segoe UI', Arial, sans-serif" font-size="10">React Flow</text>
+      </g>
+
+      <g id="inspector">
+        <rect x="665" y="190" width="305" height="560" fill="#FBFBFC"/>
+        <rect x="665" y="190" width="305" height="44" fill="#FBFBFC"/>
+        <path d="M665 234H970" stroke="#EAECEF"/>
+        <g stroke="#838995" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="686.5" cy="212" r="3.4"/>
+          <path d="M686.5 204.3V206.6M686.5 217.4V219.7M678.8 212H681.1M691.9 212H694.2M681.1 206.6L682.8 208.2M690.2 215.8L691.9 217.4M681.1 217.4L682.8 215.8M690.2 208.2L691.9 206.6"/>
+        </g>
+        <text x="703" y="220" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="0.75">INSPECTOR</text>
+
+        <g transform="translate(812,324)">
+          <rect x="-26" y="-24" width="52" height="48" rx="16" fill="#FCFCFD" stroke="#E2E4E7"/>
+          <g stroke="#838995" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="0" cy="0" r="4"/>
+            <path d="M0 -9V-6.2M0 6.2V9M-9 0H-6.2M6.2 0H9M-6.4 -6.4L-4.7 -4.7M4.7 4.7L6.4 6.4M-6.4 6.4L-4.7 4.7M4.7 -4.7L6.4 -6.4"/>
+          </g>
+        </g>
+        <text x="812" y="373" text-anchor="middle" fill="#8F96A0" font-family="'Segoe UI', Arial, sans-serif" font-size="12">Select a node to review parameters and</text>
+        <text x="812" y="392" text-anchor="middle" fill="#8F96A0" font-family="'Segoe UI', Arial, sans-serif" font-size="12">run output</text>
+
+        <g fill="none" stroke="#818792" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="689" cy="465" r="6.5"/>
+          <path d="M687 461.8L692 465L687 468.2Z" fill="#818792" stroke="none"/>
+        </g>
+        <text x="706" y="470" fill="#8B919A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="800" letter-spacing="1.2">RUN STATUS</text>
+
+        <rect x="681" y="487" width="263" height="76" rx="16" fill="#FAFAFB" stroke="#E4E6E9"/>
+        <text x="695" y="518" fill="#8D929A" font-family="'Segoe UI', Arial, sans-serif" font-size="12">Status</text>
+        <rect x="870" y="500" width="54" height="24" rx="12" fill="#E8F6EB" stroke="#CDE7D4"/>
+        <text x="897" y="516" text-anchor="middle" fill="#5A9E6A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">success</text>
+        <text x="695" y="544" fill="#8D929A" font-family="'Segoe UI', Arial, sans-serif" font-size="12">Started</text>
+        <text x="925" y="544" text-anchor="end" fill="#8D929A" font-family="'Segoe UI', Arial, sans-serif" font-size="12">01:27:22</text>
+
+        <text x="693" y="586" fill="#8B919A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Output</text>
+        <rect x="681" y="598" width="263" height="138" rx="10" fill="#F4F4F6" stroke="#E0E2E5"/>
+        <rect x="935" y="598" width="9" height="138" rx="4.5" fill="#D5D8DE"/>
+        <text x="694" y="623" fill="#4B5563" font-family="'Cascadia Code', 'Courier New', monospace" font-size="10">{"{"}</text>
+        <text x="706" y="643" fill="#4B5563" font-family="'Cascadia Code', 'Courier New', monospace" font-size="10">"generate_video": {"{"}</text>
+        <text x="720" y="663" fill="#4B5563" font-family="'Cascadia Code', 'Courier New', monospace" font-size="10">"video_path": "/workspace/sessions/..."</text>
+        <text x="720" y="683" fill="#4B5563" font-family="'Cascadia Code', 'Courier New', monospace" font-size="10">"video_info": {"{"}</text>
+        <text x="734" y="703" fill="#4B5563" font-family="'Cascadia Code', 'Courier New', monospace" font-size="10">"status": "success",</text>
+        <text x="734" y="723" fill="#4B5563" font-family="'Cascadia Code', 'Courier New', monospace" font-size="10">"task_id": "20260308_012744"</text>
+      </g>
+    </g>
+  </g>
+
+  <g id="assistant-rail" filter="url(#shadowShell)">
+    <rect x="980" y="20" width="373" height="730" rx="24" fill="#FBFBFC" stroke="#E8E8EB"/>
+
+    <g id="assistant-header">
+      <rect x="994" y="26" width="345" height="48" rx="20" fill="#FFFFFF" stroke="#ECECEF"/>
+      <rect x="997" y="30" width="74" height="20" rx="10" fill="#F1F2F4"/>
+      <text x="1005" y="44" fill="#9AA0A8" font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="800" letter-spacing="1.1">ASSISTANT</text>
+      <text x="997" y="63" fill="#30323A" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12" font-weight="700">I uploaded the 2025 Q4 city targets and budget sheet...</text>
+      <rect x="1296" y="30" width="36" height="20" rx="10" fill="#F3F4F6"/>
+      <text x="1314" y="44" text-anchor="middle" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">Hide</text>
+      <path d="M994 74H1339" stroke="#ECEDEF"/>
+    </g>
+
+    <g id="assistant-thread">
+      <rect x="1192" y="103" width="112" height="42" rx="21" fill="#111A33"/>
+      <text x="1248" y="129" text-anchor="middle" fill="#FFFFFF" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="11.5" font-weight="700">Generate Dashboard</text>
+      <rect x="1307" y="111" width="24" height="24" rx="12" fill="#F5F6F8"/>
+      <text x="1319" y="126" text-anchor="middle" fill="#9AA0A8" font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="700">You</text>
+
+      <circle cx="1012" cy="169" r="13" fill="#111827"/>
+      <text x="1012" y="173" text-anchor="middle" fill="#FFFFFF" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">AI</text>
+      <rect x="1036" y="160" width="278" height="162" rx="18" fill="#FFFFFF" stroke="#E6E7EB"/>
+      <g filter="url(#shadowCard)">
+        <rect x="1058" y="173" width="220" height="49" rx="12" fill="#FAFAFB" stroke="#E6E7EB"/>
+        <circle cx="1074" cy="196" r="5" fill="#56C271"/>
+        <circle cx="1074" cy="196" r="2" fill="#EAF8EE"/>
+        <text x="1090" y="192" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">workflow_agent</text>
+        <text x="1090" y="208" fill="#A0A4AC" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">SUPERVISOR</text>
+        <rect x="1236" y="184" width="43" height="20" rx="10" fill="#EAF7E9" stroke="#D3E8D1"/>
+        <text x="1257" y="198" text-anchor="middle" fill="#66B673" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">Done</text>
+        <path d="M1291 191L1296 196L1301 191" stroke="#9AA0A8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g filter="url(#shadowCard)">
+        <rect x="1058" y="233" width="220" height="49" rx="12" fill="#FAFAFB" stroke="#E6E7EB"/>
+        <circle cx="1074" cy="256" r="5" fill="#56C271"/>
+        <circle cx="1074" cy="256" r="2" fill="#EAF8EE"/>
+        <text x="1090" y="252" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">summarize_workflo...</text>
+        <text x="1090" y="268" fill="#A0A4AC" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">SUPERVISOR</text>
+        <rect x="1236" y="244" width="43" height="20" rx="10" fill="#EAF7E9" stroke="#D3E8D1"/>
+        <text x="1257" y="258" text-anchor="middle" fill="#66B673" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">Done</text>
+        <path d="M1291 251L1296 256L1301 251" stroke="#9AA0A8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <text x="1046" y="297" fill="#525763" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="12">Dashboard updated successfully.</text>
+      <text x="1046" y="315" fill="#525763" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="12">Open the refreshed dashboard.</text>
+
+      <rect x="1186" y="361" width="118" height="42" rx="21" fill="#111A33"/>
+      <text x="1245" y="387" text-anchor="middle" fill="#FFFFFF" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="11.5" font-weight="700">Generate Video</text>
+      <rect x="1307" y="369" width="24" height="24" rx="12" fill="#F5F6F8"/>
+      <text x="1319" y="384" text-anchor="middle" fill="#9AA0A8" font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="700">You</text>
+
+      <circle cx="1012" cy="430" r="13" fill="#111827"/>
+      <text x="1012" y="434" text-anchor="middle" fill="#FFFFFF" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">AI</text>
+      <rect x="1036" y="421" width="289" height="214" rx="18" fill="#FFFFFF" stroke="#E6E7EB"/>
+      <g filter="url(#shadowCard)">
+        <rect x="1058" y="434" width="220" height="49" rx="12" fill="#FAFAFB" stroke="#E6E7EB"/>
+        <circle cx="1074" cy="457" r="5" fill="#56C271"/>
+        <circle cx="1074" cy="457" r="2" fill="#EAF8EE"/>
+        <text x="1090" y="453" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">workflow_agent</text>
+        <text x="1090" y="469" fill="#A0A4AC" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">SUPERVISOR</text>
+        <rect x="1236" y="445" width="43" height="20" rx="10" fill="#EAF7E9" stroke="#D3E8D1"/>
+        <text x="1257" y="459" text-anchor="middle" fill="#66B673" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">Done</text>
+        <path d="M1291 452L1296 457L1301 452" stroke="#9AA0A8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g filter="url(#shadowCard)">
+        <rect x="1058" y="494" width="220" height="49" rx="12" fill="#FAFAFB" stroke="#E6E7EB"/>
+        <circle cx="1074" cy="517" r="5" fill="#56C271"/>
+        <circle cx="1074" cy="517" r="2" fill="#EAF8EE"/>
+        <text x="1090" y="513" fill="#30323A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">summarize_workflo...</text>
+        <text x="1090" y="529" fill="#A0A4AC" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">SUPERVISOR</text>
+        <rect x="1236" y="505" width="43" height="20" rx="10" fill="#EAF7E9" stroke="#D3E8D1"/>
+        <text x="1257" y="519" text-anchor="middle" fill="#66B673" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">Done</text>
+        <path d="M1291 512L1296 517L1301 512" stroke="#9AA0A8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <text x="1046" y="574" fill="#525763" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="11.5">Video regenerated successfully.</text>
+      <text x="1046" y="590" fill="#525763" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="11.5">Task ID: 20260308_012744.</text>
+      <text x="1046" y="606" fill="#525763" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="11.5">Quarterly performance is compared across</text>
+      <text x="1046" y="622" fill="#525763" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="11.5">Hangzhou, Shenzhen, Shanghai, Beijing,</text>
+      <text x="1046" y="638" fill="#525763" font-family="'Segoe UI', 'PingFang SC', sans-serif" font-size="11.5">Guangzhou, and Chengdu with campaign analysis.</text>
+    </g>
+
+    <g id="assistant-composer" filter="url(#shadowCard)">
+      <rect x="996" y="678" width="341" height="56" rx="18" fill="#FFFFFF" stroke="#E6E7EB"/>
+      <rect x="1006" y="692" width="28" height="28" rx="14" fill="#F5F6F8" stroke="#E5E7EB"/>
+      <path d="M1020 699V713M1013 706H1027" stroke="#6B7280" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="1029" cy="690" r="8" fill="#111827"/>
+      <text x="1029" y="693" text-anchor="middle" fill="#FFFFFF" font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="700">2</text>
+      <text x="1044" y="710" fill="#B2B6BD" font-family="'Segoe UI', Arial, sans-serif" font-size="12">Ask DeepEye about your attached data...</text>
+      <circle cx="1318" cy="706" r="16" fill="#FAFAFB" stroke="#E1E3E7"/>
+      <path d="M1318 698V714M1311 705L1318 698L1325 705" stroke="#C1C5CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="1267" y="726" width="70" height="16" rx="8" fill="#F1F2F4"/>
+      <text x="1302" y="738" text-anchor="middle" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="700">2 data attached</text>
+    </g>
+
+    <rect x="1346" y="508" width="6" height="160" rx="3" fill="#D7DADF"/>
+  </g>
+</svg>
