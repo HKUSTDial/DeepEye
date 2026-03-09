@@ -4,9 +4,20 @@ import './StepItem.css'
 
 interface StepItemProps {
   step: ToolStep
+  depth?: number
 }
 
-export default function StepItem({ step }: StepItemProps) {
+function formatSourceLabel(source?: string) {
+  const raw = source?.trim() || 'tool'
+  return raw
+    .replace(/[._]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+export default function StepItem({ step, depth = 0 }: StepItemProps) {
   const [expanded, setExpanded] = useState(false)
   const isRunning = useMemo(() => step.status === 'running', [step.status])
   const hasDetails = useMemo(
@@ -23,7 +34,7 @@ export default function StepItem({ step }: StepItemProps) {
     if (step.status === 'error') return 'Error'
     return 'Running'
   }, [step.status])
-  const sourceLabel = useMemo(() => step.source?.trim() || 'tool', [step.source])
+  const sourceLabel = useMemo(() => formatSourceLabel(step.source), [step.source])
 
   // Thought Step
   if (step.type === 'thought') {
@@ -52,10 +63,14 @@ export default function StepItem({ step }: StepItemProps) {
     <>
       <span className={`tool-node ${nodeStateClass}`}></span>
       <span className="tool-main">
-        <span className="tool-name">{step.name}</span>
-        <span className="tool-source">{sourceLabel}</span>
+        <span className="tool-title-row">
+          <span className="tool-name">{step.name}</span>
+          <span className={`tool-status ${nodeStateClass}`}>{statusLabel}</span>
+        </span>
+        <span className="tool-meta-row">
+          <span className="tool-source">{sourceLabel}</span>
+        </span>
       </span>
-      <span className={`tool-status ${nodeStateClass}`}>{statusLabel}</span>
       {hasDetails && (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +88,7 @@ export default function StepItem({ step }: StepItemProps) {
 
   // Tool Step
   return (
-    <div className="tool-tree-item">
+    <div className={`tool-tree-item ${depth > 0 ? 'is-nested' : ''}`}>
       {hasDetails ? (
         <button
           onClick={() => setExpanded(!expanded)}
@@ -100,7 +115,7 @@ export default function StepItem({ step }: StepItemProps) {
           {step.subSteps && step.subSteps.length > 0 && (
             <div className="tool-children">
               {step.subSteps.map((sub, idx) => (
-                <StepItem key={`sub-${idx}`} step={sub} />
+                <StepItem key={`sub-${idx}`} step={sub} depth={depth + 1} />
               ))}
             </div>
           )}

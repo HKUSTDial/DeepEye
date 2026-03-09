@@ -1,5 +1,14 @@
 /* Workflow Components - Unified Styles */
 
+.workflow-live-panel {
+  --workflow-link: var(--accent);
+  --workflow-link-active: var(--accent-hover);
+  --workflow-link-soft: rgba(32, 33, 35, 0.14);
+  --workflow-port-input: var(--accent);
+  --workflow-port-output: #c27a1a;
+  --workflow-grid: var(--border-color);
+}
+
 /* Toolbar */
 .workflow-toolbar {
   display: flex;
@@ -696,7 +705,7 @@
 .workflow-canvas-container {
   flex: 1;
   position: relative;
-  background: var(--main-bg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-bg) 98%, #ffffff) 0%, color-mix(in srgb, var(--panel-bg) 93%, var(--main-bg-alt)) 100%);
   width: 100%;
   height: 100%;
 }
@@ -704,11 +713,13 @@
 .workflow-canvas {
   width: 100%;
   height: 100%;
-  background: var(--main-bg-alt);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--workflow-link) 10%, transparent) 0%, transparent 32%),
+    linear-gradient(180deg, color-mix(in srgb, var(--main-bg-alt) 98%, #ffffff) 0%, color-mix(in srgb, var(--main-bg-alt) 92%, var(--panel-bg)) 100%);
 }
 
 .workflow-canvas-background {
-  background: var(--main-bg-alt) !important;
+  opacity: 0.88;
 }
 
 .workflow-canvas-controls {
@@ -746,31 +757,66 @@
   transform: translateY(-1px);
 }
 
+.workflow-canvas .react-flow__edge-path {
+  stroke: var(--workflow-link);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--workflow-link) 14%, transparent));
+}
+
+.workflow-canvas .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--workflow-link-active);
+}
+
+.workflow-canvas .react-flow__edge.workflow-edge--new .react-flow__edge-path {
+  stroke: var(--workflow-link-active);
+  stroke-dasharray: 7 5;
+  animation: workflow-edge-dash 1.1s linear infinite;
+}
+
 /* Node */
 .workflow-node {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-  padding: 12px;
-  min-width: 180px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
+  position: relative;
+  overflow: visible;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 99%, #ffffff) 0%, color-mix(in srgb, var(--card-bg) 94%, var(--main-bg-alt)) 100%);
+  border: 1px solid color-mix(in srgb, var(--card-border) 90%, transparent);
+  border-radius: 16px;
+  padding: 13px 14px;
+  min-width: 196px;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.workflow-node::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, var(--workflow-link) 0%, color-mix(in srgb, var(--workflow-port-output) 64%, var(--workflow-link)) 100%);
+  opacity: 0.9;
 }
 
 .workflow-node:hover {
-  border-color: var(--card-border-hover);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border-color: color-mix(in srgb, var(--workflow-link) 20%, var(--card-border-hover));
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.11);
+  transform: translateY(-1px);
 }
 
 .workflow-node.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--workflow-link-active);
+  box-shadow:
+    0 0 0 3px var(--workflow-link-soft),
+    0 20px 36px rgba(15, 23, 42, 0.12);
 }
 
 /* Node Status Variants */
 .workflow-node--running {
-  border-color: color-mix(in srgb, var(--accent) 18%, var(--card-border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--workflow-link) 22%, var(--card-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--workflow-link) 12%, transparent),
+    0 18px 30px rgba(15, 23, 42, 0.1);
 }
 
 .workflow-node--success {
@@ -803,19 +849,26 @@
   }
 }
 
+@keyframes workflow-edge-dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
 .workflow-node-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 13px;
 }
 
 .workflow-node-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--main-text);
   flex: 1;
+  line-height: 1.3;
 }
 
 .workflow-node-status-icon {
@@ -877,31 +930,35 @@
 }
 
 .workflow-node-port-label {
-  color: var(--main-text-muted);
+  color: color-mix(in srgb, var(--main-text-muted) 88%, var(--main-text));
   font-size: 11px;
 }
 
 .workflow-node-handle {
   position: absolute !important;
-  width: 8px !important;
-  height: 8px !important;
+  width: 10px !important;
+  height: 10px !important;
   border: 2px solid !important;
   border-radius: 50% !important;
-  transition: all 0.2s ease !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--main-bg-alt) 92%, transparent) !important;
 }
 
 .workflow-node-handle-input {
-  border-color: var(--accent) !important;
-  background: var(--accent) !important;
+  border-color: var(--workflow-port-input) !important;
+  background: color-mix(in srgb, var(--workflow-port-input) 22%, #ffffff) !important;
 }
 
 .workflow-node-handle-output {
-  border-color: #a855f7 !important;
-  background: #a855f7 !important;
+  border-color: var(--workflow-port-output) !important;
+  background: color-mix(in srgb, var(--workflow-port-output) 22%, #ffffff) !important;
 }
 
 .workflow-node-handle:hover {
-  transform: translateY(-50%) scale(1.5) !important;
+  transform: translateY(-50%) scale(1.45) !important;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--workflow-link) 14%, transparent),
+    0 0 0 8px color-mix(in srgb, var(--main-bg-alt) 92%, transparent) !important;
 }
 
 .workflow-node-icon {

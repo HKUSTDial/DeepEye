@@ -133,10 +133,15 @@ export class SessionChat {
     let current: Message | null = null
     let stepStack: ToolStep[] = []
     const pendingBySource: Record<string, ToolStep[]> = {}
-    const appendTextToTimeline = (message: Message, text: string, isStreaming: boolean = false) => {
+    const appendTextToTimeline = (
+      message: Message,
+      text: string,
+      isStreaming: boolean = false,
+      mergeWithPrevious: boolean = true,
+    ) => {
       if (!message.timeline) message.timeline = []
       const last = message.timeline[message.timeline.length - 1]
-      if (last && last.kind === 'text') {
+      if (mergeWithPrevious && last && last.kind === 'text') {
         last.content += text
         last.isStreaming = isStreaming
       } else {
@@ -205,7 +210,7 @@ export class SessionChat {
           }
           const chunk = current.content ? `\n${content}` : content
           current.content += chunk
-          appendTextToTimeline(current, chunk, this.isStreaming)
+          appendTextToTimeline(current, content, this.isStreaming, false)
         } else {
           // 对于其他来源的 token，追加到当前步骤的 thought
           const pending = pendingBySource[source]

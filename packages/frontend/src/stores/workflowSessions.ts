@@ -13,6 +13,13 @@ export interface VideoProgressLogEntry {
   message: string
 }
 
+export interface DashboardProgressState {
+  visible: boolean
+  stage: number
+  percent: number
+  logs: VideoProgressLogEntry[]
+}
+
 export interface VideoProgressState {
   visible: boolean
   step: number
@@ -38,6 +45,7 @@ export interface WorkflowSessionState {
   activeRun: WorkflowRun | null
   runOutput: string
   dashboardRefreshKey: number
+  dashboardProgress: DashboardProgressState
   videoProgress: VideoProgressState
   /** URL of a ready video-preview container (set from video artifacts or snapshot restore) */
   videoPreviewUrl: string | null
@@ -67,11 +75,22 @@ interface WorkflowSessionsStore {
   setActiveRun: (sessionId: string, run: WorkflowRun | null) => void
   setRunOutput: (sessionId: string, output: string) => void
   triggerDashboardRefresh: (sessionId: string) => void
+  setDashboardProgressVisible: (sessionId: string, visible: boolean) => void
+  appendDashboardProgressLog: (sessionId: string, message: string) => void
+  setDashboardProgressStage: (sessionId: string, stage: number) => void
+  setDashboardProgressPercent: (sessionId: string, percent: number) => void
   setVideoProgressVisible: (sessionId: string, visible: boolean) => void
   appendVideoProgressLog: (sessionId: string, message: string) => void
   setVideoProgressStep: (sessionId: string, step: number) => void
   setVideoProgressPercent: (sessionId: string, percent: number) => void
   setVideoPreviewUrl: (sessionId: string, url: string | null) => void
+}
+
+const initialDashboardProgress: DashboardProgressState = {
+  visible: false,
+  stage: 0,
+  percent: 0,
+  logs: [],
 }
 
 const initialVideoProgress: VideoProgressState = {
@@ -99,6 +118,7 @@ const createEmptySession = (): WorkflowSessionState => ({
   activeRun: null,
   runOutput: '',
   dashboardRefreshKey: 0,
+  dashboardProgress: { ...initialDashboardProgress },
   videoProgress: { ...initialVideoProgress },
   videoPreviewUrl: null,
   lastUpdated: null,
@@ -150,7 +170,7 @@ const deriveRunOutput = (run: WorkflowRun | null) => {
   return run?.error || ''
 }
 
-const deriveVideoPreviewUrl = (run: WorkflowRun | null, artifacts: WorkflowArtifact[]) => {
+const deriveVideoPreviewUrl = (artifacts: WorkflowArtifact[]) => {
   const videoArtifact = [...artifacts]
     .reverse()
     .find((artifact) => artifact.kind === 'video' && typeof artifact.payload?.video_url === 'string')
@@ -223,7 +243,8 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
             error: run?.status === 'failed' ? run?.error ?? null : null,
             activeRun: run,
             runOutput: deriveRunOutput(run),
-            videoPreviewUrl: deriveVideoPreviewUrl(run, artifacts),
+            dashboardProgress: { ...initialDashboardProgress },
+            videoPreviewUrl: deriveVideoPreviewUrl(artifacts),
             lastUpdated: Date.now(),
           },
         },
@@ -489,6 +510,93 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
           [sessionId]: {
             ...current,
             dashboardRefreshKey: current.dashboardRefreshKey + 1,
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
+  setDashboardProgressVisible: (sessionId, visible) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      const previous = current.dashboardProgress ?? initialDashboardProgress
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...current,
+            dashboardProgress: visible
+              ? previous.visible
+                ? { ...previous, visible: true }
+                : { ...initialDashboardProgress, visible: true }
+              : { ...previous, visible: false },
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
+  appendDashboardProgressLog: (sessionId, message) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      const prev = current.dashboardProgress ?? initialDashboardProgress
+      const time = new Date().toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+      const entry: VideoProgressLogEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        time,
+        message,
+      }
+      const logs = [...prev.logs, entry].slice(-50)
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...current,
+            dashboardProgress: { ...prev, visible: true, logs },
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
+  setDashboardProgressStage: (sessionId, stage) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      const prev = current.dashboardProgress ?? initialDashboardProgress
+      const boundedStage = Math.max(prev.stage, Math.max(0, Math.min(stage, 5)))
+      const percentStops = [12, 28, 46, 64, 82, 94]
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...current,
+            dashboardProgress: {
+              ...prev,
+              visible: true,
+              stage: boundedStage,
+              percent: percentStops[boundedStage] ?? prev.percent,
+            },
+            lastUpdated: Date.now(),
+          },
+        },
+      }
+    }),
+  setDashboardProgressPercent: (sessionId, percent) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      const prev = current.dashboardProgress ?? initialDashboardProgress
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: {
+            ...current,
+            dashboardProgress: {
+              ...prev,
+              visible: true,
+              percent: Math.min(100, Math.max(0, percent)),
+            },
             lastUpdated: Date.now(),
           },
         },

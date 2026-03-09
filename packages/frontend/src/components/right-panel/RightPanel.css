@@ -613,6 +613,19 @@
   animation: panel-fade-in 220ms ease;
 }
 
+.panel-surface--report {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-surface--dashboard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
 .panel-frame {
   position: relative;
   flex: 1;
@@ -656,6 +669,13 @@
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.panel-report-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .panel-inline-note {
@@ -725,139 +745,481 @@
   color: var(--main-text-muted);
 }
 
-.panel-progress-shell {
+.artifact-progress-shell {
   padding: 14px 14px 0;
 }
 
-.panel-progress-card {
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
-  background: color-mix(in srgb, var(--card-bg) 96%, var(--main-bg-alt));
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+.artifact-progress-card {
+  --artifact-progress-tone: var(--accent);
+  position: relative;
+  overflow: hidden;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--artifact-progress-tone) 18%, var(--border-color));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--artifact-progress-tone) 12%, transparent) 0%, transparent 44%),
+    linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 99%, #ffffff) 0%, color-mix(in srgb, var(--main-bg-alt) 92%, var(--card-bg)) 100%);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-.panel-progress-header {
+.artifact-progress-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.artifact-progress-card::after {
+  content: '';
+  position: absolute;
+  right: -64px;
+  bottom: -64px;
+  width: 180px;
+  height: 180px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--artifact-progress-tone) 10%, transparent);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.artifact-progress-card--report::before {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--artifact-progress-tone) 12%, transparent) 0 2px, transparent 2px),
+    repeating-linear-gradient(180deg, color-mix(in srgb, var(--artifact-progress-tone) 9%, transparent) 0 1px, transparent 1px 18px);
+  background-size: 18px 100%, 100% 18px;
+  background-position: 20px 0, 0 0;
+}
+
+.artifact-progress-card--dashboard::before {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--artifact-progress-tone) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--artifact-progress-tone) 9%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 82%, transparent 100%);
+}
+
+.artifact-progress-card--video::before {
+  background:
+    radial-gradient(circle at 18% 50%, color-mix(in srgb, var(--artifact-progress-tone) 15%, transparent) 0 2px, transparent 2px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--artifact-progress-tone) 10%, transparent) 0 1px, transparent 1px 24px);
+  background-size: 28px 100%, 100% 100%;
+}
+
+.artifact-progress-card--failed {
+  --artifact-progress-tone: var(--error);
+}
+
+.artifact-progress-card--failed .artifact-progress-track-fill {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--error) 18%, transparent);
+}
+
+.artifact-progress-head {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 16px;
 }
 
-.panel-progress-copy {
+.artifact-progress-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.artifact-progress-icon {
+  position: relative;
+  overflow: hidden;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--artifact-progress-tone) 18%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--artifact-progress-tone) 16%, var(--card-bg)) 0%, color-mix(in srgb, var(--artifact-progress-tone) 6%, var(--card-bg)) 100%);
+  color: color-mix(in srgb, var(--artifact-progress-tone) 76%, var(--main-text));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.artifact-progress-card--report .artifact-progress-icon::before,
+.artifact-progress-card--report .artifact-progress-icon::after,
+.artifact-progress-card--dashboard .artifact-progress-icon::before,
+.artifact-progress-card--dashboard .artifact-progress-icon::after,
+.artifact-progress-card--video .artifact-progress-icon::before,
+.artifact-progress-card--video .artifact-progress-icon::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.artifact-progress-card--report .artifact-progress-icon::before {
+  left: 10px;
+  right: 12px;
+  bottom: 11px;
+  height: 1px;
+  background: color-mix(in srgb, var(--artifact-progress-tone) 38%, transparent);
+  box-shadow:
+    0 -5px 0 color-mix(in srgb, var(--artifact-progress-tone) 28%, transparent),
+    0 -10px 0 color-mix(in srgb, var(--artifact-progress-tone) 22%, transparent);
+}
+
+.artifact-progress-card--report .artifact-progress-icon::after {
+  top: 8px;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  border-top: 1.5px solid color-mix(in srgb, var(--artifact-progress-tone) 48%, transparent);
+  border-right: 1.5px solid color-mix(in srgb, var(--artifact-progress-tone) 48%, transparent);
+  transform: skew(-10deg);
+}
+
+.artifact-progress-card--dashboard .artifact-progress-icon::before {
+  inset: 9px;
+  border: 1px solid color-mix(in srgb, var(--artifact-progress-tone) 30%, transparent);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--artifact-progress-tone) 20%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--artifact-progress-tone) 20%, transparent) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.artifact-progress-card--dashboard .artifact-progress-icon::after {
+  top: 10px;
+  left: 10px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--artifact-progress-tone) 72%, #ffffff);
+  box-shadow:
+    16px 0 0 color-mix(in srgb, var(--artifact-progress-tone) 52%, transparent),
+    0 16px 0 color-mix(in srgb, var(--artifact-progress-tone) 52%, transparent),
+    16px 16px 0 color-mix(in srgb, var(--artifact-progress-tone) 38%, transparent);
+}
+
+.artifact-progress-card--video .artifact-progress-icon::before {
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--artifact-progress-tone) 30%, transparent);
+  box-shadow:
+    28px 0 0 color-mix(in srgb, var(--artifact-progress-tone) 30%, transparent);
+}
+
+.artifact-progress-card--video .artifact-progress-icon::after {
+  top: 9px;
+  left: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--artifact-progress-tone) 70%, #ffffff);
+  box-shadow:
+    0 8px 0 color-mix(in srgb, var(--artifact-progress-tone) 70%, #ffffff),
+    0 16px 0 color-mix(in srgb, var(--artifact-progress-tone) 70%, #ffffff),
+    28px 0 0 color-mix(in srgb, var(--artifact-progress-tone) 70%, #ffffff),
+    28px 8px 0 color-mix(in srgb, var(--artifact-progress-tone) 70%, #ffffff),
+    28px 16px 0 color-mix(in srgb, var(--artifact-progress-tone) 70%, #ffffff);
+}
+
+.artifact-progress-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  min-width: 0;
 }
 
-.panel-progress-title {
-  font-size: 13px;
-  font-weight: var(--font-weight-semibold);
+.artifact-progress-kicker-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.artifact-progress-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--artifact-progress-tone) 64%, var(--main-text-muted));
+}
+
+.artifact-progress-signature {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--artifact-progress-tone) 14%, var(--border-color));
+  background: color-mix(in srgb, var(--artifact-progress-tone) 7%, var(--card-bg));
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--artifact-progress-tone) 76%, var(--main-text));
+}
+
+.artifact-progress-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
   color: var(--main-text);
 }
 
-.panel-progress-description,
-.panel-progress-percent {
+.artifact-progress-description {
+  max-width: 560px;
   font-size: 11px;
+  line-height: 1.6;
   color: var(--main-text-muted);
 }
 
-.panel-progress-percent {
-  font-weight: var(--font-weight-semibold);
-  color: var(--main-text);
-  white-space: nowrap;
+.artifact-progress-meter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 140px;
 }
 
-.panel-progress-bar {
+.artifact-progress-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--artifact-progress-tone) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--artifact-progress-tone) 6%, var(--card-bg));
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--artifact-progress-tone) 78%, var(--main-text));
+}
+
+.artifact-progress-status--waiting {
+  border-color: color-mix(in srgb, var(--border-color) 92%, transparent);
+  background: color-mix(in srgb, var(--main-bg-alt) 92%, transparent);
+  color: var(--main-text-muted);
+}
+
+.artifact-progress-status--failed {
+  border-color: color-mix(in srgb, var(--error) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--error) 5%, var(--card-bg));
+  color: var(--error);
+}
+
+.artifact-progress-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.artifact-progress-status--running .artifact-progress-status-dot,
+.artifact-progress-status--ready .artifact-progress-status-dot {
+  animation: artifact-progress-pulse 1.6s ease-in-out infinite;
+}
+
+.artifact-progress-value {
+  font-size: 31px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--main-text);
+}
+
+.artifact-progress-caption {
+  max-width: 220px;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: right;
+  color: var(--main-text-muted);
+}
+
+.artifact-progress-track {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  height: 6px;
-  margin-bottom: 12px;
+  height: 10px;
+  margin: 16px 0 12px;
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--border-color) 72%, transparent);
 }
 
-.panel-progress-fill {
+.artifact-progress-track::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: artifact-progress-shimmer 2.8s linear infinite;
+  pointer-events: none;
+}
+
+.artifact-progress-track-fill {
+  position: relative;
+  z-index: 1;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 88%, #ffffff), color-mix(in srgb, var(--accent) 68%, #ffffff));
-  transition: width 0.6s ease;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--artifact-progress-tone) 88%, #ffffff),
+    color-mix(in srgb, var(--artifact-progress-tone) 64%, #ffffff)
+  );
+  box-shadow: 0 0 20px color-mix(in srgb, var(--artifact-progress-tone) 20%, transparent);
+  transition: width 0.45s ease;
 }
 
-.panel-stage-list {
+.artifact-progress-metrics {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.artifact-progress-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--artifact-progress-tone) 12%, var(--border-color));
+  background: color-mix(in srgb, var(--card-bg) 92%, var(--main-bg-alt));
+}
+
+.artifact-progress-metric-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--main-text-muted);
+}
+
+.artifact-progress-metric-value {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+  color: var(--main-text);
+}
+
+.artifact-progress-steps {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.artifact-progress-step {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
+  min-height: 96px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  background: color-mix(in srgb, var(--main-bg-alt) 88%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
-.panel-stage-item {
+.artifact-progress-step--active {
+  border-color: color-mix(in srgb, var(--artifact-progress-tone) 20%, var(--border-color));
+  background: color-mix(in srgb, var(--artifact-progress-tone) 6%, var(--card-bg));
+  transform: translateY(-1px);
+}
+
+.artifact-progress-step--done {
+  border-color: color-mix(in srgb, var(--artifact-progress-tone) 12%, var(--border-color));
+  background: color-mix(in srgb, var(--artifact-progress-tone) 4%, var(--card-bg));
+}
+
+.artifact-progress-step--warning {
+  border-color: color-mix(in srgb, var(--error) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--error) 5%, var(--card-bg));
+}
+
+.artifact-progress-step-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
-  border-radius: 13px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
-  background: color-mix(in srgb, var(--main-bg-alt) 86%, transparent);
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.panel-stage-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent);
-  background: color-mix(in srgb, var(--card-bg) 95%, var(--main-bg-alt));
+.artifact-progress-step-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+  background: color-mix(in srgb, var(--card-bg) 94%, var(--main-bg-alt));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 13px;
-  color: var(--main-text-muted);
-}
-
-.panel-stage-text {
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.45;
-  color: var(--main-text-muted);
-}
-
-.panel-stage-item--active {
-  border-color: color-mix(in srgb, var(--accent) 18%, var(--border-color));
-  background: color-mix(in srgb, var(--accent) 5%, var(--card-bg));
-  transform: translateY(-1px);
-}
-
-.panel-stage-item--active .panel-stage-icon {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 20%, var(--border-color));
-  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg));
-  animation: panel-stage-pulse 1.8s ease-in-out infinite;
-}
-
-.panel-stage-item--active .panel-stage-text,
-.panel-stage-item--done .panel-stage-text {
+  font-size: 15px;
   color: var(--main-text);
 }
 
-.panel-stage-item--done {
-  border-color: color-mix(in srgb, var(--accent) 12%, var(--border-color));
-  background: color-mix(in srgb, var(--accent) 4%, var(--card-bg));
+.artifact-progress-step--active .artifact-progress-step-icon {
+  border-color: color-mix(in srgb, var(--artifact-progress-tone) 20%, var(--border-color));
+  color: color-mix(in srgb, var(--artifact-progress-tone) 82%, var(--main-text));
+  animation: artifact-progress-pulse 1.8s ease-in-out infinite;
 }
 
-.panel-stage-item--done .panel-stage-icon {
-  color: var(--accent);
+.artifact-progress-step--warning .artifact-progress-step-icon {
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 18%, var(--border-color));
 }
 
-.panel-stage-item--warning {
-  border-color: color-mix(in srgb, #d97706 22%, var(--border-color));
-  background: color-mix(in srgb, #d97706 6%, var(--card-bg));
+.artifact-progress-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--main-bg-alt) 92%, transparent);
+  color: var(--main-text-muted);
 }
 
-.panel-stage-item--warning .panel-stage-icon,
-.panel-stage-item--warning .panel-stage-text {
-  color: #b45309;
+.artifact-progress-step-badge--active,
+.artifact-progress-step-badge--done {
+  color: color-mix(in srgb, var(--artifact-progress-tone) 82%, var(--main-text));
+  background: color-mix(in srgb, var(--artifact-progress-tone) 10%, var(--card-bg));
+}
+
+.artifact-progress-step-badge--warning {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 10%, var(--card-bg));
+}
+
+.artifact-progress-step-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--main-text-muted);
+}
+
+.artifact-progress-step--active .artifact-progress-step-label,
+.artifact-progress-step--done .artifact-progress-step-label,
+.artifact-progress-step--warning .artifact-progress-step-label {
+  color: var(--main-text);
 }
 
 .panel-empty-suggestions {
@@ -910,8 +1272,8 @@
 
 .panel-report-frame {
   width: 100%;
-  min-height: 400px;
   flex: 1;
+  min-height: 0;
   border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
   border-radius: 20px;
   background: #ffffff;
@@ -922,61 +1284,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.panel-step-rail {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.panel-step-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 72px;
-  padding: 9px 8px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
-  background: color-mix(in srgb, var(--main-bg-alt) 86%, transparent);
-  text-align: center;
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
-}
-
-.panel-step-pill--active {
-  border-color: color-mix(in srgb, var(--accent) 18%, var(--border-color));
-  background: color-mix(in srgb, var(--accent) 5%, var(--card-bg));
-  transform: translateY(-1px);
-}
-
-.panel-step-pill--done {
-  border-color: color-mix(in srgb, var(--accent) 12%, var(--border-color));
-  background: color-mix(in srgb, var(--accent) 4%, var(--card-bg));
-}
-
-.panel-step-pill--warning {
-  border-color: color-mix(in srgb, var(--error) 18%, var(--border-color));
-  background: color-mix(in srgb, var(--error) 4%, var(--card-bg));
-}
-
-.panel-step-pill-icon {
-  font-size: 17px;
-  line-height: 1;
-}
-
-.panel-step-pill-label {
-  font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.4;
-  color: var(--main-text-muted);
-}
-
-.panel-step-pill--active .panel-step-pill-label,
-.panel-step-pill--done .panel-step-pill-label,
-.panel-step-pill--warning .panel-step-pill-label {
-  color: var(--main-text);
 }
 
 .panel-log-console {
@@ -1115,12 +1422,18 @@
   color: var(--main-text);
 }
 
-@keyframes panel-stage-pulse {
+@keyframes artifact-progress-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--artifact-progress-tone, var(--accent)) 12%, transparent);
   }
   50% {
     box-shadow: 0 0 0 8px rgba(0, 0, 0, 0);
+  }
+}
+
+@keyframes artifact-progress-shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
 
@@ -1154,6 +1467,14 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artifact-progress-status-dot,
+  .artifact-progress-step-icon,
+  .artifact-progress-track::before {
+    animation: none !important;
   }
 }
 
@@ -1191,7 +1512,7 @@
 
   .panel-toolbar,
   .panel-inline-header,
-  .panel-progress-header {
+  .artifact-progress-head {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -1205,7 +1526,17 @@
     width: 100%;
   }
 
-  .panel-step-rail {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .artifact-progress-meter {
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .artifact-progress-caption {
+    max-width: none;
+    text-align: left;
+  }
+
+  .artifact-progress-steps {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   }
 }

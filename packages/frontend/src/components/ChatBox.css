@@ -404,25 +404,128 @@
   gap: 10px;
 }
 
-.report-step-line {
+.chat-progress-line {
+  --chat-progress-tone: var(--accent);
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--main-bg);
-  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
-  border-radius: 8px;
-  font-size: var(--chat-font-sm);
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--chat-progress-tone) 18%, var(--border-color));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--chat-progress-tone) 10%, transparent) 0%, transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, #ffffff) 0%, color-mix(in srgb, var(--main-bg-alt) 94%, var(--card-bg)) 100%);
 }
 
-.report-step-badge {
+.chat-progress-line--report {
+  --chat-progress-tone: #c2410c;
+}
+
+.chat-progress-line--dashboard {
+  --chat-progress-tone: #0f766e;
+}
+
+.chat-progress-line--video {
+  --chat-progress-tone: #1d4ed8;
+}
+
+.chat-progress-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--chat-progress-tone) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--chat-progress-tone) 8%, var(--card-bg));
+  color: color-mix(in srgb, var(--chat-progress-tone) 78%, var(--main-text));
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   flex-shrink: 0;
+}
+
+.chat-progress-copy {
+  min-width: 0;
+  flex: 1 1 180px;
+  display: grid;
+  gap: 3px;
+}
+
+.chat-progress-label {
+  font-size: 13px;
+  line-height: 1.35;
   font-weight: 600;
   color: var(--main-text);
+  overflow-wrap: anywhere;
 }
 
-.report-step-label {
-  color: var(--main-text);
+.chat-progress-detail {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--main-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.chat-progress-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--chat-progress-tone) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--chat-progress-tone) 6%, var(--card-bg));
+  color: color-mix(in srgb, var(--chat-progress-tone) 78%, var(--main-text));
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.chat-progress-state--running {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chat-progress-tone) 8%, transparent);
+}
+
+.chat-progress-state--done {
+  color: #047857;
+}
+
+.chat-progress-state--warning {
+  color: #b45309;
+}
+
+.chat-progress-state--error {
+  color: var(--error);
+}
+
+.chat-container.compact .assistant-timeline {
+  gap: 8px;
+}
+
+.chat-container.compact .chat-progress-line {
+  padding: 9px 10px;
+  gap: 6px 8px;
+  border-radius: 14px;
+}
+
+.chat-container.compact .chat-progress-copy {
+  flex-basis: 100%;
+}
+
+.chat-container.compact .chat-progress-label {
+  font-size: 12px;
+}
+
+.chat-container.compact .chat-progress-detail {
+  font-size: 10px;
+}
+
+.chat-container.compact .chat-progress-badge,
+.chat-container.compact .chat-progress-state {
+  min-height: 22px;
+  font-size: 9px;
 }
 
 .chat-container .thinking-dots {
@@ -802,6 +905,7 @@
 }
 
 .chat-input-wrapper {
+  --chat-composer-control-offset: 10px;
   position: relative;
   display: flex;
   align-items: flex-end;
@@ -828,7 +932,7 @@
 .chat-upload-btn {
   position: absolute;
   left: 9px;
-  bottom: 8px;
+  top: var(--chat-composer-control-offset);
   width: 32px;
   height: 32px;
   border: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent);
@@ -850,7 +954,7 @@
   width: 30px;
   height: 30px;
   left: 8px;
-  bottom: 8px;
+  top: 9px;
 }
 
 .chat-upload-btn:hover:not(:disabled) {
@@ -899,7 +1003,7 @@
   flex: 1;
   width: 100%;
   min-height: 24px;
-  padding: 11px 64px 11px 50px;
+  padding: 10px 64px 10px 50px;
   background: transparent;
   border: none;
   outline: none;
@@ -914,7 +1018,7 @@
 }
 
 .chat-container.compact .chat-input {
-  padding: 10px 56px 10px 46px;
+  padding: 9px 56px 9px 46px;
   font-size: 13px;
   line-height: 1.45;
 }
@@ -945,7 +1049,7 @@ body.dark-theme .chat-container .chat-input:active {
 .chat-send-btn {
   position: absolute;
   right: 9px;
-  bottom: 8px;
+  top: var(--chat-composer-control-offset);
   width: 32px;
   height: 32px;
   border-radius: 10px;
@@ -965,13 +1069,13 @@ body.dark-theme .chat-container .chat-input:active {
   width: 30px;
   height: 30px;
   right: 8px;
-  bottom: 8px;
+  top: 9px;
 }
 
 .chat-stop-btn {
   position: absolute;
   right: 9px;
-  bottom: 8px;
+  top: 9px;
   height: 34px;
   min-width: 60px;
   border-radius: var(--chat-ui-radius);
@@ -986,7 +1090,7 @@ body.dark-theme .chat-container .chat-input:active {
 
 .chat-container.compact .chat-stop-btn {
   right: 8px;
-  bottom: 8px;
+  top: 8px;
   height: 32px;
   min-width: 56px;
   font-size: 11px;
