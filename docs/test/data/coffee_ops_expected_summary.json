@@ -1,0 +1,96 @@
+{
+  "scenario": "European coffee chain city weekly operations review, Q4 2025",
+  "date_range": {
+    "start": "2025-11-03",
+    "end": "2025-12-22"
+  },
+  "headline_findings": [
+    "Zurich has the highest total revenue at 1271000, but also the highest average stockout rate at 0.0934.",
+    "Amsterdam is the fastest-growing city and the strongest acquisition city, with 8120 new members and 48.31% revenue growth versus the first week.",
+    "London has the highest delivery dependence at 0.6671 and the highest average bad review rate at 0.0386, making fulfillment quality the main risk.",
+    "Geneva is the most balanced city, combining 0.5629 repeat rate, 0.0264 stockout rate, and 0.0186 bad review rate.",
+    "Paris has the highest average ticket at 30.57, but only 4400 new members and the flattest growth among the larger cities.",
+    "Milan has the strongest loyalty, with the highest repeat rate at 0.6167 and the lowest bad review rate at 0.0153."
+  ],
+  "city_rollup": [
+    {
+      "city": "Zurich",
+      "total_revenue": 1271000,
+      "total_orders": 45870,
+      "total_new_members": 5820,
+      "avg_ticket": 27.71,
+      "avg_repeat_rate": 0.5821,
+      "avg_stockout_rate": 0.0934,
+      "avg_bad_review_rate": 0.0233,
+      "avg_delivery_share": 0.3787,
+      "revenue_growth_vs_first_week": 0.2394
+    },
+    {
+      "city": "Amsterdam",
+      "total_revenue": 1162000,
+      "total_orders": 47870,
+      "total_new_members": 8120,
+      "avg_ticket": 24.27,
+      "avg_repeat_rate": 0.5157,
+      "avg_stockout_rate": 0.052,
+      "avg_bad_review_rate": 0.021,
+      "avg_delivery_share": 0.4545,
+      "revenue_growth_vs_first_week": 0.4831
+    },
+    {
+      "city": "London",
+      "total_revenue": 1079000,
+      "total_orders": 42150,
+      "total_new_members": 6010,
+      "avg_ticket": 25.6,
+      "avg_repeat_rate": 0.4367,
+      "avg_stockout_rate": 0.044,
+      "avg_bad_review_rate": 0.0386,
+      "avg_delivery_share": 0.6671,
+      "revenue_growth_vs_first_week": 0.1508
+    },
+    {
+      "city": "Paris",
+      "total_revenue": 1072000,
+      "total_orders": 35070,
+      "total_new_members": 4400,
+      "avg_ticket": 30.57,
+      "avg_repeat_rate": 0.5151,
+      "avg_stockout_rate": 0.0376,
+      "avg_bad_review_rate": 0.0209,
+      "avg_delivery_share": 0.3551,
+      "revenue_growth_vs_first_week": 0.0692
+    },
+    {
+      "city": "Geneva",
+      "total_revenue": 998000,
+      "total_orders": 43800,
+      "total_new_members": 5410,
+      "avg_ticket": 22.79,
+      "avg_repeat_rate": 0.5629,
+      "avg_stockout_rate": 0.0264,
+      "avg_bad_review_rate": 0.0186,
+      "avg_delivery_share": 0.4031,
+      "revenue_growth_vs_first_week": 0.2321
+    },
+    {
+      "city": "Milan",
+      "total_revenue": 910000,
+      "total_orders": 41560,
+      "total_new_members": 4010,
+      "avg_ticket": 21.9,
+      "avg_repeat_rate": 0.6167,
+      "avg_stockout_rate": 0.0303,
+      "avg_bad_review_rate": 0.0153,
+      "avg_delivery_share": 0.3004,
+      "revenue_growth_vs_first_week": 0.1923
+    }
+  ],
+  "latest_week_watchlist": {
+    "week_start": "2025-12-22",
+    "highest_revenue_city": "Zurich",
+    "highest_stockout_city": "Zurich",
+    "highest_bad_review_city": "London",
+    "highest_repeat_rate_city": "Milan"
+  }
+}

@@ -1,108 +1,158 @@
-# Retail Ops Workflow Test Sample
+# European Coffee Chain Workflow Demo Sample
 
 ## Scenario
-你是一家连锁零售品牌的区域经营负责人。你已经拿到两类异构数据：
+You are the regional operations lead for a European coffee chain preparing an end-of-year performance review. You already have two heterogeneous data sources:
 
-1. 一份 CSV：`retail_city_targets_q4_2025.csv`
-   - 记录每个城市的 Q4 收入目标、营销预算、活动主题和负责人
-2. 一个 PostgreSQL 数据库：`retail_ops`
-   - 记录 Q4 每天每家门店的销售、折扣、退款和会员订单数据
+1. A CSV file: `coffee_city_campaign_calendar_q4_2025.csv`
+   - Weekly campaign planning by city, including hero product, discount mechanic, channel focus, and city owner
+2. A PostgreSQL database: `retail_ops`
+   - Store-level daily operating facts, which need to be aggregated to city-week level before they can be joined with the CSV
 
-目标是让 DeepEye 自动编排一条异构工作流：
-- `datasource.read` 读取 CSV
-- `sql.execute` 聚合数据库销售数据
-- `python.code` 做跨源合并与指标派生
-- 最终输出 `Dashboard`、`Report`、`Video`
+This scenario works well for an international jury because it is immediately understandable:
+- Which city is growing fastest
+- Which city generates the most revenue
+- Which city has a supply risk
+- Which city has a fulfillment risk
+- Which city is the most balanced operator
+
+The goal is to let DeepEye orchestrate a heterogeneous workflow that:
+- Uses `datasource.read` to load the campaign CSV
+- Uses `sql.execute` to aggregate store-level daily data into city-week operating data
+- Uses `python.code` only to join the two sources
+- Produces a `Dashboard`, `Report`, and `Video`
+
+## Why This Demo Fits Geneva Judges
+- The business context is universal and does not depend on local Chinese market knowledge.
+- The KPIs are simple enough to understand in seconds.
+- The workflow still demonstrates real multi-source analysis, not just chart generation.
+- The final narrative naturally supports dashboard, report, and video outputs in English.
+- The database now contains about `2,016` store-day records, which feels materially closer to a real business dataset than a tiny handcrafted table.
 
 ## Files
-- CSV: [data/retail_city_targets_q4_2025.csv](/home/liboyan/project/DeepEye/docs/test/data/retail_city_targets_q4_2025.csv)
-- Expected summary: [data/expected_summary.json](/home/liboyan/project/DeepEye/docs/test/data/expected_summary.json)
+- CSV: [data/coffee_city_campaign_calendar_q4_2025.csv](/home/liboyan/project/DeepEye/docs/test/data/coffee_city_campaign_calendar_q4_2025.csv)
+- Expected summary: [data/coffee_ops_expected_summary.json](/home/liboyan/project/DeepEye/docs/test/data/coffee_ops_expected_summary.json)
 - DB init SQL: [docker/test-db/retail_ops_init.sql](/home/liboyan/project/DeepEye/docker/test-db/retail_ops_init.sql)
 
 ## Docker Compose DB Service
-建议使用 `retail-ops-db` 这个 compose 服务。
+Use the `retail-ops-db` compose service.
 
-连接串：
+Connection string:
 ```text
 postgresql://retail_ops:deepeye_retail_ops_password@retail-ops-db:5432/retail_ops
 ```
 
+## Dataset Shape
+CSV fields:
+- `city`
+- `week_start`
+- `city_tier`
+- `store_count`
+- `campaign_name`
+- `hero_product`
+- `discount_rule`
+- `channel_focus`
+- `ops_owner`
+
+Database tables:
+- `stores`
+  - `store_id`
+  - `city`
+  - `store_code`
+  - `store_name`
+  - `store_format`
+  - `store_weight`
+- `store_daily_ops`
+  - `ops_date`
+  - `store_id`
+  - `orders`
+  - `revenue`
+  - `new_members`
+  - `repeated_orders`
+  - `stockout_orders`
+  - `bad_reviews`
+  - `delivery_orders`
+
 ## Recommended SQL Shape
-建议 LLM 在 `sql.execute` 中先聚合到城市粒度，再把结果交给 `python.code` 与 CSV 融合：
+Aggregate the daily store-level facts into a `city + week_start` dataset first. That gives the artifact enough trend detail without exposing raw operational noise:
 
 ```sql
 SELECT
-  s.city AS city,
-  SUM(ds.net_revenue) AS total_revenue,
-  SUM(ds.orders_count) AS total_orders,
-  SUM(ds.member_orders) AS member_orders,
-  SUM(ds.discount_amount) AS total_discount,
-  SUM(ds.refund_amount) AS total_refund
-FROM daily_store_sales ds
-JOIN stores s ON ds.store_id = s.store_id
-WHERE ds.sales_date BETWEEN DATE '2025-10-01' AND DATE '2025-12-31'
-GROUP BY s.city
-ORDER BY total_revenue DESC;
+  DATE_TRUNC('week', sdo.ops_date)::date AS week_start,
+  s.city,
+  SUM(sdo.revenue) AS revenue,
+  SUM(sdo.orders) AS orders,
+  ROUND(SUM(sdo.revenue) / NULLIF(SUM(sdo.orders), 0), 2) AS avg_ticket,
+  SUM(sdo.new_members) AS new_members,
+  ROUND(SUM(sdo.repeated_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS repeat_rate,
+  ROUND(SUM(sdo.stockout_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS stockout_rate,
+  ROUND(SUM(sdo.bad_reviews)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS bad_review_rate,
+  ROUND(SUM(sdo.delivery_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS delivery_share
+FROM store_daily_ops sdo
+JOIN stores s ON sdo.store_id = s.store_id
+WHERE sdo.ops_date BETWEEN DATE '2025-11-03' AND DATE '2025-12-28'
+GROUP BY 1, 2
+ORDER BY week_start, city;
 ```
 
 ## Why `python.code` Is Needed
-CSV 里有数据库没有的经营字段：
-- `quarter_target_revenue`
-- `marketing_budget`
-- `focus_campaign`
-- `strategic_tier`
-- `regional_owner`
+The CSV contains campaign context that does not exist in the database:
+- `campaign_name`
+- `hero_product`
+- `discount_rule`
+- `channel_focus`
+- `city_tier`
+- `store_count`
+- `ops_owner`
 
-因此需要 `python.code` 做跨源合并，并派生：
-- `achievement_rate`
-- `revenue_gap`
-- `budget_roi`
-- `member_penetration`
-- `priority_label`
+`python.code` should therefore:
+- Normalize the `week_start` format if needed
+- Join the CSV rows and the aggregated SQL result on `city + week_start`
+- Output the final analysis-ready dataset for downstream artifact nodes
+
+This sample does not require Python-based KPI calculations. `python.code` should only be responsible for cross-source joining.
 
 ## Manual Test Steps
-1. 启动 compose 服务，确保 `retail-ops-db` 已就绪。
-2. 前端上传 CSV 文件：[data/retail_city_targets_q4_2025.csv](/home/liboyan/project/DeepEye/docs/test/data/retail_city_targets_q4_2025.csv)
-3. 前端添加数据库数据源，连接到 `retail-ops-db`
-4. 依次测试以下 3 个用户请求
+1. Start the compose stack and make sure `retail-ops-db` is healthy.
+2. Upload the CSV file [data/coffee_city_campaign_calendar_q4_2025.csv](/home/liboyan/project/DeepEye/docs/test/data/coffee_city_campaign_calendar_q4_2025.csv) in the frontend.
+3. Add the PostgreSQL datasource and connect it to `retail-ops-db`.
+4. Run the three user requests below.
 
 ## Prompt 1: Dashboard
 ```text
-我刚上传了一份 2025Q4 城市经营目标与营销预算表，也连接了门店销售数据库。请基于这些数据整理一份城市经营分析数据集，生成一个 dashboard，让我能看到城市排名、目标完成情况和预算效率等业务洞察信息。
+I uploaded a weekly city campaign calendar and connected a store-level daily operations database for our European coffee chain. Aggregate the daily data to city-week level, join the two sources by city and week, then build a dashboard that quickly shows revenue performance, member growth, and operational risks across cities.
 ```
 
 ## Prompt 2: Report
 ```text
-我刚上传了一份 2025Q4 城市经营目标与营销预算表，也连接了门店销售数据库。请基于这些数据生成一份专业的英文经营分析报告。
+I uploaded a weekly city campaign calendar and connected a store-level daily operations database for our European coffee chain. Aggregate the daily data to city-week level, then create a professional English business review that explains which cities are growing fastest, which cities have supply or fulfillment risks, and what actions leadership should take next.
 ```
 
 ## Prompt 3: Video
 ```text
-我刚上传了一份 2025Q4 城市经营目标与营销预算表，也连接了门店销售数据库。请基于这些数据做一个英文数据洞察视频。
+I uploaded a weekly city campaign calendar and connected a store-level daily operations database for our European coffee chain. Aggregate the daily data to city-week level and create a 60-second English insight video structured around growth cities, risk cities, and the most balanced city.
 ```
 
 ## Expected Business Conclusions
-基于当前样例数据，稳定应当得到这些核心事实：
+With the current sample data, the workflow should consistently surface these conclusions after SQL aggregation:
 
-- Q4 总营收最高的城市：`Hangzhou`
-- 总营收：`794673.36`
-- 第二名：`Shenzhen`，总营收 ` 736325.78`
-- 第三名：`Shanghai`，总营收 ` 705395.86`
-
-更细的经营判断：
-- 目标达成率最高城市：`Shenzhen`
-- 预算 ROI 最高城市：`Hangzhou`
-- 明显低于目标的城市：Shanghai, Beijing, Chengdu
+- `Zurich` has the highest total revenue at `1271000`, but also the highest average stockout rate at `9.34%`
+- `Amsterdam` is the fastest-growing city and the strongest acquisition city, with `8120` new members and `48.31%` revenue growth versus the first week
+- `London` has the highest delivery dependence and the clearest fulfillment risk, with `66.71%` average delivery share and `3.86%` average bad review rate
+- `Geneva` is the most balanced city, with `56.29%` repeat rate, `2.64%` stockout rate, and `1.86%` bad review rate
+- `Paris` has the highest average ticket at `30.57`, but slower growth than the other major cities
+- `Milan` has the strongest loyalty profile, with `61.67%` repeat rate and the lowest bad review rate at `1.53%`
 
 ## Suggested Workflow Shape
 ```text
-read_targets_csv(datasource.read)
-  -> aggregate_sales(sql.execute)
-  -> merge_and_score(python.code)
+read_campaign_calendar_csv(datasource.read)
+  -> aggregate_store_daily_ops(sql.execute)
+  -> join_on_city_and_week(python.code)
   -> dashboard/report/video artifact node
 ```
 
 ## Notes For Review
-- 如果 workflow 没有使用 `python.code`，大概率没有真正完成跨源融合
-- 如果 artifact 节点缺少 `dataset_ref`，说明 DAG 没连通
-- 如果 `python.code` 只输出文本而不是表格 JSON / dataset_ref，下游 artifact 会失败
+- If the workflow does not use `python.code`, it probably did not complete a real cross-source merge
+- If the workflow skips SQL aggregation and feeds raw daily rows into the artifact, the story becomes noisy and less judge-friendly
+- If the final dataset is reduced to a city total only, the dashboard and video lose most of the trend story
+- If an artifact node is missing `dataset_ref`, the DAG is not wired correctly
+- If `python.code` outputs only prose instead of tabular JSON or `dataset_ref`, downstream artifacts will fail

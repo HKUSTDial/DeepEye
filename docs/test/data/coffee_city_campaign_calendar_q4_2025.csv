@@ -1,0 +1,49 @@
+city,week_start,city_tier,store_count,campaign_name,hero_product,discount_rule,channel_focus,ops_owner
+Zurich,2025-11-03,premium_core,16,Winter Oat Latte Launch,oat latte,second cup 50 percent off,store,Nina Keller
+Zurich,2025-11-10,premium_core,16,Commuter Breakfast Pass,ham croissant + americano,breakfast set at 29 CHF,store,Nina Keller
+Zurich,2025-11-17,premium_core,16,Berry Yogurt Latte Launch,berry yogurt latte,6 CHF off new item,store,Nina Keller
+Zurich,2025-11-24,premium_core,16,Weekend Duo Offer,sea salt latte,2 drinks for 58 CHF,store,Nina Keller
+Zurich,2025-12-01,premium_core,16,Afternoon Delivery Boost,dirty latte,8 CHF off over 35 CHF,delivery,Nina Keller
+Zurich,2025-12-08,premium_core,16,Holiday Gift Box Presale,drip bag gift box,gift box at 12 percent off,member,Nina Keller
+Zurich,2025-12-15,premium_core,16,Toffee Hazelnut Return,toffee hazelnut latte,member coupon at 20 percent off,member,Nina Keller
+Zurich,2025-12-22,premium_core,16,Year-End Membership Sprint,signature latte,recharge bundle with bonus vouchers,member,Nina Keller
+Amsterdam,2025-11-03,growth_hub,20,Tech District Breakfast Week,flat white,breakfast set at 28 EUR,store,Lars de Vries
+Amsterdam,2025-11-10,growth_hub,20,First Cup Acquisition Push,americano,9 EUR off first order,member,Lars de Vries
+Amsterdam,2025-11-17,growth_hub,20,Office Group Order Week,matcha latte,3 cups at 25 percent off,delivery,Lars de Vries
+Amsterdam,2025-11-24,growth_hub,20,Friday Team Orders,cold brew,20 EUR off over 99 EUR,delivery,Lars de Vries
+Amsterdam,2025-12-01,growth_hub,20,Afternoon Delivery Boost,coconut latte,8 EUR off over 35 EUR,delivery,Lars de Vries
+Amsterdam,2025-12-08,growth_hub,20,Cold Brew Energy Week,orange cold brew,free add-on second cup,store,Lars de Vries
+Amsterdam,2025-12-15,growth_hub,20,Gift Card Sprint,gift card set,gift card plus 15 EUR voucher,member,Lars de Vries
+Amsterdam,2025-12-22,growth_hub,20,Year-End Membership Sprint,signature latte,recharge bundle with bonus vouchers,member,Lars de Vries
+London,2025-11-03,core_market,22,Tube Commute Coffee Week,americano,2 items for 39 GBP at morning rush,store,Emily Carter
+London,2025-11-10,core_market,22,Delivery Mug Bundle,latte + mug,10 GBP off over 39 GBP,delivery,Emily Carter
+London,2025-11-17,core_market,22,Office Tea-Time Push,black sesame latte,15 GBP off over 99 GBP,delivery,Emily Carter
+London,2025-11-24,core_market,22,Cold Weather Free Delivery,hot latte,free delivery,delivery,Emily Carter
+London,2025-12-01,core_market,22,Afternoon Delivery Boost,dirty latte,8 GBP off over 35 GBP,delivery,Emily Carter
+London,2025-12-08,core_market,22,Breakfast Duo Week,flat white,2 drinks for 55 GBP,store,Emily Carter
+London,2025-12-15,core_market,22,Gift Card Sprint,gift card set,gift card plus 15 GBP voucher,member,Emily Carter
+London,2025-12-22,core_market,22,Warm Dessert Week,cinnamon roll set,dessert add-on at 30 percent off,store,Emily Carter
+Geneva,2025-11-03,premium_core,12,Sparkling Coffee Week,sparkling coffee,second cup at 40 percent off,store,Sophie Martin
+Geneva,2025-11-10,premium_core,12,New Member Trial Week,fruit tea latte,8 CHF off first order,member,Sophie Martin
+Geneva,2025-11-17,premium_core,12,Light Lunch Combo,iced latte + cake,combo at 36 CHF,store,Sophie Martin
+Geneva,2025-11-24,premium_core,12,Dessert Pairing Week,tiramisu latte,dessert add-on at 30 percent off,store,Sophie Martin
+Geneva,2025-12-01,premium_core,12,Afternoon Delivery Boost,dirty latte,8 CHF off over 35 CHF,delivery,Sophie Martin
+Geneva,2025-12-08,premium_core,12,Weekend Sharing Bundle,fruit tea bucket,second item half price,store,Sophie Martin
+Geneva,2025-12-15,premium_core,12,Gift Card Sprint,gift card set,gift card plus 15 CHF voucher,member,Sophie Martin
+Geneva,2025-12-22,premium_core,12,Year-End Membership Sprint,signature latte,recharge bundle with bonus vouchers,member,Sophie Martin
+Paris,2025-11-03,premium_core,18,Signature Latte Week,reserve latte,second cup at 30 percent off,store,Claire Dubois
+Paris,2025-11-10,premium_core,18,New Member Trial Week,vanilla flat white,8 EUR off first order,member,Claire Dubois
+Paris,2025-11-17,premium_core,18,Office Dessert Pairing,pistachio latte,combo at 42 EUR,store,Claire Dubois
+Paris,2025-11-24,premium_core,18,Weekend Brunch Bundle,brunch cold brew,combo at 48 EUR,store,Claire Dubois
+Paris,2025-12-01,premium_core,18,Afternoon Delivery Boost,dirty latte,8 EUR off over 35 EUR,delivery,Claire Dubois
+Paris,2025-12-08,premium_core,18,Holiday Pastry Pairing,hazelnut mocha,dessert add-on at 30 percent off,store,Claire Dubois
+Paris,2025-12-15,premium_core,18,Gift Card Sprint,gift card set,gift card plus 15 EUR voucher,member,Claire Dubois
+Paris,2025-12-22,premium_core,18,Year-End Membership Sprint,signature latte,recharge bundle with bonus vouchers,member,Claire Dubois
+Milan,2025-11-03,growth_hub,17,Neighborhood Breakfast Week,americano,breakfast set at 25 EUR,store,Marco Rossi
+Milan,2025-11-10,growth_hub,17,New Member Trial Week,osmanthus latte,8 EUR off first order,member,Marco Rossi
+Milan,2025-11-17,growth_hub,17,Slow Afternoon Tea Week,milk tea latte,combo at 32 EUR,store,Marco Rossi
+Milan,2025-11-24,growth_hub,17,Warm Dessert Week,brown sugar latte,dessert add-on at 30 percent off,store,Marco Rossi
+Milan,2025-12-01,growth_hub,17,Afternoon Delivery Boost,dirty latte,8 EUR off over 35 EUR,delivery,Marco Rossi
+Milan,2025-12-08,growth_hub,17,Neighborhood Member Day,toffee latte,double loyalty points,member,Marco Rossi
+Milan,2025-12-15,growth_hub,17,Gift Card Sprint,gift card set,gift card plus 15 EUR voucher,member,Marco Rossi
+Milan,2025-12-22,growth_hub,17,Year-End Membership Sprint,signature latte,recharge bundle with bonus vouchers,member,Marco Rossi

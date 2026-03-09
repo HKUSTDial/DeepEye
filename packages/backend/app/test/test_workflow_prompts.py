@@ -39,8 +39,10 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "prefer `create_workflow_and_run`" in prompt
     assert "Do NOT call `read_workflow`, `update_workflow`, or `run_workflow` before the first run" in prompt
     assert "File + database joint analysis" in prompt
+    assert "File at reporting grain + raw database detail" in prompt
     assert "Use `datasource.read` only for attached files." in prompt
     assert "Use `sql.execute` only for attached databases." in prompt
+    assert "If a file datasource is already at the reporting grain" in prompt
     assert "`root.nodes` and `root.edges` MUST be JSON objects keyed by each item's `id`" in prompt
     assert 'NEVER emit them as arrays or lists' in prompt
     assert '"root": {"nodes": {"read_file": {' in prompt
@@ -76,6 +78,9 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "### Example 3: Transform output into a report artifact" in prompt
     assert "### Example 4: Transform output into a dashboard artifact" in prompt
     assert "### Example 5: Transform output into a video artifact" in prompt
+    assert "store_daily_ops" in prompt
+    assert "\"join_campaign_context\"" in prompt
+    assert "\"language\": \"English\"" in prompt
     assert "\"edge_sql_to_python\"" in prompt
     assert "\"query\": \"SELECT client_id AS client_id, revenue AS revenue FROM sales\"" in prompt
     assert "Artifact nodes do not fetch attached data on their own." in prompt
