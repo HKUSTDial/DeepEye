@@ -1,5 +1,5 @@
-import { useMemo, useEffect, useState, useCallback, useRef } from 'react'
-import { BackgroundVariant, type Edge, type Node } from 'reactflow'
+import { useMemo, useEffect, useState, useCallback, useRef, type CSSProperties } from 'react'
+import { BackgroundVariant, type Edge, type Node, type ReactFlowInstance } from 'reactflow'
 import { ArrowUpRight, Loader2, Workflow as WorkflowIcon } from 'lucide-react'
 import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
@@ -13,6 +13,7 @@ import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNod
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
+import { getDashboardProgressStage, isDashboardProgressMessage } from '../../../utils/dashboardProgress'
 import type { WorkflowDraft, WorkflowRun } from '../../../types'
 import {
   buildWorkflowRunFromEvent,
@@ -165,7 +166,7 @@ function toFlow(definition: Record<string, unknown>, nodeDefs: Record<string, No
       sourceHandle: edge.source.port_id,
       targetHandle: edge.target.port_id,
       animated: false,
-      style: { stroke: '#6366f1', strokeWidth: 2 },
+      style: { stroke: 'var(--workflow-link)', strokeWidth: 2.25 },
     }))
 
   return { nodes, edges }
@@ -238,6 +239,10 @@ export function WorkflowLivePanel({
   const setFileError = useWorkflowSessionsStore((state) => state.setFileError)
   const setValidatedGraph = useWorkflowSessionsStore((state) => state.setValidatedGraph)
   const clearValidated = useWorkflowSessionsStore((state) => state.clearValidated)
+  const setDashboardProgressVisible = useWorkflowSessionsStore((state) => state.setDashboardProgressVisible)
+  const appendDashboardProgressLog = useWorkflowSessionsStore((state) => state.appendDashboardProgressLog)
+  const setDashboardProgressStage = useWorkflowSessionsStore((state) => state.setDashboardProgressStage)
+  const setDashboardProgressPercent = useWorkflowSessionsStore((state) => state.setDashboardProgressPercent)
   const setVideoProgressVisible = useWorkflowSessionsStore((state) => state.setVideoProgressVisible)
   const appendVideoProgressLog = useWorkflowSessionsStore((state) => state.appendVideoProgressLog)
   const setVideoProgressStep = useWorkflowSessionsStore((state) => state.setVideoProgressStep)
@@ -266,6 +271,8 @@ export function WorkflowLivePanel({
   const [isExporting, setIsExporting] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const runEventSourceRef = useRef<EventSource | null>(null)
+  const reactFlowRef = useRef<ReactFlowInstance | null>(null)
+  const graphHostRef = useRef<HTMLDivElement | null>(null)
 
   const activeFilePathRef = useRef<string | null>(null)
   const activeDraftIdRef = useRef<string | null>(null)
@@ -380,6 +387,14 @@ export function WorkflowLivePanel({
         if (agentEvent.type === 'token') {
           const data = agentEvent.data || {}
           if (data.source === 'workflow' && typeof data.content === 'string') {
+            if (isDashboardProgressMessage(data.content)) {
+              const stage = getDashboardProgressStage(data.content)
+              setDashboardProgressVisible(sessionId, true)
+              appendDashboardProgressLog(sessionId, data.content)
+              if (stage !== null) {
+                setDashboardProgressStage(sessionId, stage)
+              }
+            }
             appendVideoProgressLog(sessionId, data.content)
             const stepMatch = data.content.match(/Step\s*(\d)\s*\/\s*4/)
             if (stepMatch) {
@@ -407,6 +422,8 @@ export function WorkflowLivePanel({
         }
         if (phase === 'artifact_ready') {
           if (artifactKind === 'dashboard') {
+            setDashboardProgressPercent(sessionId, 100)
+            setDashboardProgressVisible(sessionId, false)
             openOrFocusTab('dashboard')
             return
           }
@@ -421,6 +438,7 @@ export function WorkflowLivePanel({
           }
         }
         if (phase === 'artifact_refresh' && artifactKind === 'dashboard') {
+          setDashboardProgressVisible(sessionId, false)
           openOrFocusTab('dashboard')
           return
         }
@@ -434,13 +452,18 @@ export function WorkflowLivePanel({
           if (nodeId && status) {
             const typedOutputs = outputs as Record<string, unknown> | undefined
             setNodeStatus(sessionId, nodeId, status, typedOutputs)
-            if (typedOutputs?.dashboard_url) {
-              openOrFocusTab('dashboard')
-            }
             const session = useWorkflowSessionsStore.getState().sessions[sessionId]
             const root = (session?.definition as Record<string, { nodes?: Record<string, { type?: string }> }> | null)?.root
             const nodesMap = session?.validatedNodes ?? root?.nodes ?? {}
             const nodeType = (nodesMap[nodeId] as { type?: string } | undefined)?.type
+            if (nodeType === 'data.generate_dashboard' && status === 'running') {
+              setDashboardProgressVisible(sessionId, true)
+            }
+            if (typedOutputs?.dashboard_url) {
+              setDashboardProgressPercent(sessionId, 100)
+              setDashboardProgressVisible(sessionId, false)
+              openOrFocusTab('dashboard')
+            }
             if (nodeType === 'video.generator') {
               setVideoProgressVisible(sessionId, status === 'running')
             }
@@ -515,6 +538,7 @@ export function WorkflowLivePanel({
           return
         }
         if (phase === 'run_end') {
+          setDashboardProgressVisible(sessionId, false)
           setVideoProgressVisible(sessionId, false)
           const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
           const error = typeof payload?.error === 'string' ? payload?.error : null
@@ -560,6 +584,10 @@ export function WorkflowLivePanel({
   }, [
     sessionId,
     isStreaming,
+    setDashboardProgressVisible,
+    appendDashboardProgressLog,
+    setDashboardProgressStage,
+    setDashboardProgressPercent,
     setNodeStatus,
     setRunStatus,
     setActiveRun,
@@ -927,6 +955,63 @@ export function WorkflowLivePanel({
   ])
 
   const nodeTypes = useMemo(() => NODE_TYPES, [])
+  const workflowToneStyle = useMemo(
+    () =>
+      ({
+        '--workflow-link': isDark ? '#49b6a6' : '#0f766e',
+        '--workflow-link-active': isDark ? '#7ed9ca' : '#115e59',
+        '--workflow-link-soft': isDark ? 'rgba(73, 182, 166, 0.18)' : 'rgba(15, 118, 110, 0.16)',
+        '--workflow-port-input': isDark ? '#49b6a6' : '#0f766e',
+        '--workflow-port-output': isDark ? '#f3b560' : '#c27a1a',
+        '--workflow-grid': isDark ? '#29403d' : '#b7cfc8',
+      }) as CSSProperties,
+    [isDark],
+  )
+  const fitWorkflowView = useCallback(
+    (duration = 260) => {
+      if (!reactFlowRef.current || flowWithStatus.nodes.length === 0) return
+      window.requestAnimationFrame(() => {
+        reactFlowRef.current?.fitView({
+          padding: 0.22,
+          minZoom: 0.55,
+          maxZoom: 1.08,
+          duration,
+        })
+      })
+    },
+    [flowWithStatus.nodes.length],
+  )
+
+  useEffect(() => {
+    if (flowWithStatus.nodes.length === 0) return
+    fitWorkflowView(flowWithStatus.nodes.length > 12 ? 340 : 260)
+  }, [
+    fitWorkflowView,
+    flowWithStatus.nodes.length,
+    flowWithStatus.edges.length,
+    displaySessionId,
+    activeViewState,
+    sessionState?.lastUpdated,
+  ])
+
+  useEffect(() => {
+    const host = graphHostRef.current
+    if (!host || flowWithStatus.nodes.length === 0) return
+    let timeoutId: number | null = null
+    const observer = new ResizeObserver(() => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+      timeoutId = window.setTimeout(() => fitWorkflowView(180), 90)
+    })
+    observer.observe(host)
+    return () => {
+      observer.disconnect()
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [fitWorkflowView, flowWithStatus.nodes.length])
 
   if (
     !definition &&
@@ -971,7 +1056,10 @@ export function WorkflowLivePanel({
   }
 
   return (
-    <div className={`workflow-live-panel panel-view ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
+    <div
+      className={`workflow-live-panel workflow-live-panel--${isDark ? 'dark' : 'light'} panel-view`}
+      style={workflowToneStyle}
+    >
       <div className="panel-toolbar">
         <div className="panel-toolbar-main">
           <div className="panel-toolbar-icon">
@@ -1174,7 +1262,7 @@ export function WorkflowLivePanel({
         </div>
       </div>
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">
+        <div ref={graphHostRef} className="min-w-0 flex-1">
           <WorkflowGraph
             nodes={flowWithStatus.nodes}
             edges={flowWithStatus.edges}
@@ -1185,13 +1273,36 @@ export function WorkflowLivePanel({
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             panOnScroll
             fitView
-            fitViewOptions={{ padding: 0.2 }}
-            className={isDark ? 'bg-slate-950' : 'bg-slate-50'}
+            fitViewOptions={{ padding: 0.22, minZoom: 0.55, maxZoom: 1.08 }}
+            onInit={(instance) => {
+              reactFlowRef.current = instance
+              fitWorkflowView(0)
+            }}
+            className="workflow-canvas workflow-canvas--panel"
+            defaultEdgeOptions={{
+              style: { stroke: 'var(--workflow-link)', strokeWidth: 2.25 },
+              animated: false,
+            }}
             backgroundVariant={BackgroundVariant.Dots}
             backgroundGap={20}
-            backgroundSize={1}
-            backgroundColor={isDark ? '#334155' : '#cbd5e1'}
+            backgroundSize={1.1}
+            backgroundColor="var(--workflow-grid)"
             showControls
+            showMiniMap
+            miniMapNodeColor={(node) => {
+              switch (node.data.runStatus) {
+                case 'running':
+                  return isDark ? '#7ed9ca' : '#0f766e'
+                case 'success':
+                  return isDark ? '#4ade80' : '#15803d'
+                case 'failed':
+                  return '#ef4444'
+                case 'pending':
+                  return isDark ? '#f3b560' : '#c27a1a'
+                default:
+                  return isDark ? '#385250' : '#7aa59b'
+              }
+            }}
           />
         </div>
         <WorkflowInspector

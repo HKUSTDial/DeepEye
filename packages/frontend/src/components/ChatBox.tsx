@@ -5,15 +5,56 @@ import remarkGfm from 'remark-gfm'
 import { useChat } from '../hooks/useChat'
 import { useChatStore } from '../stores/chat'
 import { useKnowledgeBasesStore } from '../stores/knowledgeBases'
+import { createReportProgressLine, parseChatProgressLine, type ChatProgressLine } from '../utils/chatProgress'
 import DataSourceManager from './DataSourceManager'
 import StepItem from './StepItem'
-import type { Message } from '../types'
+import type { Message, ToolStep } from '../types'
 import './ChatBox.css'
 
 interface ChatBoxProps {
   dataSourceIds: string[]
   onDataSourceIdsChange?: (ids: string[]) => void
   compact?: boolean
+}
+
+function buildStepActivityKey(steps?: ToolStep[]): string {
+  if (!steps || steps.length === 0) return ''
+  return steps
+    .map((step) => {
+      const subKey = buildStepActivityKey(step.subSteps)
+      return [
+        step.type,
+        step.name,
+        step.status,
+        step.input?.length || 0,
+        step.output?.length || 0,
+        step.thought?.length || 0,
+        subKey,
+      ].join(':')
+    })
+    .join('|')
+}
+
+function buildMessageActivityKey(message?: Message): string {
+  if (!message) return ''
+  const timelineKey = (message.timeline || [])
+    .map((item) => {
+      if (item.kind === 'text') {
+        return `text:${item.content.length}:${item.isStreaming ? 1 : 0}`
+      }
+      if (item.kind === 'report_step') {
+        return `report:${item.stepIndex}:${item.label}`
+      }
+      return `step:${buildStepActivityKey([item.step])}`
+    })
+    .join('|')
+  return [
+    message.role,
+    message.content.length,
+    message.isStreaming ? 1 : 0,
+    buildStepActivityKey(message.steps),
+    timelineKey,
+  ].join('~')
 }
 
 export default function ChatBox({
@@ -141,7 +182,8 @@ export default function ChatBox({
       }
     }, 0)
   }
-  const lastMessageContent = messages.length > 0 ? messages[messages.length - 1]?.content ?? '' : ''
+  const lastMessageActivityKey =
+    messages.length > 0 ? buildMessageActivityKey(messages[messages.length - 1]) : ''
 
   useEffect(() => {
     const container = chatContainerRef.current
@@ -163,7 +205,7 @@ export default function ChatBox({
     if (isNearBottom) {
       scrollToBottom('smooth')
     }
-  }, [messages.length, lastMessageContent, isNearBottom])
+  }, [messages.length, lastMessageActivityKey, isNearBottom])
 
   const handleCompositionStart = () => {
     composingRef.current = true
@@ -272,6 +314,16 @@ export default function ChatBox({
       <span className="streaming-indicator-dot"></span>
     </span>
   )
+  const renderProgressLine = (progress: ChatProgressLine, key: string) => (
+    <div key={key} className={`chat-progress-line chat-progress-line--${progress.tone} chat-progress-line--${progress.status}`}>
+      <span className="chat-progress-badge">{progress.badge}</span>
+      <span className="chat-progress-copy">
+        <span className="chat-progress-label">{progress.label}</span>
+        {progress.detail ? <span className="chat-progress-detail">{progress.detail}</span> : null}
+      </span>
+      <span className={`chat-progress-state chat-progress-state--${progress.status}`}>{progress.status}</span>
+    </div>
+  )
   const hasText = (value?: string) => Boolean(value && value.trim().length > 0)
   const showJumpButton = messages.length > 0 && !isNearBottom
   const sourceStatusText = dataSourceIds.length > 0
@@ -296,12 +348,16 @@ export default function ChatBox({
               return <StepItem key={`timeline-step-${idx}`} step={item.step} />
             }
             if (item.kind === 'report_step') {
-              return (
-                <div key={`timeline-report-${idx}`} className="report-step-line">
-                  <span className="report-step-badge">Step {item.stepIndex}/{item.totalSteps}</span>
-                  <span className="report-step-label">{item.label}</span>
-                </div>
+              return renderProgressLine(
+                createReportProgressLine(item.stepIndex, item.totalSteps, item.label),
+                `timeline-report-${idx}`,
               )
+            }
+            if (item.kind === 'text') {
+              const progress = parseChatProgressLine(item.content || '')
+              if (progress) {
+                return renderProgressLine(progress, `timeline-progress-${idx}`)
+              }
             }
             return (
               <div key={`timeline-text-${idx}`} className="message-content">

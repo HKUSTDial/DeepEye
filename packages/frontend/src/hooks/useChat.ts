@@ -5,6 +5,7 @@ import { useReportStore } from '../stores/report'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { chatApi, datasourceApi, type AgentEvent } from '../api'
 import { extractVideoOutputParams } from '../api/video'
+import { getDashboardProgressStage, isDashboardProgressMessage } from '../utils/dashboardProgress'
 import {
   buildWorkflowRunFromEvent,
   getWorkflowArtifacts,
@@ -48,6 +49,8 @@ export function useChat() {
   const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
   const setVideoPreviewUrl = useWorkflowSessionsStore((state) => state.setVideoPreviewUrl)
   const triggerDashboardRefresh = useWorkflowSessionsStore((state) => state.triggerDashboardRefresh)
+  const setDashboardProgressVisible = useWorkflowSessionsStore((state) => state.setDashboardProgressVisible)
+  const setDashboardProgressPercent = useWorkflowSessionsStore((state) => state.setDashboardProgressPercent)
   const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
   const setReportResult = useReportStore((state) => state.setReportResult)
   const addReportStep = useReportStore((state) => state.addReportStep)
@@ -129,10 +132,13 @@ export function useChat() {
 
     if (kind === 'dashboard') {
       if (phase === 'artifact_ready') {
+        setDashboardProgressPercent(sessionId, 100)
+        setDashboardProgressVisible(sessionId, false)
         openOrFocusTab('dashboard')
         return true
       }
       if (phase === 'artifact_refresh') {
+        setDashboardProgressVisible(sessionId, false)
         triggerDashboardRefresh(sessionId)
         openOrFocusTab('dashboard')
         return true
@@ -273,7 +279,26 @@ export function useChat() {
             if (nodeId && status) {
               const typedOutputs = outputs as Record<string, unknown> | undefined
               setNodeStatus(sessionId, nodeId, status, typedOutputs)
+              if (status === 'running') {
+                const workflowState = useWorkflowSessionsStore.getState().sessions[sessionId]
+                const definition =
+                  workflowState?.definition && typeof workflowState.definition === 'object'
+                    ? (workflowState.definition as Record<string, unknown>)
+                    : null
+                const root = definition?.root && typeof definition.root === 'object'
+                  ? (definition.root as Record<string, unknown>)
+                  : definition
+                const nodes =
+                  root?.nodes && typeof root.nodes === 'object'
+                    ? (root.nodes as Record<string, { type?: string }>)
+                    : {}
+                if (nodes[nodeId]?.type === 'data.generate_dashboard') {
+                  setDashboardProgressVisible(sessionId, true)
+                }
+              }
               if (typedOutputs?.dashboard_url) {
+                setDashboardProgressPercent(sessionId, 100)
+                setDashboardProgressVisible(sessionId, false)
                 openOrFocusTab('dashboard')
               }
             }
@@ -283,6 +308,9 @@ export function useChat() {
             const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
             const error = typeof payload?.error === 'string' ? payload?.error : null
             useWorkflowSessionsStore.getState().setVideoProgressVisible(sessionId, false)
+            if (status !== 'success') {
+              setDashboardProgressVisible(sessionId, false)
+            }
 
             setRunStatus(sessionId, status, error)
             setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, workflowEvent, status, { error }))
@@ -333,6 +361,14 @@ export function useChat() {
           const data = (agentEvent.data || {}) as Record<string, unknown>
           if (data.source === 'workflow' && typeof data.content === 'string') {
             const store = useWorkflowSessionsStore.getState()
+            if (isDashboardProgressMessage(data.content)) {
+              const stage = getDashboardProgressStage(data.content)
+              store.setDashboardProgressVisible(sessionId, true)
+              store.appendDashboardProgressLog(sessionId, data.content)
+              if (stage !== null) {
+                store.setDashboardProgressStage(sessionId, stage)
+              }
+            }
             store.appendVideoProgressLog(sessionId, data.content)
             // task_id 后端在 Step 2 开始时就生成并推送，一收到就打开预览并传入，无需等 run_end
             const taskIdMatch = data.content.match(/Task ID:\s*(\d{8}_\d{6})/i)

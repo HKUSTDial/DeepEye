@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, FileText, Loader2, Sparkles, TriangleAlert } from 'lucide-react'
+import { ArtifactProgressCard } from '../ArtifactProgressCard'
 import { useReportStore } from '../../../stores/report'
 
 const STAGES = [
@@ -15,6 +16,19 @@ const STAGES = [
 const STAGE_END_PCT = [8, 22, 42, 58, 82, 93, 100]
 
 type StageStatus = 'done' | 'active' | 'warning' | 'pending'
+
+function getStageDetail(status: StageStatus) {
+  switch (status) {
+    case 'done':
+      return 'Completed'
+    case 'active':
+      return 'Live now'
+    case 'warning':
+      return 'Review logs'
+    default:
+      return 'Queued'
+  }
+}
 
 function parseStages(
   steps: string[],
@@ -120,6 +134,18 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   }
 
   const roundedPct = isDone ? 100 : Math.round(displayPercent)
+  const progressedCount = stageStatuses.filter((status) => status !== 'pending').length
+  const currentStageLabel =
+    maxStage >= 0 && maxStage < STAGES.length
+      ? STAGES[maxStage].label
+      : 'Preparing the report pipeline'
+  const reportStepsProgress = STAGES.map((stage, index) => ({
+    id: stage.label,
+    label: stage.label,
+    detail: getStageDetail(stageStatuses[index]),
+    icon: stageStatuses[index] === 'done' ? '✓' : stage.icon,
+    status: stageStatuses[index],
+  }))
 
   if (!reportHtml && reportSteps.length === 0 && !isGenerating) {
     return (
@@ -137,39 +163,29 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   return (
     <div className="panel-view">
       {showProgress && (
-        <div className="panel-progress-shell">
-          <div className="panel-progress-card">
-            <div className="panel-progress-header">
-              <div className="panel-progress-copy">
-                <div className="panel-toolbar-label">Report</div>
-                <div className="panel-progress-title">Generating report</div>
-                <div className="panel-progress-description">
-                  DeepEye is preparing the narrative, metrics, and charts for the final document.
-                </div>
-              </div>
-              <div className="panel-progress-percent tabular-nums">{roundedPct}%</div>
-            </div>
-
-            <div className="panel-progress-bar">
-              <div className="panel-progress-fill" style={{ width: `${displayPercent}%` }} />
-            </div>
-
-            <div className="panel-stage-list">
-              {STAGES.map((stage, index) => {
-                const status = stageStatuses[index]
-                return (
-                  <div key={stage.label} className={`panel-stage-item panel-stage-item--${status}`}>
-                    <span className="panel-stage-icon">{status === 'done' ? '✓' : stage.icon}</span>
-                    <span className="panel-stage-text">{stage.label}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+        <div className="artifact-progress-shell">
+          <ArtifactProgressCard
+            artifact="Report"
+            title="Generating report"
+            description="DeepEye is preparing the narrative, metrics, and chart package for the final document."
+            icon={<FileText size={18} />}
+            variant="report"
+            signature="Editorial pipeline"
+            status={isWaiting ? 'waiting' : 'running'}
+            statusLabel={isWaiting ? 'Queued' : 'Running'}
+            percent={roundedPct}
+            currentLabel={currentStageLabel}
+            metrics={[
+              { label: 'Phases', value: `${progressedCount}/7` },
+              { label: 'Output', value: 'HTML report' },
+            ]}
+            steps={reportStepsProgress}
+            tone="#c2410c"
+          />
         </div>
       )}
 
-      <div className="panel-surface">
+      <div className={`panel-surface${reportHtml ? ' panel-surface--report' : ''}`}>
         {reportError ? (
           <div className="panel-state-card panel-state-card--error">
             <div className="panel-state-icon">
@@ -181,7 +197,7 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
             </div>
           </div>
         ) : reportHtml ? (
-          <>
+          <div className="panel-report-layout">
             <div className="panel-inline-header">
               <div className="panel-inline-note">
                 {reportFilename ? (
@@ -203,7 +219,7 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
               className="panel-report-frame"
               sandbox="allow-same-origin allow-scripts"
             />
-          </>
+          </div>
         ) : isWaiting ? (
           <div className="panel-state-card">
             <div className="panel-state-icon">

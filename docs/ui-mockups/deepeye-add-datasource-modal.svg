@@ -116,7 +116,7 @@
     <path d="M58 693H64L67 696V706C67 707.1 66.1 708 65 708H58C56.9 708 56 707.1 56 706V695C56 693.9 56.9 693 58 693Z" stroke="#8E95A1" stroke-width="1.6" stroke-linejoin="round"/>
     <path d="M64 693V697H68" stroke="#8E95A1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M59 701.5H64" stroke="#8E95A1" stroke-width="1.4" stroke-linecap="round"/>
-    <text x="89" y="696" fill="#353C46" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">retail_city_targets_q4_2025.csv</text>
+    <text x="89" y="696" fill="#353C46" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">coffee_city_campaign_calendar_q4_2025.csv</text>
     <text x="89" y="716" fill="#8D94A0" font-family="'Segoe UI', Arial, sans-serif" font-size="11">FILE</text>
 
     <rect x="810" y="686" width="31" height="31" rx="11.5" fill="#FBFBFC" stroke="#D8DCE3"/>

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Film, Loader2, PlayCircle, Sparkles, TriangleAlert } from 'lucide-react'
+import {
+  ArtifactProgressCard,
+  type ArtifactProgressStep,
+  type ArtifactProgressStepStatus,
+} from '../ArtifactProgressCard'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 
 interface VideoPreviewPanelProps {
@@ -51,6 +56,26 @@ const STEP_MESSAGES: Record<number, string> = {
   3: '🎬 Step 4/4: Rendering video components...',
 }
 
+function getVideoStepStatus(index: number, currentStep: number, failed: boolean): ArtifactProgressStepStatus {
+  if (failed && index === currentStep) return 'warning'
+  if (index < currentStep) return 'done'
+  if (index === currentStep) return 'active'
+  return 'pending'
+}
+
+function getStepDetail(status: ArtifactProgressStepStatus) {
+  switch (status) {
+    case 'done':
+      return 'Completed'
+    case 'active':
+      return 'Live now'
+    case 'warning':
+      return 'Check logs'
+    default:
+      return 'Queued'
+  }
+}
+
 function getLogEntryType(message: string): 'success' | 'warn' | 'error' | 'info' | null {
   const text = message.trim()
   if (text.includes('✅') || text.includes('✓')) return 'success'
@@ -72,13 +97,6 @@ function withQueryParam(url: string, key: string, value?: string | null): string
   }
 }
 
-function getVideoStepClass(index: number, currentStep: number, failed: boolean) {
-  if (failed && index === currentStep) return 'panel-step-pill panel-step-pill--warning'
-  if (index < currentStep) return 'panel-step-pill panel-step-pill--done'
-  if (index === currentStep) return 'panel-step-pill panel-step-pill--active'
-  return 'panel-step-pill'
-}
-
 function getLogRowClass(type: ReturnType<typeof getLogEntryType>) {
   return type ? `panel-log-row panel-log-row--${type}` : 'panel-log-row'
 }
@@ -98,6 +116,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const videoPreviewUrl = sessionState?.videoPreviewUrl ?? null
   const [isPreviewReady, setIsPreviewReady] = useState(false)
   const [isCheckingPreview, setIsCheckingPreview] = useState(false)
+  const [previewCheckCount, setPreviewCheckCount] = useState(0)
   const previewCheckIntervalRef = useRef<number | null>(null)
 
   const previewDeclaredReady = Boolean(videoPreviewUrl)
@@ -121,11 +140,13 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   useEffect(() => {
     if (!effectivePreviewUrlWithSession) {
       setIsPreviewReady(false)
+      setPreviewCheckCount(0)
       return
     }
 
     if (previewDeclaredReady) {
       setIsPreviewReady(true)
+      setPreviewCheckCount(0)
       if (previewCheckIntervalRef.current) {
         window.clearInterval(previewCheckIntervalRef.current)
         previewCheckIntervalRef.current = null
@@ -134,9 +155,11 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     }
 
     setIsPreviewReady(false)
+    setPreviewCheckCount(0)
 
     const checkReady = async () => {
       setIsCheckingPreview(true)
+      setPreviewCheckCount((count) => count + 1)
       try {
         const response = await fetch(effectivePreviewUrlWithSession, { method: 'HEAD', cache: 'no-store' })
         const fromPreviewRoute = response.headers.get('X-Video-Preview') === '1'
@@ -198,6 +221,43 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
   const runInProgress = runStatus === 'running' || runStatus === null
   const runFailed = runStatus === 'failed'
+  const generationStepNumber = Math.min(videoProgress.step + 1, STEP_LABELS.length)
+  const latestVideoLog = videoProgress.logs.length > 0 ? videoProgress.logs[videoProgress.logs.length - 1]?.message : null
+  const videoProgressSteps: ArtifactProgressStep[] = STEP_LABELS.map((step) => {
+    const status = getVideoStepStatus(step.index, videoProgress.step, runFailed)
+    return {
+      id: `${step.index}`,
+      label: step.label,
+      detail: getStepDetail(status),
+      icon: runFailed && step.index === videoProgress.step ? '⚠️' : step.icon,
+      status,
+    }
+  })
+  const previewWarmupPercent = isPreviewReady ? 100 : Math.min(34 + previewCheckCount * 14, 86)
+  const previewWarmupSteps = [
+    { id: 'artifact', label: 'Receive preview artifact', icon: '🔗', status: 'done' as const, detail: 'Ready' },
+    {
+      id: 'boot',
+      label: 'Boot preview container',
+      icon: '🚀',
+      status: isPreviewReady ? 'done' as const : previewCheckCount <= 1 ? 'active' as const : 'done' as const,
+      detail: isPreviewReady ? 'Ready' : previewCheckCount <= 1 ? 'Starting' : 'Warmed',
+    },
+    {
+      id: 'probe',
+      label: 'Probe player endpoint',
+      icon: '🩺',
+      status: isPreviewReady ? 'done' as const : previewCheckCount > 1 ? 'active' as const : 'pending' as const,
+      detail: isPreviewReady ? 'Healthy' : previewCheckCount > 1 ? 'Checking' : 'Queued',
+    },
+    {
+      id: 'mount',
+      label: 'Mount live preview',
+      icon: '🖥️',
+      status: isPreviewReady ? 'done' as const : 'pending' as const,
+      detail: isPreviewReady ? 'Visible' : 'Queued',
+    },
+  ]
 
   if (effectivePreviewUrlWithSession) {
     return (
@@ -235,6 +295,33 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
             </div>
           )}
         </div>
+
+        {!isPreviewReady ? (
+          <div className="artifact-progress-shell">
+            <ArtifactProgressCard
+              artifact="Video"
+              title="Starting live preview"
+              description="The render artifact is ready. DeepEye is warming the preview container before the player mounts."
+              icon={<Film size={18} />}
+              variant="video"
+              signature="Playback surface"
+              status={previewCheckCount > 0 ? 'running' : 'waiting'}
+              statusLabel={previewCheckCount > 0 ? 'Connecting' : 'Starting'}
+              percent={previewWarmupPercent}
+              currentLabel={
+                previewCheckCount > 1
+                  ? 'Waiting for the preview HTML to respond to health checks.'
+                  : 'Allocating the preview container and loading the player shell.'
+              }
+              metrics={[
+                ...(displayTaskId ? [{ label: 'Task', value: displayTaskId }] : []),
+                { label: 'Checks', value: previewCheckCount > 0 ? String(previewCheckCount) : 'Pending' },
+              ]}
+              steps={previewWarmupSteps}
+              tone="#2563eb"
+            />
+          </div>
+        ) : null}
 
         <div className="panel-frame">
           {isPreviewReady ? (
@@ -285,39 +372,33 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
         <div className="panel-surface">
           <div className="panel-stack">
-            <div className="panel-progress-card">
-              <div className="panel-progress-header">
-                <div className="panel-progress-copy">
-                  <div className="panel-toolbar-label">Video</div>
-                  <div className="panel-progress-title">
-                    {runFailed ? 'Video generation failed' : 'Rendering data video'}
-                  </div>
-                  <div className="panel-progress-description">
-                    {runFailed
-                      ? 'The workflow stopped before the preview could open. Inspect the latest logs below.'
-                      : 'DeepEye is generating the video config, timeline, and render artifacts.'}
-                  </div>
-                </div>
-                <div className="panel-progress-percent tabular-nums">
-                  {runFailed ? 'Failed' : `${videoProgress.percent}%`}
-                </div>
-              </div>
-
-              {!runFailed && (
-                <div className="panel-progress-bar">
-                  <div className="panel-progress-fill" style={{ width: `${videoProgress.percent}%` }} />
-                </div>
-              )}
-
-              <div className="panel-step-rail">
-                {STEP_LABELS.map((step) => (
-                  <div key={step.index} className={getVideoStepClass(step.index, videoProgress.step, runFailed)}>
-                    <span className="panel-step-pill-icon">{step.icon}</span>
-                    <span className="panel-step-pill-label">{step.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ArtifactProgressCard
+              artifact="Video"
+              title={runFailed ? 'Video generation failed' : 'Rendering data video'}
+              description={
+                runFailed
+                  ? 'The workflow stopped before the preview could open. Inspect the latest logs below.'
+                  : 'DeepEye is generating the video config, timeline, and render artifacts.'
+              }
+              icon={runFailed ? <TriangleAlert size={18} /> : <PlayCircle size={18} />}
+              variant="video"
+              signature="Render pipeline"
+              status={runFailed ? 'failed' : videoProgress.percent > 0 || videoProgress.logs.length > 0 ? 'running' : 'waiting'}
+              statusLabel={runFailed ? 'Failed' : videoProgress.percent > 0 || videoProgress.logs.length > 0 ? 'Rendering' : 'Queued'}
+              percent={videoProgress.percent}
+              currentLabel={
+                runFailed
+                  ? 'Component render stopped before preview handoff.'
+                  : latestVideoLog || STEP_MESSAGES[videoProgress.step] || 'Preparing the render workflow.'
+              }
+              metrics={[
+                { label: 'Stage', value: `${generationStepNumber}/4` },
+                { label: 'Logs', value: String(videoProgress.logs.length) },
+                ...(displayTaskId ? [{ label: 'Task', value: displayTaskId }] : []),
+              ]}
+              steps={videoProgressSteps}
+              tone="#2563eb"
+            />
 
             {runError ? (
               <div className="panel-state-card panel-state-card--error">

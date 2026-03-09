@@ -166,6 +166,7 @@ The latest user request asks for an answer grounded in the attached data sources
 - Use `datasource.read` only for attached files.
 - Use `sql.execute` only for attached databases.
 - For database-backed analysis, push filtering, aggregation, and projection into `sql.execute` before using downstream nodes.
+- If a file datasource is already at the reporting grain (for example `city + week_start`) and the database datasource is raw operational detail (for example `store + day`), aggregate the database to the join grain in `sql.execute` first, then use `python.code` only for the multi-source join or light reshaping.
 - Use `dataset_ref` as the ONLY tabular data edge between workflow nodes. Do not connect `rows` ports between nodes.
 - Use the provided schema and preview rows to reason about the actual column names that downstream nodes will receive.
 
@@ -223,6 +224,7 @@ The latest user request asks for an answer grounded in the attached data sources
 - Single attached file -> `datasource.read` -> optional `rows.*` / `python.code` -> `llm.answer`
 - Single attached database -> `sql.execute` -> optional `rows.*` / `python.code` -> `llm.answer`
 - File + database joint analysis -> `datasource.read` + `sql.execute` -> `python.code` -> `llm.answer`
+- File at reporting grain + raw database detail -> `datasource.read` + `sql.execute` (aggregate first) -> `python.code` (join/enrich) -> `llm.answer` or artifact
 - Analysis report -> source node(s) -> optional transform -> `report.generate`
 - Dashboard -> source node(s) -> optional transform -> `data.generate_dashboard`
 - Data video -> source node(s) -> required transform when the source is large/raw -> `video.generator`
@@ -329,28 +331,28 @@ The latest user request asks for an answer grounded in the attached data sources
 {{
   "root": {{
     "nodes": {{
-      "read_clients": {{
-        "id": "read_clients",
+      "read_campaign_calendar": {{
+        "id": "read_campaign_calendar",
         "type": "datasource.read",
         "params": {{
           "datasource_id": "file_datasource_id"
         }},
         "metadata": {{"position": {{"x": 80, "y": 120}}}}
       }},
-      "query_sales": {{
-        "id": "query_sales",
+      "aggregate_city_weekly_ops": {{
+        "id": "aggregate_city_weekly_ops",
         "type": "sql.execute",
         "params": {{
           "datasource_id": "db_datasource_id",
-          "query": "SELECT client_id AS client_id, revenue AS revenue FROM sales"
+          "query": "SELECT DATE_TRUNC('week', sdo.ops_date)::date AS week_start, s.city AS city, SUM(sdo.revenue) AS revenue, SUM(sdo.orders) AS orders, ROUND(SUM(sdo.revenue) / NULLIF(SUM(sdo.orders), 0), 2) AS avg_ticket, SUM(sdo.new_members) AS new_members, ROUND(SUM(sdo.repeated_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS repeat_rate, ROUND(SUM(sdo.stockout_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS stockout_rate, ROUND(SUM(sdo.bad_reviews)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS bad_review_rate, ROUND(SUM(sdo.delivery_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS delivery_share FROM store_daily_ops sdo JOIN stores s ON sdo.store_id = s.store_id GROUP BY 1, 2 ORDER BY week_start, city"
         }},
         "metadata": {{"position": {{"x": 80, "y": 320}}}}
       }},
-      "join_and_aggregate": {{
-        "id": "join_and_aggregate",
+      "join_campaign_context": {{
+        "id": "join_campaign_context",
         "type": "python.code",
         "params": {{
-          "code": "data = json.load(sys.stdin)\\nclients_df, sales_df = load_dataset_refs(data)\\nmerged = clients_df.merge(sales_df, on='client_id', how='inner')\\ncity_totals = merged.groupby('city', as_index=False)['revenue'].sum().rename(columns={{'revenue': 'total_revenue'}}).sort_values('total_revenue', ascending=False)\\nemit_dataframe(city_totals)"
+          "code": "data = json.load(sys.stdin)\\ncampaign_df, ops_df = load_dataset_refs(data)\\njoined = campaign_df.merge(ops_df, on=['city', 'week_start'], how='inner')\\nemit_dataframe(joined)"
         }},
         "metadata": {{"position": {{"x": 360, "y": 220}}}}
       }},
@@ -358,7 +360,7 @@ The latest user request asks for an answer grounded in the attached data sources
         "id": "generate_report",
         "type": "report.generate",
         "params": {{
-          "query": "Create a concise report about the top city by total revenue."
+          "query": "Create an English business review about the fastest growth city, the highest-risk city, and the most balanced city."
         }},
         "metadata": {{"position": {{"x": 660, "y": 220}}}}
       }}
@@ -366,17 +368,17 @@ The latest user request asks for an answer grounded in the attached data sources
     "edges": {{
       "edge_file_to_python": {{
         "id": "edge_file_to_python",
-        "source": {{"node_id": "read_clients", "port_id": "dataset_ref"}},
-        "target": {{"node_id": "join_and_aggregate", "port_id": "dataset_ref"}}
+        "source": {{"node_id": "read_campaign_calendar", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}}
       }},
       "edge_sql_to_python": {{
         "id": "edge_sql_to_python",
-        "source": {{"node_id": "query_sales", "port_id": "dataset_ref"}},
-        "target": {{"node_id": "join_and_aggregate", "port_id": "dataset_ref"}}
+        "source": {{"node_id": "aggregate_city_weekly_ops", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}}
       }},
       "edge_python_to_report": {{
         "id": "edge_python_to_report",
-        "source": {{"node_id": "join_and_aggregate", "port_id": "dataset_ref"}},
+        "source": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}},
         "target": {{"node_id": "generate_report", "port_id": "dataset_ref"}}
       }}
     }}
@@ -389,28 +391,28 @@ The latest user request asks for an answer grounded in the attached data sources
 {{
   "root": {{
     "nodes": {{
-      "read_targets": {{
-        "id": "read_targets",
+      "read_campaign_calendar": {{
+        "id": "read_campaign_calendar",
         "type": "datasource.read",
         "params": {{
           "datasource_id": "file_datasource_id"
         }},
         "metadata": {{"position": {{"x": 80, "y": 120}}}}
       }},
-      "query_sales": {{
-        "id": "query_sales",
+      "aggregate_city_weekly_ops": {{
+        "id": "aggregate_city_weekly_ops",
         "type": "sql.execute",
         "params": {{
           "datasource_id": "db_datasource_id",
-          "query": "SELECT city AS city, SUM(revenue) AS total_revenue, COUNT(*) AS total_orders FROM sales GROUP BY city"
+          "query": "SELECT DATE_TRUNC('week', sdo.ops_date)::date AS week_start, s.city AS city, SUM(sdo.revenue) AS revenue, SUM(sdo.orders) AS orders, ROUND(SUM(sdo.revenue) / NULLIF(SUM(sdo.orders), 0), 2) AS avg_ticket, SUM(sdo.new_members) AS new_members, ROUND(SUM(sdo.repeated_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS repeat_rate, ROUND(SUM(sdo.stockout_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS stockout_rate, ROUND(SUM(sdo.bad_reviews)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS bad_review_rate, ROUND(SUM(sdo.delivery_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS delivery_share FROM store_daily_ops sdo JOIN stores s ON sdo.store_id = s.store_id GROUP BY 1, 2 ORDER BY week_start, city"
         }},
         "metadata": {{"position": {{"x": 80, "y": 320}}}}
       }},
-      "calculate_metrics": {{
-        "id": "calculate_metrics",
+      "join_campaign_context": {{
+        "id": "join_campaign_context",
         "type": "python.code",
         "params": {{
-          "code": "data = json.load(sys.stdin)\\ntargets_df, sales_df = load_dataset_refs(data)\\nmerged = targets_df.merge(sales_df, on='city', how='left')\\nmerged['target_achievement_rate'] = (merged['total_revenue'] / merged['quarter_target_revenue'] * 100).round(2)\\nmerged['budget_roi'] = (merged['total_revenue'] / merged['marketing_budget']).round(2)\\nemit_dataframe(merged)"
+          "code": "data = json.load(sys.stdin)\\ncampaign_df, ops_df = load_dataset_refs(data)\\njoined = campaign_df.merge(ops_df, on=['city', 'week_start'], how='inner')\\nemit_dataframe(joined)"
         }},
         "metadata": {{"position": {{"x": 380, "y": 220}}}}
       }},
@@ -418,7 +420,7 @@ The latest user request asks for an answer grounded in the attached data sources
         "id": "generate_dashboard",
         "type": "data.generate_dashboard",
         "params": {{
-          "question": "Generate a dashboard showing city ranking, goal attainment, and budget efficiency."
+          "question": "Generate an English dashboard that highlights revenue performance, member growth, supply risk, fulfillment risk, and the most balanced city."
         }},
         "metadata": {{"position": {{"x": 680, "y": 220}}}}
       }}
@@ -426,17 +428,17 @@ The latest user request asks for an answer grounded in the attached data sources
     "edges": {{
       "edge_file_to_python": {{
         "id": "edge_file_to_python",
-        "source": {{"node_id": "read_targets", "port_id": "dataset_ref"}},
-        "target": {{"node_id": "calculate_metrics", "port_id": "dataset_ref"}}
+        "source": {{"node_id": "read_campaign_calendar", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}}
       }},
       "edge_sql_to_python": {{
         "id": "edge_sql_to_python",
-        "source": {{"node_id": "query_sales", "port_id": "dataset_ref"}},
-        "target": {{"node_id": "calculate_metrics", "port_id": "dataset_ref"}}
+        "source": {{"node_id": "aggregate_city_weekly_ops", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}}
       }},
       "edge_python_to_dashboard": {{
         "id": "edge_python_to_dashboard",
-        "source": {{"node_id": "calculate_metrics", "port_id": "dataset_ref"}},
+        "source": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}},
         "target": {{"node_id": "generate_dashboard", "port_id": "dataset_ref"}}
       }}
     }}
@@ -449,28 +451,28 @@ The latest user request asks for an answer grounded in the attached data sources
 {{
   "root": {{
     "nodes": {{
-      "read_targets": {{
-        "id": "read_targets",
+      "read_campaign_calendar": {{
+        "id": "read_campaign_calendar",
         "type": "datasource.read",
         "params": {{
           "datasource_id": "file_datasource_id"
         }},
         "metadata": {{"position": {{"x": 80, "y": 120}}}}
       }},
-      "query_sales": {{
-        "id": "query_sales",
+      "aggregate_city_weekly_ops": {{
+        "id": "aggregate_city_weekly_ops",
         "type": "sql.execute",
         "params": {{
           "datasource_id": "db_datasource_id",
-          "query": "SELECT city AS city, SUM(revenue) AS total_revenue FROM sales GROUP BY city"
+          "query": "SELECT DATE_TRUNC('week', sdo.ops_date)::date AS week_start, s.city AS city, SUM(sdo.revenue) AS revenue, SUM(sdo.orders) AS orders, ROUND(SUM(sdo.revenue) / NULLIF(SUM(sdo.orders), 0), 2) AS avg_ticket, SUM(sdo.new_members) AS new_members, ROUND(SUM(sdo.repeated_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS repeat_rate, ROUND(SUM(sdo.stockout_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS stockout_rate, ROUND(SUM(sdo.bad_reviews)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS bad_review_rate, ROUND(SUM(sdo.delivery_orders)::numeric / NULLIF(SUM(sdo.orders), 0), 4) AS delivery_share FROM store_daily_ops sdo JOIN stores s ON sdo.store_id = s.store_id GROUP BY 1, 2 ORDER BY week_start, city"
         }},
         "metadata": {{"position": {{"x": 80, "y": 320}}}}
       }},
-      "prepare_video_dataset": {{
-        "id": "prepare_video_dataset",
+      "join_campaign_context": {{
+        "id": "join_campaign_context",
         "type": "python.code",
         "params": {{
-          "code": "data = json.load(sys.stdin)\\ntargets_df, sales_df = load_dataset_refs(data)\\nmerged = targets_df.merge(sales_df, on='city', how='left')\\nmerged['target_achievement_rate'] = (merged['total_revenue'] / merged['quarter_target_revenue'] * 100).round(2)\\nvideo_df = merged[['city', 'total_revenue', 'target_achievement_rate']].sort_values('total_revenue', ascending=False)\\nemit_dataframe(video_df)"
+          "code": "data = json.load(sys.stdin)\\ncampaign_df, ops_df = load_dataset_refs(data)\\njoined = campaign_df.merge(ops_df, on=['city', 'week_start'], how='inner')\\nemit_dataframe(joined)"
         }},
         "metadata": {{"position": {{"x": 380, "y": 220}}}}
       }},
@@ -478,8 +480,8 @@ The latest user request asks for an answer grounded in the attached data sources
         "id": "generate_video",
         "type": "video.generator",
         "params": {{
-          "query": "Generate a short Chinese summary video about city revenue ranking and target achievement.",
-          "language": "Chinese"
+          "query": "Generate a short English insight video about growth cities, risk cities, and the most balanced city.",
+          "language": "English"
         }},
         "metadata": {{"position": {{"x": 680, "y": 220}}}}
       }}
@@ -487,17 +489,17 @@ The latest user request asks for an answer grounded in the attached data sources
     "edges": {{
       "edge_file_to_python": {{
         "id": "edge_file_to_python",
-        "source": {{"node_id": "read_targets", "port_id": "dataset_ref"}},
-        "target": {{"node_id": "prepare_video_dataset", "port_id": "dataset_ref"}}
+        "source": {{"node_id": "read_campaign_calendar", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}}
       }},
       "edge_sql_to_python": {{
         "id": "edge_sql_to_python",
-        "source": {{"node_id": "query_sales", "port_id": "dataset_ref"}},
-        "target": {{"node_id": "prepare_video_dataset", "port_id": "dataset_ref"}}
+        "source": {{"node_id": "aggregate_city_weekly_ops", "port_id": "dataset_ref"}},
+        "target": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}}
       }},
       "edge_python_to_video": {{
         "id": "edge_python_to_video",
-        "source": {{"node_id": "prepare_video_dataset", "port_id": "dataset_ref"}},
+        "source": {{"node_id": "join_campaign_context", "port_id": "dataset_ref"}},
         "target": {{"node_id": "generate_video", "port_id": "dataset_ref"}}
       }}
     }}
