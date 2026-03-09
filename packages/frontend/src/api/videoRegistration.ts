@@ -68,3 +68,12 @@ export function getRegisteredVideo(taskId: string, sessionId?: string | null): R
 export function isVideoRegistered(taskId: string, sessionId?: string | null): boolean {
   return cache.has(cacheKey(taskId, sessionId))
 }
+
+/** 清除视频组件缓存，强制下次预览时重新拉取 TSX。在控制台执行 window.clearVideoCache?.() 可刷新组件 */
+export function clearVideoCache(taskId?: string, sessionId?: string | null): void {
+  if (taskId != null) {
+    cache.delete(cacheKey(taskId, sessionId ?? undefined))
+  } else {
+    cache.clear()
+  }
+}

@@ -41,6 +41,23 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # Global sales ops DB for heterogeneous workflow test (global_sales_workflow_sample)
+  global-ops-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=${GLOBAL_OPS_DB_USER}
+      - POSTGRES_PASSWORD=${GLOBAL_OPS_DB_PASSWORD}
+      - POSTGRES_DB=${GLOBAL_OPS_DB_NAME}
+    volumes:
+      - global_ops_db_data:/var/lib/postgresql/data
+      - ./docker/test-db/global_ops_init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GLOBAL_OPS_DB_USER} -d ${GLOBAL_OPS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # 异构工作流手测样例数据库
   retail-ops-db:
     image: postgres:15-alpine
@@ -102,7 +119,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    command: celery -A app.core.celery_app worker --loglevel=info
+    command: /app/.venv/bin/python -m celery -A app.core.celery_app worker --loglevel=info
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
@@ -147,6 +164,7 @@ volumes:
   postgres_data:
   minio_data:
   retail_ops_db_data:
+  global_ops_db_data:
   workspace_data:
 
 networks:

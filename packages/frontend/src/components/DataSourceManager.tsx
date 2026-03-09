@@ -598,7 +598,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
               disabled={isTestingCreate}
               className="data-source-secondary-btn"
             >
-              {isTestingCreate ? '测试中...' : '测试连接'}
+              {isTestingCreate ? 'Testing...' : 'Test connection'}
             </button>
             <button type="button" onClick={createDataSource} className="data-source-submit-btn">
               Connect database
@@ -746,7 +746,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                       disabled={isTestingEdit || isSavingEdit}
                       className="data-source-secondary-btn"
                     >
-                      {isTestingEdit ? '测试中...' : '测试连接'}
+                      {isTestingEdit ? 'Testing...' : 'Test connection'}
                     </button>
                     <button
                       type="button"

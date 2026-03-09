@@ -18,8 +18,14 @@ import {
 } from './pages'
 import ProtectedRoute from './components/ProtectedRoute'
 import { initTheme } from './hooks/useTheme'
+import { clearVideoCache } from './api/videoRegistration'
 
 initTheme()
+
+// 开发调试用：控制台执行 clearVideoCache() 可清除视频组件缓存，强制重新拉取 TSX
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { clearVideoCache?: typeof clearVideoCache }).clearVideoCache = clearVideoCache
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -14,37 +14,19 @@ const height = videoConfig?.meta?.height ?? 1080
 const durationInFrames = Math.max(1, Math.ceil((videoConfig?.meta?.video_duration ?? 10) * fps))
 
 export function App() {
-  const title = videoConfig?.meta?.title ?? 'DeepEye Video Preview'
   return (
     <div
       data-app="deepeye-video-preview"
       style={{
         width: '100vw',
         height: '100vh',
-        background: '#0f1419',
+        background: '#f8fafc',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
-        gap: 12,
       }}
     >
-      <div
-        style={{
-          position: 'absolute',
-          top: 16,
-          left: 0,
-          right: 0,
-          fontSize: 18,
-          fontWeight: 700,
-          color: 'rgba(255,255,255,0.9)',
-          textAlign: 'center',
-          padding: '0 16px',
-          zIndex: 10,
-        }}
-      >
-        {title}
-      </div>
       <Player
         component={VideoPlayer}
         inputProps={{ config: videoConfig, sceneComponents }}
