@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Run health checks</title>
+  <defs>
+    <linearGradient id="bg-health-checks" x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F9FCFF"/>
+      <stop offset="1" stop-color="#EEF5FB"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="18" fill="url(#bg-health-checks)" stroke="#D5E0EC" stroke-width="1.5"/>
+  <g transform="translate(20 20)" stroke="#4A91C2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M11 2v2"/>
+    <path d="M5 2v2"/>
+    <path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/>
+    <path d="M8 15a6 6 0 0 0 12 0v-3"/>
+    <circle cx="20" cy="10" r="2"/>
+  </g>
+</svg>

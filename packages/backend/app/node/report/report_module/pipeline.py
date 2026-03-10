@@ -14,7 +14,11 @@ from typing import List, Dict
 from jinja2 import Template
 from openai import OpenAI
 from app.core.config import settings
-from .utils import execute_python_code
+from .utils import (
+    build_report_chart_placeholder_html,
+    execute_python_code,
+    render_plotly_figure_for_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +292,7 @@ class AutoReportPipeline:
                             {columns_context}
 
                             [Task]:
-                            1. Create a chart object `fig` using plotly.express (px). Only one chart per execution.
+                            1. Create exactly one focused chart object `fig` using plotly.express (px). Only one chart per execution.
                             2. **Instruction**: "{section['chart_instruction']}"
                             3. **Data Handling**: 
                                - Access tables via `dfs['name']`. 
@@ -303,6 +307,9 @@ class AutoReportPipeline:
                                fig = px.bar(temp, x='category_col', y='count_col', ...)
 
                                - **CRITICAL FIX**: Plotly cannot serialize 'Period' objects. Convert to string (`.astype(str)`).
+                               - Do NOT use `make_subplots`, dual-axis layouts, multiple domains, parallel coordinates mixed with other charts, or dashboard-style composites.
+                               - Do NOT set a fixed chart width. If you set height, keep it between 380 and 520.
+                               - Prefer a single bar, line, scatter, box, area, or heatmap view that fits comfortably inside a report card.
 
                             4. **Analysis**: Calculate table stats and `print()` them.
 
@@ -316,21 +323,28 @@ class AutoReportPipeline:
             exec_res = execute_python_code(code, dfs)
             #print(exec_res)
 
-            chart_html = ""
+            chart_html = build_report_chart_placeholder_html("No chart was generated for this section.")
             stats_data = "(No statistical data produced.)"
 
             if exec_res['success']:
                 if exec_res['fig']:
                     try:
-                        chart_html = exec_res['fig'].to_html(full_html=False, include_plotlyjs='cdn')
+                        chart_html = render_plotly_figure_for_report(exec_res['fig'])
                     except TypeError as e:
                         self._emit(f"      ❌ Serialization Error (Period/Type issue): {e}")
-                        chart_html = f"<div class='alert alert-danger'>Chart Rendering Error: Data contains non-serializable types.<br>{e}</div>"
+                        chart_html = build_report_chart_placeholder_html(
+                            f"Chart rendering failed because the figure contains non-serializable values. {e}"
+                        )
+                else:
+                    self._emit("      ⚠️ No figure object was produced")
 
                 if exec_res['text']:
                     stats_data = exec_res['text'].strip()
             else:
                 self._emit(f"      ⚠️ Code Execution Failed: {exec_res.get('error')}")
+                chart_html = build_report_chart_placeholder_html(
+                    f"Chart generation code failed: {exec_res.get('error') or 'Unknown execution error.'}"
+                )
 
             # 3. Insight Generation Phase
             insight_prompt = f"""

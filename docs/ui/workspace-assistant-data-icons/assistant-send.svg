@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Assistant send icon</title>
+  <rect x="6" y="6" width="52" height="52" rx="18" fill="#F8F9FB" stroke="#E5E7EB" stroke-width="1.5"/>
+  <g transform="translate(20 20)" stroke="#B9BEC6" stroke-width="1.95" fill="none">
+    <path d="m5 12 7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12 19V5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

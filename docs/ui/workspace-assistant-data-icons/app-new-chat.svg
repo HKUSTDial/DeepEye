@@ -1,0 +1,7 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>New chat plus icon</title>
+  <rect x="6" y="6" width="52" height="52" rx="18" fill="#17191F"/>
+  <g transform="translate(20 20)" stroke="#FFFFFF" stroke-width="1.95" fill="none">
+    <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

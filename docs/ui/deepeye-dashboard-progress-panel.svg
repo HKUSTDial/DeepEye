@@ -1,0 +1,184 @@
+<svg width="1585" height="412" viewBox="0 0 1585 412" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DeepEye Dashboard Progress Panel</title>
+  <defs>
+    <linearGradient id="panelBg" x1="8" y1="206" x2="1577" y2="206" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FBFDFD"/>
+      <stop offset="1" stop-color="#F2F8F8"/>
+    </linearGradient>
+    <radialGradient id="panelGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1420 210) rotate(180) scale(420 260)">
+      <stop offset="0" stop-color="#DDF1F0" stop-opacity="0.7"/>
+      <stop offset="0.58" stop-color="#ECF7F7" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#F3F9F9" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="coolGrid" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M0.5 0V28" stroke="#DCE9E9" stroke-width="1"/>
+      <path d="M0 0.5H28" stroke="#DCE9E9" stroke-width="1"/>
+    </pattern>
+    <clipPath id="panelClip">
+      <rect x="7" y="10" width="1571" height="395" rx="26"/>
+    </clipPath>
+
+    <symbol id="icon-layout-dashboard" viewBox="0 0 24 24">
+      <rect width="7" height="9" x="3" y="3" rx="1.2" />
+      <rect width="7" height="5" x="14" y="3" rx="1.2" />
+      <rect width="7" height="9" x="14" y="12" rx="1.2" />
+      <rect width="7" height="5" x="3" y="16" rx="1.2" />
+    </symbol>
+    <symbol id="icon-compass" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" stroke-width="1.8"/>
+      <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" stroke-width="1.8"/>
+    </symbol>
+    <symbol id="icon-chart-bars" viewBox="0 0 24 24">
+      <path d="M3 20.5H21" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="5" y="11" width="4" height="8" rx="1.2" fill="#59C0C8"/>
+      <rect x="10" y="7" width="4" height="12" rx="1.2" fill="#6E76E6"/>
+      <rect x="15" y="4" width="4" height="15" rx="1.2" fill="#F28C97"/>
+    </symbol>
+    <symbol id="icon-calculator" viewBox="0 0 24 24">
+      <rect x="4" y="2.5" width="16" height="19" rx="2.2" stroke-width="1.7"/>
+      <path d="M8 6h8" stroke-width="1.7" stroke-linecap="round"/>
+      <circle cx="8" cy="11" r="1.05" fill="#59C0C8" stroke="none"/>
+      <circle cx="12" cy="11" r="1.05" fill="#F28C97" stroke="none"/>
+      <circle cx="16" cy="11" r="1.05" fill="#F0BF4A" stroke="none"/>
+      <circle cx="8" cy="15" r="1.05" fill="#6E76E6" stroke="none"/>
+      <circle cx="12" cy="15" r="1.05" fill="#59C0C8" stroke="none"/>
+      <circle cx="16" cy="15" r="1.05" fill="#F28C97" stroke="none"/>
+      <circle cx="8" cy="19" r="1.05" fill="#F0BF4A" stroke="none"/>
+      <circle cx="12" cy="19" r="1.05" fill="#6E76E6" stroke="none"/>
+      <circle cx="16" cy="19" r="1.05" fill="#59C0C8" stroke="none"/>
+    </symbol>
+    <symbol id="icon-link" viewBox="0 0 24 24">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke-width="1.8"/>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke-width="1.8"/>
+    </symbol>
+    <symbol id="icon-puzzle" viewBox="0 0 24 24">
+      <path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z" stroke-width="1.5"/>
+    </symbol>
+    <symbol id="icon-rocket" viewBox="0 0 24 24">
+      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" stroke-width="1.7"/>
+      <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" stroke-width="1.7"/>
+      <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" stroke-width="1.7"/>
+      <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" stroke-width="1.7"/>
+    </symbol>
+    <symbol id="icon-stethoscope" viewBox="0 0 24 24">
+      <path d="M11 2v2" stroke-width="1.8"/>
+      <path d="M5 2v2" stroke-width="1.8"/>
+      <path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1" stroke-width="1.8"/>
+      <path d="M8 15a6 6 0 0 0 12 0v-3" stroke-width="1.8"/>
+      <circle cx="20" cy="10" r="2" stroke-width="1.8"/>
+    </symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <path d="M5 13.2 9.4 17.6 19 6.8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+
+  <rect width="1585" height="412" fill="#FAFBFC"/>
+
+  <g id="dashboard-progress-panel">
+    <rect x="7" y="10" width="1571" height="395" rx="26" fill="url(#panelBg)" stroke="#BFD4D3" stroke-width="1.5"/>
+    <g clip-path="url(#panelClip)">
+      <rect x="7" y="10" width="1571" height="395" fill="url(#coolGrid)" opacity="0.82"/>
+      <rect x="1190" y="10" width="388" height="395" fill="url(#panelGlow)"/>
+    </g>
+
+    <g id="header">
+      <rect x="30" y="31" width="58" height="58" rx="17" fill="#EEF6F6" stroke="#C7DBDB" stroke-width="1.5"/>
+      <g transform="translate(42 43)" fill="#3B9692" stroke="#2F817D" stroke-width="0.4">
+        <use href="#icon-layout-dashboard" width="24" height="24"/>
+      </g>
+      <text x="100" y="50" fill="#2C7B77" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="700" letter-spacing="1">DASHBOARD</text>
+      <rect x="198" y="31" width="202" height="34" rx="17" fill="#EEF6F6" stroke="#C5DAD9" stroke-width="1.5"/>
+      <text x="209" y="53" fill="#206C68" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" font-weight="700" letter-spacing="0.6">VISUAL ANALYSIS PIPELINE</text>
+
+      <text x="100" y="85" fill="#1E2431" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="22" font-weight="700">Generating dashboard</text>
+      <text x="100" y="110" fill="#74808B" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="500">DeepEye is still designing the dashboard structure and packaging the preview app.</text>
+    </g>
+
+    <g id="status" text-anchor="end">
+      <rect x="1451" y="31" width="106" height="39" rx="19.5" fill="#F9FCFC" stroke="#C5D9D8" stroke-width="1.5"/>
+      <circle cx="1469" cy="50.5" r="5" fill="#0F766E"/>
+      <text x="1540" y="56" fill="#28746F" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="1.2">RUNNING</text>
+
+      <text x="1561" y="108" fill="#11182F" font-family="'Segoe UI', Arial, sans-serif" font-size="40" font-weight="800">14%</text>
+      <text x="1561" y="134" fill="#70808A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="500">Generating dashboard title and</text>
+      <text x="1561" y="159" fill="#70808A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="500">description...</text>
+    </g>
+
+    <g id="progress-bar">
+      <rect x="28" y="180" width="1530" height="13" rx="6.5" fill="#E7E9EC"/>
+      <rect x="28" y="180" width="214" height="13" rx="6.5" fill="#55A8A4"/>
+    </g>
+
+    <g id="metrics">
+      <rect x="28" y="210" width="103" height="37" rx="18.5" fill="#FCFEFE" stroke="#C7D9D8" stroke-width="1.5"/>
+      <text x="42" y="233.5" fill="#5F6D78" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4">STAGE</text>
+      <text x="91" y="233.5" fill="#1F2531" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">1/6</text>
+
+      <rect x="140" y="210" width="212" height="37" rx="18.5" fill="#FCFEFE" stroke="#C7D9D8" stroke-width="1.5"/>
+      <text x="154" y="233.5" fill="#5F6D78" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4">NODE</text>
+      <text x="205" y="233.5" fill="#1F2531" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">generate_dashboard</text>
+    </g>
+
+    <g id="cards">
+      <g id="card-1">
+        <rect x="28" y="266" width="243" height="115" rx="20" fill="#EDF3F3" stroke="#9FC4C1" stroke-width="1.5"/>
+        <rect x="44" y="280" width="46" height="46" rx="15" fill="#FCFEFE" stroke="#C5DAD9" stroke-width="1.5"/>
+        <g transform="translate(55 291)" stroke="#D49A25" fill="none">
+          <use href="#icon-compass" width="24" height="24"/>
+        </g>
+        <text x="239" y="305" text-anchor="end" fill="#0E6B66" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">RUNNING</text>
+        <text x="44" y="349" fill="#0F172E" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="600">Generate title and framing</text>
+      </g>
+
+      <g id="card-2">
+        <rect x="285" y="266" width="243" height="115" rx="20" fill="#FCFEFE" stroke="#D5E2E2" stroke-width="1.5"/>
+        <rect x="301" y="280" width="46" height="46" rx="15" fill="#FDFEFE" stroke="#D5E0E0" stroke-width="1.5"/>
+        <g transform="translate(312 291)">
+          <use href="#icon-chart-bars" width="24" height="24"/>
+        </g>
+        <text x="494" y="305" text-anchor="end" fill="#717B86" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">QUEUED</text>
+        <text x="301" y="351" fill="#687381" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="600">Design visualizations</text>
+      </g>
+
+      <g id="card-3">
+        <rect x="542" y="266" width="243" height="115" rx="20" fill="#FCFEFE" stroke="#D5E2E2" stroke-width="1.5"/>
+        <rect x="558" y="280" width="46" height="46" rx="15" fill="#FDFEFE" stroke="#D5E0E0" stroke-width="1.5"/>
+        <g transform="translate(569 291)" stroke="#E3714D" fill="none">
+          <use href="#icon-calculator" width="24" height="24"/>
+        </g>
+        <text x="751" y="305" text-anchor="end" fill="#717B86" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">QUEUED</text>
+        <text x="558" y="351" fill="#687381" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="600">Design key metrics</text>
+      </g>
+
+      <g id="card-4">
+        <rect x="799" y="266" width="243" height="115" rx="20" fill="#FCFEFE" stroke="#D5E2E2" stroke-width="1.5"/>
+        <rect x="815" y="280" width="46" height="46" rx="15" fill="#FDFEFE" stroke="#D5E0E0" stroke-width="1.5"/>
+        <g transform="translate(826 291)" stroke="#8B7FE2" fill="none">
+          <use href="#icon-link" width="24" height="24"/>
+        </g>
+        <text x="1008" y="305" text-anchor="end" fill="#717B86" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">QUEUED</text>
+        <text x="815" y="351" fill="#687381" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="600">Design interactions</text>
+      </g>
+
+      <g id="card-5">
+        <rect x="1056" y="266" width="243" height="115" rx="20" fill="#FCFEFE" stroke="#D5E2E2" stroke-width="1.5"/>
+        <rect x="1072" y="280" width="46" height="46" rx="15" fill="#FDFEFE" stroke="#D5E0E0" stroke-width="1.5"/>
+        <g transform="translate(1083 291)" stroke="#8EBE4E" fill="none">
+          <use href="#icon-puzzle" width="24" height="24"/>
+        </g>
+        <text x="1265" y="305" text-anchor="end" fill="#717B86" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">QUEUED</text>
+        <text x="1072" y="351" fill="#687381" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="600">Consolidate layout</text>
+      </g>
+
+      <g id="card-6">
+        <rect x="1313" y="266" width="243" height="115" rx="20" fill="#FCFEFE" stroke="#D5E2E2" stroke-width="1.5"/>
+        <rect x="1329" y="280" width="46" height="46" rx="15" fill="#FDFEFE" stroke="#D5E0E0" stroke-width="1.5"/>
+        <g transform="translate(1340 291)" stroke="#F26C8E" fill="none">
+          <use href="#icon-rocket" width="24" height="24"/>
+        </g>
+        <text x="1522" y="305" text-anchor="end" fill="#717B86" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">QUEUED</text>
+        <text x="1329" y="351" fill="#687381" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="600">Implement and deploy preview</text>
+      </g>
+    </g>
+  </g>
+</svg>

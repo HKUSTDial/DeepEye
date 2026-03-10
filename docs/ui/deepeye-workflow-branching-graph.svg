@@ -1,0 +1,81 @@
+<svg width="1216" height="736" viewBox="0 0 1216 736" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DeepEye workflow branching graph</title>
+  <desc>Editable SVG reconstruction of a workflow graph with datasource, SQL, Python, report, dashboard, and video nodes.</desc>
+  <defs>
+    <linearGradient id="nodeFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FCFCFD"/>
+    </linearGradient>
+    <filter id="nodeShadow" x="-20%" y="-20%" width="140%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.06"/>
+    </filter>
+    <style>
+      .bg { fill: #F6F7F8; }
+      .node { fill: url(#nodeFill); stroke: #E3E5E8; stroke-width: 1.5; rx: 16; filter: url(#nodeShadow); }
+      .title { fill: #1F2937; font-family: Inter, "SF Pro Display", "Segoe UI", sans-serif; font-size: 14px; font-weight: 700; }
+      .port { fill: #7D8594; font-family: Inter, "SF Pro Display", "Segoe UI", sans-serif; font-size: 11px; font-weight: 500; }
+      .edge { fill: none; stroke: #2E333D; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 8 7; }
+      .handle { fill: #FFFFFF; stroke: #202633; stroke-width: 3; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1216" height="736"/>
+
+  <path class="edge" d="M288 256C355 256 365 387 448 387"/>
+  <path class="edge" d="M291 489C362 489 374 387 448 387"/>
+  <path class="edge" d="M703 350C810 350 811 119 902 119"/>
+  <path class="edge" d="M703 350C801 350 814 352 901 352"/>
+  <path class="edge" d="M703 350C801 350 810 564 907 564"/>
+
+  <rect class="node" x="32" y="182" width="256" height="108" rx="16"/>
+  <text class="title" x="57" y="219">Datasource Read</text>
+  <text class="port" x="276" y="262" text-anchor="end">dataset_ref</text>
+  <circle class="handle" cx="288" cy="256" r="6"/>
+
+  <rect class="node" x="42" y="417" width="249" height="108" rx="16"/>
+  <text class="title" x="58" y="453">Sql Execute</text>
+  <text class="port" x="279" y="495" text-anchor="end">dataset_ref</text>
+  <circle class="handle" cx="291" cy="489" r="6"/>
+
+  <rect class="node" x="448" y="277" width="255" height="143" rx="16"/>
+  <text class="title" x="467" y="312">Python Code</text>
+  <circle class="handle" cx="448" cy="350" r="6"/>
+  <text class="port" x="460" y="356">input</text>
+  <circle class="handle" cx="448" cy="387" r="6"/>
+  <text class="port" x="460" y="393">dataset_ref</text>
+  <text class="port" x="691" y="356" text-anchor="end">dataset_ref</text>
+  <circle class="handle" cx="703" cy="350" r="6"/>
+
+  <rect class="node" x="902" y="68" width="291" height="145" rx="16"/>
+  <text class="title" x="921" y="102">Report Generate</text>
+  <circle class="handle" cx="902" cy="119" r="6"/>
+  <text class="port" x="914" y="125">dataset_ref</text>
+  <text class="port" x="1181" y="116" text-anchor="end">report_path</text>
+  <circle class="handle" cx="1193" cy="110" r="6"/>
+  <text class="port" x="1181" y="151" text-anchor="end">report_html</text>
+  <circle class="handle" cx="1193" cy="145" r="6"/>
+
+  <rect class="node" x="901" y="274" width="292" height="143" rx="16"/>
+  <text class="title" x="920" y="308">Data Generate Dashboard</text>
+  <circle class="handle" cx="901" cy="352" r="6"/>
+  <text class="port" x="913" y="358">dataset_ref</text>
+  <text class="port" x="1181" y="353" text-anchor="end">output_path</text>
+  <circle class="handle" cx="1193" cy="347" r="6"/>
+  <text class="port" x="1181" y="388" text-anchor="end">dashboard_url</text>
+  <circle class="handle" cx="1193" cy="382" r="6"/>
+
+  <rect class="node" x="907" y="485" width="287" height="251" rx="16"/>
+  <text class="title" x="926" y="520">Video Generator</text>
+  <circle class="handle" cx="907" cy="564" r="6"/>
+  <text class="port" x="919" y="570">dataset_ref</text>
+  <text class="port" x="1182" y="564" text-anchor="end">video_path</text>
+  <circle class="handle" cx="1194" cy="558" r="6"/>
+  <text class="port" x="1182" y="601" text-anchor="end">video_info</text>
+  <circle class="handle" cx="1194" cy="595" r="6"/>
+  <text class="port" x="1182" y="638" text-anchor="end">task_id</text>
+  <circle class="handle" cx="1194" cy="632" r="6"/>
+  <text class="port" x="1182" y="675" text-anchor="end">session_id</text>
+  <circle class="handle" cx="1194" cy="669" r="6"/>
+  <text class="port" x="1182" y="712" text-anchor="end">video_url</text>
+  <circle class="handle" cx="1194" cy="706" r="6"/>
+</svg>

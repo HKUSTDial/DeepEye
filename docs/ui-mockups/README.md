@@ -3,6 +3,7 @@ DeepEye UI SVG Mockups
 Files
 - `deepeye-workspace-main.svg`: main shell with sidebar, workspace surface, and assistant rail.
 - `deepeye-add-datasource-modal.svg`: add data source modal with upload and database connection states.
+- `deepeye-video-panel-progress.svg`: video panel progress state with playback surface header, progress bar, and preview boot cards.
 
 Usage
 - Open directly in a browser for review.

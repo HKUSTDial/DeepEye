@@ -1,0 +1,7 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Workspace document icon</title>
+  <rect x="6" y="6" width="52" height="52" rx="18" fill="#FCFCFD" stroke="#E5E7EB" stroke-width="1.5"/>
+  <g transform="translate(20 20)" stroke="#B8BDC7" stroke-width="1.75" fill="none">
+    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

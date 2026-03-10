@@ -7,6 +7,13 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> <style>
         @media print { .no-print { display: none; } body { font-size: 12pt; } }
         .report-section { background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 2rem; margin-bottom: 2rem; }
+        .report-chart-shell { width: 100%; overflow: hidden; border-radius: 0.9rem; border: 1px solid #dbe3ef; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+        .report-chart-embed { width: 100%; min-height: 360px; padding: 0.75rem; overflow-x: auto; overflow-y: hidden; }
+        .report-chart-embed .js-plotly-plot, .report-chart-embed .plotly-graph-div { width: 100% !important; max-width: 100% !important; }
+        .report-chart-empty { min-height: 280px; padding: 2rem 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); color: #475569; }
+        .report-chart-empty-icon { font-size: 2rem; line-height: 1; margin-bottom: 0.75rem; }
+        .report-chart-empty-title { font-size: 0.95rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem; }
+        .report-chart-empty-body { max-width: 34rem; font-size: 0.82rem; line-height: 1.6; color: #64748b; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans leading-relaxed">
@@ -50,7 +57,7 @@
                 <div class="mb-4 text-gray-600 bg-blue-50 p-4 rounded border border-blue-100">
                     {{ section.desc }}
                 </div>
-                <div class="bg-white p-2 border rounded shadow-sm">
+                <div class="report-chart-shell">
                     {{ section.chart_html | safe }}
                 </div>
             </div>

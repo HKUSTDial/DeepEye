@@ -1,0 +1,160 @@
+<svg width="2022" height="584" viewBox="0 0 2022 584" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="panelBg" x1="6" y1="291" x2="2000" y2="291" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7F7F9"/>
+      <stop offset="0.58" stop-color="#F6F7FB"/>
+      <stop offset="1" stop-color="#EEF2FF"/>
+    </linearGradient>
+    <radialGradient id="rightGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1868 320) rotate(180) scale(530 430)">
+      <stop offset="0" stop-color="#DDE6FF" stop-opacity="0.55"/>
+      <stop offset="0.48" stop-color="#E8EEFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#EEF2FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="progressFill" x1="34" y1="263" x2="1226" y2="263" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3E72E3"/>
+      <stop offset="1" stop-color="#7097EE"/>
+    </linearGradient>
+    <linearGradient id="monitorScreen" x1="1544" y1="412" x2="1568" y2="428" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#35363B"/>
+      <stop offset="0.55" stop-color="#101114"/>
+      <stop offset="1" stop-color="#61636A"/>
+    </linearGradient>
+    <pattern id="verticalGrid" x="0" y="0" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M1 0V42" stroke="#DCE1EB" stroke-width="1"/>
+    </pattern>
+    <pattern id="dotRow" x="0" y="0" width="48" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="2.5" cy="4" r="3" fill="#D7DCEF"/>
+    </pattern>
+    <clipPath id="panelClip">
+      <rect x="6" y="16" width="1994" height="550" rx="34"/>
+    </clipPath>
+  </defs>
+
+  <rect width="2022" height="584" fill="#FAFAFB"/>
+
+  <g id="video-panel-progress">
+    <rect x="6" y="16" width="1994" height="550" rx="34" fill="url(#panelBg)" stroke="#C9D1E2" stroke-width="2"/>
+    <g clip-path="url(#panelClip)">
+      <rect x="6" y="16" width="1994" height="550" fill="url(#verticalGrid)" opacity="0.75"/>
+      <rect x="1200" y="16" width="800" height="550" fill="url(#rightGlow)"/>
+      <rect x="14" y="287" width="1980" height="8" fill="url(#dotRow)" opacity="0.9"/>
+    </g>
+
+    <g id="header">
+      <rect x="34" y="46" width="76" height="76" rx="22" fill="#E5EBF8" stroke="#C7CFE2" stroke-width="2"/>
+      <circle cx="51" cy="64" r="3" fill="#8DA4E2"/>
+      <circle cx="51" cy="76" r="3" fill="#8DA4E2"/>
+      <circle cx="51" cy="88" r="3" fill="#8DA4E2"/>
+      <circle cx="51" cy="100" r="3" fill="#8DA4E2"/>
+      <circle cx="93" cy="64" r="3" fill="#8DA4E2"/>
+      <circle cx="93" cy="76" r="3" fill="#8DA4E2"/>
+      <circle cx="93" cy="88" r="3" fill="#8DA4E2"/>
+      <circle cx="93" cy="100" r="3" fill="#8DA4E2"/>
+      <rect x="62" y="71" width="24" height="26" rx="3" stroke="#4E6FBC" stroke-width="3"/>
+      <path d="M70 71V97M78 71V97" stroke="#4E6FBC" stroke-width="2"/>
+      <path d="M62 79H86M62 89H86" stroke="#4E6FBC" stroke-width="2"/>
+
+      <text x="130" y="72" fill="#5876B5" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700" letter-spacing="1">VIDEO</text>
+      <rect x="208" y="45" width="220" height="40" rx="20" fill="#E8EDF9" stroke="#C9D1E3" stroke-width="2"/>
+      <text x="223" y="71" fill="#5672B0" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700" letter-spacing="0.6">PLAYBACK SURFACE</text>
+
+      <text x="130" y="118" fill="#1F2430" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="28" font-weight="700">Starting live preview</text>
+      <text x="130" y="160" fill="#7B7F89" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="500">The render artifact is ready. DeepEye is warming the preview container before the player mounts.</text>
+    </g>
+
+    <g id="status" text-anchor="end">
+      <rect x="1787" y="45" width="154" height="46" rx="23" fill="#F8FAFF" stroke="#C8D0E3" stroke-width="2"/>
+      <circle cx="1813" cy="69" r="6.5" fill="#3464C9"/>
+      <text x="1921" y="75" fill="#496CB5" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="0.8">CONNECTING</text>
+
+      <text x="1942" y="147" fill="#10172E" font-family="'Segoe UI', Arial, sans-serif" font-size="52" font-weight="700">62%</text>
+      <text x="1942" y="191" fill="#777C88" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="500">Waiting for the preview HTML to respond</text>
+      <text x="1942" y="218" fill="#777C88" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="500">to health checks.</text>
+    </g>
+
+    <g id="progress">
+      <rect x="34" y="254" width="1922" height="18" rx="9" fill="#E6E7EB"/>
+      <rect x="34" y="254" width="1048" height="18" rx="9" fill="url(#progressFill)"/>
+    </g>
+
+    <g id="meta-chips">
+      <rect x="34" y="294" width="268" height="54" rx="22" fill="#F8F8FA" stroke="#C9CDD8" stroke-width="2"/>
+      <text x="54" y="327" fill="#7E828B" font-family="'Segoe UI', Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1.5">TASK</text>
+      <text x="118" y="327" fill="#222630" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">20260309_090350</text>
+
+      <rect x="316" y="294" width="142" height="54" rx="22" fill="#F8F8FA" stroke="#C9CDD8" stroke-width="2"/>
+      <text x="336" y="327" fill="#7E828B" font-family="'Segoe UI', Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1.5">CHECKS</text>
+      <text x="427" y="327" fill="#222630" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">2</text>
+    </g>
+
+    <g id="cards">
+      <g id="card-ready">
+        <rect x="34" y="372" width="472" height="164" rx="29" fill="#F0F2F7" stroke="#C8CEDA" stroke-width="2"/>
+        <rect x="57" y="395" width="58" height="58" rx="18" fill="#FAFBFD" stroke="#D6DBE6" stroke-width="2"/>
+        <g transform="translate(86 424) rotate(-42)" stroke="#81858E" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <rect x="-12" y="-6.5" width="13.5" height="22" rx="6.75"/>
+          <rect x="-1.5" y="-15.5" width="13.5" height="22" rx="6.75"/>
+          <path d="M-1.2 0.6H1.2"/>
+        </g>
+        <rect x="392" y="404" width="94" height="36" rx="18" fill="#E8EDF8"/>
+        <text x="439" y="428" text-anchor="middle" fill="#446ABD" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">READY</text>
+        <text x="56" y="488" fill="#252A34" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">Receive preview artifact</text>
+      </g>
+
+      <g id="card-warmed">
+        <rect x="524" y="372" width="472" height="164" rx="29" fill="#F0F2F7" stroke="#C8CEDA" stroke-width="2"/>
+        <rect x="547" y="395" width="58" height="58" rx="18" fill="#FAFBFD" stroke="#D6DBE6" stroke-width="2"/>
+        <g transform="translate(576 423) rotate(-36)">
+          <path d="M0 -15.5C5.2 -15.5 9.1 -11.4 10.2 -5.1L10.8 1.4C10.8 8 7.6 13.8 2.6 17.5H-2.6C-7.6 13.8 -10.8 8 -10.8 1.4L-10.2 -5.1C-9.1 -11.4 -5.2 -15.5 0 -15.5Z" fill="#DCE3F3" stroke="#878EA1" stroke-width="1.55"/>
+          <path d="M-5.9 -11.8C-4.1 -14.4 -2.2 -15.5 0 -15.5C2.2 -15.5 4.2 -14.4 5.9 -11.8Z" fill="#BFD5FF"/>
+          <rect x="-4.8" y="-8.6" width="9.6" height="17.2" rx="4.8" fill="#74A9F5"/>
+          <circle cx="0.4" cy="-3.7" r="3.1" fill="#792338"/>
+          <path d="M-10.6 1.8L-15.2 7.4L-9.1 8.7L-6.4 4.1Z" fill="#F1993A"/>
+          <path d="M10.6 1.8L15.2 7.4L9.1 8.7L6.4 4.1Z" fill="#DE4B3F"/>
+          <path d="M-4.7 9.6L-7.7 16.6L-2 15.1L-0.8 9.6Z" fill="#2D4B90"/>
+          <path d="M4.9 9.6L7.8 16.6L2.1 15.1L0.9 9.6Z" fill="#D84D3B"/>
+          <path d="M0 18.1C2 15.9 4.3 16.6 5.4 19.1C4 21.7 2.6 23.5 0 24.7C-2.6 23.5 -4 21.7 -5.4 19.1C-4.3 16.6 -2 15.9 0 18.1Z" fill="#F6D44F"/>
+          <path d="M0 18.6C1.1 17.3 2.2 17.7 3.1 19C2.3 20.5 1.4 21.6 0 22.4C-1.4 21.6 -2.3 20.5 -3.1 19C-2.2 17.7 -1.1 17.3 0 18.6Z" fill="#F08B2B"/>
+        </g>
+        <rect x="832" y="404" width="110" height="36" rx="18" fill="#E8EDF8"/>
+        <text x="887" y="428" text-anchor="middle" fill="#446ABD" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">WARMED</text>
+        <text x="546" y="488" fill="#252A34" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">Boot preview container</text>
+      </g>
+
+      <g id="card-checking">
+        <rect x="1014" y="370" width="472" height="164" rx="29" fill="#EEF2FB" stroke="#C6CDDA" stroke-width="2"/>
+        <rect x="1037" y="393" width="58" height="58" rx="18" fill="#FAFBFD" stroke="#C8D0E4" stroke-width="2"/>
+        <g transform="translate(1066 423)" stroke="#888C95" stroke-width="2.05" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <path d="M-7.8 -17.6V-14.8"/>
+          <path d="M8.8 -17.6V-14.8"/>
+          <path d="M-10 -13.5V-7.8C-10 -2.9 -6.9 1.2 -2.8 2.7"/>
+          <path d="M6 -13.5V-2C6 3.2 9.2 7.2 13.6 8.5"/>
+          <path d="M-10 -13.5C-10 -16.2 -7.8 -18.5 -5.1 -18.5C-2.4 -18.5 -0.1 -16.3 -0.1 -13.6"/>
+          <path d="M6 -13.5C6 -16.2 8.2 -18.5 10.9 -18.5C13.6 -18.5 15.8 -16.3 15.8 -13.6"/>
+          <path d="M-2.8 2.7C-2.8 7.6 -1.5 11.5 2.5 14.4"/>
+          <path d="M13.6 8.5C13.6 11.9 13.6 14.6 12.1 16.7C10.3 19.2 7.1 19.5 4.2 18.3"/>
+          <path d="M11.7 16.6C13.5 14.7 15.2 13.1 17.2 12.3"/>
+          <path d="M7.3 12.2H14.7"/>
+          <circle cx="18.6" cy="11.8" r="3.5" fill="#595D66" stroke="#8D9199"/>
+        </g>
+        <rect x="1340" y="402" width="116" height="36" rx="18" fill="#E8EDF8"/>
+        <text x="1398" y="426" text-anchor="middle" fill="#446ABD" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">CHECKING</text>
+        <text x="1036" y="488" fill="#252A34" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">Probe player endpoint</text>
+      </g>
+
+      <g id="card-queued">
+        <rect x="1504" y="372" width="470" height="164" rx="29" fill="#F6F4F1" stroke="#E0DDD8" stroke-width="2"/>
+        <rect x="1527" y="395" width="58" height="58" rx="18" fill="#FAFAF9" stroke="#E2DFDA" stroke-width="2"/>
+        <g transform="translate(1556 424)">
+          <rect x="-14" y="-12" width="28" height="19" rx="1.8" fill="#D9D6D0"/>
+          <rect x="-11.5" y="-9.5" width="23" height="14" rx="0.9" fill="url(#monitorScreen)"/>
+          <path d="M1 -9.5H11.5V4.5L2 -9.5H1Z" fill="#656970" opacity="0.45"/>
+          <rect x="-4.2" y="8.2" width="8.4" height="4.3" rx="1.2" fill="#C5C2BD"/>
+          <rect x="-8.7" y="12.5" width="17.4" height="2.7" rx="1.35" fill="#DAD7D2"/>
+        </g>
+        <text x="1926" y="428" text-anchor="end" fill="#7B7E86" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="0.8">QUEUED</text>
+        <text x="1526" y="488" fill="#6A6D75" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">Mount live preview</text>
+      </g>
+    </g>
+  </g>
+</svg>

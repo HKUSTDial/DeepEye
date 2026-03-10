@@ -1,0 +1,34 @@
+<svg width="922" height="246" viewBox="0 0 922 246" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DeepEye Report Progress Line Step 2</title>
+  <defs>
+    <linearGradient id="reportLineBg" x1="11" y1="10" x2="11" y2="236" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FBF8F6"/>
+    </linearGradient>
+    <radialGradient id="reportLineGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(792 66) rotate(180) scale(178 122)">
+      <stop offset="0" stop-color="#F7E7DF" stop-opacity="0.72"/>
+      <stop offset="0.58" stop-color="#FCF4F0" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="badgeBg" x1="35" y1="32" x2="228" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8F0EB"/>
+      <stop offset="1" stop-color="#F6ECE7"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="922" height="246" fill="#FAFAFB"/>
+
+  <g id="report-progress-line-step-2">
+    <rect x="11" y="10" width="900" height="222" rx="28" fill="url(#reportLineBg)" stroke="#E2CBC1" stroke-width="2"/>
+    <rect x="613" y="10" width="298" height="222" rx="28" fill="url(#reportLineGlow)"/>
+
+    <rect x="36" y="32" width="193" height="53" rx="26.5" fill="url(#badgeBg)" stroke="#E1C7BA" stroke-width="2"/>
+    <text x="61" y="66" fill="#B76131" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="800" letter-spacing="0.04em">REPORT</text>
+    <text x="164" y="66" fill="#A85A32" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="800">2/7</text>
+
+    <text x="37" y="131" fill="#1F2430" font-family="'Segoe UI', Arial, sans-serif" font-size="31" font-weight="700">Generate dataset context</text>
+
+    <rect x="36" y="157" width="96" height="41" rx="20.5" fill="#FBF2EE" stroke="#E1C7BA" stroke-width="2"/>
+    <text x="84" y="184" text-anchor="middle" fill="#B76131" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">Running</text>
+  </g>
+</svg>

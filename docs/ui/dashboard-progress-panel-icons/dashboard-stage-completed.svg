@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Completed check icon</title>
+  <defs>
+    <linearGradient id="bg-dashboard-completed" x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4F6F8"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="18" fill="url(#bg-dashboard-completed)" stroke="#DFE5EA" stroke-width="1.5"/>
+  <path d="M21 32L29.5 40.5L43 22" stroke="#212833" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

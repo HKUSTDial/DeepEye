@@ -1,0 +1,200 @@
+<svg width="2048" height="751" viewBox="0 0 2048 751" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DeepEye Report Progress Panel</title>
+  <defs>
+    <linearGradient id="panelBg" x1="18" y1="306" x2="2032" y2="306" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FCF9F8"/>
+      <stop offset="1" stop-color="#F9F3F1"/>
+    </linearGradient>
+    <radialGradient id="panelGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1840 350) rotate(180) scale(620 430)">
+      <stop offset="0" stop-color="#F7E2DB" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#FAEFEB" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#FBF4F2" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="warmGrid" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M0.5 0V32" stroke="#EAD9D3" stroke-width="1"/>
+      <path d="M0 0.5H32" stroke="#EAD9D3" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="progressFill" x1="47" y1="243" x2="1782" y2="243" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D15F25"/>
+      <stop offset="1" stop-color="#D6713C"/>
+    </linearGradient>
+    <clipPath id="panelClip">
+      <rect x="18" y="22" width="2014" height="567" rx="34"/>
+    </clipPath>
+    <symbol id="file-text" viewBox="0 0 24 24">
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+      <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+      <path d="M10 9H8"/>
+      <path d="M16 13H8"/>
+      <path d="M16 17H8"/>
+    </symbol>
+    <symbol id="pen-tool" viewBox="0 0 24 24">
+      <path d="M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z"/>
+      <path d="m18 13-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18"/>
+      <path d="m2.3 2.3 7.286 7.286"/>
+      <circle cx="11" cy="11" r="2"/>
+    </symbol>
+    <symbol id="palette" viewBox="0 0 24 24">
+      <path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/>
+      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+    </symbol>
+    <symbol id="sparkles" viewBox="0 0 24 24">
+      <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/>
+      <path d="M20 2v4"/>
+      <path d="M22 4h-4"/>
+      <circle cx="4" cy="20" r="2"/>
+    </symbol>
+  </defs>
+
+  <rect width="2048" height="751" fill="#FAFAFB"/>
+
+  <g id="report-progress-panel">
+    <rect x="18" y="22" width="2014" height="567" rx="34" fill="url(#panelBg)" stroke="#E1CDC6" stroke-width="2"/>
+    <g clip-path="url(#panelClip)">
+      <rect x="18" y="22" width="2014" height="567" fill="url(#warmGrid)" opacity="0.82"/>
+      <rect x="1280" y="22" width="752" height="567" fill="url(#panelGlow)"/>
+    </g>
+
+    <g id="header">
+      <rect x="48" y="52" width="78" height="78" rx="22" fill="#F5EEEB" stroke="#DDCEC8" stroke-width="2"/>
+      <g transform="translate(73 77)" stroke="#B55C2B" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <use href="#file-text" width="24" height="24"/>
+      </g>
+      <text x="95" y="87" fill="#E7B293" font-family="'Segoe UI', Arial, sans-serif" font-size="33" font-weight="700">7</text>
+
+      <text x="147" y="79" fill="#B4663E" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700" letter-spacing="1">REPORT</text>
+      <rect x="244" y="52" width="216" height="44" rx="22" fill="#F5EFEC" stroke="#D9C7C1" stroke-width="2"/>
+      <text x="259" y="80" fill="#A85A32" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="700" letter-spacing="0.6">EDITORIAL PIPELINE</text>
+
+      <text x="147" y="129" fill="#1F2430" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="28" font-weight="700">Generating report</text>
+      <text x="147" y="165" fill="#817A77" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="500">DeepEye is preparing the narrative, metrics, and chart package for the final document.</text>
+    </g>
+
+    <g id="status" text-anchor="end">
+      <rect x="1857" y="52" width="148" height="48" rx="24" fill="#FDFBFA" stroke="#DECBC4" stroke-width="2"/>
+      <circle cx="1882" cy="76" r="6.5" fill="#B54F18"/>
+      <text x="1986" y="83" fill="#A85A31" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="0.8">RUNNING</text>
+
+      <text x="2002" y="160" fill="#11182F" font-family="'Segoe UI', Arial, sans-serif" font-size="58" font-weight="800">89%</text>
+      <text x="2002" y="198" fill="#8B817D" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="500">Write analysis summary and conclusions</text>
+    </g>
+
+    <g id="progress-bar">
+      <rect x="47" y="233" width="1940" height="18" rx="9" fill="#E8E9ED"/>
+      <rect x="47" y="233" width="1737" height="18" rx="9" fill="url(#progressFill)"/>
+    </g>
+
+    <g id="metrics">
+      <rect x="47" y="274" width="159" height="56" rx="22" fill="#FCFBFA" stroke="#DACECA" stroke-width="2"/>
+      <text x="64" y="308" fill="#7F7774" font-family="'Segoe UI', Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1.5">PHASES</text>
+      <text x="157" y="308" fill="#202631" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">6/7</text>
+
+      <rect x="223" y="274" width="243" height="56" rx="22" fill="#FCFBFA" stroke="#DACECA" stroke-width="2"/>
+      <text x="240" y="308" fill="#7F7774" font-family="'Segoe UI', Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1.5">OUTPUT</text>
+      <text x="337" y="308" fill="#202631" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">HTML report</text>
+    </g>
+
+    <g id="stage-cards">
+      <g id="card-1">
+        <rect x="47" y="353" width="264" height="206" rx="28" fill="#FCFAF9" stroke="#DDCECA" stroke-width="2"/>
+        <rect x="68" y="375" width="58" height="58" rx="18" fill="#FDFDFD" stroke="#E0E4E8" stroke-width="2"/>
+        <path d="M82 405L93 416L111 388" stroke="#1D2430" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="145" y="386" width="143" height="38" rx="19" fill="#F3E7E1"/>
+        <text x="216.5" y="410" text-anchor="middle" fill="#BB6431" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">COMPLETED</text>
+        <text x="69" y="468" fill="#202630" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">
+          <tspan x="69" dy="0">Load and parse data</tspan>
+          <tspan x="69" dy="30">files</tspan>
+        </text>
+      </g>
+
+      <g id="card-2">
+        <rect x="328" y="353" width="264" height="206" rx="28" fill="#FCFAF9" stroke="#DDCECA" stroke-width="2"/>
+        <rect x="349" y="375" width="58" height="58" rx="18" fill="#FDFDFD" stroke="#E0E4E8" stroke-width="2"/>
+        <path d="M363 405L374 416L392 388" stroke="#1D2430" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="426" y="386" width="143" height="38" rx="19" fill="#F3E7E1"/>
+        <text x="497.5" y="410" text-anchor="middle" fill="#BB6431" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">COMPLETED</text>
+        <text x="350" y="468" fill="#202630" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">
+          <tspan x="350" dy="0">Generate dataset</tspan>
+          <tspan x="350" dy="30">context</tspan>
+        </text>
+      </g>
+
+      <g id="card-3">
+        <rect x="609" y="353" width="264" height="206" rx="28" fill="#FCFAF9" stroke="#DDCECA" stroke-width="2"/>
+        <rect x="630" y="375" width="58" height="58" rx="18" fill="#FDFDFD" stroke="#E0E4E8" stroke-width="2"/>
+        <path d="M644 405L655 416L673 388" stroke="#1D2430" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="707" y="386" width="143" height="38" rx="19" fill="#F3E7E1"/>
+        <text x="778.5" y="410" text-anchor="middle" fill="#BB6431" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">COMPLETED</text>
+        <text x="631" y="468" fill="#202630" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">
+          <tspan x="631" dy="0">Perform deep</tspan>
+          <tspan x="631" dy="30">exploratory analysis</tspan>
+          <tspan x="631" dy="30">(EDA)</tspan>
+        </text>
+      </g>
+
+      <g id="card-4">
+        <rect x="890" y="353" width="264" height="206" rx="28" fill="#FCFAF9" stroke="#DDCECA" stroke-width="2"/>
+        <rect x="911" y="375" width="58" height="58" rx="18" fill="#FDFDFD" stroke="#E0E4E8" stroke-width="2"/>
+        <path d="M925 405L936 416L954 388" stroke="#1D2430" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="988" y="386" width="143" height="38" rx="19" fill="#F3E7E1"/>
+        <text x="1059.5" y="410" text-anchor="middle" fill="#BB6431" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">COMPLETED</text>
+        <text x="912" y="468" fill="#202630" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">
+          <tspan x="912" dy="0">Calculate key business</tspan>
+          <tspan x="912" dy="30">indicators (KPI)</tspan>
+        </text>
+      </g>
+
+      <g id="card-5">
+        <rect x="1171" y="353" width="264" height="206" rx="28" fill="#FCFAF9" stroke="#DDCECA" stroke-width="2"/>
+        <rect x="1192" y="375" width="58" height="58" rx="18" fill="#FDFDFD" stroke="#E0E4E8" stroke-width="2"/>
+        <path d="M1206 405L1217 416L1235 388" stroke="#1D2430" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="1269" y="386" width="143" height="38" rx="19" fill="#F3E7E1"/>
+        <text x="1340.5" y="410" text-anchor="middle" fill="#BB6431" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">COMPLETED</text>
+        <text x="1193" y="468" fill="#202630" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">
+          <tspan x="1193" dy="0">Plan and generate visual</tspan>
+          <tspan x="1193" dy="30">charts</tspan>
+        </text>
+      </g>
+
+      <g id="card-6">
+        <rect x="1452" y="353" width="269" height="206" rx="28" fill="#FCFAF9" stroke="#DDCECA" stroke-width="2"/>
+        <rect x="1479" y="385" width="58" height="58" rx="18" fill="#FFFDFC" stroke="#D9BCAE" stroke-width="2"/>
+        <g transform="translate(1496 402)" stroke="#B45C2C" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <use href="#pen-tool" width="24" height="24"/>
+        </g>
+        <rect x="1578" y="386" width="143" height="38" rx="19" fill="#F3E7E1"/>
+        <text x="1649.5" y="410" text-anchor="middle" fill="#BB6431" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">LIVE NOW</text>
+        <text x="1479" y="468" fill="#202630" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">
+          <tspan x="1479" dy="0">Write analysis summary</tspan>
+          <tspan x="1479" dy="30">and conclusions</tspan>
+        </text>
+      </g>
+
+      <g id="card-7">
+        <rect x="1742" y="353" width="258" height="206" rx="28" fill="#FAFBFD" stroke="#E2E6EB" stroke-width="2"/>
+        <rect x="1761" y="375" width="58" height="58" rx="18" fill="#FCFDFE" stroke="#E0E4E8" stroke-width="2"/>
+        <g transform="translate(1778 392)" stroke="#7D838F" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" color="#7D838F">
+          <use href="#palette" width="24" height="24"/>
+        </g>
+        <text x="1968" y="410" text-anchor="end" fill="#747A86" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="0.8">QUEUED</text>
+        <text x="1762" y="468" fill="#6E7480" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="18" font-weight="600">
+          <tspan x="1762" dy="0">Render final HTML</tspan>
+          <tspan x="1762" dy="30">report</tspan>
+        </text>
+      </g>
+    </g>
+
+    <g id="status-card">
+      <rect x="18" y="615" width="2014" height="118" rx="28" fill="#FDFDFE" stroke="#E2E5EB" stroke-width="2"/>
+      <rect x="44" y="641" width="48" height="48" rx="16" fill="#FCFCFD" stroke="#E2E6EC" stroke-width="2"/>
+      <g transform="translate(56 653)" stroke="#818897" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <use href="#sparkles" width="24" height="24"/>
+      </g>
+      <text x="118" y="667" fill="#1F2531" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="22" font-weight="700">Report is in progress</text>
+      <text x="118" y="704" fill="#808694" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="17" font-weight="500">The workflow is still running. This pane will switch to the final document automatically.</text>
+    </g>
+  </g>
+</svg>

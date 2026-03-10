@@ -1,0 +1,91 @@
+<svg width="403" height="759" viewBox="0 0 403 759" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DeepEye Assistant Empty Chat</title>
+  <defs>
+    <linearGradient id="assistantBg" x1="0" y1="0" x2="0" y2="759" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FBFBFC"/>
+      <stop offset="1" stop-color="#F3F4F6"/>
+    </linearGradient>
+    <symbol id="icon-chat-bubble" viewBox="0 0 24 24">
+      <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-open-arrow" viewBox="0 0 24 24">
+      <path d="M7 17 17 7M9 7h8v8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-send-up" viewBox="0 0 24 24">
+      <path d="m5 12 7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 19V5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+
+  <rect width="403" height="759" rx="28" fill="url(#assistantBg)" stroke="#E4E6EB"/>
+  <rect x="6" y="16" width="391" height="742" rx="26" fill="#FFFFFF" stroke="#E4E6EB"/>
+
+  <g id="header">
+    <rect x="6" y="16" width="391" height="40" rx="26" fill="#F8F8FA" stroke="#E6E8EC"/>
+    <path d="M20 56H383" stroke="#E7E9ED"/>
+    <rect x="18" y="27" width="74" height="18" rx="9" fill="#F7F7F8" stroke="#E3E5E9"/>
+    <text x="55" y="39" text-anchor="middle" fill="#8B919B" font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="700" letter-spacing="1">ASSISTANT</text>
+    <text x="108" y="40" fill="#232834" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">Ask DeepEye</text>
+    <rect x="338" y="24" width="45" height="24" rx="12" fill="#FFFFFF" stroke="#E4E6EB"/>
+    <text x="360.5" y="40" text-anchor="middle" fill="#4B5563" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700">Hide</text>
+  </g>
+
+  <g id="empty-state">
+    <text x="24" y="106" fill="#232834" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">Attach data to begin</text>
+    <text x="24" y="134" fill="#8A919B" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500">Use + to add files or databases. Once attached, they are available</text>
+    <text x="24" y="152" fill="#8A919B" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500">automatically in this thread.</text>
+
+    <rect x="22" y="164" width="349" height="28" rx="14" fill="#FAFAFB" stroke="#E4E6EB"/>
+    <circle cx="37" cy="178" r="4" fill="#CBD5E1"/>
+    <text x="49" y="182" fill="#6B7280" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="600">No attached data yet</text>
+
+    <rect x="92" y="203" width="220" height="26" rx="13" fill="#FBFBFC" stroke="#E4E6EB"/>
+    <text x="202" y="220" text-anchor="middle" fill="#8A919B" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="600">Files and databases join automatically</text>
+    <rect x="96" y="237" width="212" height="26" rx="13" fill="#FBFBFC" stroke="#E4E6EB"/>
+    <text x="202" y="254" text-anchor="middle" fill="#8A919B" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="600">Use @ to reference a knowledge base</text>
+
+    <g transform="translate(20 281)">
+      <rect width="363" height="45" rx="16" fill="#FFFFFF" stroke="#E6E8ED"/>
+      <text x="15" y="28" fill="#232834" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">Profile the data</text>
+      <circle cx="341" cy="22.5" r="12" fill="#FCFCFD" stroke="#E5E7EB"/>
+      <g transform="translate(335 16.5)" stroke="#8A91A0" stroke-width="1.8" fill="none">
+        <use href="#icon-open-arrow" width="12" height="12"/>
+      </g>
+    </g>
+    <g transform="translate(20 335)">
+      <rect width="363" height="45" rx="16" fill="#FFFFFF" stroke="#E6E8ED"/>
+      <text x="15" y="28" fill="#232834" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">Recommend charts</text>
+      <circle cx="341" cy="22.5" r="12" fill="#FCFCFD" stroke="#E5E7EB"/>
+      <g transform="translate(335 16.5)" stroke="#8A91A0" stroke-width="1.8" fill="none">
+        <use href="#icon-open-arrow" width="12" height="12"/>
+      </g>
+    </g>
+    <g transform="translate(20 389)">
+      <rect width="363" height="45" rx="16" fill="#FFFFFF" stroke="#E6E8ED"/>
+      <text x="15" y="28" fill="#232834" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">Outline a report</text>
+      <circle cx="341" cy="22.5" r="12" fill="#FCFCFD" stroke="#E5E7EB"/>
+      <g transform="translate(335 16.5)" stroke="#8A91A0" stroke-width="1.8" fill="none">
+        <use href="#icon-open-arrow" width="12" height="12"/>
+      </g>
+    </g>
+  </g>
+
+  <g id="composer">
+    <rect x="6" y="678" width="391" height="80" fill="url(#assistantBg)" stroke="#E6E8EC"/>
+    <rect x="16" y="686" width="361" height="42" rx="16" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <circle cx="38" cy="707" r="15" fill="#FCFCFD" stroke="#E5E7EB"/>
+    <g transform="translate(31 700)" stroke="#7C8290" stroke-width="1.9" fill="none">
+      <use href="#icon-plus" width="14" height="14"/>
+    </g>
+    <text x="58" y="714" fill="#B0B6C0" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="600">Attach data, then message DeepEye...</text>
+    <circle cx="354" cy="707" r="14" fill="#F8F9FB" stroke="#E5E7EB"/>
+    <g transform="translate(347 700)" stroke="#B9BEC6" stroke-width="1.9" fill="none">
+      <use href="#icon-send-up" width="14" height="14"/>
+    </g>
+    <rect x="286" y="736" width="94" height="16" rx="8" fill="#F8F8FA" stroke="#E5E7EB"/>
+    <text x="333" y="747" text-anchor="middle" fill="#8A919B" font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="700">Use + to add data</text>
+  </g>
+</svg>
