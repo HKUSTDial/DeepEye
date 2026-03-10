@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from datetime import datetime
 
 from app.core.celery_app import celery_app
@@ -11,7 +12,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.workflow import Workflow
 from app.models.workflow_run import WorkflowRun
-from app.repositories import WorkflowRepository, WorkflowRunRepository
+from app.repositories import DataSourceRepository, WorkflowRepository, WorkflowRunRepository
 from app.infra import RedisEventBus
 from app.services.workflow_service import run_workflow, update_workflow_run
 from app.sandbox import sandbox_manager
@@ -53,14 +54,54 @@ def _publish_node(run: WorkflowRun, node_id: str, node_status: str, outputs: dic
     asyncio.run(_publish(channel, payload))
 
 
+def _workflow_file_datasources(db, workflow: Workflow, user_id) -> list:
+    """Collect file datasources referenced by datasource.read nodes in a workflow definition."""
+    definition = workflow.definition or {}
+    graph_data = definition.get("root", definition)
+    if not isinstance(graph_data, dict):
+        return []
+
+    raw_nodes = graph_data.get("nodes")
+    if not isinstance(raw_nodes, dict):
+        return []
+
+    repo = DataSourceRepository(db)
+    seen: set[str] = set()
+    datasources = []
+
+    for raw_node in raw_nodes.values():
+        if not isinstance(raw_node, dict) or raw_node.get("type") != "datasource.read":
+            continue
+        params = raw_node.get("params")
+        if not isinstance(params, dict):
+            continue
+        datasource_id = params.get("datasource_id")
+        if not datasource_id:
+            continue
+        try:
+            datasource = repo.get_by_id_and_user(str(datasource_id), user_id)
+        except Exception:
+            continue
+        if not datasource or getattr(datasource, "category", None) != "file" or not getattr(datasource, "storage_path", None):
+            continue
+        key = str(datasource.id)
+        if key in seen:
+            continue
+        seen.add(key)
+        datasources.append(datasource)
+
+    return datasources
+
+
 @celery_app.task(bind=True)
 def run_workflow_task(self, run_id: str) -> dict:
     db = SessionLocal()
     try:
         run_repo = WorkflowRunRepository(db)
         workflow_repo = WorkflowRepository(db)
+        run_lookup_id = uuid.UUID(str(run_id))
 
-        run = run_repo.get(run_id)
+        run = run_repo.get(run_lookup_id)
         if not run:
             return {"status": "error", "error": "run not found"}
 
@@ -76,6 +117,9 @@ def run_workflow_task(self, run_id: str) -> dict:
         _publish_run(run)
         sandbox_session_key = str(run.session_id or run.id)
         sandbox = asyncio.run(sandbox_manager.get_or_create_sandbox(sandbox_session_key))
+        file_datasources = _workflow_file_datasources(db, workflow, run.user_id)
+        if file_datasources:
+            asyncio.run(sandbox_manager.sync_datasource_files(sandbox_session_key, file_datasources))
         result = run_workflow(
             db,
             workflow,
@@ -90,7 +134,11 @@ def run_workflow_task(self, run_id: str) -> dict:
         _publish_run(run)
         return {"status": "finished", "run_id": str(run.id)}
     except Exception as exc:
-        run = WorkflowRunRepository(db).get(run_id)
+        try:
+            run_lookup_id = uuid.UUID(str(run_id))
+        except ValueError:
+            run_lookup_id = None
+        run = WorkflowRunRepository(db).get(run_lookup_id) if run_lookup_id else None
         if run:
             run.status = "failed"
             run.error = str(exc)

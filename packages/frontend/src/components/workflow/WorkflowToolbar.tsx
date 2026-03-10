@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { motion, type HTMLMotionProps } from 'framer-motion'
-import { Save, Play, Undo2, Redo2, FileText, Download } from 'lucide-react'
+import { Save, Play, Undo2, Redo2, Download } from 'lucide-react'
 import type { Edge, Node } from 'reactflow'
 import { useWorkflowStore } from '../../stores/workflow'
 import { useShallow } from 'zustand/react/shallow'
@@ -22,32 +22,23 @@ type WorkflowCanvasNode = Node<WorkflowCanvasNodeData>
 
 const MotionDiv = motion.div as React.ComponentType<HTMLMotionProps<'div'>>
 const MotionButton = motion.button as React.ComponentType<HTMLMotionProps<'button'>>
-const MotionSpan = motion.span as React.ComponentType<HTMLMotionProps<'span'>>
 
 export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolbarProps) {
   const {
     workflowId,
     workflowName,
-    description,
-    isDirty,
-    status,
     canUndo,
     canRedo,
     setWorkflowName,
-    setDescription,
     nodes,
     edges,
   } = useWorkflowStore(
     useShallow((state) => ({
       workflowId: state.workflowId,
       workflowName: state.workflowName,
-      description: state.description,
-      isDirty: state.isDirty,
-      status: state.status,
       canUndo: state.canUndo,
       canRedo: state.canRedo,
       setWorkflowName: state.setWorkflowName,
-      setDescription: state.setDescription,
       nodes: state.nodes,
       edges: state.edges,
     })),
@@ -86,18 +77,11 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
       className="workflow-toolbar-floating"
     >
       <div className="workflow-toolbar-inputs">
-        <FileText className="workflow-toolbar-icon" />
         <input
           value={workflowName}
           onChange={(e) => setWorkflowName(e.target.value)}
           className="workflow-toolbar-input workflow-toolbar-input-name"
-          placeholder="Workflow name"
-        />
-        <input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="workflow-toolbar-input workflow-toolbar-input-desc"
-          placeholder="Description"
+          placeholder="Workflow Naming"
         />
       </div>
 
@@ -157,26 +141,6 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
           <Play className="w-4 h-4" />
           Run
         </MotionButton>
-
-        {isDirty && (
-          <MotionSpan
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="workflow-toolbar-badge warning"
-          >
-            Unsaved
-          </MotionSpan>
-        )}
-
-        {status && (
-          <MotionSpan
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="workflow-toolbar-badge"
-          >
-            {status}
-          </MotionSpan>
-        )}
       </div>
     </MotionDiv>
   )
