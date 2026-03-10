@@ -905,11 +905,13 @@
 }
 
 .chat-input-wrapper {
+  --chat-composer-min-height: 52px;
   --chat-composer-control-offset: 10px;
+  --chat-composer-input-line-height: 1.5em;
   position: relative;
   display: flex;
-  align-items: flex-end;
-  min-height: 52px;
+  align-items: center;
+  min-height: var(--chat-composer-min-height);
   background: var(--input-bg);
   border: var(--chat-ui-border-strong);
   border-radius: 22px;
@@ -918,7 +920,10 @@
 }
 
 .chat-container.compact .chat-input-wrapper {
-  min-height: 48px;
+  --chat-composer-min-height: 48px;
+  --chat-composer-control-offset: 9px;
+  --chat-composer-input-line-height: 1.45em;
+  min-height: var(--chat-composer-min-height);
   border-radius: 18px;
 }
 
@@ -1002,25 +1007,35 @@
 .chat-input {
   flex: 1;
   width: 100%;
-  min-height: 24px;
-  padding: 10px 64px 10px 50px;
+  min-height: var(--chat-composer-min-height);
+  padding:
+    calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+    64px
+    calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+    50px;
   background: transparent;
   border: none;
   outline: none;
   color: var(--main-text);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: var(--chat-composer-input-line-height);
   resize: none;
   overflow-y: auto;
   max-height: 200px;
   box-sizing: border-box;
   font-family: inherit;
+  display: block;
 }
 
 .chat-container.compact .chat-input {
-  padding: 9px 56px 9px 46px;
+  min-height: var(--chat-composer-min-height);
+  padding:
+    calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+    56px
+    calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+    46px;
   font-size: 13px;
-  line-height: 1.45;
+  line-height: var(--chat-composer-input-line-height);
 }
 
 /* Override theme-level generic textarea styles */
@@ -1397,11 +1412,16 @@ body.dark-theme .chat-container .chat-input:active {
   }
 
   .chat-input {
-    padding: 11px 66px 11px 52px;
+    padding:
+      calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+      66px
+      calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+      52px;
   }
 
   .chat-input-wrapper {
-    min-height: 52px;
+    --chat-composer-min-height: 52px;
+    min-height: var(--chat-composer-min-height);
   }
 
   .chat-upload-btn {
@@ -1488,14 +1508,21 @@ body.dark-theme .chat-container .chat-input:active {
   }
 
   .chat-input-wrapper {
-    min-height: 50px;
+    --chat-composer-min-height: 50px;
+    --chat-composer-input-line-height: 1.45em;
+    min-height: var(--chat-composer-min-height);
     border-radius: 16px;
   }
 
   .chat-input {
-    padding: 10px 68px 10px 48px;
+    min-height: var(--chat-composer-min-height);
+    padding:
+      calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+      68px
+      calc((var(--chat-composer-min-height) - var(--chat-composer-input-line-height)) / 2)
+      48px;
     font-size: var(--chat-font-sm);
-    line-height: 1.45;
+    line-height: var(--chat-composer-input-line-height);
   }
 
   .chat-upload-btn {

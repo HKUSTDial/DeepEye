@@ -12,7 +12,14 @@ export {
 } from './auth'
 export { chatApi } from './chat'
 export { sessionApi, type AgentEvent, type StoredMessage } from './session'
-export { datasourceApi, type DatasourceTablesResponse, type DatasourceTable } from './datasource'
+export {
+  datasourceApi,
+  type DatasourcePreviewColumn,
+  type DatasourcePreviewResponse,
+  type DatasourcePreviewTable,
+  type DatasourceTablesResponse,
+  type DatasourceTable,
+} from './datasource'
 export { workflowsApi } from './workflows'
 export { workflowTemplatesApi } from './workflowTemplates'
 export { workflowNodesApi, type NodeSpec } from './workflowNodes'

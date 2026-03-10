@@ -1,6 +1,7 @@
 """API Request/Response schemas"""
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -50,6 +51,29 @@ class DataSourceConnectionTestResponse(BaseModel):
     type: str
     table_count: int
     sample_tables: list[str]
+
+
+class DataSourcePreviewTable(BaseModel):
+    name: str
+
+
+class DataSourcePreviewColumn(BaseModel):
+    name: str
+    type: str
+
+
+class DataSourcePreviewResponse(BaseModel):
+    datasource_id: UUID
+    datasource_name: str
+    category: str
+    tables: list[DataSourcePreviewTable]
+    table: str | None = None
+    columns: list[DataSourcePreviewColumn]
+    rows: list[dict[str, Any]]
+    page: int
+    page_size: int
+    total_rows: int
+    total_pages: int
 
 
 class DataSourceUpdate(BaseModel):

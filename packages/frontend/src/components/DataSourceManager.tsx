@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../api/client'
-import { datasourceApi, sessionApi, type DatasourceTablesResponse } from '../api'
+import { datasourceApi, sessionApi, type DatasourcePreviewResponse } from '../api'
 import { useChatStore } from '../stores/chat'
 import type { DataSource, DataSourceConnectionTestResponse } from '../types'
 import './DataSourceManager.css'
@@ -22,6 +22,8 @@ const URI_EXAMPLES: Record<string, string> = {
   sqlite: 'sqlite:////absolute/path/to/analytics.db',
 }
 
+const PREVIEW_PAGE_SIZE = 25
+
 const emitDatasourceUpdated = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('datasources:updated'))
@@ -37,6 +39,26 @@ const isSupportedFile = (file: File) => {
     name.endsWith('.xls') ||
     name.endsWith('.parquet')
   )
+}
+
+const formatPreviewCell = (value: unknown) => {
+  if (value === null || value === undefined) return 'NULL'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+const getPreviewRangeLabel = (preview: DatasourcePreviewResponse) => {
+  if (preview.total_rows === 0) {
+    return '0 / 0'
+  }
+  const start = (preview.page - 1) * preview.page_size + 1
+  const end = Math.min(preview.page * preview.page_size, preview.total_rows)
+  return `${start}-${end} / ${preview.total_rows}`
 }
 
 interface EngineSelectProps {
@@ -134,8 +156,8 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   const [isUploading, setIsUploading] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tablesByDsId, setTablesByDsId] = useState<Record<string, DatasourceTablesResponse>>({})
-  const [loadingTablesId, setLoadingTablesId] = useState<string | null>(null)
+  const [previewByDsId, setPreviewByDsId] = useState<Record<string, DatasourcePreviewResponse>>({})
+  const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null)
   const [expandedDsId, setExpandedDsId] = useState<string | null>(null)
   const [editingDsId, setEditingDsId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ name: '', type: 'mysql', connection_string: '' })
@@ -153,20 +175,20 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     onDataSourcesChangeRef.current?.(dataSources)
   }, [dataSources])
 
-  const getApiErrorDetail = (error: unknown, fallback: string) => {
+  const getApiErrorDetail = useCallback((error: unknown, fallback: string) => {
     if (error instanceof ApiError) {
       const detail = (error.response as { detail?: unknown } | undefined)?.detail
       if (typeof detail === 'string') return detail
       return error.message || fallback
     }
     return error instanceof Error ? error.message : fallback
-  }
+  }, [])
 
   const formatConnectionSuccess = (result: DataSourceConnectionTestResponse) => {
     const sample = result.sample_tables.slice(0, 3).join(', ')
     return result.table_count > 0
-      ? `连接成功，可访问 ${result.table_count} 张表。示例：${sample || '无'}`
-      : '连接成功，但当前库中未发现可访问的数据表。'
+      ? `Connection successful. ${result.table_count} table(s) available. Sample: ${sample || 'none'}`
+      : 'Connection successful, but no accessible tables were found in this database.'
   }
 
   const applyDataSources = useCallback(
@@ -183,17 +205,26 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     const effectiveSessionId = targetSessionId ?? sessionId
     if (!effectiveSessionId || effectiveSessionId === 'draft') {
       applyDataSources([])
+      setPreviewByDsId({})
+      setExpandedDsId(null)
+      setEditingDsId(null)
       return
     }
     try {
       const list = await sessionApi.listAttachments(effectiveSessionId)
       applyDataSources(list)
+      const visibleIds = new Set(list.map((item) => item.id))
+      setPreviewByDsId((current) =>
+        Object.fromEntries(Object.entries(current).filter(([id]) => visibleIds.has(id))),
+      )
+      setExpandedDsId((current) => (current && visibleIds.has(current) ? current : null))
+      setEditingDsId((current) => (current && visibleIds.has(current) ? current : null))
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to load'
       const is502 = typeof msg === 'string' && (msg.includes('Bad Gateway') || msg.includes('502'))
       setError(
         is502
-          ? '后端未就绪或不可达。若用 Docker：请用 http://localhost:8080 访问，并执行 docker compose ps 确认 backend-api 为 healthy；再点「重试」。'
+          ? 'Backend is not ready or unreachable. If you are using Docker, open http://localhost:8080 and run `docker compose ps` to confirm `backend-api` is healthy, then click Retry.'
           : msg,
       )
     }
@@ -211,6 +242,35 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     return created.id
   }, [createSession, sessionId])
 
+  const loadPreview = useCallback(
+    async (
+      datasource: DataSource,
+      options?: {
+        table?: string | null
+        page?: number
+      },
+    ) => {
+      setLoadingPreviewId(datasource.id)
+      setExpandedDsId(datasource.id)
+      setEditingDsId(null)
+      setError(null)
+      try {
+        const cached = previewByDsId[datasource.id]
+        const preview = await datasourceApi.preview(datasource.id, {
+          table: options?.table ?? cached?.table ?? undefined,
+          page: options?.page ?? cached?.page ?? 1,
+          pageSize: PREVIEW_PAGE_SIZE,
+        })
+        setPreviewByDsId((current) => ({ ...current, [datasource.id]: preview }))
+      } catch (e: unknown) {
+        setError(getApiErrorDetail(e, 'Failed to load preview'))
+      } finally {
+        setLoadingPreviewId(null)
+      }
+    },
+    [getApiErrorDetail, previewByDsId],
+  )
+
   const uploadFiles = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return
@@ -226,10 +286,16 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setError(null)
       try {
         const targetSessionId = await ensureSessionId()
+        const createdSources: DataSource[] = []
         for (const file of supportedFiles) {
-          await datasourceApi.upload(file, targetSessionId)
+          const created = await datasourceApi.upload(file, targetSessionId)
+          createdSources.push(created)
         }
         await loadDataSources(targetSessionId)
+        const latest = createdSources[createdSources.length - 1]
+        if (latest) {
+          await loadPreview(latest, { page: 1 })
+        }
         emitDatasourceUpdated()
         if (ignoredCount > 0) {
           setError(`${ignoredCount} unsupported file(s) were skipped.`)
@@ -241,13 +307,13 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         setIsDragOver(false)
       }
     },
-    [ensureSessionId, loadDataSources],
+    [ensureSessionId, loadDataSources, loadPreview],
   )
 
   const createDataSource = async () => {
     const conn = newDs.connection_string.trim()
     if (!conn) {
-      setError('请填写连接字符串 (Connection URI)')
+      setError('Please enter a connection string (Connection URI).')
       return
     }
     try {
@@ -255,12 +321,13 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       const tested = await runCreateConnectionTest()
       if (!tested) return
       const targetSessionId = await ensureSessionId()
-      await datasourceApi.create({
+      const created = await datasourceApi.create({
         name: newDs.name.trim() || newDs.type,
         type: newDs.type,
         connection_string: conn,
       }, targetSessionId)
       await loadDataSources(targetSessionId)
+      await loadPreview(created, { page: 1 })
       setIsCreating(false)
       setNewDs({ name: '', type: 'postgres', connection_string: '' })
       setCreateConnectionStatus(null)
@@ -273,7 +340,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   const runCreateConnectionTest = async () => {
     const conn = newDs.connection_string.trim()
     if (!conn) {
-      setError('请填写连接字符串 (Connection URI)')
+      setError('Please enter a connection string (Connection URI).')
       return false
     }
     setIsTestingCreate(true)
@@ -287,7 +354,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setCreateConnectionStatus(formatConnectionSuccess(result))
       return true
     } catch (e: unknown) {
-      setError(getApiErrorDetail(e, '数据库连接失败'))
+      setError(getApiErrorDetail(e, 'Database connection failed'))
       return false
     } finally {
       setIsTestingCreate(false)
@@ -326,7 +393,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     if (!editingDsId) return
     const conn = editForm.connection_string.trim()
     if (!conn) {
-      setError('请填写连接字符串')
+      setError('Please enter a connection string.')
       return
     }
     setIsSavingEdit(true)
@@ -340,13 +407,14 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         connection_string: conn,
       })
       applyDataSources((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-      setTablesByDsId((prev) => {
-        const next = { ...prev }
+      setPreviewByDsId((current) => {
+        const next = { ...current }
         delete next[editingDsId]
         return next
       })
       setEditingDsId(null)
       setEditConnectionStatus(null)
+      await loadPreview(updated, { page: 1 })
       emitDatasourceUpdated()
     } catch (e: unknown) {
       setError(getApiErrorDetail(e, 'Update failed'))
@@ -358,7 +426,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   const runEditConnectionTest = async () => {
     const conn = editForm.connection_string.trim()
     if (!conn) {
-      setError('请填写连接字符串')
+      setError('Please enter a connection string.')
       return false
     }
     setIsTestingEdit(true)
@@ -372,7 +440,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setEditConnectionStatus(formatConnectionSuccess(result))
       return true
     } catch (e: unknown) {
-      setError(getApiErrorDetail(e, '数据库连接失败'))
+      setError(getApiErrorDetail(e, 'Database connection failed'))
       return false
     } finally {
       setIsTestingEdit(false)
@@ -385,24 +453,32 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     setError(null)
   }
 
-  const loadTables = async (id: string, event: React.MouseEvent) => {
+  const togglePreview = async (datasource: DataSource, event: React.MouseEvent) => {
     event.stopPropagation()
-    if (tablesByDsId[id]) {
-      setExpandedDsId((current) => (current === id ? null : id))
+    if (expandedDsId === datasource.id && editingDsId !== datasource.id) {
+      setExpandedDsId(null)
       return
     }
-    setLoadingTablesId(id)
-    setError(null)
-    try {
-      const response = await datasourceApi.tables(id)
-      setTablesByDsId((prev) => ({ ...prev, [id]: response }))
-      setExpandedDsId(id)
-    } catch (e: unknown) {
-      const msg = (e as { response?: { detail?: string } })?.response?.detail ?? (e instanceof Error ? e.message : 'Failed to load tables')
-      setError(String(msg))
-    } finally {
-      setLoadingTablesId(null)
+    const cached = previewByDsId[datasource.id]
+    if (cached) {
+      setExpandedDsId(datasource.id)
+      setEditingDsId(null)
+      return
     }
+    await loadPreview(datasource, { page: 1 })
+  }
+
+  const changePreviewTable = async (datasource: DataSource, table: string) => {
+    await loadPreview(datasource, { table, page: 1 })
+  }
+
+  const changePreviewPage = async (datasource: DataSource, nextPage: number) => {
+    const preview = previewByDsId[datasource.id]
+    if (!preview) return
+    await loadPreview(datasource, {
+      table: preview.table,
+      page: nextPage,
+    })
   }
 
   const deleteDataSource = async (id: string, event: React.MouseEvent) => {
@@ -412,8 +488,8 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     try {
       await sessionApi.detachDatasource(sessionId, id)
       applyDataSources((current) => current.filter((item) => item.id !== id))
-      setTablesByDsId((prev) => {
-        const next = { ...prev }
+      setPreviewByDsId((current) => {
+        const next = { ...current }
         delete next[id]
         return next
       })
@@ -534,7 +610,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         <div className="data-source-error">
           <span>{error}</span>
           <button type="button" onClick={() => void loadDataSources()} className="data-source-link-btn">
-            重试
+            Retry
           </button>
         </div>
       )}
@@ -631,6 +707,9 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         {dataSources.map((ds) => {
           const isDatabase = ds.category === 'database'
           const isOpen = expandedDsId === ds.id || editingDsId === ds.id
+          const preview = previewByDsId[ds.id]
+          const isPreviewLoading = loadingPreviewId === ds.id
+
           return (
             <div key={ds.id} className={`data-source-card ${isOpen ? 'is-open' : ''}`}>
               <div className="data-source-row">
@@ -647,9 +726,23 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                 </div>
                 <div className="data-source-copy">
                   <span className="data-source-name">{ds.name}</span>
-                  <span className="data-source-meta">{isDatabase ? (ds.type || 'database').toUpperCase() : 'FILE'}</span>
+                  <span className="data-source-meta">{isDatabase ? (ds.type || 'database').toUpperCase() : (ds.type || 'file').toUpperCase()}</span>
                 </div>
                 <div className="data-source-row-actions">
+                  <button
+                    type="button"
+                    onClick={(event) => void togglePreview(ds, event)}
+                    className="data-source-icon-btn"
+                    title="Preview data"
+                  >
+                    {isPreviewLoading ? (
+                      <div className="data-source-spinner is-small" />
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5.75h18M3 12h18M3 18.25h18" />
+                      </svg>
+                    )}
+                  </button>
                   {isDatabase && (
                     <button
                       type="button"
@@ -660,22 +753,6 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                       </svg>
-                    </button>
-                  )}
-                  {isDatabase && (
-                    <button
-                      type="button"
-                      onClick={(event) => void loadTables(ds.id, event)}
-                      className="data-source-icon-btn"
-                      title="View tables"
-                    >
-                      {loadingTablesId === ds.id ? (
-                        <div className="data-source-spinner is-small" />
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                        </svg>
-                      )}
                     </button>
                   )}
                   <button
@@ -754,26 +831,139 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                       disabled={isSavingEdit}
                       className="data-source-submit-btn"
                     >
-                      {isSavingEdit ? '保存中...' : '保存连接'}
+                      {isSavingEdit ? 'Saving...' : 'Save connection'}
                     </button>
                     <button type="button" onClick={cancelEdit} className="data-source-secondary-btn">
-                      取消
+                      Cancel
                     </button>
                   </div>
                 </div>
               )}
 
-              {isDatabase && expandedDsId === ds.id && tablesByDsId[ds.id] && (
-                <div className="data-source-subpanel" onClick={(event) => event.stopPropagation()}>
-                  <div className="data-source-subpanel-note">Tables ({tablesByDsId[ds.id].tables.length})</div>
-                  <ul className="data-source-table-list">
-                    {tablesByDsId[ds.id].tables.map((table) => (
-                      <li key={table.name} className="data-source-table-item" title={`${table.name}: ${table.columns.map((column) => column.name).join(', ')}`}>
-                        <span className="data-source-table-name">{table.name}</span>
-                        <span className="data-source-table-meta">{table.columns.length} columns</span>
-                      </li>
-                    ))}
-                  </ul>
+              {expandedDsId === ds.id && editingDsId !== ds.id && (
+                <div className="data-source-subpanel data-source-preview-shell" onClick={(event) => event.stopPropagation()}>
+                  {isPreviewLoading && !preview ? (
+                    <div className="data-source-preview-state">
+                      <div className="data-source-spinner" />
+                      <span>Loading preview...</span>
+                    </div>
+                  ) : preview ? (
+                    <>
+                      <div className="data-source-preview-toolbar">
+                        <div className="data-source-preview-summary">
+                          <span className="data-source-subpanel-note">
+                            {preview.table
+                              ? `${preview.table} · ${preview.columns.length} columns · ${preview.total_rows} rows`
+                              : 'No previewable tables are available for this data source.'}
+                          </span>
+                          {isPreviewLoading && (
+                            <span className="data-source-preview-loading-inline">
+                              <div className="data-source-spinner is-small" />
+                              <span>Refreshing</span>
+                            </span>
+                          )}
+                        </div>
+                        <span className="data-source-preview-page-badge">
+                          {preview.page_size} rows / page
+                        </span>
+                      </div>
+
+                      {preview.tables.length > 1 && (
+                        <div className="data-source-preview-tabs">
+                          {preview.tables.map((table) => (
+                            <button
+                              key={table.name}
+                              type="button"
+                              className={`data-source-preview-tab ${preview.table === table.name ? 'is-active' : ''}`}
+                              onClick={() => void changePreviewTable(ds, table.name)}
+                              disabled={isPreviewLoading && preview.table === table.name}
+                            >
+                              {table.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {preview.table && preview.columns.length > 0 ? (
+                        <>
+                          <div className="data-source-preview-table-shell">
+                            <table className="data-source-preview-table">
+                              <thead>
+                                <tr>
+                                  {preview.columns.map((column) => (
+                                    <th key={column.name}>
+                                      <div className="data-source-preview-col">
+                                        <span className="data-source-preview-col-name">{column.name}</span>
+                                        {column.type && (
+                                          <span className="data-source-preview-col-type">{column.type}</span>
+                                        )}
+                                      </div>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {preview.rows.length > 0 ? (
+                                  preview.rows.map((row, rowIndex) => (
+                                    <tr key={`${preview.table || 'preview'}-${preview.page}-${rowIndex}`}>
+                                      {preview.columns.map((column) => {
+                                        const cell = formatPreviewCell(row[column.name])
+                                        return (
+                                          <td key={`${column.name}-${rowIndex}`} title={cell}>
+                                            <span className="data-source-preview-cell">{cell}</span>
+                                          </td>
+                                        )
+                                      })}
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td colSpan={preview.columns.length} className="data-source-preview-empty-row">
+                                      No data on this page
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="data-source-preview-footer">
+                            <span className="data-source-subpanel-note">
+                              Rows {getPreviewRangeLabel(preview)}
+                            </span>
+                            <div className="data-source-preview-pagination">
+                              <button
+                                type="button"
+                                className="data-source-preview-page-btn"
+                                onClick={() => void changePreviewPage(ds, preview.page - 1)}
+                                disabled={isPreviewLoading || preview.page <= 1}
+                              >
+                                Previous
+                              </button>
+                              <span className="data-source-preview-page-text">
+                                Page {preview.total_pages === 0 ? 0 : preview.page} of {preview.total_pages || 0}
+                              </span>
+                              <button
+                                type="button"
+                                className="data-source-preview-page-btn"
+                                onClick={() => void changePreviewPage(ds, preview.page + 1)}
+                                disabled={isPreviewLoading || preview.total_pages === 0 || preview.page >= preview.total_pages}
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="data-source-preview-state is-empty">
+                          <span>No previewable data is available for this data source.</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="data-source-preview-state is-empty">
+                      <span>Click the preview button to inspect the data.</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

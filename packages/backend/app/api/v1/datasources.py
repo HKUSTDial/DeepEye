@@ -3,7 +3,7 @@
 import shlex
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.deps import CurrentUserId
@@ -14,6 +14,7 @@ from app.schemas import (
     DataSourceConnectionTestRequest,
     DataSourceConnectionTestResponse,
     DataSourceCreate,
+    DataSourcePreviewResponse,
     DataSourceResponse,
     DataSourceUpdate,
     SandboxEvent,
@@ -22,6 +23,7 @@ from app.schemas import (
 from app.services import attach_datasource_to_session
 from app.services.datasource_connection_service import validate_database_connection
 from app.services.datasource_file_service import create_file_datasource
+from app.services.datasource_preview_service import build_datasource_preview
 from app.services.datasource_specs import (
     DataSourceCategory,
     get_datasource_filename,
@@ -226,6 +228,31 @@ def list_datasource_tables(
         return {"datasource_id": str(ds.id), "datasource_name": ds.name, "tables": result}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to connect or list tables: {str(e)}")
+
+
+@router.get("/{datasource_id}/preview", response_model=DataSourcePreviewResponse)
+def preview_datasource(
+    datasource_id: uuid.UUID,
+    user_id: CurrentUserId,
+    table: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Preview one datasource with paginated rows. Database datasources can switch tables."""
+    ds = DataSourceRepository(db).get_by_id_and_user(datasource_id, user_id)
+    if not ds:
+        raise HTTPException(status_code=404, detail="DataSource not found")
+
+    try:
+        return build_datasource_preview(
+            datasource=ds,
+            table_name=table,
+            page=page,
+            page_size=page_size,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.delete("/{datasource_id}")
