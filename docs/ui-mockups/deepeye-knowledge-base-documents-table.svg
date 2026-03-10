@@ -1,0 +1,142 @@
+<svg width="2048" height="379" viewBox="0 0 2048 379" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>DeepEye Knowledge Base Documents Table</title>
+  <defs>
+    <style>
+      .bg { fill: #f3f4f6; }
+      .card { fill: #f9fafb; stroke: #d6dae1; stroke-width: 2; }
+      .header-text {
+        fill: #6b7280;
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .row-text {
+        fill: #1f2937;
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .muted-text {
+        fill: #8a919f;
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 20px;
+        font-weight: 500;
+      }
+      .pill-text {
+        fill: #6b7280;
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .status-text {
+        fill: #58b76f;
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .sep { stroke: #d9dde4; stroke-width: 2; }
+      .icon-stroke { stroke: #1f2937; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .trash-stroke { stroke: #6b7280; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    </style>
+    <symbol id="icon-file" viewBox="0 0 24 24">
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" class="icon-stroke"/>
+      <path d="M14 2v5h5" class="icon-stroke"/>
+      <path d="M9 12h6" class="icon-stroke"/>
+      <path d="M9 16h6" class="icon-stroke"/>
+    </symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24">
+      <path d="M3 6h18" class="trash-stroke"/>
+      <path d="M8 6V4h8v2" class="trash-stroke"/>
+      <path d="M6 6l1 14h10l1-14" class="trash-stroke"/>
+      <path d="M10 10v6" class="trash-stroke"/>
+      <path d="M14 10v6" class="trash-stroke"/>
+    </symbol>
+  </defs>
+
+  <rect width="2048" height="379" class="bg"/>
+
+  <rect x="8" y="20" width="2032" height="359" rx="24" class="card"/>
+
+  <line x1="8" y1="86" x2="2040" y2="86" class="sep"/>
+  <line x1="8" y1="157" x2="2040" y2="157" class="sep"/>
+  <line x1="8" y1="228" x2="2040" y2="228" class="sep"/>
+  <line x1="8" y1="299" x2="2040" y2="299" class="sep"/>
+
+  <g id="header">
+    <text x="34" y="57" class="header-text">Document</text>
+    <text x="1118" y="57" class="header-text">Segment Mode</text>
+    <text x="1280" y="57" class="header-text">Words</text>
+    <text x="1397" y="57" class="header-text">Recalls</text>
+    <text x="1515" y="57" class="header-text">Uploaded</text>
+    <text x="1742" y="57" class="header-text">Status</text>
+    <text x="1943" y="57" class="header-text">Actions</text>
+  </g>
+
+  <g id="row-1">
+    <g transform="translate(34 106)">
+      <use href="#icon-file" width="30" height="30"/>
+    </g>
+    <text x="82" y="127" class="row-text">data-empty-database.svg</text>
+    <rect x="1118" y="105" width="68" height="36" rx="18" fill="#ececef"/>
+    <text x="1152" y="128" text-anchor="middle" class="pill-text">Auto</text>
+    <text x="1280" y="128" class="muted-text">--</text>
+    <text x="1397" y="128" class="muted-text">0</text>
+    <text x="1515" y="128" class="muted-text">2026/3/10 13:23:34</text>
+    <rect x="1740" y="105" width="86" height="36" rx="18" fill="#eaf4ea"/>
+    <text x="1783" y="128" text-anchor="middle" class="status-text">Ready</text>
+    <g transform="translate(1981 110)">
+      <use href="#icon-trash" width="24" height="24"/>
+    </g>
+  </g>
+
+  <g id="row-2">
+    <g transform="translate(34 177)">
+      <use href="#icon-file" width="30" height="30"/>
+    </g>
+    <text x="82" y="198" class="row-text">retail_city_targets_q4_2025.csv</text>
+    <rect x="1118" y="176" width="68" height="36" rx="18" fill="#ececef"/>
+    <text x="1152" y="199" text-anchor="middle" class="pill-text">Auto</text>
+    <text x="1280" y="199" class="muted-text">--</text>
+    <text x="1397" y="199" class="muted-text">0</text>
+    <text x="1515" y="199" class="muted-text">2026/3/10 13:23:09</text>
+    <rect x="1740" y="176" width="86" height="36" rx="18" fill="#eaf4ea"/>
+    <text x="1783" y="199" text-anchor="middle" class="status-text">Ready</text>
+    <g transform="translate(1981 181)">
+      <use href="#icon-trash" width="24" height="24"/>
+    </g>
+  </g>
+
+  <g id="row-3">
+    <g transform="translate(34 248)">
+      <use href="#icon-file" width="30" height="30"/>
+    </g>
+    <text x="82" y="269" class="row-text">data-dropzone-cloud-upload.svg</text>
+    <rect x="1118" y="247" width="68" height="36" rx="18" fill="#ececef"/>
+    <text x="1152" y="270" text-anchor="middle" class="pill-text">Auto</text>
+    <text x="1280" y="270" class="muted-text">--</text>
+    <text x="1397" y="270" class="muted-text">0</text>
+    <text x="1515" y="270" class="muted-text">2026/3/10 13:23:45</text>
+    <rect x="1740" y="247" width="86" height="36" rx="18" fill="#eaf4ea"/>
+    <text x="1783" y="270" text-anchor="middle" class="status-text">Ready</text>
+    <g transform="translate(1981 252)">
+      <use href="#icon-trash" width="24" height="24"/>
+    </g>
+  </g>
+
+  <g id="row-4">
+    <g transform="translate(34 319)">
+      <use href="#icon-file" width="30" height="30"/>
+    </g>
+    <text x="82" y="340" class="row-text">data-empty-database.svg</text>
+    <rect x="1118" y="318" width="68" height="36" rx="18" fill="#ececef"/>
+    <text x="1152" y="341" text-anchor="middle" class="pill-text">Auto</text>
+    <text x="1280" y="341" class="muted-text">--</text>
+    <text x="1397" y="341" class="muted-text">0</text>
+    <text x="1515" y="341" class="muted-text">2026/3/10 13:23:52</text>
+    <rect x="1740" y="318" width="86" height="36" rx="18" fill="#eaf4ea"/>
+    <text x="1783" y="341" text-anchor="middle" class="status-text">Ready</text>
+    <g transform="translate(1981 323)">
+      <use href="#icon-trash" width="24" height="24"/>
+    </g>
+  </g>
+</svg>

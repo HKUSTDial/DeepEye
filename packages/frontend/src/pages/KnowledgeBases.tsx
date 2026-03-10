@@ -16,6 +16,7 @@ export default function KnowledgeBases() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadBases()
@@ -48,6 +49,19 @@ export default function KnowledgeBases() {
       navigate(`/knowledge-bases/${created.id}`)
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  const handleDeleteKnowledgeBase = async (id: string, kbName: string) => {
+    const confirmed = window.confirm(`Delete knowledge base "${kbName}"? This will remove all files in it.`)
+    if (!confirmed) return
+
+    setDeletingId(id)
+    try {
+      await knowledgeBasesApi.remove(id)
+      await refreshBases()
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -150,9 +164,9 @@ export default function KnowledgeBases() {
               background: 'var(--table-header-bg)'
             }}>
               <div className="col-span-5">Knowledge Base</div>
-              <div className="col-span-4">Description</div>
+              <div className="col-span-3">Description</div>
               <div className="col-span-2">Last Updated</div>
-              <div className="col-span-1 text-right">Actions</div>
+              <div className="col-span-2 text-right">Actions</div>
             </div>
             
             {/* Table Body */}
@@ -204,7 +218,7 @@ export default function KnowledgeBases() {
                   onMouseEnter={(e) => e.currentTarget.style.background = 'var(--table-row-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   onClick={() => navigate(`/knowledge-bases/${kb.id}`)}
-                >
+                  >
                   <div className="col-span-5 flex items-center gap-3 min-w-0">
                     <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
                       <svg className="w-5 h-5" style={{ color: 'var(--accent)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,13 +235,13 @@ export default function KnowledgeBases() {
                       <div className="text-xs mt-0.5" style={{ color: 'var(--main-text-muted)', opacity: 0.7 }}>ID: {kb.id.slice(0, 8)}...</div>
                     </div>
                   </div>
-                  <div className="col-span-4 flex items-center min-w-0" style={{ color: 'var(--main-text-muted)' }}>
+                  <div className="col-span-3 flex items-center min-w-0" style={{ color: 'var(--main-text-muted)' }}>
                     <div className="truncate">{kb.description || 'No description'}</div>
                   </div>
                   <div className="col-span-2 flex items-center" style={{ color: 'var(--main-text-muted)' }}>
                     {new Date(kb.updated_at).toLocaleDateString()}
                   </div>
-                  <div className="col-span-1 flex items-center justify-end">
+                  <div className="col-span-2 flex items-center justify-end gap-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -239,6 +253,23 @@ export default function KnowledgeBases() {
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
                       Open
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void handleDeleteKnowledgeBase(kb.id, kb.name)
+                      }}
+                      disabled={deletingId === kb.id}
+                      className="px-3 py-1.5 rounded text-xs font-medium transition-all"
+                      style={{ color: deletingId === kb.id ? 'var(--main-text-muted)' : '#dc2626' }}
+                      onMouseEnter={(e) => {
+                        if (deletingId !== kb.id) e.currentTarget.style.background = 'rgba(220, 38, 38, 0.08)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent'
+                      }}
+                    >
+                      {deletingId === kb.id ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </div>

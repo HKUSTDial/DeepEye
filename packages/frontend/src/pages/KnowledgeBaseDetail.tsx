@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { BookOpen, FileText, Folder } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { knowledgeBasesApi } from '../api'
+import { useKnowledgeBasesStore } from '../stores/knowledgeBases'
 import type { KnowledgeBase, KnowledgeBaseFile } from '../types'
 import './KnowledgeBaseDetail.css'
 
@@ -10,6 +11,7 @@ export default function KnowledgeBaseDetail() {
   const { kbId } = useParams()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const refreshBases = useKnowledgeBasesStore((state) => state.refreshBases)
 
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [files, setFiles] = useState<KnowledgeBaseFile[]>([])
@@ -17,6 +19,7 @@ export default function KnowledgeBaseDetail() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
+  const [isDeletingKb, setIsDeletingKb] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -63,6 +66,24 @@ export default function KnowledgeBaseDetail() {
       setFiles((prev) => prev.filter((file) => file.id !== fileId))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete file.')
+    }
+  }
+
+  const handleDeleteKnowledgeBase = async () => {
+    if (!kbId || !kb) return
+    const confirmed = window.confirm(`Delete knowledge base "${kb.name}"? This will remove all files in it.`)
+    if (!confirmed) return
+
+    setIsDeletingKb(true)
+    setError(null)
+    try {
+      await knowledgeBasesApi.remove(kbId)
+      await refreshBases()
+      navigate('/knowledge-bases')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete knowledge base.')
+    } finally {
+      setIsDeletingKb(false)
     }
   }
 
@@ -175,6 +196,14 @@ export default function KnowledgeBaseDetail() {
                 <span className="kb-stat-value">{(totalSize / 1024 / 1024).toFixed(2)} MB</span>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => void handleDeleteKnowledgeBase()}
+              disabled={isDeletingKb || isUploading}
+              className="kb-danger-btn"
+            >
+              {isDeletingKb ? 'Deleting...' : 'Delete KB'}
+            </button>
             <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="kb-upload-btn">
               <svg className="kb-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />

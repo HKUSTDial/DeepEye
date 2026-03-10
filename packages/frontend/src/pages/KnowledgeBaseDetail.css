@@ -257,6 +257,31 @@
   cursor: not-allowed;
 }
 
+.kb-danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: rgba(220, 38, 38, 0.04);
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.kb-danger-btn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.26);
+}
+
+.kb-danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .kb-upload-icon {
   width: 14px;
   height: 14px;
