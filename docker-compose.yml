@@ -42,21 +42,21 @@ services:
     restart: unless-stopped
 
   # Global sales ops DB for heterogeneous workflow test (global_sales_workflow_sample)
-  global-ops-db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=${GLOBAL_OPS_DB_USER}
-      - POSTGRES_PASSWORD=${GLOBAL_OPS_DB_PASSWORD}
-      - POSTGRES_DB=${GLOBAL_OPS_DB_NAME}
-    volumes:
-      - global_ops_db_data:/var/lib/postgresql/data
-      - ./docker/test-db/global_ops_init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${GLOBAL_OPS_DB_USER} -d ${GLOBAL_OPS_DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+  # global-ops-db:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     - POSTGRES_USER=${GLOBAL_OPS_DB_USER}
+  #     - POSTGRES_PASSWORD=${GLOBAL_OPS_DB_PASSWORD}
+  #     - POSTGRES_DB=${GLOBAL_OPS_DB_NAME}
+  #   volumes:
+  #     - global_ops_db_data:/var/lib/postgresql/data
+  #     - ./docker/test-db/global_ops_init.sql:/docker-entrypoint-initdb.d/init.sql
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${GLOBAL_OPS_DB_USER} -d ${GLOBAL_OPS_DB_NAME}"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
 
   # 异构工作流手测样例数据库
   retail-ops-db:
