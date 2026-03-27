@@ -55,3 +55,4 @@ packages/backend/app/node/src/components/CustomInfographic/
 /packages/backend/app/services/report_workspace/reports/
 /report_module/final_report*.html
 /packages/frontend/src/components/video/*/
+docs/test/

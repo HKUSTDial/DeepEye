@@ -197,6 +197,17 @@ def search_kb_chunks(
         )
     results: list[dict] = []
     for row in rows:
+        mapping = getattr(row, "_mapping", None)
+        if mapping and {"chunk_index", "content", "file_id", "filename"}.issubset(mapping.keys()):
+            results.append(
+                {
+                    "file_id": mapping["file_id"],
+                    "filename": mapping["filename"],
+                    "chunk_index": mapping["chunk_index"],
+                    "content": mapping["content"],
+                }
+            )
+            continue
         if isinstance(row, tuple) and len(row) >= 4 and not isinstance(row[0], KnowledgeBaseChunk):
             chunk_index, content, file_id, filename = row[:4]
             results.append(
