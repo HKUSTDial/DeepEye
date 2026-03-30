@@ -68,7 +68,7 @@ async def load_workflow_definition_from_file(session_id: str, path: str) -> dict
     if not sandbox:
         raise ValueError("failed to get or create sandbox")
 
-    result = await sandbox.exec_command(f"cat {path}")
+    result = await sandbox.exec_command(f"cat {shlex.quote(path)}")
     if result.exit_code != 0:
         raise ValueError(result.stderr or "failed to read workflow file")
 
@@ -80,12 +80,8 @@ async def write_workflow_definition_to_file(session_id: str, path: str, definiti
     if not sandbox:
         raise ValueError("failed to get or create sandbox")
 
-    await sandbox.exec_command("mkdir -p /workspace/workflow")
     payload = json.dumps(definition, ensure_ascii=False, indent=2)
-    quoted_path = shlex.quote(path)
-    result = await sandbox.exec_command(f"cat > {quoted_path} << 'EOF'\n{payload}\nEOF")
-    if result.exit_code != 0:
-        raise ValueError(result.stderr or "failed to write workflow file")
+    await sandbox.write_text_file(path, payload)
 
 
 def prepare_tracked_workflow_file_run(

@@ -18,6 +18,7 @@ class StatusResponse(BaseModel):
     has_volume: bool
     idle_seconds: float
     should_stop: bool
+    should_destroy: bool
 
 
 class StatsResponse(BaseModel):
@@ -25,6 +26,7 @@ class StatsResponse(BaseModel):
     total_sessions: int
     total_sandboxes_cached: int
     total_containers_docker: int
+    total_volumes: int
     activity: dict
     cleanup_running: bool
 
@@ -85,15 +87,20 @@ async def start_sandbox(session_id: str):
 
 
 @router.delete("/sessions/{session_id}")
-async def destroy_sandbox(session_id: str):
+async def destroy_sandbox(session_id: str, delete_data: bool = False):
     """
-    Destroy sandbox for session (no backup).
-    
-    This will permanently delete the container.
+    Destroy sandbox for session.
+
+    By default only the container is removed and the workspace volume is preserved.
+    Set ``delete_data=true`` to permanently delete the volume as well.
     """
     try:
-        await sandbox_manager.destroy_session(session_id)
-        return {"status": "success", "message": f"Destroyed sandbox for {session_id}"}
+        await sandbox_manager.destroy_session(session_id, delete_data=delete_data)
+        if delete_data:
+            message = f"Destroyed sandbox and deleted data for {session_id}"
+        else:
+            message = f"Destroyed sandbox for {session_id} (data preserved)"
+        return {"status": "success", "message": message}
         
     except Exception as e:
         raise HTTPException(
@@ -177,4 +184,3 @@ async def sync_from_docker(session_id: str):
             status_code=500,
             detail=f"Sync failed: {str(e)}"
         )
-

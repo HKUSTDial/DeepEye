@@ -57,7 +57,7 @@ async def test_sandbox_manager():
     print("\n--- Test 4: Manager stats ---")
     stats = sandbox_manager.get_stats()
     print(f"✓ Total sessions: {stats['total_sessions']}")
-    print(f"✓ Total sandboxes: {stats['total_sandboxes']}")
+    print(f"✓ Total sandboxes: {stats['total_sandboxes_cached']}")
     
     # Test 5: Stop session1 (preserve data)
     print("\n--- Test 5: Stop session1 ---")
@@ -75,21 +75,21 @@ async def test_sandbox_manager():
     
     # Test 7: Destroy session1 (remove data)
     print("\n--- Test 7: Destroy session1 ---")
-    await sandbox_manager.destroy_session(session1)
+    await sandbox_manager.destroy_session(session1, delete_data=True)
     print("✓ Session1 destroyed (data removed)")
     
     stats = sandbox_manager.get_stats()
     print(f"✓ Remaining sessions: {stats['total_sessions']}")
-    print(f"✓ Remaining sandboxes: {stats['total_sandboxes']}")
+    print(f"✓ Remaining sandboxes: {stats['total_sandboxes_cached']}")
     
     # Test 8: Destroy all
     print("\n--- Test 8: Destroy all ---")
-    await sandbox_manager.destroy_all()
+    await sandbox_manager.cleanup_all()
     print("✓ All sessions destroyed")
     
     stats = sandbox_manager.get_stats()
     print(f"✓ Final sessions: {stats['total_sessions']}")
-    print(f"✓ Final sandboxes: {stats['total_sandboxes']}")
+    print(f"✓ Final sandboxes: {stats['total_sandboxes_cached']}")
     
     print("\n✅ All tests passed!")
 

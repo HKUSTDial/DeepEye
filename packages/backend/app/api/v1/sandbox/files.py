@@ -1,8 +1,8 @@
 """Sandbox file management API"""
 
-import json
 import base64
 import io
+import shlex
 import zipfile
 from typing import List, Optional
 
@@ -14,6 +14,28 @@ from deepeye.utils.logger import logger
 from app.sandbox import sandbox_manager
 
 router = APIRouter(prefix="/files", tags=["sandbox-files"])
+
+
+def _sh_quote(value: str) -> str:
+    return shlex.quote(value)
+
+
+def _join_path(parent: str, name: str) -> str:
+    normalized_parent = parent.rstrip("/")
+    if not normalized_parent:
+        return f"/{name}"
+    return f"{normalized_parent}/{name}"
+
+
+async def _get_existing_sandbox(session_id: str):
+    sandbox = await sandbox_manager.get_sandbox(session_id)
+    if not sandbox:
+        logger.warning(f"[SandboxFiles] No sandbox found for session {session_id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No sandbox found for session {session_id}",
+        )
+    return sandbox
 
 
 class FileInfo(BaseModel):
@@ -58,24 +80,18 @@ async def list_files(session_id: str, path: str = "/workspace"):
         List of files and directories
     """
     try:
-        sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-        if not sandbox:
-            logger.warning(f"[SandboxFiles] No sandbox found for session {session_id}")
-            raise HTTPException(
-                status_code=404,
-                detail=f"No sandbox found for session {session_id}"
-            )
+        sandbox = await _get_existing_sandbox(session_id)
+        qpath = _sh_quote(path)
         
         # Check if path exists and is a directory
-        check_cmd = f"[ -d '{path}' ] && echo 'exists'"
+        check_cmd = f"test -d {qpath} && echo 'exists'"
         check_result = await sandbox.exec_command(check_cmd)
         if not check_result.success or "exists" not in check_result.stdout:
             logger.info(f"[SandboxFiles] Path {path} does not exist or is not a directory, returning empty list")
             return FileListResponse(session_id=session_id, files=[])
         
-        # Use find command with tab-separated output (most reliable)
-        # Format: filename \t type(f/d) \t size
-        cmd = f"find '{path}' -maxdepth 1 ! -path '{path}' -printf '%f\\t%y\\t%s\\n' 2>/dev/null"
+        # Use null-delimited output so tabs/newlines in filenames don't corrupt parsing.
+        cmd = f"find {qpath} -maxdepth 1 ! -path {qpath} -printf '%f\\0%y\\0%s\\0' 2>/dev/null"
         logger.info(f"[SandboxFiles] Executing: {cmd}")
         result = await sandbox.exec_command(cmd)
         logger.info(f"[SandboxFiles] Result - success: {result.success}, stdout: {result.stdout[:300]}")
@@ -87,20 +103,20 @@ async def list_files(session_id: str, path: str = "/workspace"):
                 detail=f"Failed to list files: {result.stderr}"
             )
         
-        # Parse tab-separated output
+        # Parse null-delimited output in name/type/size triplets.
         files = []
-        for line in result.stdout.strip().split('\n'):
-            if not line:
+        entries = result.stdout.split("\0")
+        if entries and entries[-1] == "":
+            entries.pop()
+        for i in range(0, len(entries), 3):
+            triplet = entries[i:i + 3]
+            if len(triplet) != 3:
+                logger.warning(f"[SandboxFiles] Skipping incomplete entry at offset {i}: {triplet!r}")
                 continue
-            
-            parts = line.split('\t')
-            if len(parts) != 3:
-                logger.warning(f"[SandboxFiles] Skipping invalid line: {line}")
-                continue
-            
-            name, ftype, size_str = parts
+
+            name, ftype, size_str = triplet
             file_type = "directory" if ftype == 'd' else "file"
-            file_path = f"{path.rstrip('/')}/{name}"
+            file_path = _join_path(path, name)
             
             # Get file extension for files
             extension = None
@@ -157,17 +173,7 @@ async def get_file_content(session_id: str, path: str):
         File content (text or base64 encoded)
     """
     try:
-        # Shell-quote the path for safe usage in sandbox exec commands.
-        # This prevents failures for paths containing spaces and avoids injection issues.
-        def _sh_quote(value: str) -> str:
-            return "'" + value.replace("'", "'\"'\"'") + "'"
-
-        sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-        if not sandbox:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No sandbox found for session {session_id}"
-            )
+        sandbox = await _get_existing_sandbox(session_id)
         
         # Check if file exists
         qpath = _sh_quote(path)
@@ -287,19 +293,7 @@ async def write_file(session_id: str, payload: FileWriteRequest):
         
         path = payload.path
         content = payload.content
-        dir_path = path.rsplit("/", 1)[0] if "/" in path else "/workspace"
-        await sandbox.exec_command(f"mkdir -p {dir_path}")
-        # Escape content for shell
-        # Use heredoc for multiline content
-        result = await sandbox.exec_command(
-            f"cat > {path} << 'EOF'\n{content}\nEOF"
-        )
-        
-        if not result.success:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to write file: {result.stderr}"
-            )
+        await sandbox.write_text_file(path, content)
         
         logger.info(f"[SandboxFiles] Written file: {path} for session {session_id}")
         
@@ -336,7 +330,7 @@ async def delete_file(session_id: str, path: str):
             )
         
         # Check if path exists
-        qpath = "'" + path.replace("'", "'\"'\"'") + "'"
+        qpath = _sh_quote(path)
         check_result = await sandbox.exec_command(f"test -e {qpath} && echo 'exists'")
         if not check_result.success or 'exists' not in check_result.stdout:
             raise HTTPException(
@@ -403,16 +397,12 @@ async def download_file(session_id: str, path: str):
             encoded = quote(original_name, safe="")
             return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
 
-        sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-        if not sandbox:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No sandbox found for session {session_id}"
-            )
+        sandbox = await _get_existing_sandbox(session_id)
+        qpath = _sh_quote(path)
         
         # Check if path exists and get type
         check_result = await sandbox.exec_command(
-            f"if [ -d '{path}' ]; then echo 'directory'; elif [ -f '{path}' ]; then echo 'file'; else echo 'notfound'; fi"
+            f"if test -d {qpath}; then echo 'directory'; elif test -f {qpath}; then echo 'file'; else echo 'notfound'; fi"
         )
         path_type = check_result.stdout.strip()
         
@@ -427,7 +417,7 @@ async def download_file(session_id: str, path: str):
         
         if path_type == 'file':
             # Download single file
-            result = await sandbox.exec_command(f"base64 '{path}'")
+            result = await sandbox.exec_command(f"base64 {qpath}")
             if not result.success:
                 raise HTTPException(
                     status_code=500,
@@ -476,7 +466,7 @@ async def download_file(session_id: str, path: str):
             
             # Get all files in directory recursively
             find_result = await sandbox.exec_command(
-                f"find '{path}' -type f -printf '%P\\n' 2>/dev/null"
+                f"find {qpath} -type f -printf '%P\\0' 2>/dev/null"
             )
             
             if not find_result.success:
@@ -485,14 +475,15 @@ async def download_file(session_id: str, path: str):
                     detail=f"Failed to list directory: {find_result.stderr}"
                 )
             
-            files = [f for f in find_result.stdout.strip().split('\n') if f]
+            files = [f for f in find_result.stdout.split('\0') if f]
+            base_dir = path.rstrip("/") or "/"
             
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for relative_path in files:
-                    full_path = f"{path.rstrip('/')}/{relative_path}"
+                    full_path = _join_path(base_dir, relative_path)
                     
                     # Read file content as base64
-                    result = await sandbox.exec_command(f"base64 '{full_path}'")
+                    result = await sandbox.exec_command(f"base64 {_sh_quote(full_path)}")
                     if result.success:
                         try:
                             file_content = base64.b64decode(result.stdout.strip())
@@ -525,4 +516,3 @@ async def download_file(session_id: str, path: str):
             status_code=500,
             detail=f"Internal error: {str(e)}"
         )
-

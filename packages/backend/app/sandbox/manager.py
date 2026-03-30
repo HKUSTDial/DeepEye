@@ -71,6 +71,7 @@ class SandboxManager:
         
         # Activity tracking
         self._activity = ActivityTracker()
+        self._session_locks: dict[str, asyncio.Lock] = {}
         
         # Background cleanup task
         self._cleanup_task = None
@@ -94,20 +95,19 @@ class SandboxManager:
         Returns:
             Sandbox instance (existing or newly created)
         """
-        # First, try to get existing sandbox
-        sandbox = await self.get_sandbox(session_id)
-        if sandbox:
-            logger.info(f"[SandboxManager] Reusing existing sandbox for {session_id}: {sandbox.container_name}")
-            # IMPORTANT: Record activity when reusing sandbox, especially after restart
-            self._activity.record_activity(session_id)
-            return sandbox
-        
-        # No existing sandbox, create new one
-        logger.info(f"[SandboxManager] No existing sandbox for {session_id}, creating new one")
-        sandbox = await self.create_for_session(session_id)
-        # Record activity for newly created sandbox
-        self._activity.record_activity(session_id)
-        return sandbox
+        session_lock = self._session_locks.setdefault(session_id, asyncio.Lock())
+        async with session_lock:
+            # First, try to get existing sandbox
+            sandbox = await self.get_sandbox(session_id)
+            if sandbox:
+                logger.info(f"[SandboxManager] Reusing existing sandbox for {session_id}: {sandbox.container_name}")
+                # IMPORTANT: Record activity when reusing sandbox, especially after restart
+                self._activity.record_activity(session_id)
+                return sandbox
+
+            # No existing sandbox, create new one
+            logger.info(f"[SandboxManager] No existing sandbox for {session_id}, creating new one")
+            return await self.create_for_session(session_id)
     
     async def create_for_session(self, session_id: str) -> DockerSandbox:
         """
@@ -185,7 +185,9 @@ class SandboxManager:
                 await sandbox.write_file(dest_path, data)
                 
                 # Verify file was written
-                result = await sandbox.exec_command(f"test -f {dest_path} && echo 'EXISTS' || echo 'NOT_FOUND'")
+                result = await sandbox.exec_command(
+                    f"test -f {shlex.quote(dest_path)} && echo 'EXISTS' || echo 'NOT_FOUND'"
+                )
                 if 'EXISTS' in result.stdout:
                     logger.info(f"[SandboxManager] ✅ Successfully synced {ds.name} to {dest_path} ({len(data)} bytes)")
                     manifest[manifest_key] = manifest_entry

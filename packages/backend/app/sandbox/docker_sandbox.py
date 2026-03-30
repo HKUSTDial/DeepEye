@@ -3,6 +3,7 @@
 import time
 import asyncio
 import os
+import shlex
 
 import docker
 from docker.errors import DockerException, NotFound
@@ -241,13 +242,24 @@ class DockerSandbox:
         # Ensure directory exists
         dir_path = os.path.dirname(path)
         if dir_path and dir_path != "/":
-            await self.exec_command(f"mkdir -p {dir_path}")
+            result = await self.exec_command(f"mkdir -p {shlex.quote(dir_path)}")
+            if result.exit_code != 0:
+                raise RuntimeError(result.stderr or "failed to create sandbox directory")
 
         # Put archive into container
-        self.container.put_archive(dir_path or "/", tar_stream)
+        if not self.container.put_archive(dir_path or "/", tar_stream):
+            raise RuntimeError(f"failed to write file to sandbox: {path}")
+
+    async def write_text_file(self, path: str, content: str, encoding: str = "utf-8") -> None:
+        """Write text content to a file in the sandbox."""
+        await self.write_file(path, content.encode(encoding))
 
     async def health_check(self) -> bool:
         """Check if container is running"""
+        return self.is_running()
+
+    def is_running(self) -> bool:
+        """Check if the underlying container is running."""
         if not self._created or not self.container:
             return False
 

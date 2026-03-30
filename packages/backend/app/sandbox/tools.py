@@ -1,10 +1,27 @@
 """Sandbox tools for agent use"""
 
+import re
 from typing import Callable
 
 from deepeye.tools.base import tool
 from app.sandbox.docker_sandbox import DockerSandbox
-from app.schemas import SandboxEvent, SandboxEventType
+
+_MUTATING_COMMAND_PATTERNS = (
+    re.compile(r"(^|[;&|]\s*)(mkdir|rmdir|rm|mv|cp|touch|install|ln|unlink|truncate|chmod|chown)\b"),
+    re.compile(r"(^|[;&|]\s*)(sed\s+-i|perl\s+-pi|tee)\b"),
+    re.compile(r"(^|[;&|]\s*)(tar\s+[^;\n]*\s-[^;\n]*[cuxr]|unzip|zip)\b"),
+    re.compile(r"(^|[;&|]\s*)(git\s+(apply|am|checkout|restore|clean|stash|commit|merge|rebase|cherry-pick))\b"),
+    re.compile(r"(^|[;&|]\s*)(python|python3|node|bash|sh)\b[^;\n]*\s-c\b"),
+    re.compile(r"(^|[;&|]\s*)(echo|printf|cat)\b[^;\n]*[>]{1,2}"),
+    re.compile(r"(^|[;&|]\s*)[^#\n]*\s[>]{1,2}\s*[^>\n]"),
+)
+
+
+def _command_may_modify_files(command: str) -> bool:
+    normalized = command.strip()
+    if not normalized:
+        return False
+    return any(pattern.search(normalized) for pattern in _MUTATING_COMMAND_PATTERNS)
 
 
 def create_bash_tool(
@@ -54,8 +71,8 @@ def create_bash_tool(
             result = await sandbox.exec_command(command)
             
             if result.success:
-                # Notify files may have changed
-                if on_files_changed:
+                # Only notify on commands that are likely to mutate workspace files.
+                if on_files_changed and _command_may_modify_files(command):
                     on_files_changed()
                 return result.stdout or "(Command completed successfully)"
             else:
@@ -82,4 +99,3 @@ def get_sandbox_tools(
         List of tool functions
     """
     return [create_bash_tool(sandbox, on_files_changed)]
-

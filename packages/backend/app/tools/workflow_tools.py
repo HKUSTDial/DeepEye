@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import shlex
 import uuid
 from typing import Any
 
@@ -51,7 +52,7 @@ async def _read_workflow_file(session_id: str, path: str) -> dict:
     sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
     if not sandbox:
         raise ValueError("failed to get or create sandbox")
-    result = await sandbox.exec_command(f"cat {path}")
+    result = await sandbox.exec_command(f"cat {shlex.quote(path)}")
     if result.exit_code != 0:
         raise ValueError(result.stderr or "failed to read workflow file")
     if not result.stdout.strip():

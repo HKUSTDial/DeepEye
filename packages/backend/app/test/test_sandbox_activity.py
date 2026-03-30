@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fnmatch import fnmatch
 from types import SimpleNamespace
 
@@ -45,6 +45,18 @@ class _FakeDockerClient:
         self.containers = SimpleNamespace(list=lambda **kwargs: containers)
 
 
+class _FakeRunningSandbox:
+    def __init__(self) -> None:
+        self.is_created = True
+        self.stop_calls = 0
+
+    def is_running(self) -> bool:
+        return True
+
+    async def stop(self) -> None:
+        self.stop_calls += 1
+
+
 def test_activity_tracker_shares_state_across_instances() -> None:
     redis_client = _FakeRedis()
     tracker_a = ActivityTracker(redis_client=redis_client)
@@ -56,6 +68,13 @@ def test_activity_tracker_shares_state_across_instances() -> None:
     assert tracker_b.get_last_active("session-1") == timestamp
     assert tracker_b.get_idle_time("session-1") < timedelta(minutes=1)
     assert tracker_b.get_all_sessions() == ["session-1"]
+
+
+def test_parse_datetime_normalizes_aware_values_to_utc_naive() -> None:
+    parsed = ActivityTracker._parse_datetime("2026-03-30T10:15:00+02:00")
+
+    assert parsed == datetime(2026, 3, 30, 8, 15, 0)
+    assert parsed.tzinfo is None
 
 
 @pytest.mark.anyio
@@ -107,3 +126,23 @@ async def test_cleanup_cycle_destroys_discovered_session_with_stale_shared_activ
     await manager._run_cleanup_cycle()
 
     assert destroyed == [("stale-session", False)]
+
+
+@pytest.mark.anyio
+async def test_cleanup_cycle_stops_idle_cached_running_sandbox(monkeypatch) -> None:
+    manager = SandboxManager()
+    activity = ActivityTracker(redis_client=_FakeRedis())
+    sandbox = _FakeRunningSandbox()
+    idle_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=5)
+
+    manager._sandboxes.clear()
+    manager._sandboxes["idle-session"] = [sandbox]
+    monkeypatch.setattr(manager, "_activity", activity, raising=False)
+    monkeypatch.setattr(manager, "_docker", _FakeDockerClient([]), raising=False)
+    activity.record_activity("idle-session", at=idle_time)
+    monkeypatch.setattr(settings, "SANDBOX_IDLE_TIMEOUT", 1)
+    monkeypatch.setattr(settings, "SANDBOX_DESTROY_TIMEOUT", 3600)
+
+    await manager._run_cleanup_cycle()
+
+    assert sandbox.stop_calls == 1
