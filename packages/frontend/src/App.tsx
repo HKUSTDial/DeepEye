@@ -27,6 +27,7 @@ function App() {
   const [isDraggingChat, setIsDraggingChat] = useState(false)
   const hasNormalizedLayoutRef = useRef(false)
   const mainAreaRef = useRef<HTMLDivElement>(null)
+  const previousRightPanelSessionKeyRef = useRef<string | null>(null)
 
   const sessionId = useChatStore((state) => state.sessionId)
   const currentSession = useChatStore((state) => state.currentSession)
@@ -37,6 +38,8 @@ function App() {
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
   const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
+  const activateRightPanelSession = useRightPanelStore((state) => state.activateSession)
+  const transferRightPanelSession = useRightPanelStore((state) => state.transferSessionLayout)
   const hydrateWorkspaceState = useWorkflowSessionsStore((state) => state.hydrateWorkspaceState)
   const setReportResult = useReportStore((state) => state.setReportResult)
   const clearReport = useReportStore((state) => state.clear)
@@ -52,6 +55,10 @@ function App() {
     }
     return 'Reports, dashboards, files, and previews'
   }, [chatTitle])
+  const rightPanelSessionKey = useMemo(
+    () => (sessionId && sessionId !== 'draft' ? sessionId : 'draft'),
+    [sessionId],
+  )
 
   const toggleSidebarCollapse = () => {
     setSidebarCollapsed((current) => !current)
@@ -112,6 +119,16 @@ function App() {
       setRightPanelRatio(window.innerWidth < 1320 ? 30 : 28)
     }
   }, [rightPanelRatio, setRightPanelRatio])
+
+  useEffect(() => {
+    const previousKey = previousRightPanelSessionKeyRef.current
+    if (previousKey === 'draft' && rightPanelSessionKey !== 'draft') {
+      transferRightPanelSession('draft', rightPanelSessionKey)
+    } else {
+      activateRightPanelSession(rightPanelSessionKey)
+    }
+    previousRightPanelSessionKeyRef.current = rightPanelSessionKey
+  }, [rightPanelSessionKey, activateRightPanelSession, transferRightPanelSession])
 
   useEffect(() => {
     let cancelled = false
