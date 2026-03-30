@@ -4,22 +4,14 @@ import { ArrowUpRight, Loader2, Workflow as WorkflowIcon } from 'lucide-react'
 import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
-import { chatApi, sessionApi } from '../../../api'
-import { extractVideoOutputParams } from '../../../api/video'
+import { sessionApi } from '../../../api'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { useChatStore } from '../../../stores/chat'
 import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNodes'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
-import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useTheme } from '../../../hooks/useTheme'
-import { getDashboardProgressStage, isDashboardProgressMessage } from '../../../utils/dashboardProgress'
+import { ensureSessionEventStream } from '../../../services/sessionEventStream'
 import type { WorkflowDraft, WorkflowRun } from '../../../types'
-import {
-  buildWorkflowRunFromEvent,
-  getWorkflowOutputs,
-  matchesTrackedWorkflowEvent,
-  parseWorkflowEvent,
-} from '../../../utils/workflowEvents'
 
 const NODE_TYPES = { workflowNode: WorkflowNode }
 const WORKFLOW_DIR = '/workspace/workflow'
@@ -222,7 +214,6 @@ export function WorkflowLivePanel({
   )
   const ensureSession = useWorkflowSessionsStore((state) => state.ensureSession)
   const setWorkflowError = useWorkflowSessionsStore((state) => state.setError)
-  const setNodeStatus = useWorkflowSessionsStore((state) => state.setNodeStatus)
   const setRunStatus = useWorkflowSessionsStore((state) => state.setRunStatus)
   const setWorkflowDefinition = useWorkflowSessionsStore((state) => state.setDefinition)
   const clearWorkflow = useWorkflowSessionsStore((state) => state.clearDraft)
@@ -238,16 +229,7 @@ export function WorkflowLivePanel({
   const setFileError = useWorkflowSessionsStore((state) => state.setFileError)
   const setValidatedGraph = useWorkflowSessionsStore((state) => state.setValidatedGraph)
   const clearValidated = useWorkflowSessionsStore((state) => state.clearValidated)
-  const setDashboardProgressVisible = useWorkflowSessionsStore((state) => state.setDashboardProgressVisible)
-  const appendDashboardProgressLog = useWorkflowSessionsStore((state) => state.appendDashboardProgressLog)
-  const setDashboardProgressStage = useWorkflowSessionsStore((state) => state.setDashboardProgressStage)
-  const setDashboardProgressPercent = useWorkflowSessionsStore((state) => state.setDashboardProgressPercent)
   const setVideoProgressVisible = useWorkflowSessionsStore((state) => state.setVideoProgressVisible)
-  const appendVideoProgressLog = useWorkflowSessionsStore((state) => state.appendVideoProgressLog)
-  const setVideoProgressStep = useWorkflowSessionsStore((state) => state.setVideoProgressStep)
-  const setVideoProgressPercent = useWorkflowSessionsStore((state) => state.setVideoProgressPercent)
-  const setVideoPreviewUrl = useWorkflowSessionsStore((state) => state.setVideoPreviewUrl)
-  const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
   const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
@@ -269,7 +251,6 @@ export function WorkflowLivePanel({
   const [isRunning, setIsRunning] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const runEventSourceRef = useRef<EventSource | null>(null)
   const reactFlowRef = useRef<ReactFlowInstance | null>(null)
   const graphHostRef = useRef<HTMLDivElement | null>(null)
 
@@ -364,249 +345,6 @@ export function WorkflowLivePanel({
   useEffect(() => {
     isLoadingFilesRef.current = isLoadingFiles
   }, [isLoadingFiles])
-
-  useEffect(() => {
-    return () => {
-      if (runEventSourceRef.current) {
-        runEventSourceRef.current.close()
-        runEventSourceRef.current = null
-      }
-    }
-  }, [])
-
-  const ensureRunEventStream = useCallback(() => {
-    if (!sessionId || isStreaming || runEventSourceRef.current) {
-      return
-    }
-    const es = chatApi.createEventSource(sessionId)
-    runEventSourceRef.current = es
-    es.onmessage = (event) => {
-      try {
-        const agentEvent = JSON.parse(event.data) as { type?: string; data?: Record<string, unknown> }
-        if (agentEvent.type === 'token') {
-          const data = agentEvent.data || {}
-          if (data.source === 'workflow' && typeof data.content === 'string') {
-            if (isDashboardProgressMessage(data.content)) {
-              const stage = getDashboardProgressStage(data.content)
-              setDashboardProgressVisible(sessionId, true)
-              appendDashboardProgressLog(sessionId, data.content)
-              if (stage !== null) {
-                setDashboardProgressStage(sessionId, stage)
-              }
-            }
-            appendVideoProgressLog(sessionId, data.content)
-            const stepMatch = data.content.match(/Step\s*(\d)\s*\/\s*4/)
-            if (stepMatch) {
-              setVideoProgressVisible(sessionId, true)
-              const stepIndex = parseInt(stepMatch[1], 10) - 1
-              if (stepIndex >= 0 && stepIndex <= 3) setVideoProgressStep(sessionId, stepIndex)
-            }
-            if (/Step\s*4\s*\/\s*4\s*Done|Video generation completed|🎉/.test(data.content)) {
-              setVideoProgressPercent(sessionId, 100)
-            }
-          }
-          return
-        }
-        if (agentEvent.type !== 'workflow_event') {
-          return
-        }
-        const workflowEvent = parseWorkflowEvent(agentEvent)
-        if (!workflowEvent) {
-          return
-        }
-        const { filePath, phase, payload, artifact, artifactKind } = workflowEvent
-        const currentTrackedRun = useWorkflowSessionsStore.getState().sessions[sessionId]?.activeRun
-        if (!matchesTrackedWorkflowEvent(currentTrackedRun, activeDraftIdRef.current, workflowEvent)) {
-          return
-        }
-        if (phase === 'artifact_ready') {
-          if (artifactKind === 'dashboard') {
-            setDashboardProgressPercent(sessionId, 100)
-            setDashboardProgressVisible(sessionId, false)
-            openOrFocusTab('dashboard')
-            return
-          }
-          if (artifactKind === 'video') {
-            const taskId = typeof artifact?.task_id === 'string' ? artifact.task_id : null
-            const videoUrl = typeof artifact?.video_url === 'string' ? artifact.video_url : null
-            if (videoUrl) {
-              setVideoPreviewUrl(sessionId, videoUrl)
-            }
-            openOrFocusTab('video-preview', taskId ? { taskId } : {})
-            return
-          }
-        }
-        if (phase === 'artifact_refresh' && artifactKind === 'dashboard') {
-          setDashboardProgressVisible(sessionId, false)
-          openOrFocusTab('dashboard')
-          return
-        }
-        if (phase === 'run_start') {
-          return
-        }
-        if (phase === 'node_status') {
-          const nodeId = typeof payload?.node_id === 'string' ? payload?.node_id : ''
-          const status = typeof payload?.status === 'string' ? payload?.status : ''
-          const outputs = typeof payload?.outputs === 'object' ? payload?.outputs : undefined
-          if (nodeId && status) {
-            const typedOutputs = outputs as Record<string, unknown> | undefined
-            setNodeStatus(sessionId, nodeId, status, typedOutputs)
-            const session = useWorkflowSessionsStore.getState().sessions[sessionId]
-            const root = (session?.definition as Record<string, { nodes?: Record<string, { type?: string }> }> | null)?.root
-            const nodesMap = session?.validatedNodes ?? root?.nodes ?? {}
-            const nodeType = (nodesMap[nodeId] as { type?: string } | undefined)?.type
-            if (nodeType === 'data.generate_dashboard' && status === 'running') {
-              setDashboardProgressVisible(sessionId, true)
-            }
-            if (typedOutputs?.dashboard_url) {
-              setDashboardProgressPercent(sessionId, 100)
-              setDashboardProgressVisible(sessionId, false)
-              openOrFocusTab('dashboard')
-            }
-            if (nodeType === 'video.generator') {
-              setVideoProgressVisible(sessionId, status === 'running')
-            }
-          }
-          return
-        }
-        if (phase === 'create_workflow' || phase === 'update_workflow') {
-          const workflow = payload?.workflow || payload?.definition
-          if (workflow && typeof workflow === 'object') {
-            const draftId = workflowEvent.draftId
-            const root = (workflow as Record<string, unknown>).root as Record<string, unknown> | undefined
-            const nodes = (root?.nodes as Record<string, unknown>) || {}
-            const edges = (root?.edges as Record<string, unknown>) || {}
-            const nodeList = Object.values(nodes)
-            const edgeList = Object.values(edges)
-            const stepDelayMs = 50
-
-            clearWorkflow(sessionId)
-            clearValidated(sessionId)
-            setActiveDraftId(sessionId, draftId)
-            if (filePath) {
-              setActiveFilePath(sessionId, filePath)
-            }
-            if (draftId) {
-              setAvailableDrafts((prev) => {
-                const current = prev.find((draft) => draft.id === draftId)
-                const nextDraft: WorkflowDraft = current
-                  ? {
-                      ...current,
-                      display_name:
-                        current.display_name ||
-                        filePath?.split('/').pop()?.replace(/\.json$/i, '') ||
-                        `draft-${draftId.slice(0, 8)}`,
-                      definition: workflow as Record<string, unknown>,
-                      file_path: filePath ?? current.file_path ?? null,
-                      updated_at: new Date().toISOString(),
-                    }
-                  : {
-                      id: draftId,
-                      session_id: sessionId,
-                      turn_id: workflowEvent.turnId ?? null,
-                      user_id: '',
-                      source: 'workflow_agent',
-                      status: 'draft',
-                      display_name: filePath?.split('/').pop()?.replace(/\.json$/i, '') || `draft-${draftId.slice(0, 8)}`,
-                      file_path: filePath,
-                      definition: workflow as Record<string, unknown>,
-                      version: 1,
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    }
-                return [nextDraft, ...prev.filter((draft) => draft.id !== nextDraft.id)]
-              })
-            }
-            setWorkflowDefinition(sessionId, workflow as Record<string, unknown>)
-            setViewState(sessionId, 'switching')
-            setWorkflowError(sessionId, null)
-
-            nodeList.forEach((node, index) => {
-              setTimeout(() => addWorkflowNode(sessionId, node as Record<string, unknown>), index * stepDelayMs)
-            })
-            const edgeStart = nodeList.length * stepDelayMs
-            edgeList.forEach((edge, index) => {
-              setTimeout(
-                () => addWorkflowEdge(sessionId, edge as Record<string, unknown>),
-                edgeStart + index * stepDelayMs,
-              )
-            })
-            const totalDelay = (nodeList.length + edgeList.length) * stepDelayMs
-            setTimeout(() => setViewState(sessionId, 'ready'), totalDelay)
-          }
-          return
-        }
-        if (phase === 'run_end') {
-          setDashboardProgressVisible(sessionId, false)
-          setVideoProgressVisible(sessionId, false)
-          const status = typeof payload?.status === 'string' ? payload?.status : 'failed'
-          const error = typeof payload?.error === 'string' ? payload?.error : null
-          setRunStatus(sessionId, status, error)
-          setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, workflowEvent, status, { error }))
-            const outputs = getWorkflowOutputs(payload)
-          if (outputs) {
-            setRunOutput(sessionId, JSON.stringify(outputs, null, 2))
-            console.log('🎬 WorkflowLivePanel: run_end phase, checking for video output...')
-            console.log('📊 WorkflowLivePanel: Full outputs object:', JSON.stringify(outputs, null, 2))
-            console.log('📊 WorkflowLivePanel: Output keys:', Object.keys(outputs))
-            const videoParams = extractVideoOutputParams(outputs)
-            console.log('🎬 WorkflowLivePanel: Extracted video params:', videoParams)
-            if (!videoParams.taskId) {
-              const firstOutputKey = Object.keys(outputs)[0]
-              console.warn('⚠️ WorkflowLivePanel: No video output detected. Output structure:', {
-                nodeIds: Object.keys(outputs),
-                firstNodeOutput: firstOutputKey ? outputs[firstOutputKey] : undefined,
-              })
-            }
-            if (videoParams.taskId) {
-              console.log('🎬 WorkflowLivePanel: Video output detected, opening preview panel...', {
-                taskId: videoParams.taskId,
-              })
-              openOrFocusTab('video-preview', { taskId: videoParams.taskId })
-            } else {
-              console.log('⚠️ WorkflowLivePanel: No video output detected in payload.outputs')
-            }
-          } else if (error) {
-            setRunOutput(sessionId, error)
-          }
-          es.close()
-          runEventSourceRef.current = null
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
-    es.onerror = () => {
-      es.close()
-      runEventSourceRef.current = null
-    }
-  }, [
-    sessionId,
-    isStreaming,
-    setDashboardProgressVisible,
-    appendDashboardProgressLog,
-    setDashboardProgressStage,
-    setDashboardProgressPercent,
-    setNodeStatus,
-    setRunStatus,
-    setActiveRun,
-    setRunOutput,
-    setVideoProgressVisible,
-    appendVideoProgressLog,
-    setVideoProgressStep,
-    setVideoProgressPercent,
-    setVideoPreviewUrl,
-    clearWorkflow,
-    clearValidated,
-    setActiveDraftId,
-    setActiveFilePath,
-    setWorkflowDefinition,
-    setViewState,
-    setWorkflowError,
-    addWorkflowNode,
-    addWorkflowEdge,
-    openOrFocusTab,
-  ])
 
   useEffect(() => {
     if (sessionId) {
@@ -1180,7 +918,7 @@ export function WorkflowLivePanel({
                     buildOptimisticRun(sessionId, filePath, 'running', { draftId }),
                   )
                   setRunOutput(sessionId, '')
-                  ensureRunEventStream()
+                  ensureSessionEventStream(sessionId)
                   const response = await sessionApi.runWorkflowDraft(sessionId, draftId)
                   if (response.error) {
                     setRunStatus(sessionId, 'failed', response.error)
