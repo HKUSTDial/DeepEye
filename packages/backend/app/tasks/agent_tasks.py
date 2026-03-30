@@ -30,7 +30,6 @@ from app.tools.workflow_tools import (
     create_design_workflow_tool,
     create_summarize_workflow_result_tool,
 )
-from app.tools.kb_tools import create_knowledge_base_agent_tool
 from deepeye.utils.logger import logger
 
 _SCHEMA_PREVIEW_ROWS = 3
@@ -217,15 +216,6 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         turn_id=turn_id,
         collector=collector,
     )
-    cb_kb = AgentCallback(
-        event_bus,
-        session_id,
-        "knowledge_base_agent",
-        user_id=user_id_str,
-        turn_id=turn_id,
-        collector=collector,
-    )
-
     # Get existing sandbox or create new one (reuse within session)
     channel = f"session:{session_id}"
     logger.info(f"[AgentTask] Getting or creating sandbox for session: {session_id}")
@@ -307,18 +297,6 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     )
 
     user_input = agent_input.user_input
-
-    if user_id and agent_input.kb_ids:
-        logger.info(f"[AgentTask] Adding knowledge base tool for user: {user_id}")
-        tools.append(
-            create_knowledge_base_agent_tool(
-                model,
-                session_id,
-                str(user_id),
-                agent_input.kb_ids,
-                callbacks=[cb_kb],
-            )
-        )
 
     logger.info("[AgentTask] Setting up LangGraph checkpointer...")
     async with AsyncPostgresSaver.from_conn_string(settings.POSTGRES_STATE_URL) as checkpointer:

@@ -26,8 +26,6 @@ packages/backend/app/node/
   data/
     datasource_read.py   # datasource.read 节点
     sql_execute.py       # sql.execute 节点
-  knowledge/
-    knowledge_search.py  # knowledge.search 节点
   code/
     python_code.py       # python.code 节点
   dashboard/

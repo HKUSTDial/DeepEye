@@ -18,7 +18,7 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    imports=["app.tasks.agent_tasks", "app.tasks.workflow_tasks", "app.tasks.kb_tasks"],
+    imports=["app.tasks.agent_tasks", "app.tasks.workflow_tasks"],
 )
 
 # Export for compatibility

@@ -16,7 +16,6 @@ NODE_MODULES: tuple[str, ...] = (
     "app.node.data.datasource_read",
     "app.node.data.sql_execute",
     "app.node.rows.basic",
-    "app.node.knowledge.knowledge_search",
     "app.node.llm.answer",
     "app.node.code.python_code",
     "app.node.dashboard.node",

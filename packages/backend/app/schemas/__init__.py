@@ -27,14 +27,6 @@ from app.schemas.events import (
     UserMessage,
 )
 from app.schemas.input import AgentInput
-from app.schemas.knowledge_base import (
-    KnowledgeBaseCreate,
-    KnowledgeBaseFileResponse,
-    KnowledgeBaseResponse,
-    KnowledgeBaseSearchRequest,
-    KnowledgeBaseSearchResult,
-    KnowledgeBaseUpdate,
-)
 from app.schemas.workflow import (
     ChatTurnResponse,
     WorkflowArtifactResponse,
@@ -80,23 +72,17 @@ __all__ = [
     "UserMessage",
     # Internal
     "AgentInput",
-    "WorkflowCreate",
-    "WorkflowResponse",
-    "WorkflowRunResponse",
-    "WorkflowUpdate",
     "ChatTurnResponse",
+    "WorkflowArtifactResponse",
+    "WorkflowCreate",
     "WorkflowDraftResponse",
     "WorkflowDraftUpsertRequest",
-    "WorkflowArtifactResponse",
     "WorkflowQueuedRunResponse",
-    "WorkspaceStateResponse",
-    "KnowledgeBaseCreate",
-    "KnowledgeBaseUpdate",
-    "KnowledgeBaseResponse",
-    "KnowledgeBaseFileResponse",
-    "KnowledgeBaseSearchRequest",
-    "KnowledgeBaseSearchResult",
+    "WorkflowResponse",
+    "WorkflowRunResponse",
     "WorkflowTemplateParam",
     "WorkflowTemplateResponse",
     "WorkflowTemplateRunRequest",
+    "WorkflowUpdate",
+    "WorkspaceStateResponse",
 ]

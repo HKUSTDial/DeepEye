@@ -7,9 +7,6 @@ from app.models.auth_audit_event import AuthAuditEvent
 from app.models.chat_session import ChatSession
 from app.models.chat_turn import ChatTurn
 from app.models.datasource import DataSource
-from app.models.knowledge_base import KnowledgeBase
-from app.models.knowledge_base_chunk import KnowledgeBaseChunk
-from app.models.knowledge_base_file import KnowledgeBaseFile
 from app.models.refresh_token import RefreshToken
 from app.models.session_attachment import SessionAttachment
 from app.models.session_message import SessionMessage
@@ -28,9 +25,6 @@ __all__ = [
     "ChatSession",
     "ChatTurn",
     "DataSource",
-    "KnowledgeBase",
-    "KnowledgeBaseChunk",
-    "KnowledgeBaseFile",
     "RefreshToken",
     "SessionAttachment",
     "SessionMessage",

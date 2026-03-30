@@ -52,8 +52,6 @@ def test_workflow_node_specs_hide_internal_or_legacy_params() -> None:
     assert "workers" not in (specs["video.generator"].params_schema or {})
     assert "instructions" not in (specs["llm.answer"].params_schema or {})
     assert "query" not in specs["sql.execute"].inputs
-    assert "kb_ids" not in specs["knowledge.search"].inputs
-    assert "query" not in specs["knowledge.search"].inputs
     assert "question" not in specs["llm.answer"].inputs
     assert "question" not in specs["data.generate_dashboard"].inputs
     assert "query" not in specs["video.generator"].inputs
@@ -100,7 +98,6 @@ def test_workflow_validation_rejects_missing_required_params_and_inputs() -> Non
             "dashboard": Node(id="dashboard", type="data.generate_dashboard"),
             "report": Node(id="report", type="report.generate"),
             "video": Node(id="video", type="video.generator"),
-            "kb": Node(id="kb", type="knowledge.search"),
         },
         edges={},
     )
@@ -116,8 +113,6 @@ def test_workflow_validation_rejects_missing_required_params_and_inputs() -> Non
     assert ("input.required.missing", "nodes.report.inputs.dataset_ref") in issue_codes
     assert ("param.required.missing", "nodes.video.params.query") in issue_codes
     assert ("input.required.missing", "nodes.video.inputs.dataset_ref") in issue_codes
-    assert ("param.required.missing", "nodes.kb.params.kb_ids") in issue_codes
-    assert ("param.required.missing", "nodes.kb.params.query") in issue_codes
 
 
 def test_required_input_is_not_satisfied_by_same_named_param() -> None:

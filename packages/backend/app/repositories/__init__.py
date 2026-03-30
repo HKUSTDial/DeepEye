@@ -6,9 +6,6 @@ from app.repositories.base import BaseRepository, SQLAlchemyRepository
 from app.repositories.chat_turn_repo import ChatTurnRepository
 from app.repositories.datasource_repo import DataSourceRepository
 from app.repositories.event_repo import EventRepository
-from app.repositories.knowledge_base_chunk_repo import KnowledgeBaseChunkRepository
-from app.repositories.knowledge_base_file_repo import KnowledgeBaseFileRepository
-from app.repositories.knowledge_base_repo import KnowledgeBaseRepository
 from app.repositories.message_repo import MessageRepository
 from app.repositories.refresh_token_repo import RefreshTokenRepository
 from app.repositories.session_attachment_repo import SessionAttachmentRepository
@@ -28,9 +25,6 @@ __all__ = [
     "SessionRepository",
     "EventRepository",
     "DataSourceRepository",
-    "KnowledgeBaseChunkRepository",
-    "KnowledgeBaseFileRepository",
-    "KnowledgeBaseRepository",
     "MessageRepository",
     "RefreshTokenRepository",
     "SessionAttachmentRepository",

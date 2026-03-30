@@ -2,7 +2,8 @@
 业务 API v1 (需要鉴权)
 """
 from fastapi import APIRouter
-from . import sessions, chat, datasources, workflows, workflow_templates, workflow_files, workflow_nodes, knowledge_bases, video
+
+from . import chat, datasources, sessions, video, workflow_files, workflow_nodes, workflow_templates, workflows
 from .sandbox import router as sandbox_router
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
@@ -15,7 +16,6 @@ router.include_router(workflows.router)     # /api/v1/workflows
 router.include_router(workflow_templates.router)  # /api/v1/workflow-templates
 router.include_router(workflow_files.router)      # /api/v1/workflow-files
 router.include_router(workflow_nodes.router)      # /api/v1/workflow-nodes
-router.include_router(knowledge_bases.router)     # /api/v1/knowledge-bases
 router.include_router(video.router)         # /api/v1/video
 router.include_router(sandbox_router)       # /api/v1/sandbox
 

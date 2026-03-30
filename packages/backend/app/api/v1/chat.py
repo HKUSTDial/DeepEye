@@ -43,7 +43,6 @@ async def start_chat(
         session_id, 
         request.message, 
         request.datasource_ids,
-        request.kb_ids
     )
     return {"session_id": session_id, "task_id": task_id, "message": "Agent started"}
 

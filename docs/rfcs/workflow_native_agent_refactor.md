@@ -422,7 +422,6 @@ validator 需要真正检查:
 
 ### 12.1 Source Nodes
 - `datasource.read`
-- `knowledge.search`
 
 ### 12.2 Transform Nodes
 - `rows.profile`
@@ -646,8 +645,7 @@ validator 需要真正检查:
 4. report generation
 5. dashboard generation
 6. video generation
-7. knowledge base retrieval
-8. clarification path
+7. clarification path
 
 ### 17.4 Frontend
 - 当前没有成熟 UI test 框架时，至少补:

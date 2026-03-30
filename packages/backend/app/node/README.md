@@ -26,8 +26,6 @@ packages/backend/app/node/
   data/
     datasource_read.py   # datasource.read node
     sql_execute.py       # sql.execute node
-  knowledge/
-    knowledge_search.py  # knowledge.search node
   code/
     python_code.py       # python.code node
   dashboard/

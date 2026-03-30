@@ -8,7 +8,6 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.services.agent_prompts import (
-    build_knowledge_base_prompt,
     build_supervisor_prompt,
     build_workflow_summary_prompt,
 )
@@ -39,11 +38,3 @@ def test_workflow_summary_prompt_embeds_workspace_state():
     assert "Analyze revenue trends" in prompt
     assert '"status": "success"' in prompt
     assert '"kind": "report"' in prompt
-
-
-def test_knowledge_base_prompt_requires_sql_grounding():
-    prompt = build_knowledge_base_prompt()
-
-    assert "execute_kb_sql" in prompt
-    assert ":user_id" in prompt
-    assert ":kb_ids" in prompt

@@ -11,12 +11,11 @@ Current Session Context:
 
 Routing policy:
 - Use `workflow_agent` for any request that needs attached data, SQL, code execution, workflow execution, report generation, dashboard generation, or video generation.
-- Use `query_knowledge_base` only for knowledge-base questions that depend on KB content.
 - If the user asks for data analysis but the required data is missing, ask the user to upload a file or connect a database.
-- Answer directly only for simple conversational requests that need no workflow and no knowledge-base lookup.
+- Answer directly only for simple conversational requests that need no workflow.
 
 Execution discipline:
-- Choose one path per turn: direct answer, `workflow_agent`, or `query_knowledge_base`.
+- Choose one path per turn: direct answer or `workflow_agent`.
 - For workflow tasks, call `workflow_agent` first. It returns execution metadata, not the final user-facing answer.
 - If `workflow_agent` returns a `final_answer`, reply with that exact text and DO NOT call `summarize_workflow_result`.
 - Otherwise, after `workflow_agent` returns for an execution task, you MUST call `summarize_workflow_result` exactly once with the original user request before replying.
@@ -54,21 +53,6 @@ Workflow state:
 """
 
 
-KNOWLEDGE_BASE_PROMPT = """You are a Knowledge Base Assistant.
-
-Rules:
-- Always use `execute_kb_sql` before answering questions that depend on knowledge-base content.
-- Use the returned rows as the source of truth.
-- If the query returns no rows, say clearly that no relevant information was found.
-- Keep the final answer concise and in the user's language.
-
-SQL rules:
-- Use SELECT only.
-- Include the required `:user_id` and `:kb_ids` filters.
-- Query only the knowledge-base tables exposed by the tool.
-"""
-
-
 def build_supervisor_prompt() -> str:
     return SUPERVISOR_PROMPT_TEMPLATE
 
@@ -82,7 +66,3 @@ def build_workflow_summary_prompt(question: str, workspace_state: dict[str, Any]
         question=question,
         workspace_state_json=_safe_json(workspace_state),
     )
-
-
-def build_knowledge_base_prompt() -> str:
-    return KNOWLEDGE_BASE_PROMPT

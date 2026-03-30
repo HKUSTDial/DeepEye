@@ -8,7 +8,6 @@ def start_agent_workflow(
     session_id: str,
     message: str,
     datasource_ids: list[str] | None = None,
-    kb_ids: list[str] | None = None,
 ) -> str:
     """Start agent workflow and return task ID."""
     task = run_agent_workflow.delay(
@@ -16,7 +15,6 @@ def start_agent_workflow(
             session_id=session_id,
             user_input=message,
             datasource_ids=datasource_ids,
-            kb_ids=kb_ids,
         ).model_dump()
     )
     return task.id

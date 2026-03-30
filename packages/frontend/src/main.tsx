@@ -8,8 +8,6 @@ import App from './App'
 import {
   Auth,
   ForgotPassword,
-  KnowledgeBaseDetail,
-  KnowledgeBases,
   Login,
   Register,
   ResetPassword,
@@ -42,22 +40,6 @@ createRoot(document.getElementById('root')!).render(
           element={
             <ProtectedRoute>
               <WorkflowsNew />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/knowledge-bases"
-          element={
-            <ProtectedRoute>
-              <KnowledgeBases />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/knowledge-bases/:kbId"
-          element={
-            <ProtectedRoute>
-              <KnowledgeBaseDetail />
             </ProtectedRoute>
           }
         />

@@ -422,7 +422,7 @@ export function useChat() {
     }
   }
 
-  const sendMessage = async (text: string, _datasourceIds?: string[], kbIds?: string[], csvFiles?: File[]) => {
+  const sendMessage = async (text: string, _datasourceIds?: string[], csvFiles?: File[]) => {
     if (!text.trim() && (!csvFiles || csvFiles.length === 0)) return
 
     setError(null)
@@ -457,7 +457,6 @@ export function useChat() {
       await chatApi.start({
         message: query,
         session_id: session_id,
-        kb_ids: kbIds && kbIds.length > 0 ? kbIds : undefined,
       })
 
       if (isFirstMessage) {

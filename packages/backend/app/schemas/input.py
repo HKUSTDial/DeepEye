@@ -9,4 +9,3 @@ class AgentInput(BaseModel):
     session_id: str
     user_input: str
     datasource_ids: list[str] | None = None
-    kb_ids: list[str] | None = None

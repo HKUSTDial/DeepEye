@@ -4,7 +4,6 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useChat } from '../hooks/useChat'
 import { useChatStore } from '../stores/chat'
-import { useKnowledgeBasesStore } from '../stores/knowledgeBases'
 import { createReportProgressLine, parseChatProgressLine, type ChatProgressLine } from '../utils/chatProgress'
 import DataSourceManager from './DataSourceManager'
 import StepItem from './StepItem'
@@ -66,13 +65,8 @@ export default function ChatBox({
   // 每个属性单独订阅 - 最简单可靠的方式
   const messages = useChatStore((state) => state.messages)
   const isStreaming = useChatStore((state) => state.isStreaming)
-  const kbBases = useKnowledgeBasesStore((state) => state.bases)
-  const loadBases = useKnowledgeBasesStore((state) => state.loadBases)
   
   const [input, setInput] = useState('')
-  const [showMentions, setShowMentions] = useState(false)
-  const [mentionQuery, setMentionQuery] = useState('')
-  const [activeMentionIndex, setActiveMentionIndex] = useState(0)
   const [showDataSourceManager, setShowDataSourceManager] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
@@ -80,7 +74,6 @@ export default function ChatBox({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
   const compositionEndedAtRef = useRef(0)
-  const mentionDropdownRef = useRef<HTMLDivElement>(null)
   const starterPrompts = [
     {
       label: 'Profile the data',
@@ -98,10 +91,6 @@ export default function ChatBox({
       prompt: 'Generate a business report draft with summary, key findings, risks, and actionable recommendations.',
     },
   ]
-
-  useEffect(() => {
-    loadBases()
-  }, [loadBases])
 
   useEffect(() => {
     if (!showDataSourceManager) return
@@ -122,20 +111,6 @@ export default function ChatBox({
     }
   }, [showDataSourceManager])
 
-  useEffect(() => {
-    const onMouseDown = (event: MouseEvent) => {
-      if (!showMentions) return
-      const target = event.target as Node
-      if (mentionDropdownRef.current?.contains(target)) return
-      if (textareaRef.current?.contains(target)) return
-      setShowMentions(false)
-      setMentionQuery('')
-      setActiveMentionIndex(0)
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
-  }, [showMentions])
-
   const resizeTextarea = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
@@ -147,26 +122,12 @@ export default function ChatBox({
     resizeTextarea()
   }, [input, resizeTextarea])
 
-  const extractKbIds = (text: string) => {
-    const ids: string[] = []
-    kbBases.forEach((kb) => {
-      if (text.includes(`@${kb.name}`)) {
-        ids.push(kb.id)
-      }
-    })
-    return ids
-  }
-
   const handleSend = () => {
     const canSend = Boolean(input.trim()) && !isStreaming
     if (!canSend) return
     const query = input.trim()
-    const kbIds = extractKbIds(query)
-    sendMessage(query, dataSourceIds, kbIds)
+    sendMessage(query, dataSourceIds)
     setInput('')
-    setShowMentions(false)
-    setMentionQuery('')
-    setActiveMentionIndex(0)
     setIsNearBottom(true)
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     scrollToBottom()
@@ -216,18 +177,6 @@ export default function ChatBox({
     compositionEndedAtRef.current = e.timeStamp
   }
 
-  const mentionMatches = showMentions
-    ? kbBases.filter((kb) => kb.name.toLowerCase().includes(mentionQuery.toLowerCase()))
-    : []
-  const effectiveMentionIndex =
-    mentionMatches.length > 0 ? Math.min(activeMentionIndex, mentionMatches.length - 1) : 0
-
-  useEffect(() => {
-    if (!showMentions || mentionMatches.length === 0 || !mentionDropdownRef.current) return
-    const active = mentionDropdownRef.current.querySelector<HTMLButtonElement>('.mention-item.active')
-    active?.scrollIntoView({ block: 'nearest' })
-  }, [showMentions, mentionMatches.length, effectiveMentionIndex])
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const native = e.nativeEvent
     const keyCode = native.keyCode || native.which || 0
@@ -237,31 +186,6 @@ export default function ChatBox({
       keyCode === 229 ||
       native.timeStamp - compositionEndedAtRef.current < 30
 
-    if (showMentions) {
-      if (e.key === 'ArrowDown' && mentionMatches.length > 0) {
-        e.preventDefault()
-        setActiveMentionIndex((current) => (current + 1) % mentionMatches.length)
-        return
-      }
-      if (e.key === 'ArrowUp' && mentionMatches.length > 0) {
-        e.preventDefault()
-        setActiveMentionIndex((current) => (current - 1 + mentionMatches.length) % mentionMatches.length)
-        return
-      }
-      if ((e.key === 'Enter' || e.key === 'Tab') && mentionMatches.length > 0 && !composingOrSelecting) {
-        e.preventDefault()
-        handleMentionSelect(mentionMatches[effectiveMentionIndex].name)
-        return
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setShowMentions(false)
-        setMentionQuery('')
-        setActiveMentionIndex(0)
-        return
-      }
-    }
-
     if (e.key === 'Enter' && !e.shiftKey) {
       // IME composing state: do not send message on Enter while user is selecting candidates.
       if (composingOrSelecting) {
@@ -269,17 +193,6 @@ export default function ChatBox({
       }
       e.preventDefault()
       handleSend()
-    }
-  }
-
-  const handleMentionSelect = (name: string) => {
-    const next = input.replace(/@([^\s@]*)$/, `@${name} `)
-    setInput(next)
-    setShowMentions(false)
-    setMentionQuery('')
-    setActiveMentionIndex(0)
-    if (textareaRef.current) {
-      textareaRef.current.focus()
     }
   }
 
@@ -411,7 +324,6 @@ export default function ChatBox({
             </div>
             <div className="chat-empty-context">
               <span className={`chat-empty-context-chip ${dataSourceIds.length > 0 ? 'active' : ''}`}>Files and databases join automatically</span>
-              <span className="chat-empty-context-chip">Use @ to reference a knowledge base</span>
             </div>
             <div className="chat-empty-prompts">
               {starterPrompts.map((item) => (
@@ -533,20 +445,7 @@ export default function ChatBox({
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={(e) => {
-                const value = e.target.value
-                setInput(value)
-                const match = value.match(/@([^\s@]*)$/)
-                if (match) {
-                  setShowMentions(true)
-                  setMentionQuery(match[1])
-                  setActiveMentionIndex(0)
-                } else {
-                  setShowMentions(false)
-                  setMentionQuery('')
-                  setActiveMentionIndex(0)
-                }
-              }}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
@@ -556,31 +455,6 @@ export default function ChatBox({
               placeholder={dataSourceIds.length > 0 ? 'Ask DeepEye about your attached data...' : 'Attach data, then message DeepEye...'}
               disabled={isStreaming}
             />
-            {showMentions && (
-              <div className="mention-dropdown" ref={mentionDropdownRef}>
-                <div className="mention-header">Knowledge Bases</div>
-                {mentionMatches.length > 0 ? (
-                  <div className="mention-list">
-                    {mentionMatches.map((kb, idx) => (
-                      <button
-                        key={kb.id}
-                        type="button"
-                        onClick={() => handleMentionSelect(kb.name)}
-                        onMouseEnter={() => setActiveMentionIndex(idx)}
-                        className={`mention-item ${idx === effectiveMentionIndex ? 'active' : ''}`}
-                        aria-selected={idx === effectiveMentionIndex}
-                      >
-                        @{kb.name}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mention-empty">
-                    No knowledge base matched @{mentionQuery || '...'}
-                  </div>
-                )}
-              </div>
-            )}
             {isStreaming ? (
               <button type="button" onClick={stopMessage} className="chat-stop-btn" title="Stop generation">
                 Stop

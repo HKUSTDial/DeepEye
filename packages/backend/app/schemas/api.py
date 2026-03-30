@@ -11,7 +11,6 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
     datasource_ids: list[str] | None = None
-    kb_ids: list[str] | None = None
 
 
 class ChatSessionResponse(BaseModel):

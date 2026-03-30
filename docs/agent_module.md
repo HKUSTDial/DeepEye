@@ -27,7 +27,6 @@ Agent 模块负责“决策 + 执行 + 事件输出”。
 
 4) 子 Agent  
 - WorkflowAgent：`packages/core/deepeye/agents/workflow_agent.py`  
-- KnowledgeBaseAgent：`packages/core/deepeye/agents/knowledge_base_agent.py`  
 - CodeAgent / SQLAgent：`packages/core/deepeye/agents/code_agent.py` / `sql_agent.py`（当前主链路未用）  
 
 5) 事件与消息聚合  
@@ -45,10 +44,6 @@ Agent 模块负责“决策 + 执行 + 事件输出”。
 - `WorkflowAgent`  
   - 负责生成 workflow JSON  
   - 调用 `create_workflow / update_workflow / run_workflow_from_file`  
-
-- `KnowledgeBaseAgent`  
-  - 只负责知识库问答  
-  - 使用 `execute_kb_sql` 工具执行只读 SQL  
 
 - `AgentCallback`  
   - 统一输出 `tool_start / tool_end / workflow_event`  
@@ -99,4 +94,3 @@ tools.append(create_log_agent_tool(model, session_id, callbacks=[cb_log]))
 - 新建工具函数，放在 `packages/backend/app/tools/`  
 - 在 `agent_tasks.py` 里注入工具到 Supervisor  
 - 更新 Supervisor 提示词说明何时使用  
-

@@ -205,7 +205,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
         <div className="space-y-1 mb-6">
           <button
             onClick={() => navigate('/')}
-            className={`nav-item ${isActive('/') && !isActive('/workflows') && !isActive('/knowledge-bases') ? 'active' : ''}`}
+            className={`nav-item ${isActive('/') && !isActive('/workflows') ? 'active' : ''}`}
             title="Chat"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,16 +222,6 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             <span className="sidebar-label">Workflows</span>
-          </button>
-          <button
-            onClick={() => navigate('/knowledge-bases')}
-            className={`nav-item ${isActive('/knowledge-bases') ? 'active' : ''}`}
-            title="Knowledge Base"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <span className="sidebar-label">Knowledge Base</span>
           </button>
         </div>
 

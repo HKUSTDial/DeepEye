@@ -69,7 +69,6 @@ export interface ChatPayload {
   message: string
   session_id?: string | null
   datasource_ids?: string[]
-  kb_ids?: string[]
 }
 
 export interface ChatResponse {
@@ -155,24 +154,4 @@ export interface WorkspaceState {
   draft: WorkflowDraft | null
   run: WorkflowRun | null
   artifacts: WorkflowArtifact[]
-}
-
-export interface KnowledgeBase {
-  id: string
-  name: string
-  description?: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface KnowledgeBaseFile {
-  id: string
-  kb_id: string
-  filename: string
-  content_type?: string | null
-  size_bytes: number
-  status: string
-  error?: string | null
-  created_at: string
-  updated_at: string
 }

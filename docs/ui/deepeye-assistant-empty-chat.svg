@@ -44,9 +44,6 @@
 
     <rect x="92" y="203" width="220" height="26" rx="13" fill="#FBFBFC" stroke="#E4E6EB"/>
     <text x="202" y="220" text-anchor="middle" fill="#8A919B" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="600">Files and databases join automatically</text>
-    <rect x="96" y="237" width="212" height="26" rx="13" fill="#FBFBFC" stroke="#E4E6EB"/>
-    <text x="202" y="254" text-anchor="middle" fill="#8A919B" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="600">Use @ to reference a knowledge base</text>
-
     <g transform="translate(20 281)">
       <rect width="363" height="45" rx="16" fill="#FFFFFF" stroke="#E6E8ED"/>
       <text x="15" y="28" fill="#232834" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">Profile the data</text>
