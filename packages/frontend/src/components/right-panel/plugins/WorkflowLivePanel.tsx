@@ -248,6 +248,7 @@ export function WorkflowLivePanel({
   const setVideoProgressPercent = useWorkflowSessionsStore((state) => state.setVideoProgressPercent)
   const setVideoPreviewUrl = useWorkflowSessionsStore((state) => state.setVideoPreviewUrl)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
+  const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const isStreaming = useChatStore((state) => state.isStreaming)
   const sessionIdFromStore = useChatStore((state) => state.sessionId)
@@ -735,6 +736,13 @@ export function WorkflowLivePanel({
     if (!sessionId) return
     refreshDrafts(true)
   }, [sessionId, refreshDrafts])
+
+  useEffect(() => {
+    if (!sessionId) return
+    if (filesChangedTrigger === 0) return
+    if (sessionIdFromStore !== sessionId) return
+    void refreshDrafts(true)
+  }, [filesChangedTrigger, refreshDrafts, sessionId, sessionIdFromStore])
 
   useEffect(() => {
     if (!sessionId) return
