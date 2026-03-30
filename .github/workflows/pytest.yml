@@ -1,0 +1,30 @@
+name: pytest
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install workspace dependencies
+        run: uv sync --all-groups
+
+      - name: Run tests
+        run: uv run pytest packages/backend/app/test packages/core/tests -q

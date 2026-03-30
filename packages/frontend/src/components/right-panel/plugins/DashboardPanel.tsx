@@ -19,6 +19,8 @@ function extractDashboardNodeIds(definition: unknown): string[] {
     .map((node) => node.id as string)
 }
 
+const PREVIEW_IFRAME_SANDBOX = 'allow-same-origin allow-scripts'
+
 export function DashboardPanel({
   sessionId,
 }: {
@@ -369,6 +371,7 @@ export function DashboardPanel({
                   src={fullDashboardUrl}
                   className="h-full w-full border-none"
                   title="Dashboard Preview"
+                  sandbox={PREVIEW_IFRAME_SANDBOX}
                 />
               </div>
             ) : null}

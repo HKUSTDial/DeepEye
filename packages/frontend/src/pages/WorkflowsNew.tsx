@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import 'reactflow/dist/style.css'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -71,6 +72,19 @@ export default function WorkflowsNew() {
       className="flex h-screen overflow-hidden"
       style={{ background: 'var(--main-bg)', color: 'var(--main-text)' }}
     >
+      <div className="pointer-events-none absolute left-1/2 top-4 z-20 w-[min(720px,calc(100%-2rem))] -translate-x-1/2 px-4">
+        <div className="pointer-events-auto rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 shadow-sm backdrop-blur">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+            Legacy Workflow Editor
+          </div>
+          <div className="mt-1 text-sm text-[var(--muted-text)]">
+            Session workspace is the primary workflow surface. Keep this page for manual debugging or migration only.
+          </div>
+          <Link to="/" className="mt-3 inline-flex text-sm font-medium text-[var(--accent)] hover:underline">
+            Open main workspace
+          </Link>
+        </div>
+      </div>
       <WorkflowSidebar
         workflows={workflows}
         nodeTypes={nodeDefs}

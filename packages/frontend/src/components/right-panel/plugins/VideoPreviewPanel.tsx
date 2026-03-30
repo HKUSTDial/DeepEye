@@ -56,6 +56,8 @@ const STEP_MESSAGES: Record<number, string> = {
   3: '🎬 Step 4/4: Rendering video components...',
 }
 
+const PREVIEW_IFRAME_SANDBOX = 'allow-same-origin allow-scripts'
+
 function getVideoStepStatus(index: number, currentStep: number, failed: boolean): ArtifactProgressStepStatus {
   if (failed && index === currentStep) return 'warning'
   if (index < currentStep) return 'done'
@@ -331,6 +333,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
               className="h-full w-full border-none"
               title="Video Preview"
               allow="autoplay"
+              sandbox={PREVIEW_IFRAME_SANDBOX}
             />
           ) : null}
           {!isPreviewReady ? (

@@ -1,5 +1,6 @@
 import asyncio
 import io
+import json
 import os
 import socket
 import tarfile
@@ -11,6 +12,30 @@ from docker.errors import ImageNotFound, NotFound
 from app.core.config import settings
 from app.services.docker_build_paths import resolve_docker_build_target
 from deepeye.utils.logger import logger
+
+
+_DASHBOARD_CORS_FALLBACK_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+
+def _resolve_dashboard_cors_origins() -> list[str]:
+    origins = [str(origin).rstrip("/") for origin in settings.BACKEND_CORS_ORIGINS]
+    origins = [origin for origin in origins if origin and origin != "*"]
+    if origins:
+        return origins
+    logger.warning(
+        "[DashboardDeployService] BACKEND_CORS_ORIGINS contains wildcard or is empty. "
+        "Falling back to localhost origins for dashboard previews."
+    )
+    return list(_DASHBOARD_CORS_FALLBACK_ORIGINS)
+
+
+def _dashboard_container_environment() -> dict[str, str]:
+    return {
+        "BACKEND_CORS_ORIGINS": json.dumps(_resolve_dashboard_cors_origins()),
+    }
 
 
 class DashboardDeployService:
@@ -73,6 +98,7 @@ class DashboardDeployService:
             detach=True,
             working_dir="/app",
             command=start_cmd,
+            environment=_dashboard_container_environment(),
             labels={"type": "dashboard-instance", "task_id": task_id},
             network=network_name,
         )

@@ -39,11 +39,6 @@ from app.schemas.workflow import (
     WorkflowUpdate,
     WorkspaceStateResponse,
 )
-from app.schemas.workflow import (
-    WorkflowTemplateParam,
-    WorkflowTemplateResponse,
-    WorkflowTemplateRunRequest,
-)
 
 __all__ = [
     # API
@@ -80,9 +75,6 @@ __all__ = [
     "WorkflowQueuedRunResponse",
     "WorkflowResponse",
     "WorkflowRunResponse",
-    "WorkflowTemplateParam",
-    "WorkflowTemplateResponse",
-    "WorkflowTemplateRunRequest",
     "WorkflowUpdate",
     "WorkspaceStateResponse",
 ]

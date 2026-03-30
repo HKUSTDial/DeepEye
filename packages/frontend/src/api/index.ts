@@ -21,6 +21,5 @@ export {
   type DatasourceTable,
 } from './datasource'
 export { workflowsApi } from './workflows'
-export { workflowTemplatesApi } from './workflowTemplates'
 export { workflowNodesApi, type NodeSpec } from './workflowNodes'
 export { sandboxApi, type FileInfo, type FileContentResponse } from './sandbox'

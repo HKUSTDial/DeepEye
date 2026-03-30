@@ -1,7 +1,8 @@
-"""Simple sandbox test"""
+"""Docker integration test for sandbox basics."""
 
 import os
 import asyncio
+import pytest
 
 # Set required env vars for testing
 os.environ.setdefault("LLM_API_KEY", "test-key")
@@ -9,6 +10,11 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.sandbox import create_sandbox
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("DEEPEYE_RUN_DOCKER_TESTS") != "1",
+    reason="Set DEEPEYE_RUN_DOCKER_TESTS=1 to run Docker integration tests.",
+)
 
 
 async def test_sandbox_create():
@@ -49,4 +55,3 @@ async def test_sandbox_create():
 
 if __name__ == "__main__":
     asyncio.run(test_sandbox_create())
-

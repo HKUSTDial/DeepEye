@@ -117,24 +117,6 @@ class WorkspaceStateResponse(BaseModel):
     artifacts: list[WorkflowArtifactResponse] = []
 
 
-class WorkflowTemplateParam(BaseModel):
-    key: str
-    required: bool = False
-    placeholder: str | None = None
-    default: str | int | float | None = None
-
-
-class WorkflowTemplateResponse(BaseModel):
-    id: str
-    name: str
-    description: str | None = None
-    params: list[WorkflowTemplateParam] = []
-
-
-class WorkflowTemplateRunRequest(BaseModel):
-    params: dict
-
-
 class WorkflowFileRunRequest(BaseModel):
     session_id: str
     path: str

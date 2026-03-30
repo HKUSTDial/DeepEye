@@ -6,7 +6,6 @@ import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { chatApi, sessionApi } from '../../../api'
 import { extractVideoOutputParams } from '../../../api/video'
-import { workflowsApi } from '../../../api/workflows'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { useChatStore } from '../../../stores/chat'
 import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNodes'
@@ -267,7 +266,6 @@ export function WorkflowLivePanel({
   const [newEdgeIds, setNewEdgeIds] = useState<Set<string>>(new Set())
   const [isSaving, setIsSaving] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const runEventSourceRef = useRef<EventSource | null>(null)
@@ -1114,39 +1112,6 @@ export function WorkflowLivePanel({
             className="panel-toolbar-btn"
           >
             {isSaving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            type="button"
-            disabled={
-              !sessionId ||
-              Object.keys(nodeDefs).length === 0 ||
-              isStreaming ||
-              isUploading
-            }
-            onClick={async () => {
-              if (!sessionId) return
-              if (Object.keys(nodeDefs).length === 0) {
-                setWorkflowError(sessionId, 'Node definitions are not loaded yet.')
-                return
-              }
-              setIsUploading(true)
-              try {
-                const saved = await persistWorkflowDraft()
-                if (!saved) return
-                const definition = saved.definition
-                const filename = saved.filePath.split('/').pop() || 'workflow.json'
-                const name = filename.replace(/\.json$/i, '') || 'Untitled workflow'
-                await workflowsApi.create({ name, description: '', definition })
-                setWorkflowError(sessionId, null)
-              } catch (err) {
-                setWorkflowError(sessionId, err instanceof Error ? err.message : 'Failed to upload workflow.')
-              } finally {
-                setIsUploading(false)
-              }
-            }}
-            className="panel-toolbar-btn"
-          >
-            {isUploading ? 'Uploading...' : 'Upload'}
           </button>
           <button
             type="button"

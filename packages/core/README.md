@@ -1,19 +1,26 @@
 # DeepEye Core
 
-DeepEye is a next-generation Data Agent System designed for modularity and ease of use.
+Shared agent, datasource, sandbox, and workflow primitives used by the DeepEye backend.
 
-## Installation
+## Scope
+
+This package is primarily the internal foundation for:
+
+- workflow graph models and execution engine
+- agent wrappers built on LangGraph / LangChain
+- datasource metadata and extractor helpers
+- sandbox abstractions used by backend runtime services
+
+Direct usage is possible, but most agent entrypoints require you to supply:
+
+- a configured chat model
+- tool bindings
+- optional checkpointer / runtime integrations
+
+## Development
+
+Run core tests from the repository root:
 
 ```bash
-pip install deepeye
+uv run pytest packages/core/tests -q
 ```
-
-## Usage
-
-```python
-from deepeye.agents import SupervisorAgent
-
-agent = SupervisorAgent()
-result = agent.run("Analyze my data")
-```
-

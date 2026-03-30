@@ -15,6 +15,10 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(ROOT_DIR, "public")
 CHARTS_DIR = os.path.join(PUBLIC_DIR, "charts")
 CONFIGS_DIR = os.path.join(PUBLIC_DIR, "configs")
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 # --- Helper functions ---
 def load_schema() -> Dict[str, Any]:
@@ -67,6 +71,25 @@ def load_dataset(csv_path: str) -> pd.DataFrame:
         df["enrollment_year"] = df["enrollment_date"].dt.year
     
     return df
+
+def resolve_cors_origins() -> List[str]:
+    raw_value = os.environ.get("BACKEND_CORS_ORIGINS", "").strip()
+    if not raw_value:
+        return list(DEFAULT_CORS_ORIGINS)
+
+    parsed: Any
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        parsed = [item.strip() for item in raw_value.split(",")]
+
+    if isinstance(parsed, str):
+        parsed = [parsed]
+    if not isinstance(parsed, list):
+        return list(DEFAULT_CORS_ORIGINS)
+
+    origins = [str(origin).rstrip("/") for origin in parsed if str(origin).strip() and str(origin).strip() != "*"]
+    return origins or list(DEFAULT_CORS_ORIGINS)
 
 def dynamic_import_plot(py_filename: str):
     if not py_filename:
@@ -581,7 +604,12 @@ class DashboardEngine:
 # --- App ---
 engine = DashboardEngine()
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=resolve_cors_origins(),
+    allow_methods=["GET", "HEAD", "OPTIONS"],
+    allow_headers=["*"],
+)
 app.mount("/public", StaticFiles(directory=PUBLIC_DIR), name="public")
 
 @app.get("/")

@@ -79,6 +79,8 @@ def test_run_startup_warmup_raises_on_strict_failure(monkeypatch) -> None:
         )
 
     monkeypatch.setattr("app.core.warmup.httpx.Client", _client_factory)
+    monkeypatch.setattr(settings, "STARTUP_WARMUP_ENABLED", True)
+    monkeypatch.setattr(settings, "STARTUP_WARMUP_STRICT", True)
 
     try:
         run_startup_warmup(component="api")

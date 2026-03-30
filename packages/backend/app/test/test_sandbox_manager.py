@@ -1,7 +1,8 @@
-"""Test SandboxManager"""
+"""Docker integration test for SandboxManager."""
 
 import os
 import asyncio
+import pytest
 
 # Set required env vars
 os.environ.setdefault("LLM_API_KEY", "test-key")
@@ -9,6 +10,11 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.sandbox import sandbox_manager
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("DEEPEYE_RUN_DOCKER_TESTS") != "1",
+    reason="Set DEEPEYE_RUN_DOCKER_TESTS=1 to run Docker integration tests.",
+)
 
 
 async def test_sandbox_manager():
@@ -22,7 +28,7 @@ async def test_sandbox_manager():
     sandbox1 = await sandbox_manager.create_for_session(session1)
     print(f"✓ Created sandbox1 for {session1}")
     
-    sandbox2 = await sandbox_manager.create_for_session(session1)
+    await sandbox_manager.create_for_session(session1)
     print(f"✓ Created sandbox2 for {session1}")
     
     # Test command in sandbox1
@@ -56,12 +62,12 @@ async def test_sandbox_manager():
     # Test 5: Stop session1 (preserve data)
     print("\n--- Test 5: Stop session1 ---")
     await sandbox_manager.stop_session(session1)
-    print(f"✓ Session1 stopped (data preserved)")
+    print("✓ Session1 stopped (data preserved)")
     
     # Test 6: Restart session1
     print("\n--- Test 6: Restart session1 ---")
     await sandbox_manager.restart_session(session1)
-    print(f"✓ Session1 restarted")
+    print("✓ Session1 restarted")
     
     # Verify data still exists
     result = await sandbox1.exec_command("echo 'Still alive!'")
@@ -70,7 +76,7 @@ async def test_sandbox_manager():
     # Test 7: Destroy session1 (remove data)
     print("\n--- Test 7: Destroy session1 ---")
     await sandbox_manager.destroy_session(session1)
-    print(f"✓ Session1 destroyed (data removed)")
+    print("✓ Session1 destroyed (data removed)")
     
     stats = sandbox_manager.get_stats()
     print(f"✓ Remaining sessions: {stats['total_sessions']}")
@@ -90,4 +96,3 @@ async def test_sandbox_manager():
 
 if __name__ == "__main__":
     asyncio.run(test_sandbox_manager())
-
