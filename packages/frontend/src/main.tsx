@@ -12,7 +12,6 @@ import {
   Register,
   ResetPassword,
   VerifyEmail,
-  WorkflowsNew,
 } from './pages'
 import ProtectedRoute from './components/ProtectedRoute'
 import { initTheme } from './hooks/useTheme'
@@ -35,14 +34,6 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route
-          path="/workflows"
-          element={
-            <ProtectedRoute>
-              <WorkflowsNew />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/*"
           element={

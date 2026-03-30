@@ -205,7 +205,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
         <div className="space-y-1 mb-6">
           <button
             onClick={() => navigate('/')}
-            className={`nav-item ${isActive('/') && !isActive('/workflows') ? 'active' : ''}`}
+            className={`nav-item ${isActive('/') ? 'active' : ''}`}
             title="Chat"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

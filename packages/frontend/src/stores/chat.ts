@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import type { Session } from '../types'
 import { sandboxApi, sessionApi, type AgentEvent, type StoredMessage } from '../api'
-import { useWorkflowStore } from './workflow'
 import { SessionChat } from '../models/SessionChat'
 
 interface ChatStore {
@@ -176,7 +175,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     try {
       set({ isSwitchingSession: true })
       get().resetSandboxSignals()
-      useWorkflowStore.getState().reset()
       // 1. Get session details from backend
       const sessionInfo = await sessionApi.get(id)
       const session = new SessionChat(sessionInfo.id, sessionInfo.title)
@@ -224,4 +222,3 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ filesChangedTrigger: 0, sandboxReadySessionId: null })
   },
 }))
-
