@@ -5,11 +5,7 @@ import '../../workflow/Workflow.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
-import { WorkflowRecoveryCard } from '../../workflow/WorkflowRecoveryCard'
 import { useTheme } from '../../../hooks/useTheme'
-import { useRightPanelStore } from '../../../stores/rightPanel'
-import { useWorkspaceUiStore } from '../../../stores/workspaceUi'
-import { buildWorkflowRecoveryState } from '../../../utils/workflowRecovery'
 import { WorkflowLiveEmptyState } from './WorkflowLiveEmptyState'
 import { WorkflowLiveToolbar } from './WorkflowLiveToolbar'
 import { useTransientWorkflowHighlights } from './useTransientWorkflowHighlights'
@@ -48,7 +44,6 @@ export function WorkflowLivePanel({
     runStatus,
     runError,
     error,
-    runPhase,
     displayFileError,
     activeRun,
     runOutput,
@@ -57,7 +52,6 @@ export function WorkflowLivePanel({
     activeDraft,
     activeDraftId,
     activeViewState,
-    activeFilePath,
     lastUpdated,
     loadWorkflowDraft,
     handleSave,
@@ -68,9 +62,6 @@ export function WorkflowLivePanel({
 
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
-  const openDataSourceManager = useWorkspaceUiStore((state) => state.openDataSourceManager)
-  const requestFileReveal = useWorkspaceUiStore((state) => state.requestFileReveal)
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
 
@@ -121,17 +112,6 @@ export function WorkflowLivePanel({
   })
 
   const nodeTypes = useMemo(() => NODE_TYPES, [])
-  const recovery = useMemo(
-    () =>
-      buildWorkflowRecoveryState({
-        runPhase,
-        runError,
-        error,
-        activeFilePath,
-        runOutput,
-      }),
-    [runPhase, runError, error, activeFilePath, runOutput],
-  )
   const workflowToneStyle = useMemo(
     () =>
       ({
@@ -144,14 +124,6 @@ export function WorkflowLivePanel({
       }) as CSSProperties,
     [isDark],
   )
-  const targetSessionId = displaySessionId ?? sessionId
-
-  const handleOpenFiles = () => {
-    if (targetSessionId && activeFilePath) {
-      requestFileReveal(targetSessionId, activeFilePath)
-    }
-    openOrFocusTab('files')
-  }
 
   if (!hasRenderableWorkflow(definition, validatedNodes, validatedEdges)) {
     return (
@@ -159,19 +131,6 @@ export function WorkflowLivePanel({
         className={`workflow-live-panel workflow-live-panel--${isDark ? 'dark' : 'light'} panel-view`}
         style={workflowToneStyle}
       >
-        {recovery ? (
-          <div className="px-4 pt-4 pb-3">
-            <WorkflowRecoveryCard
-              recovery={recovery}
-              canRetry={flow.nodes.length > 0}
-              onRetry={async () => {
-                await handleRun(flow.nodes, flow.edges)
-              }}
-              onOpenDataSources={openDataSourceManager}
-              onOpenFiles={handleOpenFiles}
-            />
-          </div>
-        ) : null}
         <WorkflowLiveEmptyState dataSourceCount={dataSourceIds.length} />
       </div>
     )
@@ -211,19 +170,6 @@ export function WorkflowLivePanel({
           await handleRun(flow.nodes, flow.edges)
         }}
       />
-      {recovery ? (
-        <div className="px-4 pb-3">
-          <WorkflowRecoveryCard
-            recovery={recovery}
-            canRetry={flow.nodes.length > 0}
-            onRetry={async () => {
-              await handleRun(flow.nodes, flow.edges)
-            }}
-            onOpenDataSources={openDataSourceManager}
-            onOpenFiles={handleOpenFiles}
-          />
-        </div>
-      ) : null}
       <div className="flex min-h-0 flex-1">
         <div ref={graphHostRef} className="min-w-0 flex-1">
           <WorkflowGraph
