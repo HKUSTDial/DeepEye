@@ -3,6 +3,8 @@ import { Download, FileText, Loader2, Sparkles, TriangleAlert } from 'lucide-rea
 import { ArtifactProgressCard } from '../ArtifactProgressCard'
 import { useReportStore } from '../../../stores/report'
 
+const REPORT_IFRAME_SANDBOX = 'allow-scripts'
+
 const STAGES = [
   { label: 'Load and parse data files', icon: '📂' },
   { label: 'Generate dataset context', icon: '🔍' },
@@ -217,7 +219,7 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
               title="Report"
               srcDoc={reportHtml}
               className="panel-report-frame"
-              sandbox="allow-same-origin allow-scripts"
+              sandbox={REPORT_IFRAME_SANDBOX}
             />
           </div>
         ) : isWaiting ? (
