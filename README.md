@@ -24,6 +24,8 @@ The current monorepo contains:
    docker compose up --build
    ```
 
+   The Compose stack runs `alembic upgrade head` before starting the backend services.
+
 3. Open the app:
 
    ```text

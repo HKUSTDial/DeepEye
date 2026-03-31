@@ -12,19 +12,8 @@ from app.api.v1 import router as v1_router
 from app.core.config import settings
 from app.core.middleware import auth_middleware
 from app.core.warmup import run_startup_warmup
-from app.db.session import engine
-from app.models import Base
 from app.sandbox import sandbox_manager
 from deepeye.utils.logger import logger
-
-
-def initialize_relational_schema() -> None:
-    if not settings.AUTO_CREATE_DATABASE_SCHEMA:
-        logger.info("Skipping relational schema auto-create.")
-        return
-
-    Base.metadata.create_all(bind=engine)
-    logger.info("Relational schema auto-create completed.")
 
 
 async def initialize_checkpointer() -> None:
@@ -60,7 +49,6 @@ async def stop_sandbox_cleanup() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    initialize_relational_schema()
     run_startup_warmup(component="api")
     await initialize_checkpointer()
     start_sandbox_cleanup()

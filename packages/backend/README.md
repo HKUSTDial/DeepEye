@@ -20,6 +20,12 @@ docker compose up --build
 
 The API is then available behind the gateway at `http://localhost:8080/api/...`.
 
+If you need to apply schema migrations manually outside Docker:
+
+```bash
+uv run alembic -c packages/backend/alembic.ini upgrade head
+```
+
 ## Tests
 
 Default backend and core tests:
@@ -38,5 +44,5 @@ DEEPEYE_RUN_DOCKER_TESTS=1 uv run pytest \
 
 ## Notes
 
-- Runtime schema bootstrapping is now isolated to app startup helpers and is still being migrated toward a formal migration workflow.
+- Runtime schema changes now go through Alembic migrations. Docker Compose runs `alembic upgrade head` before the API and worker start.
 - Open-source hardening work is tracked in `docs/open_source_remediation_checklist.md`.

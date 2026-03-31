@@ -106,7 +106,6 @@ class Settings(BaseSettings):
     LLM_MODEL: str
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 8192  # max tokens for completion across agent and artifact generation
-    AUTO_CREATE_DATABASE_SCHEMA: bool = True
     STARTUP_WARMUP_ENABLED: bool = True
     STARTUP_WARMUP_STRICT: bool = True
     STARTUP_WARMUP_TIMEOUT_SECONDS: float = 15.0

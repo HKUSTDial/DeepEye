@@ -82,6 +82,8 @@ services:
     env_file:
       - .env
     depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_started
       postgres:
@@ -113,6 +115,8 @@ services:
     env_file:
       - .env
     depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_started
       postgres:
@@ -128,6 +132,22 @@ services:
       # Mount Docker socket to manage sandbox containers
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
+
+  backend-migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: alembic -c /app/packages/backend/alembic.ini upgrade head
+    volumes:
+      - ./packages/backend:/app/packages/backend
+      - ./packages/core:/app/packages/core
+      - .:/app/project
+    restart: "no"
 
   frontend:
     build:
