@@ -3,141 +3,19 @@ import { ApiError } from '../api/client'
 import { datasourceApi, sessionApi, type DatasourcePreviewResponse } from '../api'
 import { selectCurrentSessionId, useChatStore } from '../stores/chat'
 import { useDatasourceSyncStore } from '../stores/datasourceSync'
-import type { DataSource, DataSourceConnectionTestResponse } from '../types'
+import type { DataSource } from '../types'
+import { DataSourceConnectionForm } from './data-source/DataSourceConnectionForm'
+import { DataSourcePreviewPanel } from './data-source/DataSourcePreviewPanel'
+import {
+  PREVIEW_PAGE_SIZE,
+  formatConnectionSuccess,
+  isSupportedFile,
+} from './data-source/dataSourceManagerUtils'
 import './DataSourceManager.css'
 
 interface DataSourceManagerProps {
   onDataSourcesChange?: (dataSources: DataSource[]) => void
   variant?: 'sidebar' | 'composer' | 'modal'
-}
-
-const ENGINE_OPTIONS = [
-  { value: 'postgres', label: 'PostgreSQL' },
-  { value: 'mysql', label: 'MySQL' },
-  { value: 'sqlite', label: 'SQLite' },
-] as const
-
-const URI_EXAMPLES: Record<string, string> = {
-  postgres: 'postgresql://user:password@localhost:5432/analytics',
-  mysql: 'mysql://user:password@localhost:3306/analytics',
-  sqlite: 'sqlite:////absolute/path/to/analytics.db',
-}
-
-const PREVIEW_PAGE_SIZE = 25
-
-const isSupportedFile = (file: File) => {
-  const name = file.name.toLowerCase()
-  return (
-    name.endsWith('.csv') ||
-    name.endsWith('.json') ||
-    name.endsWith('.xlsx') ||
-    name.endsWith('.xls') ||
-    name.endsWith('.parquet')
-  )
-}
-
-const formatPreviewCell = (value: unknown) => {
-  if (value === null || value === undefined) return 'NULL'
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
-  }
-}
-
-const getPreviewRangeLabel = (preview: DatasourcePreviewResponse) => {
-  if (preview.total_rows === 0) {
-    return '0 / 0'
-  }
-  const start = (preview.page - 1) * preview.page_size + 1
-  const end = Math.min(preview.page * preview.page_size, preview.total_rows)
-  return `${start}-${end} / ${preview.total_rows}`
-}
-
-interface EngineSelectProps {
-  value: string
-  onChange: (value: string) => void
-}
-
-function EngineSelect({ value, onChange }: EngineSelectProps) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-
-  const selected = ENGINE_OPTIONS.find((option) => option.value === value) ?? ENGINE_OPTIONS[0]
-
-  useEffect(() => {
-    if (!open) return
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', onMouseDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open])
-
-  return (
-    <div className={`data-source-select-shell ${open ? 'is-open' : ''}`} ref={rootRef}>
-      <button
-        type="button"
-        className={`data-source-field data-source-select-trigger ${open ? 'is-open' : ''}`}
-        onClick={() => setOpen((current) => !current)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span className="data-source-select-trigger-value">{selected.label}</span>
-        <span className="data-source-select-chevron" aria-hidden="true">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="m5.5 7.5 4.5 5 4.5-5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-      </button>
-
-      {open && (
-        <div className="data-source-select-menu" role="listbox" aria-label="Database engine">
-          {ENGINE_OPTIONS.map((option) => {
-            const isSelected = option.value === value
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                className={`data-source-select-option ${isSelected ? 'is-selected' : ''}`}
-                onClick={() => {
-                  onChange(option.value)
-                  setOpen(false)
-                }}
-              >
-                <span className="data-source-select-option-label">{option.label}</span>
-                {isSelected && (
-                  <span className="data-source-select-option-check" aria-hidden="true">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="m4.5 10 3.2 3.2L15.5 5.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function DataSourceManager({ onDataSourcesChange, variant = 'sidebar' }: DataSourceManagerProps) {
@@ -180,13 +58,6 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     }
     return error instanceof Error ? error.message : fallback
   }, [])
-
-  const formatConnectionSuccess = (result: DataSourceConnectionTestResponse) => {
-    const sample = result.sample_tables.slice(0, 3).join(', ')
-    return result.table_count > 0
-      ? `Connection successful. ${result.table_count} table(s) available. Sample: ${sample || 'none'}`
-      : 'Connection successful, but no accessible tables were found in this database.'
-  }
 
   const applyDataSources = useCallback(
     (next: DataSource[] | ((current: DataSource[]) => DataSource[])) => {
@@ -606,69 +477,21 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
 
       {isCreating && (
         <div className="data-source-form-panel data-source-form-panel-db">
-          <div className="data-source-form-intro">
-            <span className="data-source-form-kicker">Database connection</span>
-            <span className="data-source-form-copy">Create a reusable live source for reports, dashboards, and follow-up analysis.</span>
-          </div>
-          <div className="data-source-form-grid">
-            <label className="data-source-field-group">
-              <span className="data-source-field-label">Display name</span>
-              <input
-                value={newDs.name}
-                onChange={(event) => {
-                  setNewDs({ ...newDs, name: event.target.value })
-                  setCreateConnectionStatus(null)
-                }}
-                placeholder="Revenue warehouse"
-                className="data-source-field"
-              />
-            </label>
-            <label className="data-source-field-group">
-              <span className="data-source-field-label">Engine</span>
-              <EngineSelect
-                value={newDs.type}
-                onChange={(nextType) => {
-                  setNewDs({ ...newDs, type: nextType })
-                  setCreateConnectionStatus(null)
-                }}
-              />
-            </label>
-          </div>
-          <label className="data-source-field-group">
-            <span className="data-source-field-label">Connection URI</span>
-            <textarea
-              value={newDs.connection_string}
-              onChange={(event) => {
-                setNewDs({ ...newDs, connection_string: event.target.value })
-                setCreateConnectionStatus(null)
-              }}
-              placeholder={URI_EXAMPLES[newDs.type] || 'Connection URI'}
-              className="data-source-field data-source-field-mono data-source-textarea"
-              rows={3}
-            />
-          </label>
-          <div className="data-source-uri-help">
-            <span className="data-source-uri-label">Example</span>
-            <code className="data-source-uri-example">{URI_EXAMPLES[newDs.type] || 'Connection URI'}</code>
-          </div>
-          {createConnectionStatus && (
-            <div className="data-source-success">
-              <span>{createConnectionStatus}</span>
-            </div>
-          )}
-          <div className="data-source-form-footer">
-            <button
-              type="button"
-              onClick={() => void runCreateConnectionTest()}
-              disabled={isTestingCreate}
-              className="data-source-secondary-btn"
-            >
-              {isTestingCreate ? 'Testing...' : 'Test connection'}
-            </button>
-            <button type="button" onClick={createDataSource} className="data-source-submit-btn">
-              Connect database
-            </button>
-          </div>
+          <DataSourceConnectionForm
+            form={newDs}
+            onChange={setNewDs}
+            statusMessage={createConnectionStatus}
+            onClearStatus={() => setCreateConnectionStatus(null)}
+            onTest={() => void runCreateConnectionTest()}
+            onSubmit={() => void createDataSource()}
+            isTesting={isTestingCreate}
+            isSubmitting={false}
+            submitLabel="Connect database"
+            intro={{
+              kicker: 'Database connection',
+              copy: 'Create a reusable live source for reports, dashboards, and follow-up analysis.',
+            }}
+          />
         </div>
       )}
 
@@ -759,201 +582,33 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
 
               {isDatabase && editingDsId === ds.id && (
                 <div className="data-source-subpanel" onClick={(event) => event.stopPropagation()}>
-                  <div className="data-source-form-grid">
-                    <label className="data-source-field-group">
-                      <span className="data-source-field-label">Display name</span>
-                      <input
-                        value={editForm.name}
-                        onChange={(event) => {
-                          setEditForm((current) => ({ ...current, name: event.target.value }))
-                          setEditConnectionStatus(null)
-                        }}
-                        placeholder="Revenue warehouse"
-                        className="data-source-field"
-                      />
-                    </label>
-                    <label className="data-source-field-group">
-                      <span className="data-source-field-label">Engine</span>
-                      <EngineSelect
-                        value={editForm.type}
-                        onChange={(nextType) => {
-                          setEditForm((current) => ({ ...current, type: nextType }))
-                          setEditConnectionStatus(null)
-                        }}
-                      />
-                    </label>
-                  </div>
-                  <label className="data-source-field-group">
-                    <span className="data-source-field-label">Connection URI</span>
-                    <textarea
-                      value={editForm.connection_string}
-                      onChange={(event) => {
-                        setEditForm((current) => ({ ...current, connection_string: event.target.value }))
-                        setEditConnectionStatus(null)
-                      }}
-                      placeholder={URI_EXAMPLES[editForm.type] || 'Connection URI'}
-                      className="data-source-field data-source-field-mono data-source-textarea"
-                      rows={3}
-                    />
-                  </label>
-                  <div className="data-source-uri-help">
-                    <span className="data-source-uri-label">Example</span>
-                    <code className="data-source-uri-example">{URI_EXAMPLES[editForm.type] || 'Connection URI'}</code>
-                  </div>
-                  {editConnectionStatus && (
-                    <div className="data-source-success">
-                      <span>{editConnectionStatus}</span>
-                    </div>
-                  )}
-                  <div className="data-source-subpanel-actions">
-                    <button
-                      type="button"
-                      onClick={() => void runEditConnectionTest()}
-                      disabled={isTestingEdit || isSavingEdit}
-                      className="data-source-secondary-btn"
-                    >
-                      {isTestingEdit ? 'Testing...' : 'Test connection'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveEdit}
-                      disabled={isSavingEdit}
-                      className="data-source-submit-btn"
-                    >
-                      {isSavingEdit ? 'Saving...' : 'Save connection'}
-                    </button>
-                    <button type="button" onClick={cancelEdit} className="data-source-secondary-btn">
-                      Cancel
-                    </button>
-                  </div>
+                  <DataSourceConnectionForm
+                    form={editForm}
+                    onChange={setEditForm}
+                    statusMessage={editConnectionStatus}
+                    onClearStatus={() => setEditConnectionStatus(null)}
+                    onTest={() => void runEditConnectionTest()}
+                    onSubmit={() => void saveEdit()}
+                    onCancel={cancelEdit}
+                    isTesting={isTestingEdit}
+                    isSubmitting={isSavingEdit}
+                    submitLabel="Save connection"
+                  />
                 </div>
               )}
 
               {expandedDsId === ds.id && editingDsId !== ds.id && (
-                <div className="data-source-subpanel data-source-preview-shell" onClick={(event) => event.stopPropagation()}>
-                  {isPreviewLoading && !preview ? (
-                    <div className="data-source-preview-state">
-                      <div className="data-source-spinner" />
-                      <span>Loading preview...</span>
-                    </div>
-                  ) : preview ? (
-                    <>
-                      <div className="data-source-preview-toolbar">
-                        <div className="data-source-preview-summary">
-                          <span className="data-source-subpanel-note">
-                            {preview.table
-                              ? `${preview.table} · ${preview.columns.length} columns · ${preview.total_rows} rows`
-                              : 'No previewable tables are available for this data source.'}
-                          </span>
-                          {isPreviewLoading && (
-                            <span className="data-source-preview-loading-inline">
-                              <div className="data-source-spinner is-small" />
-                              <span>Refreshing</span>
-                            </span>
-                          )}
-                        </div>
-                        <span className="data-source-preview-page-badge">
-                          {preview.page_size} rows / page
-                        </span>
-                      </div>
-
-                      {preview.tables.length > 1 && (
-                        <div className="data-source-preview-tabs">
-                          {preview.tables.map((table) => (
-                            <button
-                              key={table.name}
-                              type="button"
-                              className={`data-source-preview-tab ${preview.table === table.name ? 'is-active' : ''}`}
-                              onClick={() => void changePreviewTable(ds, table.name)}
-                              disabled={isPreviewLoading && preview.table === table.name}
-                            >
-                              {table.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {preview.table && preview.columns.length > 0 ? (
-                        <>
-                          <div className="data-source-preview-table-shell">
-                            <table className="data-source-preview-table">
-                              <thead>
-                                <tr>
-                                  {preview.columns.map((column) => (
-                                    <th key={column.name}>
-                                      <div className="data-source-preview-col">
-                                        <span className="data-source-preview-col-name">{column.name}</span>
-                                        {column.type && (
-                                          <span className="data-source-preview-col-type">{column.type}</span>
-                                        )}
-                                      </div>
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {preview.rows.length > 0 ? (
-                                  preview.rows.map((row, rowIndex) => (
-                                    <tr key={`${preview.table || 'preview'}-${preview.page}-${rowIndex}`}>
-                                      {preview.columns.map((column) => {
-                                        const cell = formatPreviewCell(row[column.name])
-                                        return (
-                                          <td key={`${column.name}-${rowIndex}`} title={cell}>
-                                            <span className="data-source-preview-cell">{cell}</span>
-                                          </td>
-                                        )
-                                      })}
-                                    </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td colSpan={preview.columns.length} className="data-source-preview-empty-row">
-                                      No data on this page
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                          <div className="data-source-preview-footer">
-                            <span className="data-source-subpanel-note">
-                              Rows {getPreviewRangeLabel(preview)}
-                            </span>
-                            <div className="data-source-preview-pagination">
-                              <button
-                                type="button"
-                                className="data-source-preview-page-btn"
-                                onClick={() => void changePreviewPage(ds, preview.page - 1)}
-                                disabled={isPreviewLoading || preview.page <= 1}
-                              >
-                                Previous
-                              </button>
-                              <span className="data-source-preview-page-text">
-                                Page {preview.total_pages === 0 ? 0 : preview.page} of {preview.total_pages || 0}
-                              </span>
-                              <button
-                                type="button"
-                                className="data-source-preview-page-btn"
-                                onClick={() => void changePreviewPage(ds, preview.page + 1)}
-                                disabled={isPreviewLoading || preview.total_pages === 0 || preview.page >= preview.total_pages}
-                              >
-                                Next
-                              </button>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="data-source-preview-state is-empty">
-                          <span>No previewable data is available for this data source.</span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="data-source-preview-state is-empty">
-                      <span>Click the preview button to inspect the data.</span>
-                    </div>
-                  )}
-                </div>
+                <DataSourcePreviewPanel
+                  datasource={ds}
+                  preview={preview}
+                  isLoading={isPreviewLoading}
+                  onChangeTable={(table) => {
+                    void changePreviewTable(ds, table)
+                  }}
+                  onChangePage={(nextPage) => {
+                    void changePreviewPage(ds, nextPage)
+                  }}
+                />
               )}
             </div>
           )
