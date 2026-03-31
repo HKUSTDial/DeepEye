@@ -56,4 +56,7 @@ async def write_datasource_sync_manifest(
     manifest: dict[str, dict[str, Any]],
 ) -> None:
     payload = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
-    await sandbox.write_text_file(DATASOURCE_SYNC_MANIFEST_PATH, payload)
+    if hasattr(sandbox, "write_text_file"):
+        await sandbox.write_text_file(DATASOURCE_SYNC_MANIFEST_PATH, payload)
+        return
+    await sandbox.write_file(DATASOURCE_SYNC_MANIFEST_PATH, payload.encode("utf-8"))

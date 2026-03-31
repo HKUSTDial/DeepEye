@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.sandbox.activity import ActivityTracker
 from app.sandbox.cleanup import cleanup_idle_session, collect_cleanup_sessions
 from app.sandbox.datasource_sync import (
+    DATASOURCE_SYNC_MANIFEST_PATH,
     build_datasource_manifest_entry,
     is_datasource_sync_current,
     load_datasource_sync_manifest,
@@ -34,6 +35,9 @@ from app.services.minio_service import download_bytes
 
 def _get_datasource_filename(ds) -> str:
     return get_datasource_filename(getattr(ds, "name", None), getattr(ds, "storage_path", None))
+
+
+_DATASOURCE_SYNC_MANIFEST_PATH = DATASOURCE_SYNC_MANIFEST_PATH
 
 
 class SandboxManager:
