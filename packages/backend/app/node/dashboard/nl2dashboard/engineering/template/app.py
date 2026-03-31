@@ -2,6 +2,7 @@ import json
 import os
 import importlib.util
 import math
+from datetime import date, datetime
 import numpy as np
 from typing import Any, Dict, List, Optional
 import pandas as pd
@@ -194,20 +195,54 @@ def apply_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
         op, val = cond.get("operator"), cond.get("value")
         if val is None or val == "All": continue
         try:
+            column = filtered[field]
+            sample = next((item for item in column.tolist() if pd.notna(item)), None)
+
+            def coerce_scalar(raw):
+                if raw is None:
+                    return None
+                if pd.api.types.is_datetime64_any_dtype(column) or isinstance(sample, (pd.Timestamp, datetime, date)):
+                    converted = pd.to_datetime(raw, errors="coerce")
+                    return None if pd.isna(converted) else converted
+                if pd.api.types.is_bool_dtype(column) or isinstance(sample, bool):
+                    if isinstance(raw, str):
+                        normalized = raw.strip().lower()
+                        if normalized in {"true", "1", "yes"}:
+                            return True
+                        if normalized in {"false", "0", "no"}:
+                            return False
+                    return raw
+                if pd.api.types.is_numeric_dtype(column) or (
+                    isinstance(sample, (int, float, np.integer, np.floating)) and not isinstance(sample, bool)
+                ):
+                    converted = pd.to_numeric([raw], errors="coerce")[0]
+                    if pd.isna(converted):
+                        return raw
+                    return converted.item() if hasattr(converted, "item") else converted
+                return raw
+
             # Scalar equality filter
             if op == "equals" or not isinstance(val, (list, tuple)):
-                filtered = filtered[filtered[field] == val]
+                coerced = coerce_scalar(val)
+                series = filtered[field]
+                if isinstance(coerced, pd.Timestamp):
+                    series = pd.to_datetime(series, errors="coerce")
+                filtered = filtered[series == coerced]
             # Multi-select: equivalent to in
             elif op in ("in", "one_of") and isinstance(val, (list, tuple)):
-                filtered = filtered[filtered[field].isin(val)]
+                coerced_values = [coerce_scalar(item) for item in val]
+                series = filtered[field]
+                if any(isinstance(item, pd.Timestamp) for item in coerced_values):
+                    series = pd.to_datetime(series, errors="coerce")
+                filtered = filtered[series.isin(coerced_values)]
             # Range: between
             elif op == "between" and isinstance(val, (list, tuple)) and len(val) == 2:
-                v1, v2 = val[0], val[1]
-                # If it's a date column, try to convert to datetime before comparison
-                if "date" in field or "time" in field:
-                    v1 = pd.to_datetime(v1, errors="coerce")
-                    v2 = pd.to_datetime(v2, errors="coerce")
-                filtered = filtered[(filtered[field] >= v1) & (filtered[field] <= v2)]
+                v1 = coerce_scalar(val[0])
+                v2 = coerce_scalar(val[1])
+                series = filtered[field]
+                if isinstance(v1, pd.Timestamp) or isinstance(v2, pd.Timestamp):
+                    series = pd.to_datetime(series, errors="coerce")
+                filtered = filtered[(series >= v1) & (series <= v2)]
         except Exception as e:
             # Skip this filter condition on error to avoid crashing the entire table
             print(f"[apply_filters] skip filter on {field} due to error: {e}")

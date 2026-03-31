@@ -16,7 +16,10 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 from app.core.config import settings
 from app.services import dashboard_deploy_service as dashboard_module
 from app.services.dashboard_deploy_service import (
+    _DASHBOARD_IMAGE_SOURCE_HASH_LABEL,
+    _compute_file_sha256,
     _dashboard_container_environment,
+    _dashboard_image_source_hash,
     _resolve_dashboard_cors_origins,
 )
 
@@ -91,3 +94,104 @@ async def test_remote_dashboard_deploy_uploads_source_archive(monkeypatch, tmp_p
 
     assert "app.py" in names
     assert "public/charts/chart.html" in names
+
+
+def test_dashboard_image_source_hash_reads_image_label() -> None:
+    image = type(
+        "FakeImage",
+        (),
+        {
+            "attrs": {
+                "Config": {
+                    "Labels": {
+                        _DASHBOARD_IMAGE_SOURCE_HASH_LABEL: "abc123",
+                    }
+                }
+            }
+        },
+    )()
+
+    assert _dashboard_image_source_hash(image) == "abc123"
+
+
+def test_ensure_dashboard_image_rebuilds_when_dockerfile_hash_changes(monkeypatch, tmp_path: Path) -> None:
+    dockerfile_path = tmp_path / "Dockerfile.dashboard"
+    dockerfile_path.write_text("FROM python:3.11-slim\nRUN pip install websockets\n", encoding="utf-8")
+    expected_hash = _compute_file_sha256(dockerfile_path)
+
+    class _FakeImages:
+        def __init__(self) -> None:
+            self.build_calls: list[dict[str, object]] = []
+            self.image = type("FakeImage", (), {"attrs": {"Config": {"Labels": {}}}})()
+
+        def get(self, tag: str):
+            assert tag == settings.DASHBOARD_IMAGE
+            return self.image
+
+        def build(self, **kwargs):
+            self.build_calls.append(kwargs)
+            return (object(), [])
+
+    fake_images = _FakeImages()
+    service = dashboard_module.DashboardDeployService()
+    service.docker_client = type("FakeDockerClient", (), {"images": fake_images})()
+
+    monkeypatch.setattr(settings, "DASHBOARD_AUTO_BUILD", True)
+    monkeypatch.setattr(
+        dashboard_module,
+        "_resolve_dashboard_build_target",
+        lambda: (str(tmp_path), dockerfile_path.name, dockerfile_path),
+    )
+
+    service._ensure_dashboard_image()
+
+    assert len(fake_images.build_calls) == 1
+    assert fake_images.build_calls[0]["labels"] == {
+        _DASHBOARD_IMAGE_SOURCE_HASH_LABEL: expected_hash,
+    }
+
+
+def test_ensure_dashboard_image_skips_rebuild_for_matching_hash(monkeypatch, tmp_path: Path) -> None:
+    dockerfile_path = tmp_path / "Dockerfile.dashboard"
+    dockerfile_path.write_text("FROM python:3.11-slim\nRUN pip install websockets\n", encoding="utf-8")
+    expected_hash = _compute_file_sha256(dockerfile_path)
+
+    class _FakeImages:
+        def __init__(self) -> None:
+            self.build_calls: list[dict[str, object]] = []
+            self.image = type(
+                "FakeImage",
+                (),
+                {
+                    "attrs": {
+                        "Config": {
+                            "Labels": {
+                                _DASHBOARD_IMAGE_SOURCE_HASH_LABEL: expected_hash,
+                            }
+                        }
+                    }
+                },
+            )()
+
+        def get(self, tag: str):
+            assert tag == settings.DASHBOARD_IMAGE
+            return self.image
+
+        def build(self, **kwargs):
+            self.build_calls.append(kwargs)
+            return (object(), [])
+
+    fake_images = _FakeImages()
+    service = dashboard_module.DashboardDeployService()
+    service.docker_client = type("FakeDockerClient", (), {"images": fake_images})()
+
+    monkeypatch.setattr(settings, "DASHBOARD_AUTO_BUILD", True)
+    monkeypatch.setattr(
+        dashboard_module,
+        "_resolve_dashboard_build_target",
+        lambda: (str(tmp_path), dockerfile_path.name, dockerfile_path),
+    )
+
+    service._ensure_dashboard_image()
+
+    assert fake_images.build_calls == []

@@ -1,10 +1,12 @@
 import asyncio
+import hashlib
 import io
 import json
 import os
 import socket
 import tarfile
 import time
+from pathlib import Path
 from typing import Dict
 
 import docker
@@ -22,6 +24,7 @@ _DASHBOARD_CORS_FALLBACK_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+_DASHBOARD_IMAGE_SOURCE_HASH_LABEL = "deepeye.dashboard.dockerfile_sha256"
 
 
 def _resolve_dashboard_cors_origins() -> list[str]:
@@ -40,6 +43,28 @@ def _dashboard_container_environment() -> dict[str, str]:
     return {
         "BACKEND_CORS_ORIGINS": json.dumps(_resolve_dashboard_cors_origins()),
     }
+
+
+def _compute_file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _resolve_dashboard_build_target() -> tuple[str, str, Path]:
+    build_context, dockerfile_name, dockerfile_path = resolve_docker_build_target(
+        dockerfile_setting=settings.DASHBOARD_DOCKERFILE,
+        default_context_root=settings.SANDBOX_BUILD_CONTEXT,
+        anchor_file=__file__,
+    )
+    if not dockerfile_path.exists():
+        raise RuntimeError(f"Dashboard Dockerfile not found: {dockerfile_path}")
+    return build_context, dockerfile_name, dockerfile_path
+
+
+def _dashboard_image_source_hash(image) -> str | None:
+    attrs = getattr(image, "attrs", {}) or {}
+    config = attrs.get("Config", {}) or {}
+    labels = config.get("Labels", {}) or {}
+    return labels.get(_DASHBOARD_IMAGE_SOURCE_HASH_LABEL)
 
 
 class DashboardDeployService:
@@ -233,10 +258,24 @@ class DashboardDeployService:
         return fallback_network
 
     def _ensure_dashboard_image(self) -> None:
+        build_context, dockerfile_name, dockerfile_path = _resolve_dashboard_build_target()
+        expected_source_hash = _compute_file_sha256(dockerfile_path)
         try:
-            self.docker_client.images.get(settings.DASHBOARD_IMAGE)
-            logger.info("[DashboardDeployService] Using image: %s", settings.DASHBOARD_IMAGE)
-            return
+            image = self.docker_client.images.get(settings.DASHBOARD_IMAGE)
+            current_source_hash = _dashboard_image_source_hash(image)
+            if current_source_hash == expected_source_hash:
+                logger.info("[DashboardDeployService] Using image: %s", settings.DASHBOARD_IMAGE)
+                return
+            if not settings.DASHBOARD_AUTO_BUILD:
+                raise RuntimeError(
+                    f"Dashboard image '{settings.DASHBOARD_IMAGE}' is outdated and DASHBOARD_AUTO_BUILD is disabled"
+                )
+            logger.info(
+                "[DashboardDeployService] Rebuilding image %s due to Dockerfile change (current=%s expected=%s)",
+                settings.DASHBOARD_IMAGE,
+                current_source_hash or "missing",
+                expected_source_hash,
+            )
         except ImageNotFound:
             if not settings.DASHBOARD_AUTO_BUILD:
                 raise RuntimeError(
@@ -245,16 +284,21 @@ class DashboardDeployService:
         except Exception as e:
             raise RuntimeError(f"Failed to inspect dashboard image '{settings.DASHBOARD_IMAGE}': {e}")
 
-        self._build_dashboard_image()
-
-    def _build_dashboard_image(self) -> None:
-        build_context, dockerfile_name, dockerfile_path = resolve_docker_build_target(
-            dockerfile_setting=settings.DASHBOARD_DOCKERFILE,
-            default_context_root=settings.SANDBOX_BUILD_CONTEXT,
-            anchor_file=__file__,
+        self._build_dashboard_image(
+            build_context=build_context,
+            dockerfile_name=dockerfile_name,
+            dockerfile_path=dockerfile_path,
+            expected_source_hash=expected_source_hash,
         )
-        if not dockerfile_path.exists():
-            raise RuntimeError(f"Dashboard Dockerfile not found: {dockerfile_path}")
+
+    def _build_dashboard_image(
+        self,
+        *,
+        build_context: str,
+        dockerfile_name: str,
+        dockerfile_path: Path,
+        expected_source_hash: str,
+    ) -> None:
         logger.info(
             "[DashboardDeployService] Building image %s from %s (context=%s)",
             settings.DASHBOARD_IMAGE,
@@ -266,6 +310,7 @@ class DashboardDeployService:
                 path=build_context,
                 dockerfile=dockerfile_name,
                 tag=settings.DASHBOARD_IMAGE,
+                labels={_DASHBOARD_IMAGE_SOURCE_HASH_LABEL: expected_source_hash},
                 rm=True,
             )
             logger.info("[DashboardDeployService] Built image: %s", settings.DASHBOARD_IMAGE)

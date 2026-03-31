@@ -87,6 +87,7 @@ const App = {
     charts: {},
     socket: null,
     config: null,
+    activeFilters: {},
 
     init: async function() {
         console.log("🚀 App Initializing...");
@@ -700,22 +701,17 @@ const App = {
   },
 
     sendFilter: function(field, val, op = 'equals') {
-        if(this.socket && this.socket.readyState === WebSocket.OPEN) {
-            // Handle "All" case
-            if (val === 'All' || (Array.isArray(val) && val.length === 0)) val = null;
-            
-            // Build Filter object
-            const filterObj = {};
-            if (val !== null) {
-                filterObj[field] = { operator: op, value: val };
-            } else {
-                // Send null value to clear filter
-                filterObj[field] = { operator: op, value: null };
-            }
+        if (val === 'All' || (Array.isArray(val) && val.length === 0)) val = null;
+        if (val === null) {
+            delete this.activeFilters[field];
+        } else {
+            this.activeFilters[field] = { operator: op, value: val };
+        }
 
+        if(this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify({
                 type: 'filter',
-                filters: filterObj
+                filters: this.activeFilters
             }));
         }
     },
@@ -724,6 +720,14 @@ const App = {
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
         const wsPath = location.pathname.endsWith('/') ? location.pathname + 'ws' : location.pathname + '/ws';
         this.socket = new WebSocket(`${proto}://${location.host}${wsPath}`);
+        this.socket.onopen = () => {
+            if (Object.keys(this.activeFilters).length > 0) {
+                this.socket.send(JSON.stringify({
+                    type: 'filter',
+                    filters: this.activeFilters
+                }));
+            }
+        };
         this.socket.onmessage = (e) => {
             try {
                 const msg = JSON.parse(e.data);
