@@ -1,12 +1,24 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Settings, AlertCircle, PlayCircle, CheckCircle2 } from 'lucide-react'
-import { useWorkflowStore } from '../../stores/workflow'
-import type { NodeDef } from '../../stores/workflowNodes'
-import { useShallow } from 'zustand/react/shallow'
-import type { Node as ReactFlowNode } from 'reactflow'
 import type { DataSource, WorkflowRun } from '../../types'
 import { datasourceApi } from '../../api/datasource'
+import type { Node as ReactFlowNode } from 'reactflow'
+import { useShallow } from 'zustand/react/shallow'
+import { useWorkflowStore } from '../../stores/workflow'
+import type { NodeDef } from '../../stores/workflowNodes'
+import { WorkflowInspectorOutputView } from './WorkflowInspectorOutput'
+import {
+  asObjectRecord,
+  formatDatasourceOptionLabel,
+  getDatasourceCategoryForNodeType,
+  getDatasourcePlaceholder,
+  getEmptyDatasourceMessage,
+  getStatusClass,
+  isMultilineParam,
+  stringifyParams,
+  type OutputRecord,
+} from './workflowInspectorUtils'
 
 interface WorkflowInspectorProps {
   selectedNodeId: string | null
@@ -15,123 +27,6 @@ interface WorkflowInspectorProps {
   nodes?: ReactFlowNode[]
   activeRun?: WorkflowRun | null
   runOutput?: string
-}
-
-type OutputRecord = Record<string, unknown>
-type DatasetRefOutput = OutputRecord & {
-  kind?: string
-  path?: string
-  format?: string
-  name?: string
-  source?: string
-  row_count?: number
-  columns?: unknown
-  preview_rows?: unknown
-}
-
-function stringifyParams(params: Record<string, unknown>): Record<string, string> {
-  return Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
-}
-
-function asObjectRecord(value: unknown): OutputRecord | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as OutputRecord) : null
-}
-
-function asObjectArray(value: unknown): OutputRecord[] | null {
-  if (!Array.isArray(value) || value.length === 0) {
-    return null
-  }
-  return value.every((item) => item && typeof item === 'object' && !Array.isArray(item)) ? (value as OutputRecord[]) : null
-}
-
-function isDatasetRefOutput(value: unknown): value is DatasetRefOutput {
-  const record = asObjectRecord(value)
-  return !!record && record.kind === 'dataset_ref' && typeof record.path === 'string'
-}
-
-function formatOutputLabel(key: string): string {
-  return key
-    .replace(/[_.-]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-}
-
-function formatScalarValue(value: unknown): string {
-  if (value == null) return 'N/A'
-  if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return JSON.stringify(value, null, 2)
-}
-
-function formatDatasetMetaValue(value: unknown): string | null {
-  if (typeof value === 'number') return `${value}`
-  if (typeof value === 'string' && value.trim()) return value
-  return null
-}
-
-function getDatasetPreviewRows(datasetRef: DatasetRefOutput): OutputRecord[] {
-  const rows = asObjectArray(datasetRef.preview_rows)
-  return rows ? rows.slice(0, 8) : []
-}
-
-function getPreviewColumns(rows: OutputRecord[]): string[] {
-  const seen = new Set<string>()
-  const columns: string[] = []
-  rows.forEach((row) => {
-    Object.keys(row).forEach((column) => {
-      if (!seen.has(column)) {
-        seen.add(column)
-        columns.push(column)
-      }
-    })
-  })
-  return columns.slice(0, 8)
-}
-
-function getDatasourceCategoryForNodeType(nodeType: string | undefined): DataSource['category'] | null {
-  switch (nodeType) {
-    case 'datasource.read':
-      return 'file'
-    case 'sql.execute':
-      return 'database'
-    default:
-      return null
-  }
-}
-
-function getDatasourcePlaceholder(category: DataSource['category'] | null): string {
-  if (category === 'file') {
-    return 'Select a file datasource'
-  }
-  if (category === 'database') {
-    return 'Select a database datasource'
-  }
-  return 'Select a datasource'
-}
-
-function getEmptyDatasourceMessage(category: DataSource['category'] | null): string {
-  if (category === 'file') {
-    return 'No file datasources yet. Add one from Chat with the + button, then refresh here.'
-  }
-  if (category === 'database') {
-    return 'No database datasources yet. Add one from Chat with the + button, then refresh here.'
-  }
-  return 'No datasources yet. Add one from Chat with the + button, then refresh here.'
-}
-
-function formatDatasourceOptionLabel(datasource: DataSource): string {
-  const compactName = datasource.name.length > 28 ? `${datasource.name.slice(0, 27)}...` : datasource.name
-  return `${compactName} · ${datasource.category === 'file' ? 'FILE' : 'DB'}`
-}
-
-function isMultilineParam(nodeType: string | undefined, key: string): boolean {
-  if (!nodeType) return false
-  if (nodeType === 'python.code' && key === 'code') return true
-  if (nodeType === 'sql.execute' && key === 'query') return true
-  if (key === 'question') return true
-  if (key === 'prompt') return true
-  if (key === 'system_prompt') return true
-  if (key === 'user_prompt') return true
-  return false
 }
 
 export function WorkflowInspector({
@@ -601,161 +496,4 @@ export function WorkflowInspector({
       </div>
     </motion.aside>
   )
-}
-
-function WorkflowInspectorOutputView({ output, rawOutput }: { output: OutputRecord; rawOutput: string }) {
-  const entries = Object.entries(output).filter(([key]) => key !== 'status')
-  const hasFriendlySections = entries.length > 0
-
-  return (
-    <div className="workflow-inspector-output-stack">
-      {hasFriendlySections ? (
-        entries.map(([key, value]) => (
-          <WorkflowInspectorOutputSection key={key} label={formatOutputLabel(key)} value={value} />
-        ))
-      ) : (
-        <div className="workflow-inspector-output-empty">This node completed without a material output payload.</div>
-      )}
-
-      <details className="workflow-inspector-output-raw">
-        <summary>Raw JSON</summary>
-        <pre className="workflow-inspector-output-content">{rawOutput}</pre>
-      </details>
-    </div>
-  )
-}
-
-function WorkflowInspectorOutputSection({ label, value }: { label: string; value: unknown }) {
-  if (isDatasetRefOutput(value)) {
-    const previewRows = getDatasetPreviewRows(value)
-    const previewColumns = getPreviewColumns(previewRows)
-    const datasetColumns = Array.isArray(value.columns)
-      ? value.columns.filter((column): column is string => typeof column === 'string').slice(0, 8)
-      : []
-
-    return (
-      <div className="workflow-inspector-output-card">
-        <div className="workflow-inspector-output-card-title">{label}</div>
-
-        <div className="workflow-inspector-output-metrics">
-          {[
-            ['Rows', formatDatasetMetaValue(value.row_count)],
-            ['Format', formatDatasetMetaValue(value.format)?.toUpperCase() ?? null],
-            ['Source', formatDatasetMetaValue(value.source)],
-            ['Name', formatDatasetMetaValue(value.name)],
-          ]
-            .filter(([, metricValue]) => !!metricValue)
-            .map(([metricLabel, metricValue]) => (
-              <div key={metricLabel} className="workflow-inspector-output-metric">
-                <span className="workflow-inspector-output-metric-label">{metricLabel}</span>
-                <span className="workflow-inspector-output-metric-value">{metricValue}</span>
-              </div>
-            ))}
-        </div>
-
-        {datasetColumns.length > 0 && (
-          <div className="workflow-inspector-output-chip-list">
-            {datasetColumns.map((column) => (
-              <span key={column} className="workflow-inspector-output-chip">
-                {column}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {previewRows.length > 0 && previewColumns.length > 0 && (
-          <div className="workflow-inspector-output-table-shell">
-            <table className="workflow-inspector-output-table">
-              <thead>
-                <tr>
-                  {previewColumns.map((column) => (
-                    <th key={column}>{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {previewRows.map((row, index) => (
-                  <tr key={`${label}-${index}`}>
-                    {previewColumns.map((column) => (
-                      <td key={`${index}-${column}`}>{formatScalarValue(row[column])}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const rows = asObjectArray(value)
-  if (rows) {
-    const previewColumns = getPreviewColumns(rows.slice(0, 8))
-    return (
-      <div className="workflow-inspector-output-card">
-        <div className="workflow-inspector-output-card-title">{label}</div>
-        <div className="workflow-inspector-output-table-shell">
-          <table className="workflow-inspector-output-table">
-            <thead>
-              <tr>
-                {previewColumns.map((column) => (
-                  <th key={column}>{column}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(0, 8).map((row, index) => (
-                <tr key={`${label}-${index}`}>
-                  {previewColumns.map((column) => (
-                    <td key={`${index}-${column}`}>{formatScalarValue(row[column])}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
-
-  const objectValue = asObjectRecord(value)
-  if (objectValue) {
-    return (
-      <div className="workflow-inspector-output-card">
-        <div className="workflow-inspector-output-card-title">{label}</div>
-        <div className="workflow-inspector-output-kv">
-          {Object.entries(objectValue).map(([entryKey, entryValue]) => (
-            <div key={entryKey} className="workflow-inspector-output-kv-row">
-              <span className="workflow-inspector-output-kv-key">{formatOutputLabel(entryKey)}</span>
-              <span className="workflow-inspector-output-kv-value">{formatScalarValue(entryValue)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="workflow-inspector-output-card">
-      <div className="workflow-inspector-output-card-title">{label}</div>
-      <div className="workflow-inspector-output-text">{formatScalarValue(value)}</div>
-    </div>
-  )
-}
-
-function getStatusClass(status: string): string {
-  switch (status) {
-    case 'running':
-      return 'running'
-    case 'success':
-    case 'completed':
-      return 'success'
-    case 'failed':
-      return 'failed'
-    case 'pending':
-      return 'pending'
-    default:
-      return ''
-  }
 }
