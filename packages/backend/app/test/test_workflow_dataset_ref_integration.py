@@ -335,11 +335,12 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
                 (va_app / "index.html").write_text("<html>dashboard</html>")
                 return str(va_app)
 
-        async def _fake_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None):
+        async def _fake_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None, session_id=None):
             assert task_id == "dashboard"
             assert local_va_app_path is not None
             assert Path(local_va_app_path).name == "va_app"
             assert source_archive_bytes is None
+            assert session_id == sandbox.session_id
             return {
                 "status": "running",
                 "url": f"/dashboards/deepeye-nl2dashboard-{task_id}/",
@@ -399,10 +400,11 @@ def test_dashboard_handler_emits_failure_without_ready_when_deploy_fails(monkeyp
                 (va_app / "index.html").write_text("<html>dashboard</html>")
                 return str(va_app)
 
-        async def _failing_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None):
+        async def _failing_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None, session_id=None):
             assert task_id == "dashboard"
             assert local_va_app_path is not None
             assert source_archive_bytes is None
+            assert session_id == sandbox.session_id
             return {
                 "status": "error",
                 "url": f"/dashboards/deepeye-nl2dashboard-{task_id}/",

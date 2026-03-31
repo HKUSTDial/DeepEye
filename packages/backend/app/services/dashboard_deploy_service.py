@@ -84,6 +84,7 @@ class DashboardDeployService:
         task_id: str,
         local_va_app_path: str | None = None,
         source_archive_bytes: bytes | None = None,
+        session_id: str | None = None,
     ) -> Dict:
         """
         Deploy a Dashboard to an independent container.
@@ -111,6 +112,7 @@ class DashboardDeployService:
                 result = await self._control_client.deploy_dashboard_preview(
                     task_id=task_id,
                     source_archive_bytes=source_archive_bytes,
+                    session_id=session_id,
                 )
                 runtime_metrics.increment(
                     "preview.deploy.count",
@@ -166,7 +168,11 @@ class DashboardDeployService:
             command=start_cmd,
             environment=_dashboard_container_environment(),
             labels={
-                **preview_container_labels(preview_kind="dashboard", task_id=task_id),
+                **preview_container_labels(
+                    preview_kind="dashboard",
+                    task_id=task_id,
+                    session_id=session_id,
+                ),
                 "type": "dashboard-instance",
             },
             network=network_name,

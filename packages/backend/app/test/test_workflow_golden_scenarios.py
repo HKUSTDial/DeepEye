@@ -319,11 +319,12 @@ def test_golden_sql_to_dashboard_workflow(tmp_path, monkeypatch) -> None:
                 (va_app / "index.html").write_text("<html>dashboard</html>")
                 return str(va_app)
 
-        async def _fake_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None):
+        async def _fake_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None, session_id=None):
             assert task_id == "dashboard"
             assert local_va_app_path is not None
             assert Path(local_va_app_path).name == "va_app"
             assert source_archive_bytes is None
+            assert session_id == sandbox.session_id
             return {
                 "status": "running",
                 "url": f"/dashboards/deepeye-nl2dashboard-{task_id}/",

@@ -27,6 +27,7 @@ from app.schemas import (
     WorkflowQueuedRunResponse,
 )
 from app.sandbox import sandbox_manager
+from app.services.preview_runtime_manager import preview_runtime_manager
 from app.services import attach_datasource_to_session, detach_datasource_from_session, list_session_attachments
 from app.services.workflow_file_service import (
     prepare_tracked_workflow_draft_run,
@@ -35,6 +36,7 @@ from app.services.workflow_file_service import (
 from app.services.workflow_targets import save_workflow_draft
 from app.services.workflow_tracking_service import build_workspace_state
 from app.tasks.workflow_tasks import run_workflow_draft_task
+from deepeye.utils.logger import logger
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -54,6 +56,17 @@ def _get_owned_session_or_404(db: Session, session_id: uuid.UUID, user_id: uuid.
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+async def _cleanup_session_runtime_resources(session_id: str) -> None:
+    tasks = (
+        sandbox_manager.destroy_session(session_id, delete_data=True),
+        preview_runtime_manager.cleanup_session_previews(session_id),
+    )
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Failed to cleanup runtime resources for session %s: %s", session_id, result)
 
 
 @router.post("", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
@@ -118,7 +131,7 @@ async def delete_session(
     SessionAttachmentRepository(db).detach_all_for_session(session_id)
     repo.delete(session_id)
     try:
-        asyncio.create_task(sandbox_manager.destroy_session(str(session_id), delete_data=True))
+        asyncio.create_task(_cleanup_session_runtime_resources(str(session_id)))
     except Exception:
         pass
 

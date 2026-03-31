@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.sandbox import sandbox_manager
 from app.services.dashboard_deploy_service import dashboard_deployer
+from app.services.preview_runtime_manager import preview_runtime_manager
 from app.services.video_deploy_service import video_deployer
 
 
@@ -100,6 +101,7 @@ class DashboardDeployRequest(BaseModel):
     task_id: str
     local_va_app_path: str | None = None
     source_archive_base64: str | None = None
+    session_id: str | None = None
 
 
 router_dependencies = [Depends(require_internal_api_key)]
@@ -109,9 +111,13 @@ router_dependencies = [Depends(require_internal_api_key)]
 async def lifespan(_: FastAPI):
     if settings.SANDBOX_CLEANUP_ENABLED:
         sandbox_manager.start_cleanup_task()
+    if settings.PREVIEW_RUNTIME_CLEANUP_ENABLED:
+        preview_runtime_manager.start_cleanup_task()
     yield
     if settings.SANDBOX_CLEANUP_ENABLED:
         await sandbox_manager.stop_cleanup_task()
+    if settings.PREVIEW_RUNTIME_CLEANUP_ENABLED:
+        await preview_runtime_manager.stop_cleanup_task()
 
 
 app = FastAPI(title="DeepEye Runtime Control", version="0.1.0", lifespan=lifespan)
@@ -268,6 +274,18 @@ async def deploy_video_preview(payload: VideoDeployRequest) -> dict[str, Any]:
     return await video_deployer.deploy(task_id=payload.task_id, session_id=payload.session_id)
 
 
+@app.post("/internal/runtime-control/previews/cleanup/session/{session_id}", dependencies=router_dependencies)
+async def cleanup_session_previews(session_id: str) -> dict[str, str]:
+    await preview_runtime_manager.cleanup_session_previews(session_id)
+    return {"status": "ok"}
+
+
+@app.post("/internal/runtime-control/previews/cleanup/all", dependencies=router_dependencies)
+async def cleanup_all_previews() -> dict[str, str]:
+    await preview_runtime_manager.cleanup_all_previews()
+    return {"status": "ok"}
+
+
 @app.post("/internal/runtime-control/previews/dashboard/deploy", dependencies=router_dependencies)
 async def deploy_dashboard_preview(payload: DashboardDeployRequest) -> dict[str, Any]:
     source_archive_bytes: bytes | None = None
@@ -285,4 +303,5 @@ async def deploy_dashboard_preview(payload: DashboardDeployRequest) -> dict[str,
         task_id=payload.task_id,
         local_va_app_path=payload.local_va_app_path,
         source_archive_bytes=source_archive_bytes,
+        session_id=payload.session_id,
     )

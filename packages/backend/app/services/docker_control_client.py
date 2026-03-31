@@ -165,6 +165,15 @@ class DockerControlClient:
     def cleanup_all_sandboxes_sync(self) -> dict[str, Any]:
         return self._request("POST", "/internal/runtime-control/sandbox/cleanup/all")
 
+    async def cleanup_session_previews(self, session_id: str) -> dict[str, Any]:
+        return await self._async_request(
+            "POST",
+            f"/internal/runtime-control/previews/cleanup/session/{session_id}",
+        )
+
+    async def cleanup_all_previews(self) -> dict[str, Any]:
+        return await self._async_request("POST", "/internal/runtime-control/previews/cleanup/all")
+
     def container_state(self, session_id: str) -> dict[str, Any]:
         return self._request("GET", f"/internal/runtime-control/sandbox/sessions/{session_id}/container")
 
@@ -210,13 +219,20 @@ class DockerControlClient:
             json={"task_id": task_id, "session_id": session_id},
         )
 
-    async def deploy_dashboard_preview(self, *, task_id: str, source_archive_bytes: bytes) -> dict[str, Any]:
+    async def deploy_dashboard_preview(
+        self,
+        *,
+        task_id: str,
+        source_archive_bytes: bytes,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
         return await self._async_request(
             "POST",
             "/internal/runtime-control/previews/dashboard/deploy",
             json={
                 "task_id": task_id,
                 "source_archive_base64": base64.b64encode(source_archive_bytes).decode("ascii"),
+                "session_id": session_id,
             },
         )
 

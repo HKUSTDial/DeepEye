@@ -323,7 +323,11 @@ class NL2DashboardHandler:
             try:
                 asyncio.set_event_loop(deploy_loop)
                 deploy_result = deploy_loop.run_until_complete(
-                    dashboard_deployer.deploy(safe_id, va_source_path)
+                    dashboard_deployer.deploy(
+                        safe_id,
+                        va_source_path,
+                        session_id=getattr(self.sandbox, "session_id", None),
+                    )
                 )
             finally:
                 asyncio.set_event_loop(None)

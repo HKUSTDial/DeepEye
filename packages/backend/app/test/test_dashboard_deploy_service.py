@@ -58,11 +58,18 @@ class _FakeControlClient:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
 
-    async def deploy_dashboard_preview(self, *, task_id: str, source_archive_bytes: bytes) -> dict[str, object]:
+    async def deploy_dashboard_preview(
+        self,
+        *,
+        task_id: str,
+        source_archive_bytes: bytes,
+        session_id: str | None = None,
+    ) -> dict[str, object]:
         self.calls.append(
             {
                 "task_id": task_id,
                 "source_archive_bytes": source_archive_bytes,
+                "session_id": session_id,
             }
         )
         return {"status": "running", "url": f"/dashboards/{task_id}/"}
@@ -86,6 +93,7 @@ async def test_remote_dashboard_deploy_uploads_source_archive(monkeypatch, tmp_p
     assert len(fake_control_client.calls) == 1
     payload = fake_control_client.calls[0]
     assert payload["task_id"] == "task-1"
+    assert payload["session_id"] is None
 
     archive_bytes = payload["source_archive_bytes"]
     assert isinstance(archive_bytes, bytes)
