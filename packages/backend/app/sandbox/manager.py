@@ -1,7 +1,6 @@
 """Sandbox Manager - Manage sandbox lifecycle with persistence"""
 
 import asyncio
-import json
 import shlex
 from collections import defaultdict
 from typing import Any, Dict, List
@@ -11,10 +10,23 @@ from docker.errors import NotFound
 
 from deepeye.sandbox import CommandResult
 from deepeye.utils.logger import logger
-from app.sandbox.docker_sandbox import DockerSandbox
-from app.sandbox.factory import create_sandbox
-from app.sandbox.activity import ActivityTracker
 from app.core.config import settings
+from app.sandbox.activity import ActivityTracker
+from app.sandbox.cleanup import cleanup_idle_session, collect_cleanup_sessions
+from app.sandbox.datasource_sync import (
+    build_datasource_manifest_entry,
+    is_datasource_sync_current,
+    load_datasource_sync_manifest,
+    write_datasource_sync_manifest,
+)
+from app.sandbox.docker_sandbox import DockerSandbox
+from app.sandbox.docker_discovery import (
+    find_containers_by_session,
+    list_all_volumes,
+    reconnect_to_container,
+)
+from app.sandbox.factory import create_sandbox
+from app.sandbox.session_status import build_manager_stats, build_session_status
 from app.services.docker_control_client import get_docker_control_client
 from app.services.datasource_specs import get_datasource_filename, workspace_data_path
 from app.services.minio_service import download_bytes
@@ -22,9 +34,6 @@ from app.services.minio_service import download_bytes
 
 def _get_datasource_filename(ds) -> str:
     return get_datasource_filename(getattr(ds, "name", None), getattr(ds, "storage_path", None))
-
-
-_DATASOURCE_SYNC_MANIFEST_PATH = "/workspace/.deepeye/datasource_sync_manifest.json"
 
 
 class SandboxManager:
@@ -156,7 +165,7 @@ class SandboxManager:
             file_datasources: List of DataSource objects (category='file')
         """
         sandbox = await self.get_or_create_sandbox(session_id)
-        manifest = await self._load_datasource_sync_manifest(sandbox)
+        manifest = await load_datasource_sync_manifest(sandbox)
         manifest_updated = False
         
         for ds in file_datasources:
@@ -169,9 +178,9 @@ class SandboxManager:
             
             try:
                 manifest_key = str(ds.id)
-                manifest_entry = self._build_datasource_manifest_entry(ds)
+                manifest_entry = build_datasource_manifest_entry(_get_datasource_filename, ds)
 
-                if await self._is_datasource_sync_current(
+                if await is_datasource_sync_current(
                     sandbox=sandbox,
                     manifest=manifest,
                     manifest_key=manifest_key,
@@ -213,7 +222,7 @@ class SandboxManager:
                 raise RuntimeError(f"Failed to sync datasource {ds.name} to sandbox: {e}") from e
 
         if manifest_updated:
-            await self._write_datasource_sync_manifest(sandbox, manifest)
+            await write_datasource_sync_manifest(sandbox, manifest)
         self._activity.record_activity(session_id)
 
     async def remove_datasource_file(self, session_id: str, datasource) -> None:
@@ -223,9 +232,9 @@ class SandboxManager:
         dest_path = workspace_data_path(filename)
         await sandbox.exec_command(f"rm -f -- {shlex.quote(dest_path)}")
 
-        manifest = await self._load_datasource_sync_manifest(sandbox)
+        manifest = await load_datasource_sync_manifest(sandbox)
         if manifest.pop(str(datasource.id), None) is not None:
-            await self._write_datasource_sync_manifest(sandbox, manifest)
+            await write_datasource_sync_manifest(sandbox, manifest)
         self._activity.record_activity(session_id)
     
     async def get_sandbox(self, session_id: str, index: int = 0) -> DockerSandbox | None:
@@ -275,7 +284,7 @@ class SandboxManager:
                     self._sandboxes[session_id].pop(index)
             
             # Not in local cache or cache was stale - query Docker directly by label
-            containers = self._find_containers_by_session(session_id)
+            containers = find_containers_by_session(self._docker, session_id)
             if containers and index < len(containers):
                 container = containers[index]
                 container_name = container.name
@@ -283,7 +292,7 @@ class SandboxManager:
                 
                 # Reconnect to existing container
                 try:
-                    sandbox = await self._reconnect_to_container(container)
+                    sandbox = await reconnect_to_container(container)
                     self._sandboxes[session_id].append(sandbox)
                     
                     # Update activity on reconnection
@@ -451,7 +460,7 @@ class SandboxManager:
                     logger.error(f"[SandboxManager] Error destroying sandbox: {e}")
             
             # Also destroy any containers in Docker not in local cache
-            containers = self._find_containers_by_session(session_id)
+            containers = find_containers_by_session(self._docker, session_id)
             for container in containers:
                 if container.name not in destroyed_names:
                     try:
@@ -502,25 +511,12 @@ class SandboxManager:
             stats["cleanup_running"] = bool(stats.get("cleanup_running"))
             return stats
 
-        total_sessions = len(self._sandboxes)
-        total_sandboxes = sum(len(sandboxes) for sandboxes in self._sandboxes.values())
-        
-        # Count all deepeye sandbox containers in Docker
-        all_containers = self._find_all_sandbox_containers()
-        
-        # Count all deepeye volumes
-        all_volumes = self.list_all_volumes()
-        
-        activity_stats = self._activity.get_stats()
-        
-        return {
-            "total_sessions": total_sessions,
-            "total_sandboxes_cached": total_sandboxes,
-            "total_containers_docker": len(all_containers),
-            "total_volumes": len(all_volumes),
-            "activity": activity_stats,
-            "cleanup_running": self._running,
-        }
+        return build_manager_stats(
+            sandboxes_by_session=self._sandboxes,
+            docker_client=self._docker,
+            activity=self._activity,
+            cleanup_running=self._running,
+        )
 
     def get_session_status(self, session_id: str) -> dict:
         """
@@ -535,58 +531,12 @@ class SandboxManager:
         if self._use_remote_control():
             return self._control_client.get_sandbox_status_sync(session_id)
 
-        # Local cache info
-        sandboxes = self._sandboxes.get(session_id, [])
-        idle_time = self._activity.get_idle_time(session_id)
-        # Docker containers (may include containers not in local cache)
-        docker_containers = self._find_containers_by_session(session_id)
-        
-        # Check if volume exists
-        volume_name = f"deepeye-ws-{session_id}"
-        has_volume = self._volume_exists(volume_name)
-        
-        status = {
-            "session_id": session_id,
-            "cached_sandboxes": len(sandboxes),
-            "docker_containers": len(docker_containers),
-            "container_names": [c.name for c in docker_containers],
-            "volume_name": volume_name,
-            "has_volume": has_volume,
-            "idle_seconds": idle_time.total_seconds(),
-            "should_stop": self._activity.should_stop(
-                session_id,
-                settings.SANDBOX_IDLE_TIMEOUT,
-            ),
-            "should_destroy": self._activity.should_stop(
-                session_id,
-                settings.SANDBOX_DESTROY_TIMEOUT,
-            ),
-        }
-        
-        return status
-    
-    def _volume_exists(self, volume_name: str) -> bool:
-        """Check if a Docker volume exists."""
-        if not self._docker:
-            return False
-        try:
-            self._docker.volumes.get(volume_name)
-            return True
-        except NotFound:
-            return False
-    
-    def _find_volumes_by_session(self, session_id: str) -> list:
-        """Find all volumes for a session by label."""
-        if not self._docker:
-            return []
-        try:
-            volumes = self._docker.volumes.list(
-                filters={"label": f"session_id={session_id}"}
-            )
-            return volumes
-        except Exception as e:
-            logger.error(f"[SandboxManager] Error finding volumes: {e}")
-            return []
+        return build_session_status(
+            session_id=session_id,
+            sandboxes_by_session=self._sandboxes,
+            docker_client=self._docker,
+            activity=self._activity,
+        )
     
     def list_all_volumes(self) -> list[dict]:
         """
@@ -595,114 +545,7 @@ class SandboxManager:
         Returns:
             List of volume info dicts
         """
-        if not self._docker:
-            return []
-        try:
-            volumes = self._docker.volumes.list(
-                filters={"label": "app=deepeye"}
-            )
-            return [
-                {
-                    "name": v.name,
-                    "session_id": v.attrs.get("Labels", {}).get("session_id", ""),
-                    "created": v.attrs.get("CreatedAt", ""),
-                }
-                for v in volumes
-            ]
-        except Exception as e:
-            logger.error(f"[SandboxManager] Error listing volumes: {e}")
-            return []
-    
-    def _find_containers_by_session(self, session_id: str) -> list:
-        """
-        Find all Docker containers for a session by label.
-        
-        Args:
-            session_id: Session ID
-            
-        Returns:
-            List of Docker container objects
-        """
-        if not self._docker:
-            return []
-        try:
-            return self._docker.containers.list(
-                all=True,  # Include stopped containers
-                filters={
-                    "label": [
-                        "app=deepeye",
-                        "component=sandbox",
-                        f"session_id={session_id}"
-                    ]
-                }
-            )
-        except Exception as e:
-            logger.error(f"[SandboxManager] Error finding containers for {session_id}: {e}")
-            return []
-    
-    def _find_all_sandbox_containers(self) -> list:
-        """
-        Find all deepeye sandbox containers.
-        
-        Returns:
-            List of Docker container objects
-        """
-        if not self._docker:
-            return []
-        try:
-            return self._docker.containers.list(
-                all=True,
-                filters={
-                    "label": [
-                        "app=deepeye",
-                        "component=sandbox"
-                    ]
-                }
-            )
-        except Exception as e:
-            logger.error(f"[SandboxManager] Error finding all containers: {e}")
-            return []
-    
-    async def _reconnect_to_container(self, container) -> DockerSandbox:
-        """
-        Reconnect to an existing Docker container.
-        
-        Args:
-            container: Docker container object
-            
-        Returns:
-            DockerSandbox instance connected to the container
-            
-        Raises:
-            RuntimeError: If container cannot be accessed
-        """
-        if self._use_remote_control():
-            raise RuntimeError("Remote control mode does not support direct container reconnection")
-
-        try:
-            # Create new sandbox instance
-            sandbox = DockerSandbox()
-            
-            # Manually set the container properties
-            sandbox.container = container
-            sandbox.container_name = container.name
-            sandbox.session_id = container.labels.get("session_id")
-            sandbox.volume_name = container.labels.get("volume")  # Get volume from label
-            sandbox._created = True
-            
-            # Check if container is running
-            container.reload()
-            if container.status != "running":
-                logger.warning(f"[SandboxManager] Container {container.name} is not running, starting it")
-                await sandbox.start()
-            
-            logger.info(f"[SandboxManager] Successfully reconnected to {container.name} (volume: {sandbox.volume_name})")
-            return sandbox
-            
-        except NotFound:
-            raise RuntimeError(f"Container {container.name} not found")
-        except Exception as e:
-            raise RuntimeError(f"Failed to reconnect to {container.name}: {e}")
+        return list_all_volumes(self._docker)
     
     async def sync_from_docker(self, session_id: str) -> int:
         """
@@ -726,7 +569,7 @@ class SandboxManager:
             return int(payload.get("reconnected", 0))
 
         async with self._lock:
-            containers = self._find_containers_by_session(session_id)
+            containers = find_containers_by_session(self._docker, session_id)
             if not containers:
                 return 0
             
@@ -740,7 +583,7 @@ class SandboxManager:
                 if container.name not in existing_names:
                     logger.info(f"[SandboxManager] Syncing {container.name} from Docker")
                     try:
-                        sandbox = await self._reconnect_to_container(container)
+                        sandbox = await reconnect_to_container(container)
                         self._sandboxes[session_id].append(sandbox)
                         reconnected += 1
                     except Exception as e:
@@ -752,117 +595,27 @@ class SandboxManager:
             
         return reconnected
 
-    def _build_datasource_manifest_entry(self, datasource) -> dict[str, Any]:
-        filename = _get_datasource_filename(datasource)
-        return {
-            "storage_path": getattr(datasource, "storage_path", None),
-            "filename": filename,
-            "dest_path": workspace_data_path(filename),
-        }
-
-    async def _is_datasource_sync_current(
-        self,
-        *,
-        sandbox: DockerSandbox,
-        manifest: dict[str, dict[str, Any]],
-        manifest_key: str,
-        manifest_entry: dict[str, Any],
-    ) -> bool:
-        if manifest.get(manifest_key) != manifest_entry:
-            return False
-        dest_path = manifest_entry.get("dest_path")
-        if not isinstance(dest_path, str) or not dest_path:
-            return False
-        result = await sandbox.exec_command(f"test -f {shlex.quote(dest_path)} && echo 'EXISTS' || echo 'NOT_FOUND'")
-        return result.exit_code == 0 and "EXISTS" in result.stdout
-
-    async def _load_datasource_sync_manifest(self, sandbox: DockerSandbox) -> dict[str, dict[str, Any]]:
-        result = await sandbox.exec_command(f"cat {shlex.quote(_DATASOURCE_SYNC_MANIFEST_PATH)}")
-        if result.exit_code != 0 or not result.stdout.strip():
-            return {}
-        try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            logger.warning("[SandboxManager] Failed to parse datasource sync manifest, ignoring it")
-            return {}
-        if not isinstance(payload, dict):
-            return {}
-        return {
-            str(key): value
-            for key, value in payload.items()
-            if isinstance(value, dict)
-        }
-
-    async def _write_datasource_sync_manifest(
-        self,
-        sandbox: DockerSandbox,
-        manifest: dict[str, dict[str, Any]],
-    ) -> None:
-        payload = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
-        command = (
-            f"mkdir -p {shlex.quote('/workspace/.deepeye')} && "
-            f"cat > {shlex.quote(_DATASOURCE_SYNC_MANIFEST_PATH)} <<'EOF'\n{payload}\nEOF"
-        )
-        result = await sandbox.exec_command(command)
-        if result.exit_code != 0:
-            raise RuntimeError(result.stderr or result.stdout or "failed to write datasource sync manifest")
-
-    def _discover_docker_sessions(self) -> list[str]:
-        """Discover sandbox sessions directly from Docker labels."""
-        if not self._docker:
-            return []
-        try:
-            all_containers = self._docker.containers.list(
-                all=True,
-                filters={"label": ["app=deepeye", "component=sandbox"]},
-            )
-        except Exception as e:
-            logger.error(f"[SandboxManager] Error discovering Docker sessions: {e}")
-            return []
-
-        discovered_sessions: list[str] = []
-        for container in all_containers:
-            session_id = container.labels.get("session_id")
-            if session_id and session_id not in discovered_sessions:
-                discovered_sessions.append(session_id)
-        return discovered_sessions
-
     async def _run_cleanup_cycle(self) -> None:
         """Run one cleanup cycle for idle or orphaned sessions."""
         async with self._lock:
             sessions = list(self._sandboxes.keys())
 
-        for session_id in self._discover_docker_sessions():
-            if session_id in sessions:
-                continue
-            sessions.append(session_id)
-            last_active = self._activity.get_last_active(session_id)
-            if last_active is None:
-                self._activity.record_activity(session_id)
-                logger.info(
-                    "[SandboxManager] Discovered orphaned session from Docker without activity state; marking active now: %s",
-                    session_id,
-                )
-            else:
-                logger.info(f"[SandboxManager] Discovered orphaned session from Docker: {session_id}")
+        sessions = collect_cleanup_sessions(
+            cached_sessions=sessions,
+            docker_client=self._docker,
+            activity=self._activity,
+        )
 
         for session_id in sessions:
             try:
-                if self._activity.should_stop(session_id, settings.SANDBOX_DESTROY_TIMEOUT):
-                    await self.destroy_session(session_id, delete_data=False)
-                    logger.info(
-                        f"[SandboxManager] Auto-destroyed idle {session_id} (idle > {settings.SANDBOX_DESTROY_TIMEOUT}s)"
-                    )
-                    continue
-
-                if self._activity.should_stop(session_id, settings.SANDBOX_IDLE_TIMEOUT):
-                    sandboxes = self._sandboxes.get(session_id, [])
-                    for sandbox in sandboxes:
-                        if sandbox.is_created and sandbox.is_running():
-                            await sandbox.stop()
-                            logger.info(
-                                f"[SandboxManager] Auto-stopped idle {session_id} (idle > {settings.SANDBOX_IDLE_TIMEOUT}s)"
-                            )
+                await cleanup_idle_session(
+                    session_id=session_id,
+                    sandboxes_by_session=self._sandboxes,
+                    activity=self._activity,
+                    idle_timeout=settings.SANDBOX_IDLE_TIMEOUT,
+                    destroy_timeout=settings.SANDBOX_DESTROY_TIMEOUT,
+                    destroy_session=self.destroy_session,
+                )
             except Exception as e:
                 logger.error(f"[SandboxManager] Error processing {session_id}: {e}")
 
