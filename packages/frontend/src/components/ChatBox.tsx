@@ -1,57 +1,188 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useChat } from '../hooks/useChat'
 import {
   selectCurrentMessages,
+  selectCurrentSessionId,
   selectIsStreaming,
   useChatStore,
 } from '../stores/chat'
 import { useWorkspaceUiStore } from '../stores/workspaceUi'
+import { useRightPanelStore } from '../stores/rightPanel'
 import { type ChatProgressLine } from '../utils/chatProgress'
 import { AssistantMessageBody } from './AssistantMessageBody'
 import { ChatEmptyState } from './ChatEmptyState'
-import { buildMessageActivityKey, hasText } from './chatBoxUtils'
+import { ChatContextStrip } from './ChatContextStrip'
+import { ChatErrorNotice } from './ChatErrorNotice'
+import { buildFollowUpPrompts, buildMessageActivityKey, hasText } from './chatBoxUtils'
+import type { DataSource } from '../types'
 import './ChatBox.css'
 
 interface ChatBoxProps {
-  dataSourceIds: string[]
+  dataSources: DataSource[]
   compact?: boolean
+  isLoadingDataSources?: boolean
+  onRemoveDataSource?: (dataSourceId: string) => void | Promise<void>
 }
 
 export default function ChatBox({
-  dataSourceIds,
+  dataSources,
   compact = false,
+  isLoadingDataSources = false,
+  onRemoveDataSource,
 }: ChatBoxProps) {
   const { sendMessage, stopMessage, error } = useChat()
   // 每个属性单独订阅 - 最简单可靠的方式
   const messages = useChatStore(selectCurrentMessages)
+  const sessionId = useChatStore(selectCurrentSessionId)
   const isStreaming = useChatStore(selectIsStreaming)
   const showDataSourceManager = useWorkspaceUiStore((state) => state.isDataSourceManagerOpen)
-  const toggleDataSourceManager = useWorkspaceUiStore((state) => state.toggleDataSourceManager)
+  const openDataSourceManager = useWorkspaceUiStore((state) => state.openDataSourceManager)
+  const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
   
   const [input, setInput] = useState('')
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
+  const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null)
+  const [removingDataSourceId, setRemovingDataSourceId] = useState<string | null>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composingRef = useRef(false)
   const compositionEndedAtRef = useRef(0)
-  const starterPrompts = [
-    {
-      label: 'Profile the data',
-      description: 'Check fields, structure, data quality, and immediate issues.',
-      prompt: 'Please analyze my attached data sources, highlight key fields, data quality issues, and the most practical next steps.',
-    },
-    {
-      label: 'Recommend charts',
-      description: 'Suggest the highest-signal visuals and what each one answers.',
-      prompt: 'Recommend three high-value visualizations for this dataset and explain what business questions each chart answers.',
-    },
-    {
-      label: 'Outline a report',
-      description: 'Draft a concise report with findings, risks, and actions.',
-      prompt: 'Generate a business report draft with summary, key findings, risks, and actionable recommendations.',
-    },
-  ]
+  const dataSourceIds = useMemo(() => dataSources.map((source) => source.id), [dataSources])
+  const isZhLocale = useMemo(
+    () => (typeof navigator !== 'undefined' ? navigator.language.toLowerCase().startsWith('zh') : false),
+    [],
+  )
+  const hasDatabaseSource = dataSources.some((source) => source.category === 'database')
+  const hasFileSource = dataSources.some((source) => source.category === 'file')
+  const sourceNames = dataSources.map((source) => source.name)
+  const starterPrompts = useMemo(() => {
+    if (dataSources.length === 0) {
+      return [
+        {
+          label: isZhLocale ? '快速看数' : 'Profile the data',
+          description: isZhLocale
+            ? '先规划接入文件或数据库后的第一轮检查。'
+            : 'Plan a fast first pass once files or databases are attached.',
+          prompt: isZhLocale
+            ? '请分析我附加的数据源，说明关键字段、数据质量问题，以及最值得继续追问的方向。'
+            : 'Please analyze my attached data sources, highlight key fields, data quality issues, and the most practical next steps.',
+        },
+        {
+          label: isZhLocale ? '推荐图表' : 'Recommend charts',
+          description: isZhLocale
+            ? '给出最值得做的图和每张图回答的问题。'
+            : 'Suggest the highest-signal visuals and what each one answers.',
+          prompt: isZhLocale
+            ? '请推荐三种最有价值的可视化，并说明每张图能回答什么业务问题。'
+            : 'Recommend three high-value visualizations for this dataset and explain what business questions each chart answers.',
+        },
+        {
+          label: isZhLocale ? '报告大纲' : 'Outline a report',
+          description: isZhLocale
+            ? '先起一个结论、风险和建议都齐全的报告草稿。'
+            : 'Draft a concise report with findings, risks, and actions.',
+          prompt: isZhLocale
+            ? '请生成一份业务报告草稿，包含摘要、关键发现、风险和可执行建议。'
+            : 'Generate a business report draft with summary, key findings, risks, and actionable recommendations.',
+        },
+      ]
+    }
+
+    if (hasDatabaseSource && !hasFileSource) {
+      return [
+        {
+          label: isZhLocale ? '梳理库表' : 'Map the schema',
+          description: isZhLocale
+            ? '先确认核心表、join 路径和最值得切入的问题。'
+            : 'Identify core tables, join paths, and the best starting questions.',
+          prompt: isZhLocale
+            ? '请检查已附加的数据库数据源，识别核心表与 join 关系，并给出三个最值得先做的分析方向。'
+            : 'Inspect the attached database sources, identify the core tables and joins, and recommend the three strongest analysis directions.',
+        },
+        {
+          label: isZhLocale ? '设计 KPI' : 'Design KPIs',
+          description: isZhLocale
+            ? '把现有 schema 变成一版高层指标方案。'
+            : 'Turn the available schema into an executive KPI plan.',
+          prompt: isZhLocale
+            ? '基于已附加的数据库数据源，设计一版 KPI dashboard 大纲，包含核心指标、维度和 drill-down。'
+            : 'Based on the attached database sources, propose a KPI dashboard outline with the highest-value metrics, dimensions, and drill-downs.',
+        },
+        {
+          label: isZhLocale ? '写分析 SQL' : 'Write analysis SQL',
+          description: isZhLocale
+            ? '直接起草第一批最有价值的查询。'
+            : 'Draft the first set of practical queries to answer business questions.',
+          prompt: isZhLocale
+            ? '请为已附加的数据库数据源写出第一批 SQL，用来发现业务趋势、异常和机会。'
+            : 'Write the first batch of SQL queries I should run against the attached database sources to uncover business trends, anomalies, and opportunities.',
+        },
+      ]
+    }
+
+    if (dataSources.length > 1) {
+      return [
+        {
+          label: isZhLocale ? '梳理数据关系' : 'Reconcile the sources',
+          description: isZhLocale
+            ? '先确认这些数据源之间怎么关联。'
+            : 'Figure out how the attached files and databases relate.',
+          prompt: isZhLocale
+            ? '请检查这些已附加的数据源，说明它们如何组合使用，并指出我应该先验证的 join、主键和潜在不一致。'
+            : 'Review the attached data sources, explain how they can be combined, and identify the joins, keys, and mismatches I should validate first.',
+        },
+        {
+          label: isZhLocale ? '跨源洞察' : 'Find cross-source insights',
+          description: isZhLocale
+            ? '推荐跨数据源最值得做的对比分析。'
+            : 'Recommend the most valuable comparisons across the attached sources.',
+          prompt: isZhLocale
+            ? '请找出这些已附加数据源最值得做的跨源分析，并说明每一种能揭示什么。'
+            : 'Find the highest-value cross-source analyses for the attached data and explain what each one could reveal.',
+        },
+        {
+          label: isZhLocale ? '组合报告' : 'Plan a combined report',
+          description: isZhLocale
+            ? '把多个数据源整合成一条完整业务叙事。'
+            : 'Turn the attached sources into one concise business narrative.',
+          prompt: isZhLocale
+            ? '请基于这些已附加数据源规划一份整合报告，形成一条包含发现、风险和建议动作的业务故事线。'
+            : 'Create a report outline that combines the attached data sources into one executive story with findings, risks, and recommended actions.',
+        },
+      ]
+    }
+
+    return [
+      {
+        label: isZhLocale ? '检查文件' : 'Profile the file',
+        description: isZhLocale
+          ? '先看字段、结构、质量问题和第一批机会。'
+          : 'Check fields, structure, data quality, and immediate issues.',
+        prompt: isZhLocale
+          ? `请分析当前附加的数据集${sourceNames[0] ? `（${sourceNames[0]}）` : ''}，总结 schema、数据质量问题，以及最值得继续追问的方向。`
+          : `Analyze the attached dataset ${sourceNames[0] ? `(${sourceNames[0]}) ` : ''}and summarize the schema, data quality issues, and the best next questions to ask.`,
+      },
+      {
+        label: isZhLocale ? '推荐图表' : 'Recommend charts',
+        description: isZhLocale
+          ? '挑出最有信号的图表和它们回答的问题。'
+          : 'Suggest the highest-signal visuals and what each one answers.',
+        prompt: isZhLocale
+          ? '请为当前附加的数据集推荐三种最有价值的可视化，并解释每种图表回答什么业务问题。'
+          : 'Recommend three high-value visualizations for the attached dataset and explain what business questions each chart answers.',
+      },
+      {
+        label: isZhLocale ? '起草报告' : 'Draft a report',
+        description: isZhLocale
+          ? '先生成一版数据洞察报告结构。'
+          : 'Outline the strongest structure for a data insight report.',
+        prompt: isZhLocale
+          ? '请为当前附加的数据集生成一份业务报告草稿，包含摘要、关键发现、风险和可执行建议。'
+          : 'Generate a business report draft for the attached dataset with summary, key findings, risks, and actionable recommendations.',
+      },
+    ]
+  }, [dataSources.length, hasDatabaseSource, hasFileSource, isZhLocale, sourceNames])
 
   const resizeTextarea = useCallback(() => {
     const el = textareaRef.current
@@ -64,14 +195,24 @@ export default function ChatBox({
     resizeTextarea()
   }, [input, resizeTextarea])
 
+  const resetComposer = () => {
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+  }
+
   const handleSend = () => {
-    const canSend = Boolean(input.trim()) && !isStreaming
-    if (!canSend) return
+    if (!input.trim()) return
     const query = input.trim()
-    sendMessage(query, dataSourceIds)
+    if (isStreaming) {
+      setQueuedPrompt(query)
+      setInput('')
+      resetComposer()
+      return
+    }
+    void sendMessage(query, dataSourceIds)
     setInput('')
     setIsNearBottom(true)
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    setQueuedPrompt(null)
+    resetComposer()
     scrollToBottom()
   }
 
@@ -109,6 +250,17 @@ export default function ChatBox({
       scrollToBottom('smooth')
     }
   }, [messages.length, lastMessageActivityKey, isNearBottom])
+
+  useEffect(() => {
+    if (isStreaming || error || !queuedPrompt) {
+      return
+    }
+    const nextPrompt = queuedPrompt
+    setQueuedPrompt(null)
+    void sendMessage(nextPrompt, dataSourceIds)
+    setIsNearBottom(true)
+    scrollToBottom()
+  }, [dataSourceIds, error, isStreaming, queuedPrompt, sendMessage])
 
   const handleCompositionStart = () => {
     composingRef.current = true
@@ -162,6 +314,48 @@ export default function ChatBox({
     }
   }
 
+  const insertQuotedMessage = (content: string) => {
+    const quoted = content
+      .trim()
+      .split('\n')
+      .map((line) => `> ${line}`)
+      .join('\n')
+    const prefix = input.trim() ? `${input.trim()}\n\n` : ''
+    const nextValue = `${prefix}${quoted}\n\n`
+    setInput(nextValue)
+    requestAnimationFrame(() => {
+      if (!textareaRef.current) return
+      textareaRef.current.focus()
+      const caret = nextValue.length
+      textareaRef.current.setSelectionRange(caret, caret)
+      resizeTextarea()
+    })
+  }
+
+  const removeDataSource = async (dataSourceId: string) => {
+    if (!onRemoveDataSource) return
+    setRemovingDataSourceId(dataSourceId)
+    try {
+      await onRemoveDataSource(dataSourceId)
+    } finally {
+      setRemovingDataSourceId((current) => (current === dataSourceId ? null : current))
+    }
+  }
+
+  const retryLastPrompt = () => {
+    if (isStreaming) return
+    const lastUserPrompt = [...messages]
+      .reverse()
+      .find((message) => message.role === 'user' && hasText(message.content))
+      ?.content
+      ?.trim()
+    if (!lastUserPrompt) return
+    setQueuedPrompt(null)
+    void sendMessage(lastUserPrompt, dataSourceIds)
+    setIsNearBottom(true)
+    scrollToBottom()
+  }
+
   const renderStreamingIndicator = () => (
     <span className="streaming-indicator" aria-hidden="true">
       <span className="streaming-indicator-dot"></span>
@@ -180,16 +374,55 @@ export default function ChatBox({
     </div>
   )
   const showJumpButton = messages.length > 0 && !isNearBottom
+  const dataSourceCount = dataSources.length
+  const lastAssistantMessageIndex = [...messages]
+    .map((message, index) => ({ message, index }))
+    .reverse()
+    .find((item) => item.message.role === 'assistant')
+    ?.index ?? -1
   const sourceStatusText = dataSourceIds.length > 0
-    ? `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}`
-    : 'No attached data yet'
+    ? isZhLocale
+      ? `已附加 ${dataSourceIds.length} 个数据源`
+      : `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}`
+    : isZhLocale
+      ? '当前还没有附加数据'
+      : 'No attached data yet'
   const composerHelperText = dataSourceIds.length > 0
-    ? 'All attached data is used automatically.'
-    : 'Attach a file or connect a database from Attached data.'
-  const emptyTitle = dataSourceIds.length > 0 ? 'Ask about the workspace' : 'Attach data to begin'
+    ? isZhLocale
+      ? '当前线程会自动使用所有已附加数据。'
+      : 'All attached data is used automatically.'
+    : isZhLocale
+      ? '先从“附加数据”里添加文件或连接数据库。'
+      : 'Attach a file or connect a database from Attached data.'
+  const emptyTitle = dataSourceIds.length > 0
+    ? isZhLocale ? '围绕当前工作区继续提问' : 'Ask about the workspace'
+    : isZhLocale ? '先附加数据再开始' : 'Attach data to begin'
   const emptySubtitle = dataSourceIds.length > 0
-    ? 'Use the assistant to inspect attached data, explain outputs, write SQL, or draft next steps.'
-    : 'Use + to add files or databases. Once attached, they are available automatically in this thread.'
+    ? isZhLocale
+      ? '你可以直接让助手检查数据、解释产物、写 SQL，或者起草下一步分析。'
+      : 'Use the assistant to inspect attached data, explain outputs, write SQL, or draft next steps.'
+    : isZhLocale
+      ? '点击 + 添加文件或数据库。附加后，这些数据会自动在当前线程里可用。'
+      : 'Use + to add files or databases. Once attached, they are available automatically in this thread.'
+  const emptyContextChips = useMemo(() => {
+    if (dataSources.length === 0) {
+      return ['Files and databases join automatically']
+    }
+
+    const chips = dataSources.slice(0, 2).map((source) => source.name)
+    if (dataSources.length > 2) {
+      chips.push(`+${dataSources.length - 2} more source${dataSources.length - 2 > 1 ? 's' : ''}`)
+    }
+    if (hasDatabaseSource && hasFileSource) {
+      chips.push('Files and databases can be analyzed together')
+    } else if (hasDatabaseSource) {
+      chips.push('SQL and schema context are available')
+    } else {
+      chips.push('File columns and preview rows are available')
+    }
+    return chips
+  }, [dataSources, hasDatabaseSource, hasFileSource])
+  const canRetry = !isStreaming && messages.some((message) => message.role === 'user' && hasText(message.content))
 
   return (
     <div className={`chat-container ${compact ? 'compact' : ''}`}>
@@ -198,10 +431,11 @@ export default function ChatBox({
         {/* Empty State */}
         {messages.length === 0 && (
           <ChatEmptyState
-            dataSourceCount={dataSourceIds.length}
+            dataSourceCount={dataSourceCount}
             emptyTitle={emptyTitle}
             emptySubtitle={emptySubtitle}
             sourceStatusText={sourceStatusText}
+            contextChips={emptyContextChips}
             starterPrompts={starterPrompts}
             onApplyStarterPrompt={applyStarterPrompt}
           />
@@ -251,10 +485,44 @@ export default function ChatBox({
                         className="message-action-btn"
                         onClick={() => copyMessageContent(msg.content, index)}
                       >
-                        {copiedMessageIndex === index ? 'Copied' : 'Copy'}
+                        {copiedMessageIndex === index ? (isZhLocale ? '已复制' : 'Copied') : (isZhLocale ? '复制' : 'Copy')}
                       </button>
+                      <button
+                        type="button"
+                        className="message-action-btn"
+                        onClick={() => insertQuotedMessage(msg.content)}
+                      >
+                        {isZhLocale ? '引用' : 'Quote'}
+                      </button>
+                      {index === lastAssistantMessageIndex && (
+                        <button
+                          type="button"
+                          className="message-action-btn"
+                          onClick={retryLastPrompt}
+                          disabled={isStreaming}
+                        >
+                          {isZhLocale ? '重试' : 'Retry'}
+                        </button>
+                      )}
                     </div>
                   )}
+                  {msg.role === 'assistant' &&
+                    index === lastAssistantMessageIndex &&
+                    hasText(msg.content) &&
+                    !msg.isStreaming && (
+                      <div className="message-followups">
+                        {buildFollowUpPrompts(msg.content, dataSourceCount > 0).map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            className="message-followup-chip"
+                            onClick={() => applyStarterPrompt(prompt)}
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                 </div>
 
                 {msg.role === 'user' && (
@@ -267,9 +535,15 @@ export default function ChatBox({
 
             {/* Error */}
             {error && (
-              <div className="chat-error">
-                {error}
-              </div>
+              <ChatErrorNotice
+                error={error}
+                canRetry={canRetry}
+                canOpenWorkflow={!!sessionId && sessionId !== 'draft'}
+                canOpenData
+                onRetry={retryLastPrompt}
+                onOpenData={openDataSourceManager}
+                onOpenWorkflow={() => openOrFocusTab('workflow')}
+              />
             )}
           </div>
         )}
@@ -283,18 +557,41 @@ export default function ChatBox({
             scrollToBottom('smooth')
           }}
         >
-          Jump to latest
+          {isZhLocale ? '跳到最新' : 'Jump to latest'}
         </button>
       )}
 
       {/* Input Area */}
       <div className="chat-input-container">
         <div className="chat-input-shell">
-          <div className="chat-input-wrapper">
+          <ChatContextStrip
+            dataSources={dataSources}
+            isLoading={isLoadingDataSources}
+            isCompact={compact}
+            removingDataSourceId={removingDataSourceId}
+            onOpenManager={openDataSourceManager}
+            onRemoveDataSource={removeDataSource}
+          />
+          {queuedPrompt && (
+            <div className="chat-queued-prompt">
+              <div className="chat-queued-prompt-copy">
+                <span className="chat-queued-prompt-label">{isZhLocale ? '下一条已排队' : 'Queued next'}</span>
+                <span className="chat-queued-prompt-text">{queuedPrompt}</span>
+              </div>
+              <button
+                type="button"
+                className="chat-queued-prompt-clear"
+                onClick={() => setQueuedPrompt(null)}
+              >
+                {isZhLocale ? '清除' : 'Clear'}
+              </button>
+            </div>
+          )}
+          <div className={`chat-input-wrapper ${isStreaming ? 'is-streaming' : ''}`}>
             <button
               type="button"
               className={`chat-upload-btn ${showDataSourceManager ? 'is-active' : ''}`}
-              onClick={toggleDataSourceManager}
+              onClick={openDataSourceManager}
               title={dataSourceIds.length > 0 ? `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}` : 'Attach data'}
               aria-label={dataSourceIds.length > 0 ? `Manage ${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}` : 'Attach data'}
             >
@@ -315,49 +612,68 @@ export default function ChatBox({
               rows={1}
               className="chat-input"
               style={{ maxHeight: '200px' }}
-              placeholder={dataSourceIds.length > 0 ? 'Ask DeepEye about your attached data...' : 'Attach data, then message DeepEye...'}
-              disabled={isStreaming}
+              placeholder={dataSourceIds.length > 0
+                ? isZhLocale ? '直接询问 DeepEye 关于这些数据的问题…' : 'Ask DeepEye about your attached data...'
+                : isZhLocale ? '先附加数据，再和 DeepEye 对话…' : 'Attach data, then message DeepEye...'}
             />
-            {isStreaming ? (
+            <div className="chat-composer-actions">
+              {isStreaming && (
               <button type="button" onClick={stopMessage} className="chat-stop-btn" title="Stop generation">
-                Stop
+                {isZhLocale ? '停止' : 'Stop'}
               </button>
-            ) : (
+              )}
               <button
+                type="button"
                 onClick={handleSend}
-                disabled={!input.trim() || isStreaming}
-                className="chat-send-btn"
+                disabled={!input.trim()}
+                className={isStreaming ? 'chat-queue-btn' : 'chat-send-btn'}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-5 h-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m5 12 7-7 7 7" />
-                  <path d="M12 19V5" />
-                </svg>
+                {isStreaming ? (
+                  isZhLocale ? '排队' : 'Queue'
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-5 h-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m5 12 7-7 7 7" />
+                    <path d="M12 19V5" />
+                  </svg>
+                )}
               </button>
-            )}
+            </div>
           </div>
           {!compact && (
             <div className="chat-input-meta">
               <p className="chat-input-hint">
-                {composerHelperText} Enter to send. Shift+Enter for newline. Verify critical results.
+                {isStreaming
+                  ? isZhLocale
+                    ? 'DeepEye 正在回复中。你可以继续输入，并把下一条问题排队。'
+                    : 'DeepEye is still responding. You can keep typing and queue the next prompt.'
+                  : `${composerHelperText} ${isZhLocale ? 'Enter 发送，Shift+Enter 换行。重要结果请自行核验。' : 'Enter to send. Shift+Enter for newline. Verify critical results.'}`}
               </p>
               <span className={`chat-input-ds-badge ${dataSourceIds.length > 0 ? 'is-active' : ''}`}>
-                {dataSourceIds.length > 0 ? `${dataSourceIds.length} data attached` : 'Use + to add data'}
+                {queuedPrompt
+                  ? isZhLocale ? '1 条问题已排队' : '1 prompt queued'
+                  : dataSourceIds.length > 0
+                    ? isZhLocale ? `已附加 ${dataSourceIds.length} 个数据源` : `${dataSourceIds.length} data attached`
+                    : isZhLocale ? '点击 + 添加数据' : 'Use + to add data'}
               </span>
             </div>
           )}
           {compact && (
             <div className="chat-input-meta">
               <span className={`chat-input-ds-badge ${dataSourceIds.length > 0 ? 'is-active' : ''}`}>
-                {dataSourceIds.length > 0 ? `${dataSourceIds.length} data attached` : 'Use + to add data'}
+                {queuedPrompt
+                  ? isZhLocale ? '1 条问题已排队' : '1 prompt queued'
+                  : dataSourceIds.length > 0
+                    ? isZhLocale ? `已附加 ${dataSourceIds.length} 个数据源` : `${dataSourceIds.length} data attached`
+                    : isZhLocale ? '点击 + 添加数据' : 'Use + to add data'}
               </span>
             </div>
           )}

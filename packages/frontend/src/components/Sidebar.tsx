@@ -21,6 +21,7 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, onToggleCollapse, currentUser = null, onLogout }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const PINNED_SESSIONS_STORAGE_KEY = 'deepeye:pinned-sessions'
   
   // 每个属性单独订阅 - 最简单可靠的方式
   const sessions = useChatStore((state) => state.sessions)
@@ -32,10 +33,36 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
   const selectSession = useChatStore((state) => state.selectSession)
   const deleteSession = useChatStore((state) => state.deleteSession)
   const createDraftSession = useChatStore((state) => state.createDraftSession)
+  const updateSessionTitle = useChatStore((state) => state.updateSessionTitle)
   
   const [animatingTitles, setAnimatingTitles] = useState<Map<string, string>>(new Map())
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [pinnedSessionIds, setPinnedSessionIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const raw = window.localStorage.getItem(PINNED_SESSIONS_STORAGE_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+    } catch {
+      return []
+    }
+  })
   const previousSessionsRef = useRef<Array<{ id: string; title: string }>>([])
+  const pinnedSessionSet = useMemo(() => new Set(pinnedSessionIds), [pinnedSessionIds])
+  const sortedSessions = useMemo(() => {
+    return [...sessions].sort((a, b) => {
+      const aTs = Date.parse(a.updated_at || a.created_at || '')
+      const bTs = Date.parse(b.updated_at || b.created_at || '')
+      return (Number.isNaN(bTs) ? 0 : bTs) - (Number.isNaN(aTs) ? 0 : aTs)
+    })
+  }, [sessions])
+  const pinnedSessions = useMemo(
+    () => sortedSessions.filter((session) => pinnedSessionSet.has(session.id)),
+    [pinnedSessionSet, sortedSessions],
+  )
   const groupedSessions = useMemo(() => {
     const now = new Date()
     now.setHours(0, 0, 0, 0)
@@ -47,18 +74,16 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
       date.setHours(0, 0, 0, 0)
       return Math.floor((todayTimestamp - date.getTime()) / dayMs)
     }
-    const sorted = [...sessions].sort((a, b) => {
-      const aTs = Date.parse(a.updated_at || a.created_at || '')
-      const bTs = Date.parse(b.updated_at || b.created_at || '')
-      return (Number.isNaN(bTs) ? 0 : bTs) - (Number.isNaN(aTs) ? 0 : aTs)
-    })
     const groups: { key: string; label: string; sessions: Session[] }[] = [
       { key: 'today', label: 'Today', sessions: [] },
       { key: 'yesterday', label: 'Yesterday', sessions: [] },
       { key: 'week', label: 'Last 7 Days', sessions: [] },
       { key: 'earlier', label: 'Earlier', sessions: [] },
     ]
-    for (const session of sorted) {
+    for (const session of sortedSessions) {
+      if (pinnedSessionSet.has(session.id)) {
+        continue
+      }
       const diff = getDayDiff(session.updated_at || session.created_at)
       if (diff <= 0) {
         groups[0].sessions.push(session)
@@ -71,7 +96,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
       }
     }
     return groups.filter((group) => group.sessions.length > 0)
-  }, [sessions])
+  }, [pinnedSessionSet, sortedSessions])
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/')
@@ -80,6 +105,15 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
   useEffect(() => {
     fetchSessions()
   }, [fetchSessions])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(PINNED_SESSIONS_STORAGE_KEY, JSON.stringify(pinnedSessionIds))
+  }, [PINNED_SESSIONS_STORAGE_KEY, pinnedSessionIds])
+
+  useEffect(() => {
+    setPinnedSessionIds((current) => current.filter((id) => sessions.some((session) => session.id === id)))
+  }, [sessions])
 
   useEffect(() => {
     if (!deleteTarget) return
@@ -164,6 +198,35 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
   const handleDeleteSession = (id: string, title: string, event: React.MouseEvent) => {
     event.stopPropagation()
     setDeleteTarget({ id, title: title || 'New conversation' })
+  }
+
+  const togglePinnedSession = (id: string, event: React.MouseEvent) => {
+    event.stopPropagation()
+    setPinnedSessionIds((current) => (
+      current.includes(id) ? current.filter((value) => value !== id) : [id, ...current]
+    ))
+  }
+
+  const startRenamingSession = (session: Session, event: React.MouseEvent) => {
+    event.stopPropagation()
+    setRenamingSessionId(session.id)
+    setRenameValue(session.title || 'New conversation')
+  }
+
+  const cancelRenamingSession = () => {
+    setRenamingSessionId(null)
+    setRenameValue('')
+  }
+
+  const submitSessionRename = async () => {
+    if (!renamingSessionId) return
+    const nextTitle = renameValue.trim()
+    if (!nextTitle) {
+      cancelRenamingSession()
+      return
+    }
+    await updateSessionTitle(renamingSessionId, nextTitle)
+    cancelRenamingSession()
   }
 
   const cancelDeleteSession = () => {
@@ -251,6 +314,89 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
             {/* Session list */}
             {!isLoadingSessions && sessions.length > 0 && (
               <div className="session-groups">
+                {pinnedSessions.length > 0 && (
+                  <section className="session-group">
+                    <div className="session-group-header">
+                      <span>Pinned</span>
+                      <span className="session-group-count">{pinnedSessions.length}</span>
+                    </div>
+                    <div className="session-group-list">
+                      {pinnedSessions.map((session) => (
+                        <div
+                          key={session.id}
+                          onClick={() => handleSelectSession(session.id)}
+                          onKeyDown={(event) => handleSessionKeyDown(event, session.id)}
+                          className={`session-item ${session.id === sessionId ? 'active' : ''}`}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Open conversation ${session.title || 'New conversation'}`}
+                        >
+                          <div className="session-item-main">
+                            {renamingSessionId === session.id ? (
+                              <input
+                                className="session-rename-input"
+                                value={renameValue}
+                                autoFocus
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                onClick={(event) => event.stopPropagation()}
+                                onBlur={() => void submitSessionRename()}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault()
+                                    void submitSessionRename()
+                                  } else if (event.key === 'Escape') {
+                                    event.preventDefault()
+                                    cancelRenamingSession()
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <>
+                                <span className="session-title">
+                                  {getDisplayTitle(session)}
+                                  {isAnimating(session.id) && <span className="typing-cursor">|</span>}
+                                </span>
+                                <div className="session-meta">
+                                  <span className="session-meta-chip">Pinned</span>
+                                  {session.id === sessionId && <span className="session-meta-chip is-active">Active</span>}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          <div className="session-item-actions">
+                            <button
+                              onClick={(event) => togglePinnedSession(session.id, event)}
+                              className="session-action-btn"
+                              title="Unpin conversation"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="m11.49 2.19 5.32 5.32a1 1 0 0 1-1.42 1.42l-.66-.66-2.7 2.7 3.06 4.08a1 1 0 0 1-1.48 1.33L9.5 13.14l-3.79 3.79a1 1 0 0 1-1.42-1.42l3.79-3.79-3.24-4.1a1 1 0 0 1 1.31-1.47l4.14 3.11 2.7-2.7-.66-.66a1 1 0 0 1 1.42-1.42Z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(event) => startRenamingSession(session, event)}
+                              className="session-action-btn"
+                              title="Rename"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L8.25 19.463 4 20l.537-4.25 12.325-11.263Z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteSession(session.id, session.title, e)}
+                              className="session-action-btn session-delete-btn"
+                              title="Delete"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
                 {groupedSessions.map((group) => (
                   <section key={group.key} className="session-group">
                     <div className="session-group-header">
@@ -268,19 +414,66 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                           tabIndex={0}
                           aria-label={`Open conversation ${session.title || 'New conversation'}`}
                         >
-                          <span className="session-title">
-                            {getDisplayTitle(session)}
-                            {isAnimating(session.id) && <span className="typing-cursor">|</span>}
-                          </span>
-                          <button
-                            onClick={(e) => handleDeleteSession(session.id, session.title, e)}
-                            className="session-delete-btn"
-                            title="Delete"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          <div className="session-item-main">
+                            {renamingSessionId === session.id ? (
+                              <input
+                                className="session-rename-input"
+                                value={renameValue}
+                                autoFocus
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                onClick={(event) => event.stopPropagation()}
+                                onBlur={() => void submitSessionRename()}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault()
+                                    void submitSessionRename()
+                                  } else if (event.key === 'Escape') {
+                                    event.preventDefault()
+                                    cancelRenamingSession()
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <>
+                                <span className="session-title">
+                                  {getDisplayTitle(session)}
+                                  {isAnimating(session.id) && <span className="typing-cursor">|</span>}
+                                </span>
+                                <div className="session-meta">
+                                  {session.id === sessionId && <span className="session-meta-chip is-active">Active</span>}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          <div className="session-item-actions">
+                            <button
+                              onClick={(event) => togglePinnedSession(session.id, event)}
+                              className="session-action-btn"
+                              title="Pin conversation"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="m11.49 2.19 5.32 5.32a1 1 0 0 1-1.42 1.42l-.66-.66-2.7 2.7 3.06 4.08a1 1 0 0 1-1.48 1.33L9.5 13.14l-3.79 3.79a1 1 0 0 1-1.42-1.42l3.79-3.79-3.24-4.1a1 1 0 0 1 1.31-1.47l4.14 3.11 2.7-2.7-.66-.66a1 1 0 0 1 1.42-1.42Z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(event) => startRenamingSession(session, event)}
+                              className="session-action-btn"
+                              title="Rename"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L8.25 19.463 4 20l.537-4.25 12.325-11.263Z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteSession(session.id, session.title, e)}
+                              className="session-action-btn session-delete-btn"
+                              title="Delete"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

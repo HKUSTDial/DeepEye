@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-import { createReportProgressLine, parseChatProgressLine, type ChatProgressLine } from '../utils/chatProgress'
+import type { ChatProgressLine } from '../utils/chatProgress'
 import type { Message } from '../types'
 import StepItem from './StepItem'
 import { hasText } from './chatBoxUtils'
+import { splitAssistantMessageSections } from './assistantMessageBodyUtils'
 
 interface AssistantMessageBodyProps {
   message: Message
@@ -18,53 +19,73 @@ export function AssistantMessageBody({
   renderProgressLine,
   renderStreamingIndicator,
 }: AssistantMessageBodyProps) {
-  const timeline = message.timeline && message.timeline.length > 0 ? message.timeline : null
+  const { finalContent, processEntries } = useMemo(
+    () => splitAssistantMessageSections(message),
+    [message],
+  )
+  const hasFinalContent = hasText(finalContent)
+  const [showProcess, setShowProcess] = useState(
+    () => message.isStreaming || !hasFinalContent || processEntries.length > 0,
+  )
 
-  if (timeline) {
-    return (
-      <div className="assistant-timeline">
-        {timeline.map((item, index) => {
-          if (item.kind === 'step') {
-            return <StepItem key={`timeline-step-${index}`} step={item.step} />
-          }
-          if (item.kind === 'report_step') {
-            return renderProgressLine(
-              createReportProgressLine(item.stepIndex, item.totalSteps, item.label),
-              `timeline-report-${index}`,
-            )
-          }
-          if (item.kind === 'text') {
-            const progress = parseChatProgressLine(item.content || '')
-            if (progress) {
-              return renderProgressLine(progress, `timeline-progress-${index}`)
-            }
-          }
-          return (
-            <div key={`timeline-text-${index}`} className="message-content">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content || ''}</ReactMarkdown>
-              {item.isStreaming && hasText(item.content) && renderStreamingIndicator()}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (message.isStreaming || !hasFinalContent) {
+      setShowProcess(true)
+    }
+  }, [hasFinalContent, message.isStreaming])
 
   return (
-    <>
-      {message.steps && message.steps.length > 0 && (
-        <div className="space-y-2 mb-3">
-          {message.steps.map((step, index) => (
-            <StepItem key={`step-${index}`} step={step} />
-          ))}
-        </div>
+    <div className="assistant-message-stack">
+      {processEntries.length > 0 && (
+        <section className="assistant-process-card">
+          <button
+            type="button"
+            className="assistant-process-toggle"
+            onClick={() => setShowProcess((current) => !current)}
+            aria-expanded={showProcess}
+          >
+            <span className="assistant-process-toggle-copy">
+              <span className="assistant-process-toggle-label">Activity</span>
+              <span className="assistant-process-toggle-meta">
+                {processEntries.length} update{processEntries.length > 1 ? 's' : ''}
+              </span>
+            </span>
+            <span className={`assistant-process-toggle-chevron ${showProcess ? 'is-open' : ''}`}>
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </button>
+          {showProcess && (
+            <div className="assistant-process-body">
+              {processEntries.map((entry, index) => {
+                if (entry.kind === 'step') {
+                  return <StepItem key={`timeline-step-${index}`} step={entry.step} />
+                }
+                return renderProgressLine(entry.progress, `timeline-progress-${index}`)
+              })}
+            </div>
+          )}
+        </section>
       )}
-      {(message.content || message.isStreaming) && (
+
+      {hasFinalContent && (
+        <section className="assistant-answer-card">
+          <div className="assistant-answer-kicker">
+            {message.isStreaming ? 'Drafting response' : 'Final answer'}
+          </div>
+          <div className="message-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{finalContent}</ReactMarkdown>
+            {message.isStreaming && renderStreamingIndicator()}
+          </div>
+        </section>
+      )}
+
+      {!hasFinalContent && message.isStreaming && processEntries.length === 0 && (
         <div className="message-content">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content || ''}</ReactMarkdown>
-          {message.isStreaming && hasText(message.content) && renderStreamingIndicator()}
+          {renderStreamingIndicator()}
         </div>
       )}
-    </>
+    </div>
   )
 }

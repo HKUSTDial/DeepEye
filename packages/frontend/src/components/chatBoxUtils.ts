@@ -43,3 +43,37 @@ export function buildMessageActivityKey(message?: Message): string {
 export function hasText(value?: string) {
   return Boolean(value && value.trim().length > 0)
 }
+
+export function buildFollowUpPrompts(content: string, hasAttachedData: boolean): string[] {
+  const normalized = content.toLowerCase()
+
+  if (normalized.includes('dashboard') || normalized.includes('chart')) {
+    return [
+      'Turn this into a dashboard plan with KPI cards and filters.',
+      'Which chart should I build first, and why?',
+      'What follow-up analysis would strengthen this visual story?',
+    ]
+  }
+
+  if (normalized.includes('report') || normalized.includes('summary')) {
+    return [
+      'Condense this into an executive summary.',
+      'What are the top three risks or watchouts here?',
+      'Turn this into concrete next-step recommendations.',
+    ]
+  }
+
+  if (hasAttachedData) {
+    return [
+      'What is the strongest next question to ask about this data?',
+      'Recommend charts or a dashboard based on this answer.',
+      'Turn this into a concise business report outline.',
+    ]
+  }
+
+  return [
+    'Summarize this more concisely.',
+    'What follow-up questions should I ask next?',
+    'Turn this into an action-oriented checklist.',
+  ]
+}

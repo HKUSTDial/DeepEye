@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildMessageActivityKey, buildStepActivityKey, hasText } from './chatBoxUtils'
+import { buildFollowUpPrompts, buildMessageActivityKey, buildStepActivityKey, hasText } from './chatBoxUtils'
 
 describe('chatBoxUtils', () => {
   it('builds stable activity keys for nested steps and timelines', () => {
@@ -36,5 +36,11 @@ describe('chatBoxUtils', () => {
     expect(hasText('  hello  ')).toBe(true)
     expect(hasText('   ')).toBe(false)
     expect(hasText(undefined)).toBe(false)
+  })
+
+  it('builds follow-up prompts based on the reply context', () => {
+    expect(buildFollowUpPrompts('Create a dashboard from this analysis', true)[0]).toContain('dashboard')
+    expect(buildFollowUpPrompts('Write an executive summary', true)[0]).toContain('executive')
+    expect(buildFollowUpPrompts('Plain answer', false)).toHaveLength(3)
   })
 })

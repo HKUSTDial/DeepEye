@@ -11,7 +11,7 @@ import { useRightPanelStore } from './stores/rightPanel'
 import { useReportStore } from './stores/report'
 import { useWorkflowSessionsStore } from './stores/workflowSessions'
 import { sessionApi } from './api'
-import type { WorkspaceState, WorkflowArtifactPayload } from './types'
+import type { DataSource, WorkspaceState, WorkflowArtifactPayload } from './types'
 import Sidebar from './components/Sidebar'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
@@ -20,12 +20,17 @@ import './App.css'
 
 function App() {
   const navigate = useNavigate()
-  const [dataSourceIds, setDataSourceIds] = useState<string[]>([])
+  const [attachedDataSources, setAttachedDataSources] = useState<DataSource[]>([])
+  const [isLoadingDataSources, setIsLoadingDataSources] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 1440 : false,
   )
   const [chatCollapsed, setChatCollapsed] = useState(false)
+  const [isMobileLayout, setIsMobileLayout] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 900 : false,
+  )
+  const [mobileWorkspaceView, setMobileWorkspaceView] = useState<'workspace' | 'assistant'>('assistant')
 
   const MIN_CHAT_RATIO = 22
   const MAX_CHAT_RATIO = 38
@@ -42,6 +47,7 @@ function App() {
   const currentUser = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const datasourceRevision = useDatasourceSyncStore((state) => state.revision)
+  const notifyDatasourceUpdated = useDatasourceSyncStore((state) => state.notifyUpdated)
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
   const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
@@ -66,6 +72,12 @@ function App() {
     () => (sessionId && sessionId !== 'draft' ? sessionId : 'draft'),
     [sessionId],
   )
+  const dataSourceIds = useMemo(
+    () => attachedDataSources.map((source) => source.id),
+    [attachedDataSources],
+  )
+  const showWorkspacePanel = !isMobileLayout || mobileWorkspaceView === 'workspace'
+  const showAssistantPanel = !chatCollapsed && (!isMobileLayout || mobileWorkspaceView === 'assistant')
 
   const toggleSidebarCollapse = () => {
     setSidebarCollapsed((current) => !current)
@@ -119,6 +131,16 @@ function App() {
   }, [isDraggingChat, onChatDrag, stopChatDrag])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const updateMobileLayout = () => {
+      setIsMobileLayout(window.innerWidth <= 900)
+    }
+    updateMobileLayout()
+    window.addEventListener('resize', updateMobileLayout)
+    return () => window.removeEventListener('resize', updateMobileLayout)
+  }, [])
+
+  useEffect(() => {
     if (hasNormalizedLayoutRef.current || typeof window === 'undefined') return
     hasNormalizedLayoutRef.current = true
 
@@ -143,20 +165,28 @@ function App() {
     const loadSessionAttachments = async () => {
       if (!sessionId || sessionId === 'draft') {
         if (!cancelled) {
-          setDataSourceIds([])
+          setAttachedDataSources([])
+          setIsLoadingDataSources(false)
         }
         return
       }
 
+      if (!cancelled) {
+        setIsLoadingDataSources(true)
+      }
       try {
         const attachedSources = await sessionApi.listAttachments(sessionId)
         if (!cancelled) {
-          setDataSourceIds(attachedSources.map((source) => source.id))
+          setAttachedDataSources(attachedSources)
         }
       } catch (e) {
         console.error('Failed to load session attachments', e)
         if (!cancelled) {
-          setDataSourceIds([])
+          setAttachedDataSources([])
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDataSources(false)
         }
       }
     }
@@ -166,6 +196,18 @@ function App() {
       cancelled = true
     }
   }, [sessionId, datasourceRevision])
+
+  const detachDataSource = useCallback(
+    async (datasourceId: string) => {
+      if (!sessionId || sessionId === 'draft') {
+        return
+      }
+      await sessionApi.detachDatasource(sessionId, datasourceId)
+      setAttachedDataSources((current) => current.filter((source) => source.id !== datasourceId))
+      notifyDatasourceUpdated()
+    },
+    [notifyDatasourceUpdated, sessionId],
+  )
 
   const restoreReportState = useCallback((activeSessionId: string, workspaceState: WorkspaceState) => {
     const reportPayloads = workspaceState.artifacts
@@ -291,8 +333,14 @@ function App() {
 
       <main className="workspace-shell">
         <section className="workspace-stage">
-          <div ref={mainAreaRef} className={`workspace-split ${chatCollapsed ? 'chat-collapsed' : ''}`}>
-            <section className="workspace-main" style={workspaceStyle}>
+          <div
+            ref={mainAreaRef}
+            className={`workspace-split ${chatCollapsed ? 'chat-collapsed' : ''} ${isMobileLayout ? `is-mobile-${mobileWorkspaceView}` : ''}`}
+          >
+            <section
+              className={`workspace-main ${showWorkspacePanel ? '' : 'is-mobile-hidden'}`}
+              style={showWorkspacePanel ? workspaceStyle : undefined}
+            >
               <div className="workspace-main-card">
                 <div className="workspace-main-toolbar">
                   <div className="workspace-main-toolbar-copy">
@@ -313,6 +361,24 @@ function App() {
                     </div>
                   </div>
                   <div className="workspace-main-toolbar-actions">
+                    {isMobileLayout && (
+                      <div className="workspace-mobile-switch" role="tablist" aria-label="Choose mobile workspace view">
+                        <button
+                          type="button"
+                          className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'workspace' ? 'is-active' : ''}`}
+                          onClick={() => setMobileWorkspaceView('workspace')}
+                        >
+                          Workspace
+                        </button>
+                        <button
+                          type="button"
+                          className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'assistant' ? 'is-active' : ''}`}
+                          onClick={() => setMobileWorkspaceView('assistant')}
+                        >
+                          Assistant
+                        </button>
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="workspace-toolbar-btn"
@@ -348,14 +414,17 @@ function App() {
               </div>
             </section>
 
-            {!chatCollapsed && (
+            {!chatCollapsed && !isMobileLayout && (
               <div
                 className={`chat-rail-splitter ${isDraggingChat ? 'is-active' : ''}`}
                 onMouseDown={startChatDrag}
               />
             )}
 
-            <aside className={`chat-rail ${chatCollapsed ? 'is-collapsed' : 'is-open'}`} style={chatStyle}>
+            <aside
+              className={`chat-rail ${chatCollapsed ? 'is-collapsed' : 'is-open'} ${showAssistantPanel ? '' : 'is-mobile-hidden'}`}
+              style={showAssistantPanel ? chatStyle : undefined}
+            >
               {chatCollapsed ? (
                 <button
                   type="button"
@@ -379,6 +448,24 @@ function App() {
                       <span className="chat-rail-title" title={chatTitle}>{chatTitle}</span>
                     </div>
                     <div className="chat-rail-actions">
+                      {isMobileLayout && (
+                        <div className="workspace-mobile-switch" role="tablist" aria-label="Choose mobile workspace view">
+                          <button
+                            type="button"
+                            className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'workspace' ? 'is-active' : ''}`}
+                            onClick={() => setMobileWorkspaceView('workspace')}
+                          >
+                            Workspace
+                          </button>
+                          <button
+                            type="button"
+                            className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'assistant' ? 'is-active' : ''}`}
+                            onClick={() => setMobileWorkspaceView('assistant')}
+                          >
+                            Assistant
+                          </button>
+                        </div>
+                      )}
                       <button
                         type="button"
                         className="chat-rail-action-btn"
@@ -390,7 +477,9 @@ function App() {
                   </div>
                   <div className="chat-rail-body">
                     <ChatBox
-                      dataSourceIds={dataSourceIds}
+                      dataSources={attachedDataSources}
+                      isLoadingDataSources={isLoadingDataSources}
+                      onRemoveDataSource={detachDataSource}
                       compact
                     />
                   </div>
@@ -399,7 +488,7 @@ function App() {
             </aside>
           </div>
         </section>
-        <GlobalDataSourceManagerModal onDataSourceIdsChange={setDataSourceIds} />
+        <GlobalDataSourceManagerModal onDataSourcesChange={setAttachedDataSources} />
       </main>
     </div>
   )

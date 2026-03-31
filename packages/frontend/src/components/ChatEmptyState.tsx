@@ -9,6 +9,7 @@ interface ChatEmptyStateProps {
   emptyTitle: string
   emptySubtitle: string
   sourceStatusText: string
+  contextChips: string[]
   starterPrompts: StarterPrompt[]
   onApplyStarterPrompt: (prompt: string) => void
 }
@@ -18,6 +19,7 @@ export function ChatEmptyState({
   emptyTitle,
   emptySubtitle,
   sourceStatusText,
+  contextChips,
   starterPrompts,
   onApplyStarterPrompt,
 }: ChatEmptyStateProps) {
@@ -38,9 +40,11 @@ export function ChatEmptyState({
         <span>{sourceStatusText}</span>
       </div>
       <div className="chat-empty-context">
-        <span className={`chat-empty-context-chip ${dataSourceCount > 0 ? 'active' : ''}`}>
-          Files and databases join automatically
-        </span>
+        {contextChips.map((chip) => (
+          <span key={chip} className={`chat-empty-context-chip ${dataSourceCount > 0 ? 'active' : ''}`}>
+            {chip}
+          </span>
+        ))}
       </div>
       <div className="chat-empty-prompts">
         {starterPrompts.map((item) => (

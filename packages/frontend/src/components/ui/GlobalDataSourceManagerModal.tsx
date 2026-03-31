@@ -3,14 +3,15 @@ import { createPortal } from 'react-dom'
 
 import DataSourceManager from '../DataSourceManager'
 import { useWorkspaceUiStore } from '../../stores/workspaceUi'
+import type { DataSource } from '../../types'
 import '../ChatBox.css'
 
 interface GlobalDataSourceManagerModalProps {
-  onDataSourceIdsChange?: (ids: string[]) => void
+  onDataSourcesChange?: (sources: DataSource[]) => void
 }
 
 export function GlobalDataSourceManagerModal({
-  onDataSourceIdsChange,
+  onDataSourcesChange,
 }: GlobalDataSourceManagerModalProps) {
   const isOpen = useWorkspaceUiStore((state) => state.isDataSourceManagerOpen)
   const closeDataSourceManager = useWorkspaceUiStore((state) => state.closeDataSourceManager)
@@ -59,9 +60,7 @@ export function GlobalDataSourceManagerModal({
         </button>
         <DataSourceManager
           variant="modal"
-          onDataSourcesChange={(sources) =>
-            onDataSourceIdsChange?.(sources.map((source) => source.id))
-          }
+          onDataSourcesChange={onDataSourcesChange}
         />
       </div>
     </div>,
