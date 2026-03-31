@@ -81,6 +81,7 @@ export function useWorkflowDraftCatalog({
 
   const activeFilePathRef = useRef<string | null>(null)
   const activeDraftIdRef = useRef<string | null>(null)
+  const availableDraftsRef = useRef<WorkflowDraft[]>([])
   const isLoadingFilesRef = useRef(false)
 
   const hasTrackedWorkspaceState = hasTrackedWorkflowState({
@@ -128,6 +129,10 @@ export function useWorkflowDraftCatalog({
   }, [activeDraftId])
 
   useEffect(() => {
+    availableDraftsRef.current = availableDrafts
+  }, [availableDrafts])
+
+  useEffect(() => {
     isLoadingFilesRef.current = isLoadingFiles
   }, [isLoadingFiles])
 
@@ -137,7 +142,7 @@ export function useWorkflowDraftCatalog({
       setIsLoadingFile(true)
       actions.setFileError(sessionId, null)
       try {
-        const matchingDraft = availableDrafts.find((draft) => draft.id === draftIdToLoad) || null
+        const matchingDraft = availableDraftsRef.current.find((draft) => draft.id === draftIdToLoad) || null
         const parsed = readWorkflowDraftGraph(matchingDraft)
         actions.clearWorkflow(sessionId)
         Object.values(parsed.nodes).forEach((node) => actions.addWorkflowNode(sessionId, node))
@@ -164,7 +169,7 @@ export function useWorkflowDraftCatalog({
         setIsLoadingFile(false)
       }
     },
-    [sessionId, availableDrafts, nodeDefs, actions],
+    [sessionId, nodeDefs, actions],
   )
 
   const refreshDrafts = useCallback(
@@ -174,6 +179,7 @@ export function useWorkflowDraftCatalog({
       actions.setFileError(sessionId, null)
       try {
         const drafts = await sessionApi.listWorkflowDrafts(sessionId)
+        availableDraftsRef.current = drafts
         setAvailableDrafts(drafts)
         actions.setFiles(sessionId, buildWorkflowDraftFileList(drafts, activeFilePathRef.current))
 
@@ -199,6 +205,7 @@ export function useWorkflowDraftCatalog({
         }
         actions.setViewState(sessionId, 'ready')
       } catch (err) {
+        availableDraftsRef.current = []
         actions.setFiles(sessionId, [])
         setAvailableDrafts([])
         actions.setFileError(
