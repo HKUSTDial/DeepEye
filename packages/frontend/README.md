@@ -5,7 +5,7 @@ React + TypeScript workspace UI for DeepEye.
 ## Responsibilities
 
 - chat workspace and session navigation
-- datasource and knowledge-base management
+- datasource attachment and workspace state management
 - workflow editor and live workflow panel
 - report, dashboard, and video preview panels
 

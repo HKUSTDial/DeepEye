@@ -5,7 +5,7 @@ FastAPI and Celery backend for the DeepEye data agent system.
 ## Responsibilities
 
 - authentication and session management
-- datasource and knowledge-base APIs
+- datasource, session, and workspace-state APIs
 - chat orchestration and workflow planning
 - workflow draft/run/artifact persistence
 - sandbox-backed execution for report, dashboard, and video nodes
@@ -38,5 +38,5 @@ DEEPEYE_RUN_DOCKER_TESTS=1 uv run pytest \
 
 ## Notes
 
-- Runtime schema creation currently happens on startup and is being migrated toward a formal migration workflow.
+- Runtime schema bootstrapping is now isolated to app startup helpers and is still being migrated toward a formal migration workflow.
 - Open-source hardening work is tracked in `docs/open_source_remediation_checklist.md`.

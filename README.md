@@ -1,6 +1,6 @@
 # DeepEye
 
-DeepEye is a workflow-native data agent system for multi-step analysis over uploaded files, live databases, and knowledge bases.
+DeepEye is a workflow-native data agent system for multi-step analysis over uploaded files and live databases.
 
 The current monorepo contains:
 

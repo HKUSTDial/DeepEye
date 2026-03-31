@@ -12,7 +12,7 @@
   - 验收: 用户输入和模型输出不能直接在 API 进程或浏览器上下文中无约束执行
 - [ ] 去掉后端对宿主 Docker socket 的直接依赖，或将其隔离到受限执行层
   - 验收: API/worker 不再天然具备宿主级容器控制权
-- [ ] 收敛工作流主真相，废弃旧 `Workflow`/`/workflows` 旁路
+- [x] 收敛工作流主真相，废弃旧 `Workflow`/`/workflows` 旁路
   - 验收: 对外只保留 `session -> turn -> draft -> run -> artifact` 模型
 - [ ] 建立数据库迁移体系，移除运行时 `create_all()` 作为正式升级路径
   - 验收: schema 变更可迁移、可回滚、可升级
@@ -62,3 +62,4 @@
 - [x] 移除未接通的 `workflow_templates` 冗余能力面
 - [x] 收紧 dashboard/video 预览面的默认浏览器与 CORS 暴露面
 - [x] 移除工作区到 legacy `Workflow` 的上传桥，并隐藏侧边栏旧入口
+- [x] 下线公开 `/workflows` 入口，收敛到 session-scoped workspace 与单一会话事件流
