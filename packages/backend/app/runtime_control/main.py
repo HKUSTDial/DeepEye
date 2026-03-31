@@ -98,7 +98,8 @@ class VideoDeployRequest(BaseModel):
 
 class DashboardDeployRequest(BaseModel):
     task_id: str
-    local_va_app_path: str
+    local_va_app_path: str | None = None
+    source_archive_base64: str | None = None
 
 
 router_dependencies = [Depends(require_internal_api_key)]
@@ -269,7 +270,19 @@ async def deploy_video_preview(payload: VideoDeployRequest) -> dict[str, Any]:
 
 @app.post("/internal/runtime-control/previews/dashboard/deploy", dependencies=router_dependencies)
 async def deploy_dashboard_preview(payload: DashboardDeployRequest) -> dict[str, Any]:
+    source_archive_bytes: bytes | None = None
+    if payload.source_archive_base64:
+        try:
+            source_archive_bytes = base64.b64decode(payload.source_archive_base64)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Invalid dashboard source archive") from exc
+    if source_archive_bytes is None and not payload.local_va_app_path:
+        raise HTTPException(
+            status_code=422,
+            detail="Either local_va_app_path or source_archive_base64 is required",
+        )
     return await dashboard_deployer.deploy(
         task_id=payload.task_id,
         local_va_app_path=payload.local_va_app_path,
+        source_archive_bytes=source_archive_bytes,
     )

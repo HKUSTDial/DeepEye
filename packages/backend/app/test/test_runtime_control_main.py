@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import os
 
 import pytest
@@ -49,4 +50,31 @@ async def test_exec_sandbox_command_serializes_dataclass_result(monkeypatch) -> 
         "exit_code": 0,
         "success": True,
         "execution_time_ms": 12,
+    }
+
+
+@pytest.mark.anyio
+async def test_deploy_dashboard_preview_decodes_uploaded_archive(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def _deploy(task_id: str, local_va_app_path: str | None = None, source_archive_bytes: bytes | None = None):
+        captured["task_id"] = task_id
+        captured["local_va_app_path"] = local_va_app_path
+        captured["source_archive_bytes"] = source_archive_bytes
+        return {"status": "running", "url": "/dashboards/demo/"}
+
+    monkeypatch.setattr(runtime_control_main.dashboard_deployer, "deploy", _deploy)
+
+    result = await runtime_control_main.deploy_dashboard_preview(
+        runtime_control_main.DashboardDeployRequest(
+            task_id="task-1",
+            source_archive_base64=base64.b64encode(b"dashboard-archive").decode("ascii"),
+        )
+    )
+
+    assert result == {"status": "running", "url": "/dashboards/demo/"}
+    assert captured == {
+        "task_id": "task-1",
+        "local_va_app_path": None,
+        "source_archive_bytes": b"dashboard-archive",
     }

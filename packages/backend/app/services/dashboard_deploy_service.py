@@ -54,13 +54,19 @@ class DashboardDeployService:
             logger.error(f"Failed to init docker client: {e}")
             self.docker_client = None
 
-    async def deploy(self, task_id: str, local_va_app_path: str) -> Dict:
+    async def deploy(
+        self,
+        task_id: str,
+        local_va_app_path: str | None = None,
+        source_archive_bytes: bytes | None = None,
+    ) -> Dict:
         """
         Deploy a Dashboard to an independent container.
 
         Args:
             task_id: Task ID (or node_id)
             local_va_app_path: Local directory containing generated va_app source code.
+            source_archive_bytes: Tar archive containing dashboard source files at the archive root.
 
         Returns:
             {
@@ -70,11 +76,16 @@ class DashboardDeployService:
             }
         """
         start_time = time.perf_counter()
+        if source_archive_bytes is None:
+            if not local_va_app_path:
+                raise ValueError("Either local_va_app_path or source_archive_bytes is required")
+            source_archive_bytes = self._build_dashboard_source_archive(local_va_app_path)
+
         if settings.DOCKER_CONTROL_MODE == "remote":
             try:
                 result = await self._control_client.deploy_dashboard_preview(
                     task_id=task_id,
-                    local_va_app_path=local_va_app_path,
+                    source_archive_bytes=source_archive_bytes,
                 )
                 runtime_metrics.increment(
                     "preview.deploy.count",
@@ -95,9 +106,6 @@ class DashboardDeployService:
 
         if not self.docker_client:
             raise RuntimeError("Docker not available")
-
-        if not os.path.isdir(local_va_app_path):
-            raise FileNotFoundError(f"Dashboard source path not found: {local_va_app_path}")
 
         self._ensure_dashboard_image()
         self._cleanup_preview_containers()
@@ -140,7 +148,7 @@ class DashboardDeployService:
         )
 
         try:
-            self._upload_dashboard_source(container, local_va_app_path)
+            self._upload_dashboard_source_archive(container, source_archive_bytes)
 
             await asyncio.sleep(1)
             container.reload()
@@ -264,16 +272,23 @@ class DashboardDeployService:
         except Exception as e:
             raise RuntimeError(f"Failed to build dashboard image: {e}")
 
-    def _upload_dashboard_source(self, container, local_va_app_path: str) -> None:
-        logger.info("[DashboardDeployService] Uploading dashboard code from %s", local_va_app_path)
+    def _build_dashboard_source_archive(self, local_va_app_path: str) -> bytes:
+        if not os.path.isdir(local_va_app_path):
+            raise FileNotFoundError(f"Dashboard source path not found: {local_va_app_path}")
+        logger.info("[DashboardDeployService] Packaging dashboard code from %s", local_va_app_path)
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode="w") as tar:
             for item in os.listdir(local_va_app_path):
                 item_path = os.path.join(local_va_app_path, item)
                 tar.add(item_path, arcname=item)
+        return tar_stream.getvalue()
 
-        tar_stream.seek(0)
-        container.put_archive("/app", tar_stream)
+    def _upload_dashboard_source_archive(self, container, archive_bytes: bytes) -> None:
+        logger.info(
+            "[DashboardDeployService] Uploading dashboard code archive (%s bytes)",
+            len(archive_bytes),
+        )
+        container.put_archive("/app", io.BytesIO(archive_bytes))
 
     async def _wait_for_port_ready(self, container, timeout_seconds: int) -> bool:
         for elapsed in range(timeout_seconds):

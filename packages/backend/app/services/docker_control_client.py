@@ -210,11 +210,14 @@ class DockerControlClient:
             json={"task_id": task_id, "session_id": session_id},
         )
 
-    async def deploy_dashboard_preview(self, *, task_id: str, local_va_app_path: str) -> dict[str, Any]:
+    async def deploy_dashboard_preview(self, *, task_id: str, source_archive_bytes: bytes) -> dict[str, Any]:
         return await self._async_request(
             "POST",
             "/internal/runtime-control/previews/dashboard/deploy",
-            json={"task_id": task_id, "local_va_app_path": local_va_app_path},
+            json={
+                "task_id": task_id,
+                "source_archive_base64": base64.b64encode(source_archive_bytes).decode("ascii"),
+            },
         )
 
 
