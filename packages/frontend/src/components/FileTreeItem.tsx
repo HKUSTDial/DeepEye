@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Loader2, Download, Trash2 } from 'lucide-react'
 import type { FileInfo } from '../api/sandbox'
+import { useLocale } from '../locale'
 import './FileTreeItem.css'
 
 export interface FileNode extends FileInfo {
@@ -28,6 +29,7 @@ export default function FileTreeItem({
   onDownload,
   onDelete,
 }: FileTreeItemProps) {
+  const { t } = useLocale()
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
 
@@ -207,7 +209,7 @@ export default function FileTreeItem({
               className="h-[22px] flex items-center text-[11px] text-[#6e6e6e] italic"
               style={{ paddingLeft: `${(depth + 1) * 12 + 24}px` }}
             >
-              (empty)
+              {t('files.emptyFolder')}
             </div>
           )}
         </div>
@@ -221,16 +223,15 @@ export default function FileTreeItem({
         >
           <div className="context-menu-item" onClick={handleDownload}>
             <Download size={14} />
-            <span>{file.type === 'directory' ? 'Download as ZIP' : 'Download'}</span>
+            <span>{file.type === 'directory' ? t('files.downloadAsZip') : t('common.download')}</span>
           </div>
           <div className="context-menu-divider"></div>
           <div className="context-menu-item context-menu-item-danger" onClick={handleDeleteClick}>
             <Trash2 size={14} />
-            <span>Delete</span>
+            <span>{t('common.delete')}</span>
           </div>
         </div>
       )}
     </div>
   )
 }
-

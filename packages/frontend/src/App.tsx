@@ -16,10 +16,12 @@ import Sidebar from './components/Sidebar'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
 import { GlobalDataSourceManagerModal } from './components/ui/GlobalDataSourceManagerModal'
+import { getLocalizedConversationTitle, isDefaultConversationTitle, useLocale } from './locale'
 import './App.css'
 
 function App() {
   const navigate = useNavigate()
+  const { t } = useLocale()
   const [attachedDataSources, setAttachedDataSources] = useState<DataSource[]>([])
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -58,16 +60,17 @@ function App() {
   const clearReport = useReportStore((state) => state.clear)
 
   const chatTitle = useMemo(() => {
-    const title = currentSession?.title?.trim()
-    if (!title || title === 'New conversation') return 'Ask DeepEye'
-    return title
-  }, [currentSession?.title])
-  const workspaceNote = useMemo(() => {
-    if (chatTitle !== 'Ask DeepEye') {
-      return `Thread: ${chatTitle}`
+    if (isDefaultConversationTitle(currentSession?.title)) {
+      return t('app.defaultChatTitle')
     }
-    return 'Reports, dashboards, files, and previews'
-  }, [chatTitle])
+    return getLocalizedConversationTitle(currentSession?.title, t)
+  }, [currentSession?.title, t])
+  const workspaceNote = useMemo(() => {
+    if (!isDefaultConversationTitle(currentSession?.title)) {
+      return t('app.threadLabel', { title: chatTitle })
+    }
+    return t('app.workspaceSummary')
+  }, [chatTitle, currentSession?.title, t])
   const rightPanelSessionKey = useMemo(
     () => (sessionId && sessionId !== 'draft' ? sessionId : 'draft'),
     [sessionId],
@@ -311,7 +314,7 @@ function App() {
           type="button"
           className="sidebar-overlay"
           onClick={() => setSidebarOpen(false)}
-          aria-label="Close navigation drawer"
+          aria-label={t('app.closeNavigationDrawer')}
         />
       )}
 
@@ -348,34 +351,34 @@ function App() {
                       type="button"
                       className="workspace-shell-btn"
                       onClick={() => setSidebarOpen(true)}
-                      aria-label="Open navigation"
+                      aria-label={t('app.openNavigation')}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                       </svg>
-                      <span>Menu</span>
+                      <span>{t('common.menu')}</span>
                     </button>
                     <div className="workspace-main-toolbar-copytext">
-                      <span className="workspace-main-toolbar-heading">Workspace</span>
+                      <span className="workspace-main-toolbar-heading">{t('common.workspace')}</span>
                       <span className="workspace-main-toolbar-note" title={workspaceNote}>{workspaceNote}</span>
                     </div>
                   </div>
                   <div className="workspace-main-toolbar-actions">
                     {isMobileLayout && (
-                      <div className="workspace-mobile-switch" role="tablist" aria-label="Choose mobile workspace view">
+                      <div className="workspace-mobile-switch" role="tablist" aria-label={t('app.mobileSwitchLabel')}>
                         <button
                           type="button"
                           className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'workspace' ? 'is-active' : ''}`}
                           onClick={() => setMobileWorkspaceView('workspace')}
                         >
-                          Workspace
+                          {t('common.workspace')}
                         </button>
                         <button
                           type="button"
                           className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'assistant' ? 'is-active' : ''}`}
                           onClick={() => setMobileWorkspaceView('assistant')}
                         >
-                          Assistant
+                          {t('common.assistant')}
                         </button>
                       </div>
                     )}
@@ -394,7 +397,7 @@ function App() {
                           </>
                         )}
                       </svg>
-                      {chatCollapsed ? 'Show assistant' : 'Hide assistant'}
+                      {chatCollapsed ? t('app.showAssistant') : t('app.hideAssistant')}
                     </button>
                     <button
                       type="button"
@@ -404,7 +407,7 @@ function App() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
                       </svg>
-                      New chat
+                      {t('common.newChat')}
                     </button>
                   </div>
                 </div>
@@ -430,7 +433,7 @@ function App() {
                   type="button"
                   className="chat-rail-collapsed-bar"
                   onClick={() => setChatCollapsed(false)}
-                  aria-label="Open assistant"
+                  aria-label={t('app.openAssistant')}
                 >
                   <span className="chat-rail-collapsed-icon" aria-hidden="true">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,31 +441,31 @@ function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M12 3c4.971 0 9 3.806 9 8.5S16.971 20 12 20a9.57 9.57 0 01-3.756-.741L4 20l1.05-3.063C3.768 15.43 3 13.544 3 11.5 3 6.806 7.029 3 12 3Z" />
                     </svg>
                   </span>
-                  <span className="chat-rail-collapsed-title">Open</span>
+                  <span className="chat-rail-collapsed-title">{t('app.open')}</span>
                 </button>
               ) : (
                 <div className="chat-rail-card">
                   <div className="chat-rail-header">
                     <div className="chat-rail-header-copy">
-                      <span className="chat-rail-kicker">Assistant</span>
+                      <span className="chat-rail-kicker">{t('common.assistant')}</span>
                       <span className="chat-rail-title" title={chatTitle}>{chatTitle}</span>
                     </div>
                     <div className="chat-rail-actions">
                       {isMobileLayout && (
-                        <div className="workspace-mobile-switch" role="tablist" aria-label="Choose mobile workspace view">
+                        <div className="workspace-mobile-switch" role="tablist" aria-label={t('app.mobileSwitchLabel')}>
                           <button
                             type="button"
                             className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'workspace' ? 'is-active' : ''}`}
                             onClick={() => setMobileWorkspaceView('workspace')}
                           >
-                            Workspace
+                            {t('common.workspace')}
                           </button>
                           <button
                             type="button"
                             className={`workspace-mobile-switch-btn ${mobileWorkspaceView === 'assistant' ? 'is-active' : ''}`}
                             onClick={() => setMobileWorkspaceView('assistant')}
                           >
-                            Assistant
+                            {t('common.assistant')}
                           </button>
                         </div>
                       )}
@@ -471,7 +474,7 @@ function App() {
                         className="chat-rail-action-btn"
                         onClick={() => setChatCollapsed(true)}
                       >
-                        Hide
+                        {t('common.hide')}
                       </button>
                     </div>
                   </div>

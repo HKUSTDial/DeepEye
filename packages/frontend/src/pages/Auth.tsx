@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import AuthShell from '../components/auth/AuthShell'
+import { useLocale } from '../locale'
 import { useAuthStore } from '../stores/auth'
 
 const INPUT_CLASS = 'auth-input'
@@ -14,6 +15,7 @@ function sanitizeNextPath(raw: string | null): string {
 }
 
 export default function Auth() {
+  const { t } = useLocale()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const login = useAuthStore((state) => state.login)
@@ -41,7 +43,7 @@ export default function Auth() {
       await login(email.trim(), password)
       navigate(nextPath)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : t('auth.login.failed'))
     } finally {
       setIsLoading(false)
     }
@@ -49,10 +51,10 @@ export default function Auth() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Use your DeepEye account to continue."
-      leftTitle="Sign in to your workspace"
-      leftDescription="Standard entry point with separated signup and recovery flows."
+      title={t('auth.login.title')}
+      subtitle={t('auth.login.subtitle')}
+      leftTitle={t('auth.login.leftTitle')}
+      leftDescription={t('auth.login.leftDescription')}
     >
       {error && (
         <div className="auth-feedback auth-feedback--error">
@@ -63,7 +65,7 @@ export default function Auth() {
       <form ref={formRef} onSubmit={handleLogin} className="auth-form">
         <div className="auth-form-row">
           <label htmlFor="auth-email" className="auth-form-label">
-            Email
+            {t('auth.email')}
           </label>
           <input
             id="auth-email"
@@ -72,14 +74,14 @@ export default function Auth() {
             onChange={(e) => setEmail(e.target.value)}
             required
             disabled={isLoading}
-            placeholder="you@example.com"
+            placeholder={t('auth.placeholderEmail')}
             className={INPUT_CLASS}
           />
         </div>
 
         <div className="auth-form-row">
           <label htmlFor="auth-password" className="auth-form-label">
-            Password
+            {t('auth.password')}
           </label>
           <input
             id="auth-password"
@@ -104,29 +106,29 @@ export default function Auth() {
           disabled={isLoading}
           className="auth-submit"
         >
-          {isLoading ? 'Signing in...' : 'Sign in'}
+          {isLoading ? t('auth.login.submitting') : t('auth.login.submit')}
         </button>
       </form>
 
       <div className="auth-muted-actions">
         <div>
-          New to DeepEye?{' '}
+          {t('auth.login.newToDeepEye')}{' '}
           <button
             type="button"
             onClick={() => navigate('/register')}
             className="auth-link"
           >
-            Create account
+            {t('auth.login.createAccount')}
           </button>
         </div>
         <div>
-          Forgot password?{' '}
+          {t('auth.login.forgotPassword')}{' '}
           <button
             type="button"
             onClick={() => navigate('/forgot-password')}
             className="auth-link"
           >
-            Recover access
+            {t('auth.login.recoverAccess')}
           </button>
         </div>
       </div>

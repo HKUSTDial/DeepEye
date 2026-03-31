@@ -3,7 +3,7 @@ import { LayoutDashboard, ExternalLink, RefreshCw, Loader2 } from 'lucide-react'
 import { ArtifactProgressCard } from '../ArtifactProgressCard'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { config } from '../../../config'
-import { DASHBOARD_PROGRESS_STAGES } from '../../../utils/dashboardProgress'
+import { useLocale } from '../../../locale'
 
 function extractDashboardNodeIds(definition: unknown): string[] {
   if (!definition || typeof definition !== 'object') return []
@@ -26,6 +26,7 @@ export function DashboardPanel({
 }: {
   sessionId: string | null
 }) {
+  const { t } = useLocale()
   const [localRefreshKey, setLocalRefreshKey] = useState(0)
   const [previewState, setPreviewState] = useState({
     activeToken: '',
@@ -39,6 +40,14 @@ export function DashboardPanel({
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
+  const progressStages = [
+    t('dashboard.stage1'),
+    t('dashboard.stage2'),
+    t('dashboard.stage3'),
+    t('dashboard.stage4'),
+    t('dashboard.stage5'),
+    t('dashboard.stage6'),
+  ]
   const dashboardProgress = sessionState?.dashboardProgress ?? {
     visible: false,
     stage: 0,
@@ -78,17 +87,17 @@ export function DashboardPanel({
     )
   const generationStageIndex = Math.min(
     Math.max(dashboardProgress.stage ?? 0, 0),
-    DASHBOARD_PROGRESS_STAGES.length - 1,
+    progressStages.length - 1,
   )
   const generationCurrentLabel =
     dashboardProgress.logs[dashboardProgress.logs.length - 1]?.message ||
-    DASHBOARD_PROGRESS_STAGES[generationStageIndex] ||
-    'Preparing dashboard generation'
+    progressStages[generationStageIndex] ||
+    t('dashboard.preparingGeneration')
   const generationPercent = Math.max(
     dashboardProgress.percent || 0,
     isDashboardGenerating ? 14 : 0,
   )
-  const generationSteps = DASHBOARD_PROGRESS_STAGES.map((label, index) => {
+  const generationSteps = progressStages.map((label, index) => {
     const status =
       index < generationStageIndex
         ? 'done'
@@ -98,7 +107,7 @@ export function DashboardPanel({
     return {
       id: label,
       label,
-      detail: status === 'done' ? 'Completed' : status === 'active' ? 'Running' : 'Queued',
+      detail: status === 'done' ? t('common.completed') : status === 'active' ? t('common.running') : t('common.queued'),
       icon: status === 'done' ? '✓' : ['🧭', '📊', '🧮', '🔗', '🧩', '🚀'][index] || '•',
       status,
     } as const
@@ -209,24 +218,24 @@ export function DashboardPanel({
   const isDashboardWarming = !!latestDashboard && !isReady
   const showDashboardProgress = isDashboardGenerating || isDashboardWarming
   const toolbarTitle = latestDashboard
-    ? 'Live preview'
+    ? t('dashboard.livePreview')
     : isDashboardGenerating
-      ? 'Building preview'
-      : 'No dashboard yet'
+      ? t('dashboard.buildingPreview')
+      : t('dashboard.emptyTitle')
   const toolbarStatusLabel = isDashboardGenerating
-    ? 'Generating...'
+    ? t('dashboard.generatingStatus')
     : isDashboardWarming
-      ? 'Waiting for service...'
+      ? t('dashboard.waitingServiceStatus')
       : null
 
   if (!sessionId) {
     return (
       <div className="right-panel-empty">
-        <div className="right-panel-empty-kicker">Dashboard</div>
+        <div className="right-panel-empty-kicker">{t('panel.dashboard.title')}</div>
         <LayoutDashboard className="right-panel-empty-icon" />
-        <h3 className="right-panel-empty-title">No active session</h3>
+        <h3 className="right-panel-empty-title">{t('dashboard.emptyTitleNoSession')}</h3>
         <p className="right-panel-empty-subtitle">
-          Start a conversation or run a workflow to open a live dashboard here.
+          {t('dashboard.emptySubtitleNoSession')}
         </p>
       </div>
     )
@@ -235,11 +244,11 @@ export function DashboardPanel({
   if (!latestDashboard && !isDashboardGenerating) {
     return (
       <div className="right-panel-empty">
-        <div className="right-panel-empty-kicker">Dashboard</div>
+        <div className="right-panel-empty-kicker">{t('panel.dashboard.title')}</div>
         <LayoutDashboard className="right-panel-empty-icon" />
-        <h3 className="right-panel-empty-title">No dashboard yet</h3>
+        <h3 className="right-panel-empty-title">{t('dashboard.emptyTitle')}</h3>
         <p className="right-panel-empty-subtitle">
-          Ask DeepEye to generate a dashboard for your attached data and the live preview will appear here.
+          {t('dashboard.emptySubtitle')}
         </p>
       </div>
     )
@@ -253,7 +262,7 @@ export function DashboardPanel({
             <LayoutDashboard />
           </div>
           <div className="panel-toolbar-copy">
-            <div className="panel-toolbar-label">Dashboard</div>
+            <div className="panel-toolbar-label">{t('panel.dashboard.title')}</div>
             <div className="panel-toolbar-title">{toolbarTitle}</div>
             {toolbarStatusLabel && (
               <div className="panel-toolbar-meta">
@@ -276,7 +285,7 @@ export function DashboardPanel({
               className="panel-toolbar-btn"
             >
               <RefreshCw />
-              Refresh
+              {t('common.refresh')}
             </button>
           ) : null}
           {isReady ? (
@@ -287,7 +296,7 @@ export function DashboardPanel({
               className="panel-toolbar-link"
             >
               <ExternalLink />
-              Open
+              {t('app.open')}
             </a>
           ) : null}
         </div>
@@ -297,42 +306,42 @@ export function DashboardPanel({
         <div className="artifact-progress-shell">
           {isDashboardGenerating ? (
             <ArtifactProgressCard
-              artifact="Dashboard"
-              title="Generating dashboard"
-              description="DeepEye is still designing the dashboard structure and packaging the preview app."
+              artifact={t('panel.dashboard.title')}
+              title={t('dashboard.generatingTitle')}
+              description={t('dashboard.generatingDescription')}
               icon={<LayoutDashboard size={18} />}
               variant="dashboard"
-              signature="Visual analysis pipeline"
+              signature={t('dashboard.generatingSignature')}
               status="running"
-              statusLabel="Running"
+              statusLabel={t('common.running')}
               percent={generationPercent}
               currentLabel={generationCurrentLabel}
               metrics={[
-                { label: 'Stage', value: `${Math.min(generationStageIndex + 1, generationSteps.length)}/${generationSteps.length}` },
-                { label: 'Node', value: dashboardNodeIds[dashboardNodeIds.length - 1] || 'generate_dashboard' },
+                { label: t('dashboard.metricStage'), value: `${Math.min(generationStageIndex + 1, generationSteps.length)}/${generationSteps.length}` },
+                { label: t('dashboard.metricNode'), value: dashboardNodeIds[dashboardNodeIds.length - 1] || t('dashboard.nodeFallback') },
               ]}
               steps={generationSteps}
               tone="#0f766e"
             />
           ) : (
             <ArtifactProgressCard
-              artifact="Dashboard"
-              title="Starting live dashboard"
-              description="The dashboard artifact is ready. DeepEye is warming the preview service before the interactive frame mounts."
+              artifact={t('panel.dashboard.title')}
+              title={t('dashboard.startingLiveTitle')}
+              description={t('dashboard.startingLiveDescription')}
               icon={<LayoutDashboard size={18} />}
               variant="dashboard"
-              signature="Interactive preview"
+              signature={t('dashboard.startingLiveSignature')}
               status={healthCheckCount > 0 ? 'running' : 'waiting'}
-              statusLabel={healthCheckCount > 0 ? 'Connecting' : 'Starting'}
+              statusLabel={healthCheckCount > 0 ? t('dashboard.connecting') : t('common.starting')}
               percent={dashboardWarmupPercent}
               currentLabel={
                 healthCheckCount > 1
-                  ? 'Polling the preview endpoint until the dashboard responds.'
-                  : 'Provisioning the dashboard container and loading the shell.'
+                  ? t('dashboard.pollingPreview')
+                  : t('dashboard.allocatingPreview')
               }
               metrics={[
-                { label: 'Node', value: latestDashboard?.nodeId || 'generate_dashboard' },
-                { label: 'Checks', value: healthCheckCount > 0 ? String(healthCheckCount) : 'Pending' },
+                { label: t('dashboard.metricNode'), value: latestDashboard?.nodeId || t('dashboard.nodeFallback') },
+                { label: t('dashboard.metricChecks'), value: healthCheckCount > 0 ? String(healthCheckCount) : t('dashboard.pendingChecks') },
               ]}
               steps={dashboardWarmupSteps}
               tone="#0f766e"
@@ -347,9 +356,9 @@ export function DashboardPanel({
             {!isReady ? (
               <div className="panel-frame-overlay">
                 <Loader2 className="h-7 w-7 animate-spin text-[var(--accent)]" />
-                <p className="panel-frame-overlay-title">Starting dashboard service</p>
+                <p className="panel-frame-overlay-title">{t('dashboard.overlayTitle')}</p>
                 <p className="panel-frame-overlay-subtitle">
-                  This can take a short while while the preview environment starts.
+                  {t('dashboard.overlaySubtitle')}
                 </p>
               </div>
             ) : null}
@@ -368,7 +377,7 @@ export function DashboardPanel({
                   key={`${fullDashboardUrl}-${refreshKey}`}
                   src={fullDashboardUrl}
                   className="h-full w-full border-none"
-                  title="Dashboard Preview"
+                  title={t('dashboard.iframeTitle')}
                   sandbox={PREVIEW_IFRAME_SANDBOX}
                 />
               </div>
@@ -380,9 +389,9 @@ export function DashboardPanel({
               <Loader2 size={16} className="animate-spin" />
             </div>
             <div className="panel-state-copy">
-              <div className="panel-state-title">Dashboard is in progress</div>
+              <div className="panel-state-title">{t('dashboard.inProgressTitle')}</div>
               <div className="panel-state-body">
-                The workflow is still composing the dashboard artifact. This pane will switch to the live preview automatically.
+                {t('dashboard.inProgressBody')}
               </div>
             </div>
           </div>

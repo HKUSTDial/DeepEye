@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { ENGINE_OPTIONS } from './dataSourceManagerUtils'
+import { useLocale } from '../../locale'
 
 interface EngineSelectProps {
   value: string
@@ -8,6 +9,7 @@ interface EngineSelectProps {
 }
 
 export function EngineSelect({ value, onChange }: EngineSelectProps) {
+  const { t } = useLocale()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -54,7 +56,7 @@ export function EngineSelect({ value, onChange }: EngineSelectProps) {
       </button>
 
       {open && (
-        <div className="data-source-select-menu" role="listbox" aria-label="Database engine">
+        <div className="data-source-select-menu" role="listbox" aria-label={t('datasource.engine')}>
           {ENGINE_OPTIONS.map((option) => {
             const isSelected = option.value === value
             return (

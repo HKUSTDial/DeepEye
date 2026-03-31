@@ -6,6 +6,7 @@ import {
   useChatStore,
 } from '../stores/chat'
 import type { Session } from '../types'
+import { getLocalizedConversationTitle, isDefaultConversationTitle, useLocale } from '../locale'
 import './Sidebar.css'
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
   const navigate = useNavigate()
   const location = useLocation()
   const PINNED_SESSIONS_STORAGE_KEY = 'deepeye:pinned-sessions'
+  const { t, toggleLocale } = useLocale()
   
   // 每个属性单独订阅 - 最简单可靠的方式
   const sessions = useChatStore((state) => state.sessions)
@@ -75,10 +77,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
       return Math.floor((todayTimestamp - date.getTime()) / dayMs)
     }
     const groups: { key: string; label: string; sessions: Session[] }[] = [
-      { key: 'today', label: 'Today', sessions: [] },
-      { key: 'yesterday', label: 'Yesterday', sessions: [] },
-      { key: 'week', label: 'Last 7 Days', sessions: [] },
-      { key: 'earlier', label: 'Earlier', sessions: [] },
+      { key: 'today', label: t('sidebar.today'), sessions: [] },
+      { key: 'yesterday', label: t('sidebar.yesterday'), sessions: [] },
+      { key: 'week', label: t('sidebar.last7days'), sessions: [] },
+      { key: 'earlier', label: t('sidebar.earlier'), sessions: [] },
     ]
     for (const session of sortedSessions) {
       if (pinnedSessionSet.has(session.id)) {
@@ -96,7 +98,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
       }
     }
     return groups.filter((group) => group.sessions.length > 0)
-  }, [pinnedSessionSet, sortedSessions])
+  }, [pinnedSessionSet, sortedSessions, t])
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/')
@@ -133,8 +135,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
 
     for (const newSession of currentSessions) {
       const oldSession = oldSessions.find((s) => s.id === newSession.id)
-      // Detect title change from "New conversation" to user input
-      if (oldSession && oldSession.title === 'New conversation' && newSession.title !== 'New conversation') {
+      if (oldSession && isDefaultConversationTitle(oldSession.title) && !isDefaultConversationTitle(newSession.title)) {
         animateTitle(newSession.id, newSession.title)
       }
     }
@@ -169,7 +170,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
     if (animatingTitles.has(session.id)) {
       return animatingTitles.get(session.id) || ''
     }
-    return session.title || 'New conversation'
+    return getLocalizedConversationTitle(session.title, t)
   }
 
   const isAnimating = (sessionId: string) => {
@@ -197,7 +198,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
 
   const handleDeleteSession = (id: string, title: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    setDeleteTarget({ id, title: title || 'New conversation' })
+    setDeleteTarget({ id, title: getLocalizedConversationTitle(title, t) })
   }
 
   const togglePinnedSession = (id: string, event: React.MouseEvent) => {
@@ -210,7 +211,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
   const startRenamingSession = (session: Session, event: React.MouseEvent) => {
     event.stopPropagation()
     setRenamingSessionId(session.id)
-    setRenameValue(session.title || 'New conversation')
+    setRenameValue(isDefaultConversationTitle(session.title) ? '' : session.title)
   }
 
   const cancelRenamingSession = () => {
@@ -257,8 +258,8 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
           <button
             onClick={onToggleCollapse}
             className={`sidebar-toggle-btn hover:bg-[var(--sidebar-hover)] transition-colors ${collapsed ? '' : 'ml-auto'}`}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+            aria-label={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
           >
             <svg className={`w-5 h-5 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -273,26 +274,25 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
           <button
             onClick={() => navigate('/')}
             className={`nav-item ${isActive('/') ? 'active' : ''}`}
-            title="Chat"
+            title={t('common.chat')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <span className="sidebar-label">Chat</span>
+            <span className="sidebar-label">{t('common.chat')}</span>
           </button>
         </div>
 
-        {/* Conversations */}
         <div className="mb-4 sidebar-section">
           <div className="flex items-center justify-between mb-2 px-2">
             <div className="sidebar-section-title-wrap">
-              <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase">Conversations</span>
+              <span className="text-xs font-medium text-[var(--sidebar-text-muted)] uppercase">{t('sidebar.conversations')}</span>
               <span className="session-total-chip">{sessions.length}</span>
             </div>
             <button
               onClick={handleNewChat}
               className="p-1 rounded hover:bg-[var(--sidebar-hover)] transition-colors"
-              title="New chat"
+              title={t('common.newChat')}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -317,7 +317,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                 {pinnedSessions.length > 0 && (
                   <section className="session-group">
                     <div className="session-group-header">
-                      <span>Pinned</span>
+                      <span>{t('sidebar.pinnedGroup')}</span>
                       <span className="session-group-count">{pinnedSessions.length}</span>
                     </div>
                     <div className="session-group-list">
@@ -329,7 +329,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                           className={`session-item ${session.id === sessionId ? 'active' : ''}`}
                           role="button"
                           tabIndex={0}
-                          aria-label={`Open conversation ${session.title || 'New conversation'}`}
+                          aria-label={t('sidebar.openConversation', { title: getDisplayTitle(session) })}
                         >
                           <div className="session-item-main">
                             {renamingSessionId === session.id ? (
@@ -357,8 +357,8 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                                   {isAnimating(session.id) && <span className="typing-cursor">|</span>}
                                 </span>
                                 <div className="session-meta">
-                                  <span className="session-meta-chip">Pinned</span>
-                                  {session.id === sessionId && <span className="session-meta-chip is-active">Active</span>}
+                                  <span className="session-meta-chip">{t('common.pinned')}</span>
+                                  {session.id === sessionId && <span className="session-meta-chip is-active">{t('common.active')}</span>}
                                 </div>
                               </>
                             )}
@@ -367,7 +367,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                             <button
                               onClick={(event) => togglePinnedSession(session.id, event)}
                               className="session-action-btn"
-                              title="Unpin conversation"
+                              title={t('sidebar.unpinConversation')}
                             >
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="m11.49 2.19 5.32 5.32a1 1 0 0 1-1.42 1.42l-.66-.66-2.7 2.7 3.06 4.08a1 1 0 0 1-1.48 1.33L9.5 13.14l-3.79 3.79a1 1 0 0 1-1.42-1.42l3.79-3.79-3.24-4.1a1 1 0 0 1 1.31-1.47l4.14 3.11 2.7-2.7-.66-.66a1 1 0 0 1 1.42-1.42Z" />
@@ -376,7 +376,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                             <button
                               onClick={(event) => startRenamingSession(session, event)}
                               className="session-action-btn"
-                              title="Rename"
+                              title={t('common.rename')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L8.25 19.463 4 20l.537-4.25 12.325-11.263Z" />
@@ -385,7 +385,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                             <button
                               onClick={(e) => handleDeleteSession(session.id, session.title, e)}
                               className="session-action-btn session-delete-btn"
-                              title="Delete"
+                              title={t('common.delete')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -412,7 +412,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                           className={`session-item ${session.id === sessionId ? 'active' : ''}`}
                           role="button"
                           tabIndex={0}
-                          aria-label={`Open conversation ${session.title || 'New conversation'}`}
+                          aria-label={t('sidebar.openConversation', { title: getDisplayTitle(session) })}
                         >
                           <div className="session-item-main">
                             {renamingSessionId === session.id ? (
@@ -440,7 +440,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                                   {isAnimating(session.id) && <span className="typing-cursor">|</span>}
                                 </span>
                                 <div className="session-meta">
-                                  {session.id === sessionId && <span className="session-meta-chip is-active">Active</span>}
+                                  {session.id === sessionId && <span className="session-meta-chip is-active">{t('common.active')}</span>}
                                 </div>
                               </>
                             )}
@@ -449,7 +449,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                             <button
                               onClick={(event) => togglePinnedSession(session.id, event)}
                               className="session-action-btn"
-                              title="Pin conversation"
+                              title={t('sidebar.pinConversation')}
                             >
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="m11.49 2.19 5.32 5.32a1 1 0 0 1-1.42 1.42l-.66-.66-2.7 2.7 3.06 4.08a1 1 0 0 1-1.48 1.33L9.5 13.14l-3.79 3.79a1 1 0 0 1-1.42-1.42l3.79-3.79-3.24-4.1a1 1 0 0 1 1.31-1.47l4.14 3.11 2.7-2.7-.66-.66a1 1 0 0 1 1.42-1.42Z" />
@@ -458,7 +458,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                             <button
                               onClick={(event) => startRenamingSession(session, event)}
                               className="session-action-btn"
-                              title="Rename"
+                              title={t('common.rename')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L8.25 19.463 4 20l.537-4.25 12.325-11.263Z" />
@@ -467,7 +467,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                             <button
                               onClick={(e) => handleDeleteSession(session.id, session.title, e)}
                               className="session-action-btn session-delete-btn"
-                              title="Delete"
+                              title={t('common.delete')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -488,7 +488,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                 <svg className="w-8 h-8 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                No conversations yet
+                {t('sidebar.noConversations')}
               </div>
             )}
           </div>
@@ -509,18 +509,29 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                 </div>
               </div>
             )}
-            <button
-              type="button"
-              onClick={onLogout}
-              className="sidebar-account-logout"
-              title="Sign out"
-              aria-label="Sign out"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
-              </svg>
-              {!collapsed && <span>Sign out</span>}
-            </button>
+            <div className="sidebar-account-actions">
+              <button
+                type="button"
+                onClick={toggleLocale}
+                className="sidebar-account-logout"
+                title={t('common.localeToggle')}
+                aria-label={t('common.localeToggle')}
+              >
+                <span>{t('common.localeToggle')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="sidebar-account-logout"
+                title={t('common.signOut')}
+                aria-label={t('common.signOut')}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
+                </svg>
+                {!collapsed && <span>{t('common.signOut')}</span>}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -535,12 +546,12 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                 </svg>
               </div>
               <div className="sidebar-delete-header-text">
-                <div className="sidebar-delete-title">Delete conversation?</div>
-                <div className="sidebar-delete-message">This action cannot be undone.</div>
+                <div className="sidebar-delete-title">{t('sidebar.deleteConversationTitle')}</div>
+                <div className="sidebar-delete-message">{t('sidebar.deleteConversationMessage')}</div>
               </div>
             </div>
             <div className="sidebar-delete-target">
-              <div className="sidebar-delete-target-label">Conversation</div>
+              <div className="sidebar-delete-target-label">{t('sidebar.conversationLabel')}</div>
               <span className="sidebar-delete-name">"{deleteTarget.title}"</span>
             </div>
             <div className="sidebar-delete-actions">
@@ -549,14 +560,14 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                 className="sidebar-delete-btn sidebar-delete-btn-cancel"
                 onClick={cancelDeleteSession}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 className="sidebar-delete-btn sidebar-delete-btn-confirm"
                 onClick={confirmDeleteSession}
               >
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           </div>

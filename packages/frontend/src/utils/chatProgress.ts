@@ -1,4 +1,5 @@
-import { DASHBOARD_PROGRESS_STAGES, getDashboardProgressStage } from './dashboardProgress'
+import { getDashboardProgressStage } from './dashboardProgress'
+import { translateApp } from '../locale'
 
 export type ChatProgressTone = 'report' | 'dashboard' | 'video'
 export type ChatProgressStatus = 'running' | 'done' | 'warning' | 'error'
@@ -12,10 +13,10 @@ export interface ChatProgressLine {
 }
 
 const VIDEO_PROGRESS_STAGES = [
-  'Generate video configuration',
-  'Generate audio and align timeline',
-  'Save configuration file',
-  'Render video components',
+  'video.step1',
+  'video.step2',
+  'video.step3',
+  'video.step4',
 ] as const
 
 function trimProgressText(value: string) {
@@ -25,7 +26,7 @@ function trimProgressText(value: string) {
 export function createReportProgressLine(stepIndex: number, totalSteps: number, label: string): ChatProgressLine {
   return {
     tone: 'report',
-    badge: `Report ${stepIndex}/${totalSteps}`,
+    badge: translateApp('progress.reportBadge', { stepIndex, totalSteps }),
     label,
     status: 'running',
   }
@@ -35,11 +36,11 @@ export function parseDashboardProgressLine(text: string): ChatProgressLine | nul
   const stage = getDashboardProgressStage(text)
   if (stage === null) return null
   const detail = trimProgressText(text)
-  const label = DASHBOARD_PROGRESS_STAGES[stage] || 'Dashboard progress'
+  const label = translateApp(DASHBOARD_PROGRESS_STAGE_KEYS[stage] || 'progress.dashboardFallback')
   const isDone = /deployment complete|successfully synchronized/i.test(text)
   return {
     tone: 'dashboard',
-    badge: `Dashboard ${stage + 1}/${DASHBOARD_PROGRESS_STAGES.length}`,
+    badge: translateApp('progress.dashboardBadge', { stepIndex: stage + 1, totalSteps: DASHBOARD_PROGRESS_STAGE_KEYS.length }),
     label,
     detail: detail.toLowerCase() === label.toLowerCase() ? undefined : detail,
     status: isDone ? 'done' : 'running',
@@ -51,7 +52,7 @@ export function parseVideoProgressLine(text: string): ChatProgressLine | null {
   if (!match) return null
   const stepIndex = Math.max(1, parseInt(match[1], 10))
   const totalSteps = Math.max(stepIndex, parseInt(match[2], 10))
-  const label = VIDEO_PROGRESS_STAGES[stepIndex - 1] || `Video step ${stepIndex}`
+  const label = translateApp(VIDEO_PROGRESS_STAGES[stepIndex - 1] || 'progress.videoStepFallback', { stepIndex })
   const status: ChatProgressStatus =
     /❌|failed/i.test(text)
       ? 'error'
@@ -70,7 +71,7 @@ export function parseVideoProgressLine(text: string): ChatProgressLine | null {
 
   return {
     tone: 'video',
-    badge: `Video ${stepIndex}/${totalSteps}`,
+    badge: translateApp('progress.videoBadge', { stepIndex, totalSteps }),
     label,
     detail: detail && detail.toLowerCase() !== label.toLowerCase() ? detail : undefined,
     status,
@@ -80,3 +81,11 @@ export function parseVideoProgressLine(text: string): ChatProgressLine | null {
 export function parseChatProgressLine(text: string): ChatProgressLine | null {
   return parseDashboardProgressLine(text) || parseVideoProgressLine(text)
 }
+const DASHBOARD_PROGRESS_STAGE_KEYS = [
+  'dashboard.stage1',
+  'dashboard.stage2',
+  'dashboard.stage3',
+  'dashboard.stage4',
+  'dashboard.stage5',
+  'dashboard.stage6',
+] as const

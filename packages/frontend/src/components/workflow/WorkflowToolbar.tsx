@@ -5,6 +5,7 @@ import type { Edge, Node } from 'reactflow'
 import { useWorkflowStore } from '../../stores/workflow'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkflowNodesStore, type NodeDef } from '../../stores/workflowNodes'
+import { useLocale } from '../../locale'
 
 interface WorkflowToolbarProps {
   onSave: () => void
@@ -24,6 +25,7 @@ const MotionDiv = motion.div as React.ComponentType<HTMLMotionProps<'div'>>
 const MotionButton = motion.button as React.ComponentType<HTMLMotionProps<'button'>>
 
 export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolbarProps) {
+  const { t } = useLocale()
   const {
     workflowId,
     workflowName,
@@ -81,7 +83,7 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
           value={workflowName}
           onChange={(e) => setWorkflowName(e.target.value)}
           className="workflow-toolbar-input workflow-toolbar-input-name"
-          placeholder="Workflow Naming"
+          placeholder={t('workflow.legacyWorkflowNamePlaceholder')}
         />
       </div>
 
@@ -92,7 +94,7 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
           onClick={onUndo}
           disabled={!canUndo()}
           className="workflow-toolbar-btn workflow-toolbar-btn-icon"
-          title="Undo (Ctrl+Z)"
+          title={t('workflow.legacyUndoTitle')}
         >
           <Undo2 className="w-4 h-4" />
         </MotionButton>
@@ -103,7 +105,7 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
           onClick={onRedo}
           disabled={!canRedo()}
           className="workflow-toolbar-btn workflow-toolbar-btn-icon"
-          title="Redo (Ctrl+Shift+Z)"
+          title={t('workflow.legacyRedoTitle')}
         >
           <Redo2 className="w-4 h-4" />
         </MotionButton>
@@ -117,7 +119,7 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
           className="workflow-toolbar-btn primary"
         >
           <Save className="w-4 h-4" />
-          Save
+          {t('common.save')}
         </MotionButton>
 
         <MotionButton
@@ -128,7 +130,7 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
           className="workflow-toolbar-btn"
         >
           <Download className="w-4 h-4" />
-          {isExporting ? 'Exporting...' : 'Export'}
+          {isExporting ? t('workflow.exporting') : t('common.export')}
         </MotionButton>
 
         <MotionButton
@@ -139,7 +141,7 @@ export function WorkflowToolbar({ onSave, onRun, onUndo, onRedo }: WorkflowToolb
           className="workflow-toolbar-btn success"
         >
           <Play className="w-4 h-4" />
-          Run
+          {t('common.run')}
         </MotionButton>
       </div>
     </MotionDiv>

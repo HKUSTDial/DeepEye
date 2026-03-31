@@ -41,6 +41,7 @@ describe('chatBoxUtils', () => {
   it('builds follow-up prompts based on the reply context', () => {
     expect(buildFollowUpPrompts('Create a dashboard from this analysis', true)[0]).toContain('dashboard')
     expect(buildFollowUpPrompts('Write an executive summary', true)[0]).toContain('executive')
+    expect(buildFollowUpPrompts('Create a dashboard from this analysis', true, 'zh-CN')[0]).toContain('dashboard')
     expect(buildFollowUpPrompts('Plain answer', false)).toHaveLength(3)
   })
 })

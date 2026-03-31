@@ -422,6 +422,13 @@
   white-space: nowrap;
 }
 
+.sidebar-account-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .sidebar-account-logout {
   height: 30px;
   min-width: 30px;

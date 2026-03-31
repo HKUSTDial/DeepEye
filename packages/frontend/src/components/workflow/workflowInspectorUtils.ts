@@ -1,4 +1,5 @@
 import type { DataSource } from '../../types'
+import { translateApp } from '../../locale'
 
 type OutputRecord = Record<string, unknown>
 type DatasetRefOutput = OutputRecord & {
@@ -87,28 +88,28 @@ export function getDatasourceCategoryForNodeType(
 
 export function getDatasourcePlaceholder(category: DataSource['category'] | null): string {
   if (category === 'file') {
-    return 'Select a file datasource'
+    return translateApp('workflowInspector.selectFileDatasource')
   }
   if (category === 'database') {
-    return 'Select a database datasource'
+    return translateApp('workflowInspector.selectDatabaseDatasource')
   }
-  return 'Select a datasource'
+  return translateApp('workflowInspector.selectDatasource')
 }
 
 export function getEmptyDatasourceMessage(category: DataSource['category'] | null): string {
   if (category === 'file') {
-    return 'No file datasources yet. Add one from Chat with the + button, then refresh here.'
+    return translateApp('workflowInspector.noFileDatasources')
   }
   if (category === 'database') {
-    return 'No database datasources yet. Add one from Chat with the + button, then refresh here.'
+    return translateApp('workflowInspector.noDatabaseDatasources')
   }
-  return 'No datasources yet. Add one from Chat with the + button, then refresh here.'
+  return translateApp('workflowInspector.noDatasources')
 }
 
 export function formatDatasourceOptionLabel(datasource: DataSource): string {
   const compactName =
     datasource.name.length > 28 ? `${datasource.name.slice(0, 27)}...` : datasource.name
-  return `${compactName} · ${datasource.category === 'file' ? 'FILE' : 'DB'}`
+  return `${compactName} · ${datasource.category === 'file' ? translateApp('workflowInspector.fileBadge') : translateApp('workflowInspector.dbBadge')}`
 }
 
 export function isMultilineParam(nodeType: string | undefined, key: string): boolean {

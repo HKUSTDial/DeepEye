@@ -14,6 +14,7 @@ import {
 } from 'reactflow'
 import { motion } from 'framer-motion'
 import { useWorkflowStore } from '../../stores/workflow'
+import { useLocale } from '../../locale'
 import WorkflowNode from './WorkflowNode'
 import { useShallow } from 'zustand/react/shallow'
 import type { NodeDef } from '../../stores/workflowNodes'
@@ -53,6 +54,7 @@ interface WorkflowCanvasProps {
 }
 
 export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
+  const { t } = useLocale()
   const { nodes, edges, setEdges, addToHistory, setSelectedNodeId, setNodes } = useWorkflowStore(
     useShallow((state) => ({
       nodes: state.nodes,
@@ -378,10 +380,11 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
           onClick={(event) => event.stopPropagation()}
         >
           <div className="workflow-context-menu-header">
-            {contextMenu.type === 'node' && 'Node'}
-            {contextMenu.type === 'edge' && 'Edge'}
-            {contextMenu.type === 'selection' && `Selection (${contextMenu.nodeIds.length})`}
-            {contextMenu.type === 'canvas' && 'Canvas'}
+            {contextMenu.type === 'node' && t('workflow.legacyNodeMenu')}
+            {contextMenu.type === 'edge' && t('workflow.legacyEdgeMenu')}
+            {contextMenu.type === 'selection' &&
+              t('workflow.legacySelectionMenu', { count: contextMenu.nodeIds.length })}
+            {contextMenu.type === 'canvas' && t('workflow.legacyCanvasMenu')}
           </div>
           <div className="workflow-context-menu-body">
             <button
@@ -391,7 +394,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                 closeContextMenu()
               }}
             >
-              Save Workflow
+              {t('workflow.legacySaveWorkflow')}
             </button>
             {contextMenu.type === 'node' && (
               <>
@@ -402,7 +405,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                     closeContextMenu()
                   }}
                 >
-                  Duplicate
+                  {t('workflow.legacyDuplicate')}
                 </button>
                 <button
                   className="workflow-context-menu-item danger"
@@ -411,7 +414,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                     closeContextMenu()
                   }}
                 >
-                  Delete
+                  {t('common.delete')}
                 </button>
               </>
             )}
@@ -423,7 +426,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                   closeContextMenu()
                 }}
               >
-                Delete Edge
+                {t('workflow.legacyDeleteEdge')}
               </button>
             )}
             {contextMenu.type === 'selection' && (
@@ -435,7 +438,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                     closeContextMenu()
                   }}
                 >
-                  Duplicate Selection
+                  {t('workflow.legacyDuplicateSelection')}
                 </button>
                 <button
                   className="workflow-context-menu-item danger"
@@ -444,7 +447,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                     closeContextMenu()
                   }}
                 >
-                  Delete Selection
+                  {t('workflow.legacyDeleteSelection')}
                 </button>
               </>
             )}
@@ -459,7 +462,7 @@ export function WorkflowCanvas({ onSave, nodeDefs }: WorkflowCanvasProps) {
                       closeContextMenu()
                     }}
                   >
-                    Add {def.label}
+                    {t('workflow.legacyAddNodeLabel', { label: def.label })}
                   </button>
                 ))}
               </>

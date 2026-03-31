@@ -2,39 +2,31 @@ import { useEffect, useRef, useState } from 'react'
 import { Download, FileText, Loader2, Sparkles, TriangleAlert } from 'lucide-react'
 import { ArtifactProgressCard } from '../ArtifactProgressCard'
 import { useReportStore } from '../../../stores/report'
+import { useLocale } from '../../../locale'
 
 const REPORT_IFRAME_SANDBOX = 'allow-scripts'
-
-const STAGES = [
-  { label: 'Load and parse data files', icon: '📂' },
-  { label: 'Generate dataset context', icon: '🔍' },
-  { label: 'Perform deep exploratory analysis (EDA)', icon: '🕵️' },
-  { label: 'Calculate key business indicators (KPI)', icon: '📊' },
-  { label: 'Plan and generate visual charts', icon: '📈' },
-  { label: 'Write analysis summary and conclusions', icon: '✍️' },
-  { label: 'Render final HTML report', icon: '🎨' },
-]
 
 const STAGE_END_PCT = [8, 22, 42, 58, 82, 93, 100]
 
 type StageStatus = 'done' | 'active' | 'warning' | 'pending'
 
-function getStageDetail(status: StageStatus) {
+function getStageDetail(status: StageStatus, t: (key: string) => string) {
   switch (status) {
     case 'done':
-      return 'Completed'
+      return t('report.stageDone')
     case 'active':
-      return 'Live now'
+      return t('report.stageActive')
     case 'warning':
-      return 'Review logs'
+      return t('report.stageWarning')
     default:
-      return 'Queued'
+      return t('report.stagePending')
   }
 }
 
 function parseStages(
   steps: string[],
   isDone: boolean,
+  stageCount: number,
 ): { stageStatuses: StageStatus[]; maxStage: number } {
   let maxStage = -1
   const warningStages = new Set<number>()
@@ -58,7 +50,7 @@ function parseStages(
     }
   }
 
-  const stageStatuses: StageStatus[] = STAGES.map((_, index) => {
+  const stageStatuses: StageStatus[] = Array.from({ length: stageCount }, (_, index) => {
     if (isDone || index < maxStage) return warningStages.has(index) ? 'warning' : 'done'
     if (index === maxStage) return isDone ? (warningStages.has(index) ? 'warning' : 'done') : 'active'
     return 'pending'
@@ -68,6 +60,16 @@ function parseStages(
 }
 
 export function ReportPanel({ sessionId }: { sessionId: string | null }) {
+  const { t } = useLocale()
+  const STAGES = [
+    { label: t('report.stage1'), icon: '📂' },
+    { label: t('report.stage2'), icon: '🔍' },
+    { label: t('report.stage3'), icon: '🕵️' },
+    { label: t('report.stage4'), icon: '📊' },
+    { label: t('report.stage5'), icon: '📈' },
+    { label: t('report.stage6'), icon: '✍️' },
+    { label: t('report.stage7'), icon: '🎨' },
+  ]
   const sessionReport = useReportStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
@@ -84,7 +86,7 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   const showProgress = !isDone && (isGenerating || reportSteps.length > 0) && !reportError
   const isWaiting = isGenerating && reportSteps.length === 0 && !reportError
 
-  const { stageStatuses, maxStage } = parseStages(reportSteps, isDone)
+  const { stageStatuses, maxStage } = parseStages(reportSteps, isDone, STAGES.length)
 
   useEffect(() => {
     if (maxStage > committedStageRef.current) {
@@ -140,11 +142,11 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   const currentStageLabel =
     maxStage >= 0 && maxStage < STAGES.length
       ? STAGES[maxStage].label
-      : 'Preparing the report pipeline'
+      : t('report.preparingPipeline')
   const reportStepsProgress = STAGES.map((stage, index) => ({
     id: stage.label,
     label: stage.label,
-    detail: getStageDetail(stageStatuses[index]),
+    detail: getStageDetail(stageStatuses[index], t),
     icon: stageStatuses[index] === 'done' ? '✓' : stage.icon,
     status: stageStatuses[index],
   }))
@@ -152,11 +154,11 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   if (!reportHtml && reportSteps.length === 0 && !isGenerating) {
     return (
       <div className="right-panel-empty">
-        <div className="right-panel-empty-kicker">Report</div>
+        <div className="right-panel-empty-kicker">{t('panel.report.title')}</div>
         <FileText className="right-panel-empty-icon" />
-        <h3 className="right-panel-empty-title">No report yet</h3>
+        <h3 className="right-panel-empty-title">{t('report.emptyTitle')}</h3>
         <p className="right-panel-empty-subtitle">
-          Ask DeepEye to draft a report for your attached data. The rendered document will open here when it is ready.
+          {t('report.emptySubtitle')}
         </p>
       </div>
     )
@@ -167,19 +169,19 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
       {showProgress && (
         <div className="artifact-progress-shell">
           <ArtifactProgressCard
-            artifact="Report"
-            title="Generating report"
-            description="DeepEye is preparing the narrative, metrics, and chart package for the final document."
+            artifact={t('panel.report.title')}
+            title={t('report.generatingTitle')}
+            description={t('report.generatingDescription')}
             icon={<FileText size={18} />}
             variant="report"
-            signature="Editorial pipeline"
+            signature={t('report.signature')}
             status={isWaiting ? 'waiting' : 'running'}
-            statusLabel={isWaiting ? 'Queued' : 'Running'}
+            statusLabel={isWaiting ? t('common.queued') : t('common.running')}
             percent={roundedPct}
             currentLabel={currentStageLabel}
             metrics={[
-              { label: 'Phases', value: `${progressedCount}/7` },
-              { label: 'Output', value: 'HTML report' },
+              { label: t('report.phasesMetric'), value: `${progressedCount}/7` },
+              { label: 'Output', value: t('report.outputMetric') },
             ]}
             steps={reportStepsProgress}
             tone="#c2410c"
@@ -194,7 +196,7 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
               <TriangleAlert size={16} />
             </div>
             <div className="panel-state-copy">
-              <div className="panel-state-title">Report generation failed</div>
+              <div className="panel-state-title">{t('report.failedTitle')}</div>
               <div className="panel-state-body">{reportError}</div>
             </div>
           </div>
@@ -204,19 +206,19 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
               <div className="panel-inline-note">
                 {reportFilename ? (
                   <span>
-                    Report saved to workspace: <code>{reportFilename}</code>
+                    {t('report.savedToWorkspace', { filename: reportFilename })} <code>{reportFilename}</code>
                   </span>
                 ) : (
-                  'Report ready to review.'
+                  t('report.readyToReview')
                 )}
               </div>
               <button type="button" onClick={handleDownload} className="panel-toolbar-btn panel-toolbar-btn--primary">
                 <Download />
-                Download
+                {t('common.download')}
               </button>
             </div>
             <iframe
-              title="Report"
+              title={t('report.iframeTitle')}
               srcDoc={reportHtml}
               className="panel-report-frame"
               sandbox={REPORT_IFRAME_SANDBOX}
@@ -228,9 +230,9 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
               <Loader2 size={16} className="animate-spin" />
             </div>
             <div className="panel-state-copy">
-              <div className="panel-state-title">Waiting for the report pipeline</div>
+              <div className="panel-state-title">{t('report.waitingTitle')}</div>
               <div className="panel-state-body">
-                DeepEye has started the report workflow and will stream progress here as soon as the first stage begins.
+                {t('report.waitingBody')}
               </div>
             </div>
           </div>
@@ -240,9 +242,9 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
               <Sparkles size={16} />
             </div>
             <div className="panel-state-copy">
-              <div className="panel-state-title">Report is in progress</div>
+              <div className="panel-state-title">{t('report.inProgressTitle')}</div>
               <div className="panel-state-body">
-                The workflow is still running. This pane will switch to the final document automatically.
+                {t('report.inProgressBody')}
               </div>
             </div>
           </div>

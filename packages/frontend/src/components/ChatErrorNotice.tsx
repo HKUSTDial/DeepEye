@@ -1,4 +1,5 @@
 import { deriveChatErrorState } from '../utils/chatErrorState'
+import { useLocale } from '../locale'
 
 interface ChatErrorNoticeProps {
   error: string
@@ -19,11 +20,12 @@ export function ChatErrorNotice({
   onOpenWorkflow,
   onOpenData,
 }: ChatErrorNoticeProps) {
-  const state = deriveChatErrorState(error)
+  const { locale, t } = useLocale()
+  const state = deriveChatErrorState(error, locale)
 
   return (
     <div className="chat-error-card" role="alert">
-      <div className="chat-error-card-kicker">Needs attention</div>
+      <div className="chat-error-card-kicker">{t('common.needsAttention')}</div>
       <div className="chat-error-card-title">{state.title}</div>
       <p className="chat-error-card-summary">{state.summary}</p>
       <p className="chat-error-card-suggestion">{state.suggestion}</p>
@@ -34,7 +36,7 @@ export function ChatErrorNotice({
           onClick={onRetry}
           disabled={!canRetry}
         >
-          Retry
+          {t('common.retry')}
         </button>
         {canOpenData && (
           <button
@@ -42,7 +44,7 @@ export function ChatErrorNotice({
             className="chat-error-card-btn"
             onClick={onOpenData}
           >
-            Check attached data
+            {t('common.checkAttachedData')}
           </button>
         )}
         {canOpenWorkflow && (
@@ -51,12 +53,12 @@ export function ChatErrorNotice({
             className="chat-error-card-btn"
             onClick={onOpenWorkflow}
           >
-            Open workflow
+            {t('common.openWorkflow')}
           </button>
         )}
       </div>
       <details className="chat-error-card-details">
-        <summary>Show technical details</summary>
+        <summary>{t('common.showTechnicalDetails')}</summary>
         <pre>{error}</pre>
       </details>
     </div>

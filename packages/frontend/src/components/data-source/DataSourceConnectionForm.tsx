@@ -1,5 +1,6 @@
 import { EngineSelect } from './EngineSelect'
 import { URI_EXAMPLES } from './dataSourceManagerUtils'
+import { useLocale } from '../../locale'
 
 type ConnectionFormState = {
   name: string
@@ -37,10 +38,14 @@ export function DataSourceConnectionForm({
   isTesting,
   isSubmitting,
   submitLabel,
-  testingLabel = 'Testing...',
-  idleTestLabel = 'Test connection',
+  testingLabel,
+  idleTestLabel,
   intro,
 }: DataSourceConnectionFormProps) {
+  const { t } = useLocale()
+  const resolvedTestingLabel = testingLabel ?? t('datasource.testingConnection')
+  const resolvedIdleTestLabel = idleTestLabel ?? t('datasource.testConnection')
+
   return (
     <>
       {intro && (
@@ -52,19 +57,19 @@ export function DataSourceConnectionForm({
 
       <div className="data-source-form-grid">
         <label className="data-source-field-group">
-          <span className="data-source-field-label">Display name</span>
+          <span className="data-source-field-label">{t('datasource.displayName')}</span>
           <input
             value={form.name}
             onChange={(event) => {
               onChange({ ...form, name: event.target.value })
               onClearStatus()
             }}
-            placeholder="Revenue warehouse"
+            placeholder={t('datasource.placeholderName')}
             className="data-source-field"
           />
         </label>
         <label className="data-source-field-group">
-          <span className="data-source-field-label">Engine</span>
+          <span className="data-source-field-label">{t('datasource.engine')}</span>
           <EngineSelect
             value={form.type}
             onChange={(nextType) => {
@@ -76,22 +81,22 @@ export function DataSourceConnectionForm({
       </div>
 
       <label className="data-source-field-group">
-        <span className="data-source-field-label">Connection URI</span>
+        <span className="data-source-field-label">{t('datasource.connectionUri')}</span>
         <textarea
           value={form.connection_string}
           onChange={(event) => {
             onChange({ ...form, connection_string: event.target.value })
             onClearStatus()
           }}
-          placeholder={URI_EXAMPLES[form.type] || 'Connection URI'}
+          placeholder={URI_EXAMPLES[form.type] || t('datasource.connectionUri')}
           className="data-source-field data-source-field-mono data-source-textarea"
           rows={3}
         />
       </label>
 
       <div className="data-source-uri-help">
-        <span className="data-source-uri-label">Example</span>
-        <code className="data-source-uri-example">{URI_EXAMPLES[form.type] || 'Connection URI'}</code>
+        <span className="data-source-uri-label">{t('datasource.example')}</span>
+        <code className="data-source-uri-example">{URI_EXAMPLES[form.type] || t('datasource.connectionUri')}</code>
       </div>
 
       {statusMessage && (
@@ -107,7 +112,7 @@ export function DataSourceConnectionForm({
           disabled={isTesting || isSubmitting}
           className="data-source-secondary-btn"
         >
-          {isTesting ? testingLabel : idleTestLabel}
+          {isTesting ? resolvedTestingLabel : resolvedIdleTestLabel}
         </button>
         <button
           type="button"
@@ -115,11 +120,11 @@ export function DataSourceConnectionForm({
           disabled={isSubmitting}
           className="data-source-submit-btn"
         >
-          {isSubmitting ? 'Saving...' : submitLabel}
+          {isSubmitting ? t('datasource.savingConnection') : submitLabel}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} className="data-source-secondary-btn">
-            Cancel
+            {t('common.cancel')}
           </button>
         )}
       </div>

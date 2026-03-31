@@ -6,6 +6,7 @@ import {
   type ArtifactProgressStepStatus,
 } from '../ArtifactProgressCard'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
+import { useLocale } from '../../../locale'
 
 interface VideoPreviewPanelProps {
   taskId?: string
@@ -42,20 +43,6 @@ function extractTaskIdFromOutput(runOutput: string): string | undefined {
   return taskIdMatch ? taskIdMatch[1] : undefined
 }
 
-const STEP_LABELS = [
-  { icon: '📹', label: 'Generate config', index: 0 },
-  { icon: '🎵', label: 'Audio & timeline', index: 1 },
-  { icon: '💾', label: 'Save config', index: 2 },
-  { icon: '🎬', label: 'Render components', index: 3 },
-]
-
-const STEP_MESSAGES: Record<number, string> = {
-  0: '📹 Step 1/4: Generating video configuration...',
-  1: '🎵 Step 2/4: Generating audio and aligning timeline...',
-  2: '💾 Step 3/4: Saving configuration file...',
-  3: '🎬 Step 4/4: Rendering video components...',
-}
-
 const PREVIEW_IFRAME_SANDBOX = 'allow-same-origin allow-scripts'
 
 function getVideoStepStatus(index: number, currentStep: number, failed: boolean): ArtifactProgressStepStatus {
@@ -65,16 +52,16 @@ function getVideoStepStatus(index: number, currentStep: number, failed: boolean)
   return 'pending'
 }
 
-function getStepDetail(status: ArtifactProgressStepStatus) {
+function getStepDetail(status: ArtifactProgressStepStatus, t: (key: string) => string) {
   switch (status) {
     case 'done':
-      return 'Completed'
+      return t('video.stepDone')
     case 'active':
-      return 'Live now'
+      return t('video.stepActive')
     case 'warning':
-      return 'Check logs'
+      return t('video.stepWarning')
     default:
-      return 'Queued'
+      return t('video.stepPending')
   }
 }
 
@@ -104,6 +91,7 @@ function getLogRowClass(type: ReturnType<typeof getLogEntryType>) {
 }
 
 export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps) {
+  const { t } = useLocale()
   const videoProgressLogsRef = useRef<HTMLDivElement | null>(null)
   const [pastedTaskId, setPastedTaskId] = useState('')
   const [manualTaskId, setManualTaskId] = useState<string | null>(null)
@@ -111,6 +99,18 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
+  const STEP_LABELS = [
+    { icon: '📹', label: t('video.step1'), index: 0 },
+    { icon: '🎵', label: t('video.step2'), index: 1 },
+    { icon: '💾', label: t('video.step3'), index: 2 },
+    { icon: '🎬', label: t('video.step4'), index: 3 },
+  ]
+  const STEP_MESSAGES: Record<number, string> = {
+    0: `📹 ${t('video.stepMessage1')}`,
+    1: `🎵 ${t('video.stepMessage2')}`,
+    2: `💾 ${t('video.stepMessage3')}`,
+    3: `🎬 ${t('video.stepMessage4')}`,
+  }
   const latestVideoArtifact = useMemo(
     () =>
       [...(sessionState?.artifacts ?? [])]
@@ -242,34 +242,34 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     return {
       id: `${step.index}`,
       label: step.label,
-      detail: getStepDetail(status),
+      detail: getStepDetail(status, t),
       icon: runFailed && step.index === videoProgress.step ? '⚠️' : step.icon,
       status,
     }
   })
   const previewWarmupPercent = isPreviewReady ? 100 : Math.min(34 + previewCheckCount * 14, 86)
   const previewWarmupSteps = [
-    { id: 'artifact', label: 'Receive preview artifact', icon: '🔗', status: 'done' as const, detail: 'Ready' },
+    { id: 'artifact', label: t('video.openPreview'), icon: '🔗', status: 'done' as const, detail: t('common.ready') },
     {
       id: 'boot',
-      label: 'Boot preview container',
+      label: t('video.overlayTitle'),
       icon: '🚀',
       status: isPreviewReady ? 'done' as const : previewCheckCount <= 1 ? 'active' as const : 'done' as const,
-      detail: isPreviewReady ? 'Ready' : previewCheckCount <= 1 ? 'Starting' : 'Warmed',
+      detail: isPreviewReady ? t('common.ready') : previewCheckCount <= 1 ? t('common.starting') : t('common.ready'),
     },
     {
       id: 'probe',
-      label: 'Probe player endpoint',
+      label: t('video.metricChecks'),
       icon: '🩺',
       status: isPreviewReady ? 'done' as const : previewCheckCount > 1 ? 'active' as const : 'pending' as const,
-      detail: isPreviewReady ? 'Healthy' : previewCheckCount > 1 ? 'Checking' : 'Queued',
+      detail: isPreviewReady ? t('common.ready') : previewCheckCount > 1 ? t('common.checking') : t('common.queued'),
     },
     {
       id: 'mount',
-      label: 'Mount live preview',
+      label: t('video.livePreview'),
       icon: '🖥️',
       status: isPreviewReady ? 'done' as const : 'pending' as const,
-      detail: isPreviewReady ? 'Visible' : 'Queued',
+      detail: isPreviewReady ? t('common.ready') : t('common.queued'),
     },
   ]
 
@@ -282,13 +282,13 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
               <Film />
             </div>
             <div className="panel-toolbar-copy">
-              <div className="panel-toolbar-label">Video</div>
-              <div className="panel-toolbar-title">Live preview</div>
+              <div className="panel-toolbar-label">{t('video.label')}</div>
+              <div className="panel-toolbar-title">{t('video.livePreview')}</div>
               {(!isPreviewReady || isCheckingPreview) && (
                 <div className="panel-toolbar-meta">
                   <span className="panel-toolbar-status">
                     <Loader2 className="animate-spin" />
-                    Waiting for preview...
+                    {t('video.waitingPreview')}
                   </span>
                 </div>
               )}
@@ -304,7 +304,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
                 className="panel-toolbar-link"
               >
                 <ExternalLink />
-                Open
+                {t('app.open')}
               </a>
             </div>
           )}
@@ -313,23 +313,23 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         {!isPreviewReady ? (
           <div className="artifact-progress-shell">
             <ArtifactProgressCard
-              artifact="Video"
-              title="Starting live preview"
-              description="The render artifact is ready. DeepEye is warming the preview container before the player mounts."
+              artifact={t('video.label')}
+              title={t('video.startingLiveTitle')}
+              description={t('video.startingLiveDescription')}
               icon={<Film size={18} />}
               variant="video"
-              signature="Playback surface"
+              signature={t('video.signaturePlayback')}
               status={previewCheckCount > 0 ? 'running' : 'waiting'}
-              statusLabel={previewCheckCount > 0 ? 'Connecting' : 'Starting'}
+              statusLabel={previewCheckCount > 0 ? t('dashboard.connecting') : t('common.starting')}
               percent={previewWarmupPercent}
               currentLabel={
                 previewCheckCount > 1
-                  ? 'Waiting for the preview HTML to respond to health checks.'
-                  : 'Allocating the preview container and loading the player shell.'
+                  ? t('video.waitingPreviewChecks')
+                  : t('video.allocatingPreview')
               }
               metrics={[
-                ...(displayTaskId ? [{ label: 'Task', value: displayTaskId }] : []),
-                { label: 'Checks', value: previewCheckCount > 0 ? String(previewCheckCount) : 'Pending' },
+                ...(displayTaskId ? [{ label: t('video.metricTask'), value: displayTaskId }] : []),
+                { label: t('video.metricChecks'), value: previewCheckCount > 0 ? String(previewCheckCount) : t('video.pending') },
               ]}
               steps={previewWarmupSteps}
               tone="#2563eb"
@@ -343,7 +343,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
               key={effectivePreviewUrlWithSession}
               src={effectivePreviewUrlWithSession}
               className="h-full w-full border-none"
-              title="Video Preview"
+              title={t('video.iframeTitle')}
               allow="autoplay"
               sandbox={PREVIEW_IFRAME_SANDBOX}
             />
@@ -351,12 +351,12 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
           {!isPreviewReady ? (
             <div className="panel-frame-overlay">
               <Loader2 className="h-7 w-7 animate-spin text-[var(--accent)]" />
-              <p className="panel-frame-overlay-title">Starting preview container</p>
+              <p className="panel-frame-overlay-title">{t('video.overlayTitle')}</p>
               <p className="panel-frame-overlay-subtitle">
-                This usually takes 15 to 30 seconds. The panel will switch to the rendered video as soon as the service responds.
+                {t('video.overlaySubtitle')}
               </p>
               <p className="panel-helper-text">
-                If it stays blank for more than a minute, build the preview image first: <code>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code>
+                {t('video.overlayHelper')} <code>docker build -f docker/Dockerfile.video-preview -t deepeye-video-preview:latest .</code>
               </p>
             </div>
           ) : null}
@@ -374,11 +374,11 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
               {runFailed ? <TriangleAlert /> : <PlayCircle />}
             </div>
             <div className="panel-toolbar-copy">
-              <div className="panel-toolbar-label">Video</div>
-              <div className="panel-toolbar-title">Generation status</div>
+              <div className="panel-toolbar-label">{t('video.label')}</div>
+              <div className="panel-toolbar-title">{t('video.generationStatusTitle')}</div>
               <div className="panel-toolbar-meta">
                 <span className={`panel-toolbar-status ${runFailed ? 'panel-toolbar-error' : ''}`}>
-                  {runFailed ? 'Failed' : `${videoProgress.percent}% complete`}
+                  {runFailed ? t('common.failed') : t('video.percentComplete', { count: videoProgress.percent })}
                 </span>
               </div>
             </div>
@@ -388,28 +388,28 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
         <div className="panel-surface">
           <div className="panel-stack">
             <ArtifactProgressCard
-              artifact="Video"
-              title={runFailed ? 'Video generation failed' : 'Rendering data video'}
+              artifact={t('video.label')}
+              title={runFailed ? t('video.generationFailedTitle') : t('video.renderingTitle')}
               description={
                 runFailed
-                  ? 'The workflow stopped before the preview could open. Inspect the latest logs below.'
-                  : 'DeepEye is generating the video config, timeline, and render artifacts.'
+                  ? t('video.generationFailedDescription')
+                  : t('video.renderingDescription')
               }
               icon={runFailed ? <TriangleAlert size={18} /> : <PlayCircle size={18} />}
               variant="video"
-              signature="Render pipeline"
+              signature={t('video.signatureRender')}
               status={runFailed ? 'failed' : videoProgress.percent > 0 || videoProgress.logs.length > 0 ? 'running' : 'waiting'}
-              statusLabel={runFailed ? 'Failed' : videoProgress.percent > 0 || videoProgress.logs.length > 0 ? 'Rendering' : 'Queued'}
+              statusLabel={runFailed ? t('common.failed') : videoProgress.percent > 0 || videoProgress.logs.length > 0 ? t('video.rendering') : t('common.queued')}
               percent={videoProgress.percent}
               currentLabel={
                 runFailed
-                  ? 'Component render stopped before preview handoff.'
-                  : latestVideoLog || STEP_MESSAGES[videoProgress.step] || 'Preparing the render workflow.'
+                  ? t('video.generationFailedDescription')
+                  : latestVideoLog || STEP_MESSAGES[videoProgress.step] || t('video.renderingDescription')
               }
               metrics={[
-                { label: 'Stage', value: `${generationStepNumber}/4` },
+                { label: t('dashboard.metricStage'), value: `${generationStepNumber}/4` },
                 { label: 'Logs', value: String(videoProgress.logs.length) },
-                ...(displayTaskId ? [{ label: 'Task', value: displayTaskId }] : []),
+                ...(displayTaskId ? [{ label: t('video.metricTask'), value: displayTaskId }] : []),
               ]}
               steps={videoProgressSteps}
               tone="#2563eb"
@@ -421,7 +421,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
                   <TriangleAlert size={16} />
                 </div>
                 <div className="panel-state-copy">
-                  <div className="panel-state-title">Render error</div>
+                  <div className="panel-state-title">{t('video.renderError')}</div>
                   <div className="panel-state-body">{runError}</div>
                 </div>
               </div>
@@ -429,14 +429,14 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
             <div>
               <div className="panel-inline-header">
-                <div className="panel-inline-note">Live render logs</div>
+                <div className="panel-inline-note">{t('video.liveLogs')}</div>
               </div>
               <div ref={videoProgressLogsRef} className="panel-log-console">
                 {videoProgress.logs.length === 0 ? (
                   <div className="panel-log-empty">
                     {(videoProgress.step > 0 || videoProgress.percent > 0) && STEP_MESSAGES[videoProgress.step]
-                      ? `${STEP_MESSAGES[videoProgress.step]} Live log lines will appear here when the backend emits progress.`
-                      : 'Progress logs will appear here while the render is running.'}
+                      ? t('video.logFallbackActive', { message: STEP_MESSAGES[videoProgress.step] })
+                      : t('video.logFallbackIdle')}
                   </div>
                 ) : (
                   videoProgress.logs.slice(-50).map((log) => {
@@ -459,11 +459,11 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
   return (
     <div className="right-panel-empty">
-      <div className="right-panel-empty-kicker">Video</div>
+      <div className="right-panel-empty-kicker">{t('video.label')}</div>
       <Film className="right-panel-empty-icon" />
-      <h3 className="right-panel-empty-title">No video preview yet</h3>
+      <h3 className="right-panel-empty-title">{t('video.emptyTitle')}</h3>
       <p className="right-panel-empty-subtitle">
-        DeepEye will open the rendered video here automatically. If you already have a task ID, you can open the preview manually.
+        {t('video.emptySubtitle')}
       </p>
 
       <div className="panel-form-card">
@@ -472,7 +472,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
             type="text"
             value={pastedTaskId}
             onChange={(event) => setPastedTaskId(event.target.value)}
-            placeholder="e.g. 20260306_121530"
+            placeholder={t('video.placeholderTaskId')}
             className="panel-input panel-input--mono"
             onKeyDown={(event) => {
               if (event.key === 'Enter' && pastedNormalized) {
@@ -487,11 +487,11 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
             className="panel-toolbar-btn panel-toolbar-btn--primary"
           >
             <Sparkles />
-            Open preview
+            {t('video.openPreview')}
           </button>
         </div>
         <p className="panel-helper-text">
-          Paste the task ID from chat or workflow output. Supported format: <code>YYYYMMDD_HHMMSS</code>.
+          {t('video.taskIdHelper')} <code>YYYYMMDD_HHMMSS</code>.
         </p>
       </div>
     </div>

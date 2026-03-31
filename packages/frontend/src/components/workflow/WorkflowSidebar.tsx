@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { Workflow } from '../../types'
 import { useWorkflowStore } from '../../stores/workflow'
+import { useLocale } from '../../locale'
 import { Modal } from '../ui/Modal'
 
 const nodeIcons: Record<string, LucideIcon> = {
@@ -37,6 +38,7 @@ export function WorkflowSidebar({
   onDeleteWorkflow,
   onAddNode,
 }: WorkflowSidebarProps) {
+  const { t } = useLocale()
   const [workflowsExpanded, setWorkflowsExpanded] = useState(true)
   const [nodesExpanded, setNodesExpanded] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<Workflow | null>(null)
@@ -55,7 +57,7 @@ export function WorkflowSidebar({
       <div className="workflow-sidebar-header">
         <div className="workflow-sidebar-title-wrapper">
           <WorkflowIcon className="workflow-sidebar-icon" />
-          <h2 className="workflow-sidebar-title">Workflows</h2>
+          <h2 className="workflow-sidebar-title">{t('workflow.legacySidebarTitle')}</h2>
         </div>
       </div>
 
@@ -66,7 +68,7 @@ export function WorkflowSidebar({
             onClick={() => setWorkflowsExpanded(!workflowsExpanded)}
             className="workflow-sidebar-section-toggle"
           >
-            <span className="workflow-sidebar-section-title">My Workflows</span>
+            <span className="workflow-sidebar-section-title">{t('workflow.legacyMyWorkflows')}</span>
             {workflowsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
 
@@ -80,7 +82,7 @@ export function WorkflowSidebar({
                 className="workflow-sidebar-list"
               >
                 {workflows.length === 0 ? (
-                  <div className="workflow-sidebar-empty">No workflows yet</div>
+                  <div className="workflow-sidebar-empty">{t('workflow.legacyNoWorkflows')}</div>
                 ) : (
                   workflows.map((wf) => (
                     <motion.div
@@ -106,7 +108,7 @@ export function WorkflowSidebar({
                           setDeleteTarget(wf)
                         }}
                         className="workflow-sidebar-item-delete"
-                        aria-label={`Delete workflow ${wf.name}`}
+                        aria-label={t('workflow.legacyDeleteWorkflowTitle')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -124,7 +126,7 @@ export function WorkflowSidebar({
             onClick={() => setNodesExpanded(!nodesExpanded)}
             className="workflow-sidebar-section-toggle"
           >
-            <span className="workflow-sidebar-section-title">Add Node</span>
+            <span className="workflow-sidebar-section-title">{t('workflow.legacyAddNode')}</span>
             {nodesExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
 
@@ -162,14 +164,14 @@ export function WorkflowSidebar({
       </div>
       <Modal
         open={!!deleteTarget}
-        title="Delete workflow?"
+        title={t('workflow.legacyDeleteWorkflowTitle')}
         description={
           deleteTarget
-            ? `This will permanently delete "${deleteTarget.name}" and its runs.`
+            ? t('workflow.legacyDeleteWorkflowDescription', { name: deleteTarget.name })
             : undefined
         }
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => {
           if (deleteTarget) {

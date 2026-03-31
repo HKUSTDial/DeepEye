@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useLocale } from '../../locale'
 import './AuthShell.css'
 
 interface AuthShellProps {
@@ -11,12 +12,6 @@ interface AuthShellProps {
   footer?: ReactNode
 }
 
-const DEFAULT_POINTS = [
-  'Single secure account for all DeepEye capabilities',
-  'Clear, focused auth flows with minimal jumps',
-  'Consistent UX across login, signup, and recovery',
-]
-
 export default function AuthShell({
   title,
   subtitle,
@@ -26,14 +21,18 @@ export default function AuthShell({
   children,
   footer,
 }: AuthShellProps) {
-  const points = leftPoints && leftPoints.length > 0 ? leftPoints : DEFAULT_POINTS
+  const { t } = useLocale()
+  const points =
+    leftPoints && leftPoints.length > 0
+      ? leftPoints
+      : [t('auth.point1'), t('auth.point2'), t('auth.point3')]
 
   return (
     <div className="auth-shell">
       <div className="auth-shell__inner">
         <section className="auth-shell__aside">
           <div className="auth-shell__aside-top">
-            <div className="auth-shell__badge">DeepEye Workspace</div>
+            <div className="auth-shell__badge">{t('auth.badge')}</div>
             <h1 className="auth-shell__headline">{leftTitle}</h1>
             <p className="auth-shell__lead">{leftDescription}</p>
           </div>
@@ -50,7 +49,7 @@ export default function AuthShell({
 
         <section className="auth-shell__card">
           <div className="auth-shell__form-shell">
-            <div className="auth-shell__kicker">Account access</div>
+            <div className="auth-shell__kicker">{t('auth.kicker')}</div>
             <div className="auth-shell__copy">
               <h2 className="auth-shell__title">{title}</h2>
               <p className="auth-shell__subtitle">{subtitle}</p>

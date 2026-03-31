@@ -6,10 +6,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import AuthShell from '../components/auth/AuthShell'
 import { authApi } from '../api/auth'
+import { useLocale } from '../locale'
 
 const INPUT_CLASS = 'auth-input'
 
 export default function ResetPassword() {
+  const { t } = useLocale()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -22,10 +24,10 @@ export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false)
 
   const validatePassword = (password: string): string | null => {
-    if (password.length < 8) return 'Password must be at least 8 characters'
-    if (password.length > 64) return 'Password must be at most 64 characters'
+    if (password.length < 8) return t('auth.passwordMin')
+    if (password.length > 64) return t('auth.passwordMax')
     if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-      return 'Password must include uppercase, lowercase, digit, and special character'
+      return t('auth.passwordComplexity')
     }
     return null
   }
@@ -36,12 +38,12 @@ export default function ResetPassword() {
     setMessage('')
 
     if (!token) {
-      setError('Missing reset token in URL.')
+      setError(t('auth.reset.missingToken'))
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('auth.passwordMismatch'))
       return
     }
 
@@ -59,7 +61,7 @@ export default function ResetPassword() {
       })
       setMessage(response.message)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Reset failed')
+      setError(err instanceof Error ? err.message : t('auth.reset.failed'))
     } finally {
       setIsLoading(false)
     }
@@ -67,14 +69,14 @@ export default function ResetPassword() {
 
   return (
     <AuthShell
-      title="Set a new password"
-      subtitle="Use the one-time token from your reset email."
-      leftTitle="Secure password reset"
-      leftDescription="Reset is isolated as an explicit one-time operation with strict token checks."
+      title={t('auth.reset.title')}
+      subtitle={t('auth.reset.subtitle')}
+      leftTitle={t('auth.reset.leftTitle')}
+      leftDescription={t('auth.reset.leftDescription')}
     >
       {!token && (
         <div className="auth-feedback auth-feedback--error">
-          Invalid reset link. Please request a new one.
+          {t('auth.reset.invalidLink')}
         </div>
       )}
 
@@ -93,7 +95,7 @@ export default function ResetPassword() {
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-form-row">
           <label htmlFor="newPassword" className="auth-form-label">
-            New password
+            {t('auth.newPassword')}
           </label>
           <input
             id="newPassword"
@@ -104,14 +106,14 @@ export default function ResetPassword() {
             minLength={8}
             maxLength={64}
             className={INPUT_CLASS}
-            placeholder="8-64 chars with mixed complexity"
+            placeholder={t('auth.placeholderPassword')}
             disabled={isLoading || !token}
           />
         </div>
 
         <div className="auth-form-row">
           <label htmlFor="confirmPassword" className="auth-form-label">
-            Confirm password
+            {t('auth.confirmPassword')}
           </label>
           <input
             id="confirmPassword"
@@ -122,7 +124,7 @@ export default function ResetPassword() {
             minLength={8}
             maxLength={64}
             className={INPUT_CLASS}
-            placeholder="Re-enter password"
+            placeholder={t('auth.placeholderPasswordResetConfirm')}
             disabled={isLoading || !token}
           />
         </div>
@@ -132,13 +134,13 @@ export default function ResetPassword() {
           disabled={isLoading || !token}
           className="auth-submit"
         >
-          {isLoading ? 'Resetting...' : 'Reset password'}
+          {isLoading ? t('auth.reset.submitting') : t('auth.reset.submit')}
         </button>
       </form>
 
       <div className="auth-muted-actions">
         <button type="button" onClick={() => navigate('/auth')} className="auth-link">
-          Back to login
+          {t('auth.forgot.backToLogin')}
         </button>
       </div>
     </AuthShell>

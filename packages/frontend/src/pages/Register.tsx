@@ -5,11 +5,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import AuthShell from '../components/auth/AuthShell'
+import { useLocale } from '../locale'
 import { useAuthStore } from '../stores/auth'
 
 const INPUT_CLASS = 'auth-input'
 
 export default function Register() {
+  const { t } = useLocale()
   const navigate = useNavigate()
   const register = useAuthStore((state) => state.register)
 
@@ -25,22 +27,22 @@ export default function Register() {
     setError('')
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('auth.passwordMismatch'))
       return
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(t('auth.passwordMin'))
       return
     }
 
     if (password.length > 64) {
-      setError('Password must be at most 64 characters')
+      setError(t('auth.passwordMax'))
       return
     }
 
     if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-      setError('Password must include uppercase, lowercase, digit, and special character')
+      setError(t('auth.passwordComplexity'))
       return
     }
 
@@ -50,7 +52,7 @@ export default function Register() {
       await register(email, username, password)
       navigate(`/verify-email?email=${encodeURIComponent(email)}`)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Registration failed')
+      setError(err instanceof Error ? err.message : t('auth.register.failed'))
     } finally {
       setIsLoading(false)
     }
@@ -58,10 +60,10 @@ export default function Register() {
 
   return (
     <AuthShell
-      title="Create account"
-      subtitle="Set up your DeepEye account in one minute."
-      leftTitle="Build your workspace identity"
-      leftDescription="Keep authentication and verification as focused, independent steps."
+      title={t('auth.register.title')}
+      subtitle={t('auth.register.subtitle')}
+      leftTitle={t('auth.register.leftTitle')}
+      leftDescription={t('auth.register.leftDescription')}
     >
       {error && (
         <div className="auth-feedback auth-feedback--error">
@@ -72,7 +74,7 @@ export default function Register() {
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-form-row">
           <label htmlFor="email" className="auth-form-label">
-            Email
+            {t('auth.email')}
           </label>
           <input
             id="email"
@@ -81,14 +83,14 @@ export default function Register() {
             onChange={(e) => setEmail(e.target.value)}
             required
             className={INPUT_CLASS}
-            placeholder="you@example.com"
+            placeholder={t('auth.placeholderEmail')}
             disabled={isLoading}
           />
         </div>
 
         <div className="auth-form-row">
           <label htmlFor="username" className="auth-form-label">
-            Username
+            {t('auth.username')}
           </label>
           <input
             id="username"
@@ -98,14 +100,14 @@ export default function Register() {
             required
             minLength={2}
             className={INPUT_CLASS}
-            placeholder="johndoe"
+            placeholder={t('auth.placeholderUsername')}
             disabled={isLoading}
           />
         </div>
 
         <div className="auth-form-row">
           <label htmlFor="password" className="auth-form-label">
-            Password
+            {t('auth.password')}
           </label>
           <input
             id="password"
@@ -116,14 +118,14 @@ export default function Register() {
             minLength={8}
             maxLength={64}
             className={INPUT_CLASS}
-            placeholder="8-64 chars with mixed complexity"
+            placeholder={t('auth.placeholderPassword')}
             disabled={isLoading}
           />
         </div>
 
         <div className="auth-form-row">
           <label htmlFor="confirmPassword" className="auth-form-label">
-            Confirm password
+            {t('auth.confirmPassword')}
           </label>
           <input
             id="confirmPassword"
@@ -134,7 +136,7 @@ export default function Register() {
             minLength={8}
             maxLength={64}
             className={INPUT_CLASS}
-            placeholder="Re-enter your password"
+            placeholder={t('auth.placeholderPasswordConfirm')}
             disabled={isLoading}
           />
         </div>
@@ -144,15 +146,15 @@ export default function Register() {
           disabled={isLoading}
           className="auth-submit"
         >
-          {isLoading ? 'Creating account...' : 'Register'}
+          {isLoading ? t('auth.register.submitting') : t('auth.register.submit')}
         </button>
       </form>
 
       <div className="auth-muted-actions">
         <div>
-          Already have an account?{' '}
+          {t('auth.register.haveAccount')}{' '}
           <button type="button" onClick={() => navigate('/auth')} className="auth-link">
-            Sign in
+            {t('auth.register.signIn')}
           </button>
         </div>
       </div>

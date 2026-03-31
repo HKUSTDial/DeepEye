@@ -6,11 +6,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import AuthShell from '../components/auth/AuthShell'
 import { authApi } from '../api/auth'
+import { useLocale } from '../locale'
 import { useAuthStore } from '../stores/auth'
 
 const INPUT_CLASS = 'auth-input'
 
 export default function VerifyEmail() {
+  const { t } = useLocale()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const currentUser = useAuthStore((state) => state.user)
@@ -37,7 +39,7 @@ export default function VerifyEmail() {
       setMessage(response.message)
       setDebugToken(response.debug_token ?? null)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Request failed')
+      setError(err instanceof Error ? err.message : t('auth.forgot.failed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -49,7 +51,7 @@ export default function VerifyEmail() {
     setDebugToken(null)
 
     if (!token) {
-      setError('Missing verification token in URL.')
+      setError(t('auth.verify.missingToken'))
       return
     }
 
@@ -61,7 +63,7 @@ export default function VerifyEmail() {
         setUser({ ...currentUser, is_email_verified: true })
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Verification failed')
+      setError(err instanceof Error ? err.message : t('auth.verify.failed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -69,10 +71,10 @@ export default function VerifyEmail() {
 
   return (
     <AuthShell
-      title="Email verification"
-      subtitle="Verify from your email link, or resend a new verification message."
-      leftTitle="Confirm account ownership"
-      leftDescription="Verification remains a dedicated trust step, not a primary entry point."
+      title={t('auth.verify.title')}
+      subtitle={t('auth.verify.subtitle')}
+      leftTitle={t('auth.verify.leftTitle')}
+      leftDescription={t('auth.verify.leftDescription')}
     >
       {error && (
         <div className="auth-feedback auth-feedback--error">
@@ -85,7 +87,7 @@ export default function VerifyEmail() {
           {message}
           {debugToken && (
             <div className="auth-feedback-meta">
-              Debug token: <code>{debugToken}</code>
+              {t('auth.verify.debugToken')}: <code>{debugToken}</code>
             </div>
           )}
         </div>
@@ -94,7 +96,7 @@ export default function VerifyEmail() {
       {token ? (
         <div className="auth-form">
           <p className="text-sm text-[var(--main-text-muted)]">
-            Click below to confirm your email with the verification token in this URL.
+            {t('auth.verify.confirmHelp')}
           </p>
           <button
             type="button"
@@ -102,17 +104,17 @@ export default function VerifyEmail() {
             disabled={isSubmitting}
             className="auth-submit"
           >
-            {isSubmitting ? 'Verifying...' : 'Verify email now'}
+            {isSubmitting ? t('auth.verify.confirming') : t('auth.verify.confirmNow')}
           </button>
         </div>
       ) : (
         <form onSubmit={handleResend} className="auth-form">
           <p className="text-sm text-[var(--main-text-muted)]">
-            Need a new verification email? Enter your account email below.
+            {t('auth.verify.resendHelp')}
           </p>
           <div className="auth-form-row">
             <label htmlFor="email" className="auth-form-label">
-              Email
+              {t('auth.email')}
             </label>
             <input
               id="email"
@@ -121,7 +123,7 @@ export default function VerifyEmail() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className={INPUT_CLASS}
-              placeholder="you@example.com"
+              placeholder={t('auth.placeholderEmail')}
               disabled={isSubmitting}
             />
           </div>
@@ -130,17 +132,17 @@ export default function VerifyEmail() {
             disabled={isSubmitting}
             className="auth-submit"
           >
-            {isSubmitting ? 'Sending...' : 'Send verification email'}
+            {isSubmitting ? t('auth.verify.sending') : t('auth.verify.sendEmail')}
           </button>
         </form>
       )}
 
       <div className="auth-inline-actions">
         <button type="button" onClick={() => navigate('/auth')} className="auth-link">
-          Back to login
+          {t('auth.forgot.backToLogin')}
         </button>
         <button type="button" onClick={() => navigate('/forgot-password')} className="auth-link">
-          Forgot password
+          {t('auth.verify.forgotPassword')}
         </button>
       </div>
     </AuthShell>

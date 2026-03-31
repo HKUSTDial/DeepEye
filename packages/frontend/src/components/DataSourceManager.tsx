@@ -4,6 +4,7 @@ import { datasourceApi, sessionApi, type DatasourcePreviewResponse } from '../ap
 import { selectCurrentSessionId, useChatStore } from '../stores/chat'
 import { useDatasourceSyncStore } from '../stores/datasourceSync'
 import type { DataSource } from '../types'
+import { useLocale } from '../locale'
 import { DataSourceConnectionForm } from './data-source/DataSourceConnectionForm'
 import { DataSourcePreviewPanel } from './data-source/DataSourcePreviewPanel'
 import {
@@ -19,6 +20,7 @@ interface DataSourceManagerProps {
 }
 
 export default function DataSourceManager({ onDataSourcesChange, variant = 'sidebar' }: DataSourceManagerProps) {
+  const { locale, t } = useLocale()
   const sessionId = useChatStore(selectCurrentSessionId)
   const createSession = useChatStore((state) => state.createSession)
   const datasourceRevision = useDatasourceSyncStore((state) => state.revision)
@@ -88,15 +90,15 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setExpandedDsId((current) => (current && visibleIds.has(current) ? current : null))
       setEditingDsId((current) => (current && visibleIds.has(current) ? current : null))
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to load'
+      const msg = e instanceof Error ? e.message : t('datasource.errorLoad')
       const is502 = typeof msg === 'string' && (msg.includes('Bad Gateway') || msg.includes('502'))
       setError(
         is502
-          ? 'Backend is not ready or unreachable. If you are using Docker, open http://localhost:8080 and run `docker compose ps` to confirm `backend-api` is healthy, then click Retry.'
+          ? t('datasource.errorBackendUnavailable')
           : msg,
       )
     }
-  }, [applyDataSources, sessionId])
+  }, [applyDataSources, sessionId, t])
 
   const ensureSessionId = useCallback(async () => {
     if (sessionId && sessionId !== 'draft') {
@@ -105,10 +107,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
 
     const created = await createSession()
     if (!created) {
-      throw new Error('Failed to create a session before attaching data')
+      throw new Error(t('datasource.errorCreateSession'))
     }
     return created.id
-  }, [createSession, sessionId])
+  }, [createSession, sessionId, t])
 
   const loadPreview = useCallback(
     async (
@@ -131,7 +133,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         })
         setPreviewByDsId((current) => ({ ...current, [datasource.id]: preview }))
       } catch (e: unknown) {
-        setError(getApiErrorDetail(e, 'Failed to load preview'))
+        setError(getApiErrorDetail(e, t('datasource.errorPreview')))
       } finally {
         setLoadingPreviewId(null)
       }
@@ -146,7 +148,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       const supportedFiles = files.filter(isSupportedFile)
       const ignoredCount = files.length - supportedFiles.length
       if (supportedFiles.length === 0) {
-        setError('Only CSV, JSON, Excel, and Parquet files are supported.')
+        setError(t('datasource.errorUnsupportedFiles'))
         return
       }
 
@@ -166,22 +168,22 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         }
         notifyDatasourceUpdated()
         if (ignoredCount > 0) {
-          setError(`${ignoredCount} unsupported file(s) were skipped.`)
+          setError(t('datasource.errorUnsupportedSkipped', { count: ignoredCount }))
         }
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Upload failed')
+        setError(e instanceof Error ? e.message : t('datasource.errorUpload'))
       } finally {
         setIsUploading(false)
         setIsDragOver(false)
       }
     },
-    [ensureSessionId, loadDataSources, loadPreview, notifyDatasourceUpdated],
+    [ensureSessionId, loadDataSources, loadPreview, notifyDatasourceUpdated, t],
   )
 
   const createDataSource = async () => {
     const conn = newDs.connection_string.trim()
     if (!conn) {
-      setError('Please enter a connection string (Connection URI).')
+      setError(t('datasource.errorConnectionUriRequired'))
       return
     }
     try {
@@ -201,14 +203,14 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setCreateConnectionStatus(null)
       notifyDatasourceUpdated()
     } catch (e: unknown) {
-      setError(getApiErrorDetail(e, 'Failed to create'))
+      setError(getApiErrorDetail(e, t('datasource.errorCreate')))
     }
   }
 
   const runCreateConnectionTest = async () => {
     const conn = newDs.connection_string.trim()
     if (!conn) {
-      setError('Please enter a connection string (Connection URI).')
+      setError(t('datasource.errorConnectionUriRequired'))
       return false
     }
     setIsTestingCreate(true)
@@ -219,10 +221,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         type: newDs.type,
         connection_string: conn,
       })
-      setCreateConnectionStatus(formatConnectionSuccess(result))
+      setCreateConnectionStatus(formatConnectionSuccess(result, locale))
       return true
     } catch (e: unknown) {
-      setError(getApiErrorDetail(e, 'Database connection failed'))
+      setError(getApiErrorDetail(e, t('datasource.errorDatabaseConnection')))
       return false
     } finally {
       setIsTestingCreate(false)
@@ -261,7 +263,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
     if (!editingDsId) return
     const conn = editForm.connection_string.trim()
     if (!conn) {
-      setError('Please enter a connection string.')
+      setError(t('datasource.errorConnectionUriRequiredShort'))
       return
     }
     setIsSavingEdit(true)
@@ -285,7 +287,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       await loadPreview(updated, { page: 1 })
       notifyDatasourceUpdated()
     } catch (e: unknown) {
-      setError(getApiErrorDetail(e, 'Update failed'))
+      setError(getApiErrorDetail(e, t('datasource.errorUpdate')))
     } finally {
       setIsSavingEdit(false)
     }
@@ -294,7 +296,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   const runEditConnectionTest = async () => {
     const conn = editForm.connection_string.trim()
     if (!conn) {
-      setError('Please enter a connection string.')
+      setError(t('datasource.errorConnectionUriRequiredShort'))
       return false
     }
     setIsTestingEdit(true)
@@ -305,10 +307,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         type: editForm.type,
         connection_string: conn,
       })
-      setEditConnectionStatus(formatConnectionSuccess(result))
+      setEditConnectionStatus(formatConnectionSuccess(result, locale))
       return true
     } catch (e: unknown) {
-      setError(getApiErrorDetail(e, 'Database connection failed'))
+      setError(getApiErrorDetail(e, t('datasource.errorDatabaseConnection')))
       return false
     } finally {
       setIsTestingEdit(false)
@@ -352,7 +354,8 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   const deleteDataSource = async (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
     if (!sessionId || sessionId === 'draft') return
-    if (!confirm('Remove this data source from the current thread?')) return
+    const target = dataSources.find((item) => item.id === id)
+    if (!confirm(t('datasource.confirmRemove', { name: target?.name ?? t('common.attachedData') }))) return
     try {
       await sessionApi.detachDatasource(sessionId, id)
       applyDataSources((current) => current.filter((item) => item.id !== id))
@@ -365,7 +368,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       if (editingDsId === id) setEditingDsId(null)
       notifyDatasourceUpdated()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to delete')
+      setError(e instanceof Error ? e.message : t('datasource.errorDelete'))
     }
   }
 
@@ -387,14 +390,14 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
 
       <div className="data-source-header">
         <div className="data-source-heading">
-          <span className="data-source-heading-label">Attached Data</span>
-          <span className="data-source-heading-note">Everything attached here is available to the assistant automatically.</span>
+          <span className="data-source-heading-label">{t('datasource.title')}</span>
+          <span className="data-source-heading-note">{t('datasource.note')}</span>
         </div>
         <div className="data-source-actions">
           <button
             type="button"
             className="data-source-toolbar-btn"
-            title="Upload file data"
+            title={t('datasource.uploadFileData')}
             onClick={() => fileInputRef.current?.click()}
           >
             {isUploading ? (
@@ -404,13 +407,13 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
             )}
-            <span>Upload file</span>
+            <span>{t('datasource.uploadFile')}</span>
           </button>
           <button
             type="button"
             onClick={() => setIsCreating((current) => !current)}
             className={`data-source-toolbar-btn ${isCreating ? 'is-active' : ''}`}
-            title={isCreating ? 'Cancel database form' : 'Add database'}
+            title={isCreating ? t('datasource.cancelDatabaseForm') : t('datasource.addDatabase')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -422,7 +425,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            <span>Database</span>
+            <span>{t('datasource.addDatabase')}</span>
           </button>
           <span className="data-source-count-chip">{dataSources.length}</span>
         </div>
@@ -457,10 +460,10 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
           </span>
           <span className="data-source-dropzone-copy">
             <span className="data-source-dropzone-title">
-              {isUploading ? 'Uploading files...' : 'Drag files here or click to browse'}
+              {isUploading ? t('datasource.dropzoneUploading') : t('datasource.dropzoneTitle')}
             </span>
             <span className="data-source-dropzone-note">
-              CSV, JSON, Excel, and Parquet are supported.
+              {t('datasource.dropzoneNote')}
             </span>
           </span>
         </button>
@@ -470,7 +473,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         <div className="data-source-error">
           <span>{error}</span>
           <button type="button" onClick={() => void loadDataSources()} className="data-source-link-btn">
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       )}
@@ -486,10 +489,12 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
             onSubmit={() => void createDataSource()}
             isTesting={isTestingCreate}
             isSubmitting={false}
-            submitLabel="Connect database"
+            submitLabel={t('datasource.connectDatabase')}
+            testingLabel={t('datasource.testingConnection')}
+            idleTestLabel={t('datasource.testConnection')}
             intro={{
-              kicker: 'Database connection',
-              copy: 'Create a reusable live source for reports, dashboards, and follow-up analysis.',
+              kicker: t('datasource.databaseConnection'),
+              copy: t('datasource.databaseConnectionIntro'),
             }}
           />
         </div>
@@ -512,7 +517,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                 d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
               />
             </svg>
-            <span>No attached data yet</span>
+            <span>{t('datasource.noAttachedData')}</span>
           </div>
         )}
 
@@ -545,7 +550,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                     type="button"
                     onClick={(event) => void togglePreview(ds, event)}
                     className="data-source-icon-btn"
-                    title="Preview data"
+                    title={t('datasource.previewData')}
                   >
                     {isPreviewLoading ? (
                       <div className="data-source-spinner is-small" />
@@ -560,7 +565,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                       type="button"
                       onClick={(event) => startEdit(ds, event)}
                       className="data-source-icon-btn"
-                      title="Edit connection"
+                      title={t('datasource.editConnection')}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -571,7 +576,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                     type="button"
                     onClick={(event) => void deleteDataSource(ds.id, event)}
                     className="data-source-icon-btn is-danger"
-                    title="Delete data source"
+                    title={t('datasource.deleteDataSource')}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -592,7 +597,9 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
                     onCancel={cancelEdit}
                     isTesting={isTestingEdit}
                     isSubmitting={isSavingEdit}
-                    submitLabel="Save connection"
+                    submitLabel={t('datasource.saveConnection')}
+                    testingLabel={t('datasource.testingConnection')}
+                    idleTestLabel={t('datasource.testConnection')}
                   />
                 </div>
               )}

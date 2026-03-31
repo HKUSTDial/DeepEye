@@ -11,6 +11,7 @@ import {
 } from './fileViewerUtils'
 import { useCodeHighlight } from '../hooks/useCodeHighlight'
 import { useTheme } from '../hooks/useTheme'
+import { useLocale } from '../locale'
 import './FileViewer.css'
 
 interface FileViewerProps {
@@ -25,6 +26,7 @@ const CsvPreview = lazy(() => import('./file-viewers/CsvPreview'))
 const LineNumberTextPreview = lazy(() => import('./file-viewers/LineNumberTextPreview'))
 
 export default function FileViewer({ sessionId, filePath, onClose }: FileViewerProps) {
+  const { t } = useLocale()
   const [fileContent, setFileContent] = useState<FileContentResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,12 +92,12 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load file')
+      setError(e instanceof Error ? e.message : t('files.failedToLoadFile'))
       setFileContent(null)
     } finally {
       setIsLoading(false)
     }
-  }, [highlight])
+  }, [highlight, t])
 
   useEffect(() => {
     if (sessionId && filePath) {
@@ -132,7 +134,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
             <button
               onClick={onClose}
               className="file-viewer-tab-close"
-              title="Close"
+              title={t('common.close')}
             >
               <X size={14} />
             </button>
@@ -153,7 +155,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
         {isLoading && (
           <div className="file-viewer-loading">
             <div className="loading-spinner"></div>
-            <p className="loading-text">Loading...</p>
+            <p className="loading-text">{t('common.loading')}...</p>
           </div>
         )}
 
@@ -165,7 +167,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="error-title">Failed to load file</p>
+            <p className="error-title">{t('files.failedToLoadFile')}</p>
             <p className="error-message">{error}</p>
           </div>
         )}
@@ -183,21 +185,21 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
         {/* Markdown Viewer */}
         {!isLoading && !error && viewerType === 'markdown' && fileContent && (
-          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading markdown preview...</p></div>}>
+          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">{t('files.loadingMarkdown')}</p></div>}>
             <MarkdownPreview content={fileContent.content} />
           </Suspense>
         )}
 
         {/* CSV Viewer */}
         {!isLoading && !error && viewerType === 'csv' && csvData && (
-          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading CSV preview...</p></div>}>
+          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">{t('files.loadingCsv')}</p></div>}>
             <CsvPreview headers={csvData.headers} rows={csvData.rows} />
           </Suspense>
         )}
 
         {/* XLSX Viewer */}
         {!isLoading && !error && viewerType === 'xlsx' && fileContent && (
-          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading spreadsheet preview...</p></div>}>
+          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">{t('files.loadingSpreadsheet')}</p></div>}>
             <SpreadsheetPreview
               fileContent={fileContent}
               isDownloading={isDownloading}
@@ -210,14 +212,14 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
         {!isLoading && !error && viewerType === 'binary' && fileContent && (
           <div className="file-viewer-empty">
             <FileTextIcon className="file-viewer-empty-icon" />
-            <p className="file-viewer-empty-title">Binary file preview is not supported</p>
-            <p className="file-viewer-empty-subtitle">Please download to view this file</p>
+            <p className="file-viewer-empty-title">{t('files.binaryUnsupportedTitle')}</p>
+            <p className="file-viewer-empty-subtitle">{t('files.binaryUnsupportedSubtitle')}</p>
             <button
               type="button"
               className="file-explorer-btn mt-3"
               onClick={handleDownload}
               disabled={isDownloading}
-              title="Download"
+              title={t('common.download')}
             >
               <Download size={14} className={isDownloading ? 'animate-spin' : ''} />
             </button>
@@ -230,14 +232,14 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
             {isHighlighterLoading && !highlightedCode ? (
               <div className="file-viewer-loading">
                 <div className="loading-spinner small"></div>
-                <p className="loading-text">Loading syntax highlighter...</p>
+                <p className="loading-text">{t('files.loadingHighlighter')}</p>
               </div>
             ) : highlightedCode ? (
               <div className="code-with-lines">
                 <div dangerouslySetInnerHTML={{ __html: highlightedCode }} className="shiki-wrapper"></div>
               </div>
             ) : (
-              <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading code preview...</p></div>}>
+              <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">{t('files.loadingCode')}</p></div>}>
                 <LineNumberTextPreview lines={codeLines} />
               </Suspense>
             )}
@@ -246,7 +248,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
         {/* Text Viewer with Line Numbers */}
         {!isLoading && !error && viewerType === 'text' && fileContent && (
-          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading text preview...</p></div>}>
+          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">{t('files.loadingText')}</p></div>}>
             <LineNumberTextPreview lines={codeLines} />
           </Suspense>
         )}
@@ -255,8 +257,8 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
         {!isLoading && !error && !fileContent && (
           <div className="file-viewer-empty">
             <FileTextIcon className="file-viewer-empty-icon" />
-            <p className="file-viewer-empty-title">Select a file to preview</p>
-            <p className="file-viewer-empty-subtitle">Click a file on the left</p>
+            <p className="file-viewer-empty-title">{t('files.selectToPreviewTitle')}</p>
+            <p className="file-viewer-empty-subtitle">{t('files.selectToPreviewSubtitle')}</p>
           </div>
         )}
       </div>

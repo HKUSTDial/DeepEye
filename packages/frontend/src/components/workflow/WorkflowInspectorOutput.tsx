@@ -9,6 +9,7 @@ import {
   isDatasetRefOutput,
   type OutputRecord,
 } from './workflowInspectorUtils'
+import { useLocale } from '../../locale'
 
 export function WorkflowInspectorOutputView({
   output,
@@ -17,6 +18,7 @@ export function WorkflowInspectorOutputView({
   output: OutputRecord
   rawOutput: string
 }) {
+  const { t } = useLocale()
   const entries = Object.entries(output).filter(([key]) => key !== 'status')
   const hasFriendlySections = entries.length > 0
 
@@ -28,12 +30,12 @@ export function WorkflowInspectorOutputView({
         ))
       ) : (
         <div className="workflow-inspector-output-empty">
-          This node completed without a material output payload.
+          {t('workflowInspector.noMaterialOutput')}
         </div>
       )}
 
       <details className="workflow-inspector-output-raw">
-        <summary>Raw JSON</summary>
+        <summary>{t('workflowInspector.rawJson')}</summary>
         <pre className="workflow-inspector-output-content">{rawOutput}</pre>
       </details>
     </div>
@@ -41,6 +43,7 @@ export function WorkflowInspectorOutputView({
 }
 
 function WorkflowInspectorOutputSection({ label, value }: { label: string; value: unknown }) {
+  const { t } = useLocale()
   if (isDatasetRefOutput(value)) {
     const previewRows = getDatasetPreviewRows(value)
     const previewColumns = getPreviewColumns(previewRows)
@@ -54,10 +57,10 @@ function WorkflowInspectorOutputSection({ label, value }: { label: string; value
 
         <div className="workflow-inspector-output-metrics">
           {[
-            ['Rows', formatDatasetMetaValue(value.row_count)],
-            ['Format', formatDatasetMetaValue(value.format)?.toUpperCase() ?? null],
-            ['Source', formatDatasetMetaValue(value.source)],
-            ['Name', formatDatasetMetaValue(value.name)],
+            [t('workflowInspector.rows'), formatDatasetMetaValue(value.row_count)],
+            [t('workflowInspector.format'), formatDatasetMetaValue(value.format)?.toUpperCase() ?? null],
+            [t('workflowInspector.source'), formatDatasetMetaValue(value.source)],
+            [t('workflowInspector.name'), formatDatasetMetaValue(value.name)],
           ]
             .filter(([, metricValue]) => !!metricValue)
             .map(([metricLabel, metricValue]) => (

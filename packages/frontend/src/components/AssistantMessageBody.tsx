@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 
 import type { ChatProgressLine } from '../utils/chatProgress'
 import type { Message } from '../types'
+import { useLocale } from '../locale'
 import StepItem from './StepItem'
 import { hasText } from './chatBoxUtils'
 import { splitAssistantMessageSections } from './assistantMessageBodyUtils'
@@ -19,6 +20,7 @@ export function AssistantMessageBody({
   renderProgressLine,
   renderStreamingIndicator,
 }: AssistantMessageBodyProps) {
+  const { t } = useLocale()
   const { finalContent, processEntries } = useMemo(
     () => splitAssistantMessageSections(message),
     [message],
@@ -45,9 +47,9 @@ export function AssistantMessageBody({
             aria-expanded={showProcess}
           >
             <span className="assistant-process-toggle-copy">
-              <span className="assistant-process-toggle-label">Activity</span>
+              <span className="assistant-process-toggle-label">{t('assistant.activity')}</span>
               <span className="assistant-process-toggle-meta">
-                {processEntries.length} update{processEntries.length > 1 ? 's' : ''}
+                {t('assistant.activityUpdates', { count: processEntries.length })}
               </span>
             </span>
             <span className={`assistant-process-toggle-chevron ${showProcess ? 'is-open' : ''}`}>
@@ -72,7 +74,7 @@ export function AssistantMessageBody({
       {hasFinalContent && (
         <section className="assistant-answer-card">
           <div className="assistant-answer-kicker">
-            {message.isStreaming ? 'Drafting response' : 'Final answer'}
+            {message.isStreaming ? t('assistant.draftingResponse') : t('assistant.finalAnswer')}
           </div>
           <div className="message-content">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{finalContent}</ReactMarkdown>

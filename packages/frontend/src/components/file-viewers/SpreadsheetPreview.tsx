@@ -3,6 +3,7 @@ import { Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 import type { FileContentResponse } from '../../api/sandbox'
+import { useLocale } from '../../locale'
 
 type SpreadsheetPreviewProps = {
   fileContent: FileContentResponse
@@ -15,6 +16,7 @@ export default function SpreadsheetPreview({
   isDownloading,
   onDownload,
 }: SpreadsheetPreviewProps) {
+  const { t } = useLocale()
   const xlsxData = useMemo(() => {
     if (fileContent.encoding !== 'base64') return null
 
@@ -51,10 +53,10 @@ export default function SpreadsheetPreview({
     <div className="csv-viewer">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-[var(--main-text-muted)]">
-          Sheet: <span className="font-mono">{xlsxData?.sheetName || 'Sheet1'}</span>
-          {xlsxData?.truncated ? <span> (showing first 200 rows / 50 cols)</span> : null}
+          {t('files.sheet')}: <span className="font-mono">{xlsxData?.sheetName || 'Sheet1'}</span>
+          {xlsxData?.truncated ? <span> {t('files.showingRowsCols')}</span> : null}
           {xlsxData && 'error' in xlsxData && xlsxData.error ? (
-            <span className="ml-2 text-[#ff3b30]">Parse failed: {xlsxData.error}</span>
+            <span className="ml-2 text-[#ff3b30]">{t('files.parseFailed', { error: xlsxData.error })}</span>
           ) : null}
         </div>
         <button
@@ -62,7 +64,7 @@ export default function SpreadsheetPreview({
           className="file-explorer-btn"
           onClick={onDownload}
           disabled={isDownloading}
-          title="Download"
+          title={t('common.download')}
         >
           <Download size={14} className={isDownloading ? 'animate-spin' : ''} />
         </button>

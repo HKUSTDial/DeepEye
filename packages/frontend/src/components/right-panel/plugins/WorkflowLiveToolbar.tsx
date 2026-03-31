@@ -1,6 +1,7 @@
 import { Loader2, Workflow as WorkflowIcon } from 'lucide-react'
 
 import type { WorkflowDraft } from '../../../types'
+import { useLocale } from '../../../locale'
 import {
   buildWorkflowExportFilename,
   getDraftDisplayName,
@@ -53,7 +54,15 @@ export function WorkflowLiveToolbar({
   onExport,
   onRun,
 }: WorkflowLiveToolbarProps) {
+  const { t } = useLocale()
   const exportFilename = buildWorkflowExportFilename(activeDraft, activeDraftId)
+  const runStatusLabel = (() => {
+    if (!runStatus) return null
+    if (runStatus === 'running') return t('common.running')
+    if (runStatus === 'failed' || runStatus === 'error') return t('common.failed')
+    if (runStatus === 'completed' || runStatus === 'success') return t('common.completed')
+    return runStatus
+  })()
 
   return (
     <div className="panel-toolbar">
@@ -62,16 +71,16 @@ export function WorkflowLiveToolbar({
           <WorkflowIcon />
         </div>
         <div className="panel-toolbar-copy">
-          <div className="panel-toolbar-label">Workflow</div>
-          <div className="panel-toolbar-title">Live graph</div>
+          <div className="panel-toolbar-label">{t('workflow.toolbarLabel')}</div>
+          <div className="panel-toolbar-title">{t('workflow.toolbarTitle')}</div>
           <div className="panel-toolbar-meta">
             {isViewSwitching && (
               <span className="panel-toolbar-status">
                 <Loader2 className="animate-spin" />
-                Switching session...
+                {t('workflow.switchingSession')}
               </span>
             )}
-            {runStatus && <span>Run: {runStatus}</span>}
+            {runStatusLabel && <span>{t('workflow.runPrefix', { status: runStatusLabel })}</span>}
             {runError && <span className="panel-toolbar-error">{runError}</span>}
             {error && <span className="panel-toolbar-error">{error}</span>}
             {displayFileError && <span className="panel-toolbar-error">{displayFileError}</span>}
@@ -86,7 +95,7 @@ export function WorkflowLiveToolbar({
           className="panel-toolbar-select"
         >
           {availableDrafts.length === 0 ? (
-            <option value="">No workflow drafts</option>
+            <option value="">{t('workflow.noDrafts')}</option>
           ) : (
             availableDrafts.map((draft) => (
               <option key={draft.id} value={draft.id}>
@@ -101,7 +110,7 @@ export function WorkflowLiveToolbar({
           onClick={() => void onSave()}
           className="panel-toolbar-btn"
         >
-          {isSaving ? 'Saving...' : 'Save'}
+          {isSaving ? t('workflow.saving') : t('common.save')}
         </button>
         <button
           type="button"
@@ -109,7 +118,7 @@ export function WorkflowLiveToolbar({
           onClick={() => onExport(exportFilename)}
           className="panel-toolbar-btn"
         >
-          {isExporting ? 'Exporting...' : 'Export'}
+          {isExporting ? t('workflow.exporting') : t('common.export')}
         </button>
         <button
           type="button"
@@ -117,7 +126,7 @@ export function WorkflowLiveToolbar({
           onClick={() => void onRun()}
           className="panel-toolbar-btn panel-toolbar-btn--primary"
         >
-          {isRunning ? 'Running...' : 'Run'}
+          {isRunning ? t('workflow.runningNow') : t('common.run')}
         </button>
       </div>
     </div>

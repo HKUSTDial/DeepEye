@@ -7,6 +7,7 @@ import {
   parseDashboardProgressLine,
   parseVideoProgressLine,
 } from './chatProgress'
+import { translateApp } from '../locale'
 
 export type WorkflowRunPhaseStatus = 'running' | 'done' | 'error'
 export type WorkflowRunPhaseSource = 'workflow' | 'artifact' | 'token' | 'system'
@@ -30,32 +31,32 @@ type NodePhaseDescriptor = {
   suggestion: string | null
 }
 
-const DEFAULT_ERROR_SUGGESTION = 'Open Workflow to inspect the failed step and retry.'
+const DEFAULT_ERROR_SUGGESTION = translateApp('workflow.suggestionDefault')
 
 const NODE_PHASES: Record<string, NodePhaseDescriptor> = {
   'datasource.read': {
-    label: 'Reading data',
-    suggestion: 'Open Attached data and verify the selected file or table.',
+    label: translateApp('workflow.phaseReadingData'),
+    suggestion: translateApp('workflow.suggestionData'),
   },
   'sql.execute': {
-    label: 'Running SQL',
-    suggestion: 'Review the SQL result and datasource schema, then retry the node.',
+    label: translateApp('workflow.phaseRunningSql'),
+    suggestion: translateApp('workflow.suggestionSql'),
   },
   'python.code': {
-    label: 'Running Python step',
-    suggestion: 'Inspect the Python node inputs and rerun the workflow.',
+    label: translateApp('workflow.phaseRunningPython'),
+    suggestion: translateApp('workflow.suggestionPython'),
   },
   'report.generate': {
-    label: 'Writing report',
-    suggestion: 'Retry the report step or inspect the upstream data inputs.',
+    label: translateApp('workflow.phaseWritingReport'),
+    suggestion: translateApp('workflow.suggestionReport'),
   },
   'data.generate_dashboard': {
-    label: 'Building dashboard',
-    suggestion: 'Open Workflow to inspect the dashboard node and retry the preview deployment.',
+    label: translateApp('workflow.phaseBuildingDashboard'),
+    suggestion: translateApp('workflow.suggestionDashboard'),
   },
   'video.generator': {
-    label: 'Generating video',
-    suggestion: 'Open Workflow to inspect the video node and retry the render.',
+    label: translateApp('workflow.phaseGeneratingVideo'),
+    suggestion: translateApp('workflow.suggestionVideo'),
   },
 }
 
@@ -87,12 +88,12 @@ function buildPhase(
 function describeNodeType(nodeType: string | null) {
   if (!nodeType) {
     return {
-      label: 'Running workflow node',
+      label: translateApp('workflow.phaseRunningNode'),
       suggestion: DEFAULT_ERROR_SUGGESTION,
     }
   }
   return NODE_PHASES[nodeType] ?? {
-    label: `Running ${nodeType}`,
+    label: translateApp('workflow.phaseNodeType', { nodeType }),
     suggestion: DEFAULT_ERROR_SUGGESTION,
   }
 }
@@ -119,16 +120,16 @@ function latestArtifact(artifacts: WorkflowArtifact[]) {
 
 function buildArtifactDonePhase(artifact: WorkflowArtifactPayload) {
   if (artifact.kind === 'dashboard') {
-    return buildPhase('dashboard-ready', 'Dashboard preview ready', 'done', {
-      detail: 'Preview deployed and ready to open.',
+    return buildPhase('dashboard-ready', translateApp('workflow.phaseDashboardReady'), 'done', {
+      detail: translateApp('workflow.phasePreviewReadyDetail'),
       suggestion: null,
       nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : null,
       source: 'artifact',
     })
   }
   if (artifact.kind === 'video') {
-    return buildPhase('video-ready', 'Video preview ready', 'done', {
-      detail: 'Preview deployed and ready to open.',
+    return buildPhase('video-ready', translateApp('workflow.phaseVideoReady'), 'done', {
+      detail: translateApp('workflow.phasePreviewReadyDetail'),
       suggestion: null,
       nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : null,
       source: 'artifact',
@@ -141,14 +142,14 @@ function buildArtifactDonePhase(artifact: WorkflowArtifactPayload) {
         : typeof artifact.report_path === 'string'
           ? artifact.report_path.split('/').pop() ?? null
           : null
-    return buildPhase('report-ready', 'Report ready', 'done', {
-      detail: filename ? `Generated ${filename}` : 'Report generated successfully.',
+    return buildPhase('report-ready', translateApp('workflow.phaseReportReady'), 'done', {
+      detail: filename ? translateApp('workflow.phaseReportGenerated', { filename }) : translateApp('workflow.phaseReportSuccess'),
       suggestion: null,
       nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : null,
       source: 'artifact',
     })
   }
-  return buildPhase(`${artifact.kind}-ready`, 'Artifact ready', 'done', {
+  return buildPhase(`${artifact.kind}-ready`, translateApp('workflow.phaseArtifactReady'), 'done', {
     detail: null,
     suggestion: null,
     nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : null,
@@ -157,14 +158,14 @@ function buildArtifactDonePhase(artifact: WorkflowArtifactPayload) {
 }
 
 export function createPlanningPhase(filePath: string | null) {
-  return buildPhase('planning', 'Drafting workflow', 'running', {
-    detail: filePath ? `Preparing ${filePath}` : 'Preparing nodes and edges for this run.',
+  return buildPhase('planning', translateApp('workflow.phaseDrafting'), 'running', {
+    detail: filePath ? translateApp('workflow.phasePreparingFile', { filePath }) : translateApp('workflow.phasePreparingRun'),
   })
 }
 
 export function createRunStartPhase(filePath: string | null) {
-  return buildPhase('run-start', 'Running workflow', 'running', {
-    detail: filePath ? `Executing ${filePath}` : 'Executing the validated workflow graph.',
+  return buildPhase('run-start', translateApp('workflow.phaseRunStart'), 'running', {
+    detail: filePath ? translateApp('workflow.phaseExecutingFile', { filePath }) : translateApp('workflow.phaseExecutingGraph'),
   })
 }
 
@@ -179,8 +180,8 @@ export function createNodePhase(
   const nodeLabel = nodeType ? `${nodeId} (${nodeType})` : nodeId
 
   if (status === 'failed' || status === 'error') {
-    return buildPhase(`node-${nodeId}-failed`, `${descriptor.label} failed`, 'error', {
-      detail: message ?? `Node ${nodeLabel} failed during execution.`,
+    return buildPhase(`node-${nodeId}-failed`, translateApp('workflow.phaseNodeFailed', { label: descriptor.label }), 'error', {
+      detail: message ?? translateApp('workflow.phaseNodeFailedDetail', { nodeLabel }),
       suggestion: descriptor.suggestion ?? DEFAULT_ERROR_SUGGESTION,
       nodeId,
       nodeType,
@@ -192,7 +193,7 @@ export function createNodePhase(
   }
 
   return buildPhase(`node-${nodeId}-running`, descriptor.label, 'running', {
-    detail: message ?? `Currently executing node ${nodeLabel}.`,
+    detail: message ?? translateApp('workflow.phaseNodeRunningDetail', { nodeLabel }),
     suggestion: null,
     nodeId,
     nodeType,
@@ -214,7 +215,7 @@ export function createArtifactPhase(
 
   if (phase === 'artifact_progress' && artifact.kind === 'report') {
     const message = typeof payload.message === 'string' ? normalizeDetail(payload.message) : null
-    return buildPhase('report-progress', 'Writing report', 'running', {
+    return buildPhase('report-progress', translateApp('workflow.phaseWritingReport'), 'running', {
       detail: message,
       suggestion: null,
       nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : null,
@@ -227,8 +228,8 @@ export function createArtifactPhase(
   }
 
   if (phase === 'artifact_refresh' && artifact.kind === 'dashboard') {
-    return buildPhase('dashboard-refresh', 'Dashboard preview refreshed', 'done', {
-      detail: 'Latest dashboard changes are deployed.',
+    return buildPhase('dashboard-refresh', translateApp('workflow.phaseDashboardRefreshed'), 'done', {
+      detail: translateApp('workflow.phaseDashboardChanges'),
       suggestion: null,
       nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : null,
       source: 'artifact',
@@ -239,14 +240,14 @@ export function createArtifactPhase(
     const detail = extractMessage(payload) ?? `${artifact.kind} generation failed.`
     const suggestion =
       artifact.kind === 'dashboard'
-        ? 'Open Workflow to inspect the dashboard node and retry the preview deployment.'
+        ? translateApp('workflow.suggestionDashboard')
         : artifact.kind === 'video'
-          ? 'Open Workflow to inspect the video node and retry the render.'
+          ? translateApp('workflow.suggestionVideo')
           : artifact.kind === 'report'
-            ? 'Retry the report step or inspect the upstream data inputs.'
+            ? translateApp('workflow.suggestionReport')
             : DEFAULT_ERROR_SUGGESTION
-    return buildPhase(`${artifact.kind}-failed`, `${artifact.kind} failed`, 'error', {
-      detail,
+    return buildPhase(`${artifact.kind}-failed`, translateApp('workflow.phaseArtifactFailed', { kind: artifact.kind }), 'error', {
+      detail: detail || translateApp('workflow.phaseArtifactFailedDetail', { kind: artifact.kind }),
       suggestion,
       nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : null,
       source: 'artifact',
@@ -259,11 +260,11 @@ export function createArtifactPhase(
 export function createTokenPhase(text: string) {
   const dashboardLine = parseDashboardProgressLine(text)
   if (dashboardLine) {
-    return buildPhase('dashboard-progress', 'Building dashboard', dashboardLine.status === 'error' ? 'error' : dashboardLine.status === 'done' ? 'done' : 'running', {
+    return buildPhase('dashboard-progress', translateApp('workflow.phaseBuildingDashboard'), dashboardLine.status === 'error' ? 'error' : dashboardLine.status === 'done' ? 'done' : 'running', {
       detail: dashboardLine.detail ?? dashboardLine.label,
       suggestion:
         dashboardLine.status === 'error'
-          ? 'Open Workflow to inspect the dashboard node and retry the preview deployment.'
+          ? translateApp('workflow.suggestionDashboard')
           : null,
       source: 'token',
     })
@@ -271,11 +272,11 @@ export function createTokenPhase(text: string) {
 
   const videoLine = parseVideoProgressLine(text)
   if (videoLine) {
-    return buildPhase('video-progress', 'Generating video', videoLine.status === 'error' ? 'error' : videoLine.status === 'done' ? 'done' : 'running', {
+    return buildPhase('video-progress', translateApp('workflow.phaseGeneratingVideo'), videoLine.status === 'error' ? 'error' : videoLine.status === 'done' ? 'done' : 'running', {
       detail: videoLine.detail ?? videoLine.label,
       suggestion:
         videoLine.status === 'error'
-          ? 'Open Workflow to inspect the video node and retry the render.'
+          ? translateApp('workflow.suggestionVideo')
           : null,
       source: 'token',
     })
@@ -290,18 +291,18 @@ export function createRunCompletionPhase(
   currentPhase: WorkflowRunPhaseState | null,
 ) {
   if (status === 'success' || status === 'completed') {
-    return buildPhase('run-complete', 'Workflow complete', 'done', {
-      detail: currentPhase?.status === 'done' ? currentPhase.detail : 'All workflow steps completed successfully.',
+    return buildPhase('run-complete', translateApp('workflow.phaseRunComplete'), 'done', {
+      detail: currentPhase?.status === 'done' ? currentPhase.detail : translateApp('workflow.phaseRunCompleteDetail'),
       suggestion: null,
     })
   }
 
   return buildPhase(
     currentPhase?.nodeId ? `node-${currentPhase.nodeId}-failed` : 'run-failed',
-    currentPhase?.nodeId ? `${currentPhase.label.replace(/\s+completed$|\s+failed$/i, '')} failed` : 'Workflow failed',
+    currentPhase?.nodeId ? translateApp('workflow.phaseNodeFailed', { label: currentPhase.label.replace(/\s+completed$|\s+failed$/i, '') }) : translateApp('workflow.phaseRunFailed'),
     'error',
     {
-      detail: error ?? currentPhase?.detail ?? 'The workflow run stopped before completion.',
+      detail: error ?? currentPhase?.detail ?? translateApp('workflow.phaseRunStopped'),
       suggestion: currentPhase?.suggestion ?? DEFAULT_ERROR_SUGGESTION,
       nodeId: currentPhase?.nodeId ?? null,
       nodeType: currentPhase?.nodeType ?? null,
@@ -310,16 +311,16 @@ export function createRunCompletionPhase(
 }
 
 export function createGenericErrorPhase(message: string, suggestion?: string | null) {
-  return buildPhase('workflow-error', 'Workflow failed', 'error', {
+  return buildPhase('workflow-error', translateApp('workflow.phaseRunFailed'), 'error', {
     detail: normalizeDetail(message),
     suggestion: suggestion ?? DEFAULT_ERROR_SUGGESTION,
   })
 }
 
 export function createConnectionLostPhase() {
-  return buildPhase('connection-lost', 'Connection lost', 'error', {
-    detail: 'The live event stream disconnected while the run was active.',
-    suggestion: 'Reconnect to the session or retry the run once the stream is back.',
+  return buildPhase('connection-lost', translateApp('workflow.phaseConnectionLost'), 'error', {
+    detail: translateApp('workflow.phaseConnectionLostDetail'),
+    suggestion: translateApp('workflow.phaseConnectionLostSuggestion'),
     source: 'system',
   })
 }

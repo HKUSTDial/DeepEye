@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronRight, RefreshCw, Home, FolderOpen } from 'lucide-react'
 import { sandboxApi } from '../api/sandbox'
 import { selectIsStreaming, useChatStore } from '../stores/chat'
+import { useLocale } from '../locale'
 import FileTreeItem, { type FileNode } from './FileTreeItem'
 import './FileExplorer.css'
 
@@ -16,6 +17,7 @@ export default function FileExplorer({
   selectedPath = null,
   onSelectFile,
 }: FileExplorerProps) {
+  const { t } = useLocale()
   // 每个属性单独订阅 - 最简单可靠的方式
   const isStreaming = useChatStore(selectIsStreaming)
   const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
@@ -90,8 +92,8 @@ export default function FileExplorer({
         setSandboxNotCreated(true)
         setError(null)
         setRootFiles([])
-      } else {
-        setError(e instanceof Error ? e.message : 'Failed to load files')
+        } else {
+        setError(e instanceof Error ? e.message : t('files.loadFailedTitle'))
         setRootFiles([])
       }
     } finally {
@@ -306,14 +308,14 @@ export default function FileExplorer({
         <div className="file-explorer-breadcrumb">
           <Home size={14} />
           <ChevronRight size={12} className="file-explorer-breadcrumb-separator" />
-          <span>workspace</span>
+          <span>{t('files.workspaceRoot')}</span>
         </div>
         {sessionId && (
           <button
             onClick={() => loadRootFiles(true)}
             disabled={isLoading}
             className="file-explorer-btn"
-            title="Refresh"
+            title={t('files.refreshTitle')}
           >
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
           </button>
@@ -328,10 +330,8 @@ export default function FileExplorer({
             <div className="file-explorer-empty-icon">
               <FolderOpen size={22} />
             </div>
-            <p className="file-explorer-empty-title">No workspace session</p>
-            <p className="file-explorer-empty-subtitle">
-              Start a conversation to create files, reports, and workflow artifacts here.
-            </p>
+            <p className="file-explorer-empty-title">{t('files.noSessionTitle')}</p>
+            <p className="file-explorer-empty-subtitle">{t('files.noSessionSubtitle')}</p>
           </div>
         )}
 
@@ -339,8 +339,8 @@ export default function FileExplorer({
         {sessionId && isLoading && rootFiles.length === 0 && (
           <div className="file-explorer-empty">
             <div className="w-6 h-6 rounded-full border-2 border-[var(--border-color)] border-t-[var(--accent)] animate-spin"></div>
-            <p className="file-explorer-empty-title mt-3">Loading workspace</p>
-            <p className="file-explorer-empty-subtitle">Checking the latest files and folders.</p>
+            <p className="file-explorer-empty-title mt-3">{t('files.loadingWorkspaceTitle')}</p>
+            <p className="file-explorer-empty-subtitle">{t('files.loadingWorkspaceSubtitle')}</p>
           </div>
         )}
 
@@ -350,10 +350,8 @@ export default function FileExplorer({
             <div className="file-explorer-empty-icon">
               <FolderOpen size={22} />
             </div>
-            <p className="file-explorer-empty-title">Workspace not ready</p>
-            <p className="file-explorer-empty-subtitle">
-              Run a task with DeepEye or refresh after the sandbox starts.
-            </p>
+            <p className="file-explorer-empty-title">{t('files.notReadyTitle')}</p>
+            <p className="file-explorer-empty-subtitle">{t('files.notReadySubtitle')}</p>
           </div>
         )}
 
@@ -365,7 +363,7 @@ export default function FileExplorer({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="file-explorer-empty-title">Failed to load</p>
+            <p className="file-explorer-empty-title">{t('files.loadFailedTitle')}</p>
             <p className="file-explorer-empty-subtitle">{error}</p>
           </div>
         )}
@@ -393,8 +391,8 @@ export default function FileExplorer({
             <div className="file-explorer-empty-icon">
               <FolderOpen size={22} />
             </div>
-            <p className="file-explorer-empty-title">Workspace is empty</p>
-            <p className="file-explorer-empty-subtitle">No files have been created in `/workspace` yet.</p>
+            <p className="file-explorer-empty-title">{t('files.emptyWorkspaceTitle')}</p>
+            <p className="file-explorer-empty-subtitle">{t('files.emptyWorkspaceSubtitle')}</p>
           </div>
         )}
       </div>
@@ -403,16 +401,16 @@ export default function FileExplorer({
       {showDeleteConfirm && (
         <div className="delete-overlay" onClick={cancelDelete}>
           <div className="delete-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="delete-title">Confirm Delete</div>
+            <div className="delete-title">{t('files.confirmDeleteTitle')}</div>
             <div className="delete-message">
-              Are you sure you want to delete <span className="delete-target">{deleteTarget?.name}</span>?
+              {t('files.confirmDeleteMessage', { name: deleteTarget?.name ?? '' })}
             </div>
             <div className="delete-actions">
               <button className="delete-btn delete-btn-cancel" onClick={cancelDelete}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button className="delete-btn delete-btn-confirm" onClick={confirmDelete}>
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           </div>

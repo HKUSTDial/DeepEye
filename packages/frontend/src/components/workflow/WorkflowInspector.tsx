@@ -7,6 +7,7 @@ import type { Node as ReactFlowNode } from 'reactflow'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkflowStore } from '../../stores/workflow'
 import type { NodeDef } from '../../stores/workflowNodes'
+import { useLocale } from '../../locale'
 import { WorkflowInspectorOutputView } from './WorkflowInspectorOutput'
 import { WorkflowInspectorParamField } from './WorkflowInspectorParamField'
 import {
@@ -34,6 +35,7 @@ export function WorkflowInspector({
   activeRun,
   runOutput,
 }: WorkflowInspectorProps) {
+  const { t } = useLocale()
   const { selectedNode, activeRun: storeActiveRun, runOutput: storeRunOutput } = useWorkflowStore(
     useShallow((state) => ({
       selectedNode: selectedNodeId ? state.nodes.find((n) => n.id === selectedNodeId) || null : null,
@@ -111,6 +113,14 @@ export function WorkflowInspector({
   }, [resolvedActiveRun, resolvedSelectedNode])
 
   const displayRunStatus = selectedNodeRunDetails?.status ?? resolvedActiveRun?.status ?? ''
+  const displayRunStatusLabel =
+    displayRunStatus === 'running'
+      ? t('common.running')
+      : displayRunStatus === 'completed' || displayRunStatus === 'success'
+        ? t('common.completed')
+        : displayRunStatus === 'failed' || displayRunStatus === 'error'
+          ? t('common.failed')
+          : displayRunStatus
 
   // 当选中的节点改变时，重置本地参数状态
   useEffect(() => {
@@ -266,20 +276,20 @@ export function WorkflowInspector({
           >
             <h4 className="workflow-inspector-section-title workflow-inspector-section-title--icon">
               <PlayCircle className="w-4 h-4" />
-              Run Status
+              {t('workflowInspector.runStatus')}
             </h4>
 
             <div className="workflow-inspector-run-info">
               <div className="workflow-inspector-run-row">
-                <span className="workflow-inspector-run-label">{resolvedSelectedNode ? 'Node Status' : 'Status'}</span>
+                <span className="workflow-inspector-run-label">{resolvedSelectedNode ? t('workflowInspector.nodeStatus') : t('workflowInspector.status')}</span>
                 <span className={`workflow-inspector-run-badge ${getStatusClass(displayRunStatus)}`}>
-                  {displayRunStatus}
+                  {displayRunStatusLabel}
                 </span>
               </div>
 
               {resolvedActiveRun.created_at && (
                 <div className="workflow-inspector-run-row">
-                  <span className="workflow-inspector-run-label">Started</span>
+                  <span className="workflow-inspector-run-label">{t('workflowInspector.started')}</span>
                   <span className="workflow-inspector-run-value">
                     {new Date(resolvedActiveRun.created_at).toLocaleTimeString()}
                   </span>
@@ -291,7 +301,7 @@ export function WorkflowInspector({
               <div className="workflow-inspector-output">
                 <div className="workflow-inspector-output-header">
                   <CheckCircle2 className="w-3 h-3" />
-                  Node Output
+                  {t('workflowInspector.nodeOutput')}
                 </div>
                 {selectedNodeRunDetails ? (
                   <WorkflowInspectorOutputView
@@ -300,7 +310,7 @@ export function WorkflowInspector({
                   />
                 ) : (
                   <div className="workflow-inspector-output-empty">
-                    No execution record for the selected node in the latest run yet.
+                    {t('workflowInspector.noExecutionRecord')}
                   </div>
                 )}
               </div>
@@ -308,13 +318,13 @@ export function WorkflowInspector({
               <div className="workflow-inspector-output">
                 <div className="workflow-inspector-output-header">
                   <CheckCircle2 className="w-3 h-3" />
-                  Workflow Output
+                  {t('workflowInspector.workflowOutput')}
                 </div>
                 <div className="workflow-inspector-output-empty">
-                  Select a node to inspect a friendlier output view. Raw workflow output is still available below.
+                  {t('workflowInspector.selectNodeForOutput')}
                 </div>
                 <details className="workflow-inspector-output-raw">
-                  <summary>Raw JSON</summary>
+                  <summary>{t('workflowInspector.rawJson')}</summary>
                   <pre className="workflow-inspector-output-content">{resolvedRunOutput}</pre>
                 </details>
               </div>

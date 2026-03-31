@@ -1,22 +1,24 @@
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
 
 import type { WorkflowRunPhaseState } from '../../utils/workflowRunPhase'
+import { useLocale } from '../../locale'
 
 type WorkflowRunPhaseBannerProps = {
   phase: WorkflowRunPhaseState
   compact?: boolean
 }
 
-function getPhaseStatusLabel(status: WorkflowRunPhaseState['status']) {
-  if (status === 'done') return 'Done'
-  if (status === 'error') return 'Needs attention'
-  return 'Running'
+function getPhaseStatusLabel(status: WorkflowRunPhaseState['status'], t: (key: string) => string) {
+  if (status === 'done') return t('common.ready')
+  if (status === 'error') return t('common.needsAttention')
+  return t('common.running')
 }
 
 export function WorkflowRunPhaseBanner({
   phase,
   compact = false,
 }: WorkflowRunPhaseBannerProps) {
+  const { t } = useLocale()
   const isError = phase.status === 'error'
   const isDone = phase.status === 'done'
   const containerClass = isError
@@ -35,7 +37,7 @@ export function WorkflowRunPhaseBanner({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-current/65">
-            Workflow Status
+            {t('workflow.toolbarLabel')}
           </div>
           <div className="mt-1.5 flex items-center gap-2">
             {isError ? (
@@ -52,17 +54,17 @@ export function WorkflowRunPhaseBanner({
           ) : null}
           {phase.suggestion && (isError || !compact) ? (
             <div className="mt-2 text-xs leading-5 text-current/70">
-              Next: {phase.suggestion}
+              {t('common.openWorkflow')}: {phase.suggestion}
             </div>
           ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClass}`}>
-            {getPhaseStatusLabel(phase.status)}
+            {getPhaseStatusLabel(phase.status, t)}
           </span>
           {phase.nodeId ? (
             <span className="text-[11px] font-medium text-current/65">
-              Node {phase.nodeId}
+              {t('common.node')} {phase.nodeId}
             </span>
           ) : null}
         </div>

@@ -1,4 +1,5 @@
 import type { DataSource } from '../types'
+import { useLocale } from '../locale'
 
 interface ChatContextStripProps {
   dataSources: DataSource[]
@@ -9,14 +10,14 @@ interface ChatContextStripProps {
   onRemoveDataSource: (dataSourceId: string) => void | Promise<void>
 }
 
-function formatDatasourceKind(source: DataSource) {
+function formatDatasourceKind(source: DataSource, fileLabel: string, databaseLabel: string) {
   if (source.category === 'file') {
-    return 'File'
+    return fileLabel
   }
   if (source.type) {
     return source.type.toUpperCase()
   }
-  return 'Database'
+  return databaseLabel
 }
 
 export function ChatContextStrip({
@@ -27,16 +28,17 @@ export function ChatContextStrip({
   onOpenManager,
   onRemoveDataSource,
 }: ChatContextStripProps) {
+  const { t } = useLocale()
   const count = dataSources.length
   const helper = count > 0
-    ? 'This thread uses the attached data automatically.'
-    : 'Attach files or databases once, then ask directly in chat.'
+    ? t('chat.threadUsesAttachedData')
+    : t('chat.attachDataFirst')
 
   return (
     <div className={`chat-context-strip ${isCompact ? 'is-compact' : ''}`}>
       <div className="chat-context-strip-header">
         <div className="chat-context-strip-copy">
-          <span className="chat-context-strip-kicker">Attached data</span>
+          <span className="chat-context-strip-kicker">{t('common.attachedData')}</span>
           <span className="chat-context-strip-helper">{helper}</span>
         </div>
         <button
@@ -44,12 +46,12 @@ export function ChatContextStrip({
           className="chat-context-strip-manage"
           onClick={onOpenManager}
         >
-          {count > 0 ? 'Manage' : 'Add data'}
+          {count > 0 ? t('common.manage') : t('common.addData')}
         </button>
       </div>
 
       {isLoading ? (
-        <div className="chat-context-strip-empty">Loading attached data…</div>
+        <div className="chat-context-strip-empty">{t('common.loadingAttachedData')}</div>
       ) : count > 0 ? (
         <div className="chat-context-strip-list">
           {dataSources.map((source) => {
@@ -58,15 +60,17 @@ export function ChatContextStrip({
               <div key={source.id} className="chat-context-chip">
                 <span className="chat-context-chip-copy">
                   <span className="chat-context-chip-title">{source.name}</span>
-                  <span className="chat-context-chip-kind">{formatDatasourceKind(source)}</span>
+                  <span className="chat-context-chip-kind">
+                    {formatDatasourceKind(source, t('datasource.file'), t('datasource.database'))}
+                  </span>
                 </span>
                 <button
                   type="button"
                   className="chat-context-chip-remove"
                   onClick={() => onRemoveDataSource(source.id)}
                   disabled={isRemoving}
-                  aria-label={`Remove ${source.name} from this thread`}
-                  title={`Remove ${source.name} from this thread`}
+                  aria-label={t('common.removeDataFromThread', { name: source.name })}
+                  title={t('common.removeDataFromThread', { name: source.name })}
                 >
                   {isRemoving ? '…' : '×'}
                 </button>
@@ -76,7 +80,7 @@ export function ChatContextStrip({
         </div>
       ) : (
         <div className="chat-context-strip-empty">
-          No data attached yet. Use files or databases to ground the next reply.
+          {t('common.noDataAttached')}
         </div>
       )}
     </div>

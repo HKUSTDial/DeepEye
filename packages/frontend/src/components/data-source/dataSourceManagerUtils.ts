@@ -1,5 +1,6 @@
 import type { DatasourcePreviewResponse } from '../../api'
 import type { DataSourceConnectionTestResponse } from '../../types'
+import { getActiveLocale, translateApp } from '../../locale'
 
 export const ENGINE_OPTIONS = [
   { value: 'postgres', label: 'PostgreSQL' },
@@ -46,9 +47,16 @@ export const getPreviewRangeLabel = (preview: DatasourcePreviewResponse) => {
   return `${start}-${end} / ${preview.total_rows}`
 }
 
-export const formatConnectionSuccess = (result: DataSourceConnectionTestResponse) => {
+export const formatConnectionSuccess = (
+  result: DataSourceConnectionTestResponse,
+  locale = getActiveLocale(),
+) => {
   const sample = result.sample_tables.slice(0, 3).join(', ')
   return result.table_count > 0
-    ? `Connection successful. ${result.table_count} table(s) available. Sample: ${sample || 'none'}`
-    : 'Connection successful, but no accessible tables were found in this database.'
+    ? translateApp(
+        'datasource.connectionSuccessWithTables',
+        { count: result.table_count, sample: sample || translateApp('datasource.sampleNone', undefined, locale) },
+        locale,
+      )
+    : translateApp('datasource.connectionSuccessNoTables', undefined, locale)
 }
