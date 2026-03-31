@@ -7,10 +7,15 @@ import './FileExplorer.css'
 
 interface FileExplorerProps {
   sessionId: string | null
+  selectedPath?: string | null
   onSelectFile: (path: string) => void
 }
 
-export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerProps) {
+export default function FileExplorer({
+  sessionId,
+  selectedPath = null,
+  onSelectFile,
+}: FileExplorerProps) {
   // 每个属性单独订阅 - 最简单可靠的方式
   const isStreaming = useChatStore(selectIsStreaming)
   const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
@@ -35,6 +40,10 @@ export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerPr
   useEffect(() => {
     activeSessionRef.current = sessionId
   }, [sessionId])
+
+  useEffect(() => {
+    setCurrentSelectedPath(selectedPath)
+  }, [selectedPath])
 
   // Helper functions
   const getFilesFingerprint = (files: FileNode[]): string => {

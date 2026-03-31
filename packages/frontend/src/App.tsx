@@ -16,6 +16,7 @@ import Sidebar from './components/Sidebar'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
 import { SessionOutputCenter } from './components/output-center/SessionOutputCenter'
+import { GlobalDataSourceManagerModal } from './components/ui/GlobalDataSourceManagerModal'
 import './App.css'
 
 function App() {
@@ -395,7 +396,6 @@ function App() {
                   <div className="chat-rail-body">
                     <ChatBox
                       dataSourceIds={dataSourceIds}
-                      onDataSourceIdsChange={setDataSourceIds}
                       compact
                     />
                   </div>
@@ -404,6 +404,7 @@ function App() {
             </aside>
           </div>
         </section>
+        <GlobalDataSourceManagerModal onDataSourceIdsChange={setDataSourceIds} />
       </main>
     </div>
   )

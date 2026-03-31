@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import FileExplorer from '../../FileExplorer'
 import FileViewer from '../../FileViewer'
 import { useChatStore } from '../../../stores/chat'
+import { useWorkspaceUiStore } from '../../../stores/workspaceUi'
 
 interface FilesPanelProps {
   sessionId: string | null
@@ -15,14 +16,31 @@ export function FilesPanel({ sessionId }: FilesPanelProps) {
   const [explorerRatio, setExplorerRatio] = useState(35)
   const [isDraggingExplorer, setIsDraggingExplorer] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const lastRevealRequestIdRef = useRef<number | null>(null)
 
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
+  const fileRevealRequest = useWorkspaceUiStore((state) =>
+    sessionId ? state.fileRevealRequests[sessionId] ?? null : null,
+  )
 
   useEffect(() => {
     if (sessionId) {
       notifyFilesChanged()
     }
   }, [sessionId, notifyFilesChanged])
+
+  useEffect(() => {
+    setSelectedFile(null)
+    lastRevealRequestIdRef.current = null
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!fileRevealRequest) return
+    if (fileRevealRequest.requestId === lastRevealRequestIdRef.current) return
+
+    lastRevealRequestIdRef.current = fileRevealRequest.requestId
+    setSelectedFile(fileRevealRequest.path)
+  }, [fileRevealRequest])
 
   const handleFileSelect = (path: string) => {
     setSelectedFile(path)
@@ -75,7 +93,11 @@ export function FilesPanel({ sessionId }: FilesPanelProps) {
   return (
     <div ref={panelRef} className="flex h-full w-full overflow-hidden bg-[var(--panel-bg)]">
       <div className="h-full relative min-w-0" style={explorerStyle}>
-        <FileExplorer sessionId={sessionId} onSelectFile={handleFileSelect} />
+        <FileExplorer
+          sessionId={sessionId}
+          selectedPath={selectedFile}
+          onSelectFile={handleFileSelect}
+        />
         <div
           className={`resize-handle-explorer ${isDraggingExplorer ? 'resize-active' : ''}`}
           onMouseDown={startExplorerDrag}

@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { useChat } from '../hooks/useChat'
 import {
   selectCurrentMessages,
@@ -7,9 +6,9 @@ import {
   selectIsStreaming,
   useChatStore,
 } from '../stores/chat'
+import { useWorkspaceUiStore } from '../stores/workspaceUi'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { type ChatProgressLine } from '../utils/chatProgress'
-import DataSourceManager from './DataSourceManager'
 import { AssistantMessageBody } from './AssistantMessageBody'
 import { ChatEmptyState } from './ChatEmptyState'
 import { buildMessageActivityKey, hasText } from './chatBoxUtils'
@@ -18,13 +17,11 @@ import './ChatBox.css'
 
 interface ChatBoxProps {
   dataSourceIds: string[]
-  onDataSourceIdsChange?: (ids: string[]) => void
   compact?: boolean
 }
 
 export default function ChatBox({
   dataSourceIds,
-  onDataSourceIdsChange,
   compact = false,
 }: ChatBoxProps) {
   const { sendMessage, stopMessage, error } = useChat()
@@ -38,9 +35,10 @@ export default function ChatBox({
   const runStatus = useWorkflowSessionsStore((state) =>
     currentSessionId ? state.sessions[currentSessionId]?.runStatus ?? null : null,
   )
+  const showDataSourceManager = useWorkspaceUiStore((state) => state.isDataSourceManagerOpen)
+  const toggleDataSourceManager = useWorkspaceUiStore((state) => state.toggleDataSourceManager)
   
   const [input, setInput] = useState('')
-  const [showDataSourceManager, setShowDataSourceManager] = useState(false)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -64,25 +62,6 @@ export default function ChatBox({
       prompt: 'Generate a business report draft with summary, key findings, risks, and actionable recommendations.',
     },
   ]
-
-  useEffect(() => {
-    if (!showDataSourceManager) return
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setShowDataSourceManager(false)
-      }
-    }
-
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', onKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [showDataSourceManager])
 
   const resizeTextarea = useCallback(() => {
     const el = textareaRef.current
@@ -331,7 +310,7 @@ export default function ChatBox({
             <button
               type="button"
               className={`chat-upload-btn ${showDataSourceManager ? 'is-active' : ''}`}
-              onClick={() => setShowDataSourceManager((current) => !current)}
+              onClick={toggleDataSourceManager}
               title={dataSourceIds.length > 0 ? `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}` : 'Attach data'}
               aria-label={dataSourceIds.length > 0 ? `Manage ${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}` : 'Attach data'}
             >
@@ -400,37 +379,6 @@ export default function ChatBox({
           )}
         </div>
       </div>
-      {showDataSourceManager &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="chat-datasource-modal-overlay"
-            onClick={() => setShowDataSourceManager(false)}
-          >
-            <div
-              className="chat-datasource-modal"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="chat-datasource-modal-close"
-                onClick={() => setShowDataSourceManager(false)}
-                aria-label="Close attached data dialog"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <DataSourceManager
-                variant="modal"
-                onDataSourcesChange={(sources) =>
-                  onDataSourceIdsChange?.(sources.map((source) => source.id))
-                }
-              />
-            </div>
-          </div>,
-          document.body,
-        )}
     </div>
   )
 }
