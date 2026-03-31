@@ -65,6 +65,8 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "data.get('dataset_ref', [])" in prompt
     assert "load_dataset_ref(ref)" in prompt
     assert "load_dataset_refs(data)" in prompt
+    assert "never treat `data['dataset_ref']` as a single dict" in prompt
+    assert "Do not use legacy keys like `preview` or `preview_path`" in prompt
     assert "emit_dataframe(df)" in prompt
     assert "MUST include source nodes" in prompt
     assert "Do NOT create `python.code`-only" in prompt
@@ -95,10 +97,14 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "`workflow_dataset_input_missing`" in prompt
     assert "`workflow_dataset_output_missing`" in prompt
     assert "`workflow_sql_query_invalid`" in prompt
+    assert "`workflow_python_contract_invalid`" in prompt
+    assert "`workflow_python_schema_invalid`" in prompt
     assert "\"edge_python_to_report\"" in prompt
     assert "create_plan" not in prompt
     assert "update_plan" not in prompt
     assert "pd.read_csv(refs[0]['path'])" not in prompt
+    assert "`data['dataset_ref']` is always a list." in prompt
+    assert "The dataset_ref metadata keys are `path`, `format`, `columns`, `row_count`, and optional `preview_rows`." in prompt
 
 
 def test_workflow_prompt_includes_preview_for_file_and_database_tables():

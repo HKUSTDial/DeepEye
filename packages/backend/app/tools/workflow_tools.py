@@ -31,7 +31,11 @@ from app.tools.workflow.repairs import (
     _require_reuse_after_failure,
     _terminal_failure_reply,
 )
-from app.tools.workflow.workspace_state import _extract_final_answer, _serialize_workspace_state
+from app.tools.workflow.workspace_state import (
+    _dedupe_summary_artifact_references,
+    _extract_final_answer,
+    _serialize_workspace_state,
+)
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
 from deepeye.utils.logger import logger
@@ -524,12 +528,16 @@ def create_summarize_workflow_result_tool(
         if final_answer:
             return final_answer
 
-        prompt = build_workflow_summary_prompt(question, serialized)
+        prompt = build_workflow_summary_prompt(
+            question,
+            _dedupe_summary_artifact_references(serialized),
+        )
         response = await model.ainvoke(
             [
                 SystemMessage(content=prompt),
                 HumanMessage(content=question),
-            ]
+            ],
+            config={"tags": ["sub_agent"]},
         )
         content = getattr(response, "content", "")
         return content if isinstance(content, str) else str(content)

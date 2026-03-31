@@ -16,6 +16,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
@@ -334,18 +335,20 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
                 (va_app / "index.html").write_text("<html>dashboard</html>")
                 return str(va_app)
 
-        class _DummyThread:
-            def __init__(self, target=None, daemon=None) -> None:
-                self.target = target
-                self.daemon = daemon
-
-            def start(self) -> None:
-                return None
+        async def _fake_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None):
+            assert task_id == "dashboard"
+            assert local_va_app_path is not None
+            assert Path(local_va_app_path).name == "va_app"
+            assert source_archive_bytes is None
+            return {
+                "status": "running",
+                "url": f"/dashboards/deepeye-nl2dashboard-{task_id}/",
+            }
 
         monkeypatch.setattr("app.node.dashboard.node.DashboardDesigner", _DummyDesigner)
         monkeypatch.setattr("app.node.dashboard.node.DashboardEngineer", _DummyEngineer)
         monkeypatch.setattr("app.node.dashboard.node.LLMClient", lambda api_key=None, base_url=None: object())
-        monkeypatch.setattr("threading.Thread", _DummyThread)
+        monkeypatch.setattr("app.services.dashboard_deploy_service.dashboard_deployer.deploy", _fake_dashboard_deploy)
 
         dashboard_handler = NL2DashboardHandler(db, str(user.id), sandbox=sandbox)
         dashboard_handler._emit_log = lambda *args, **kwargs: None
@@ -358,6 +361,76 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
 
         assert dashboard_result["dashboard_url"].startswith("/dashboards/")
         assert dashboard_result["output_path"].startswith("/workspace/.workflow_scripts/")
+    finally:
+        db.close()
+
+
+def test_dashboard_handler_emits_failure_without_ready_when_deploy_fails(monkeypatch) -> None:
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="dashboard-fail@example.com")
+        sandbox = _FakeSandbox(session_id="session-dashboard-fail")
+        dataset_ref = materialize_rows_to_sandbox_dataset(
+            [{"city": "Shenzhen", "revenue": 150}],
+            sandbox=sandbox,
+            name_hint="dashboard_input",
+            source="test",
+        )
+
+        class _DummyDesigner:
+            def __init__(self, llm_client=None, model=None) -> None:
+                del llm_client, model
+
+            def design(self, info_doc, output_dir, callback=None):
+                assert info_doc["dataset_path"].endswith(".csv")
+                Path(output_dir).mkdir(parents=True, exist_ok=True)
+                if callback:
+                    callback("design ok")
+                return {"charts": [{"type": "bar"}]}
+
+        class _DummyEngineer:
+            def __init__(self, llm_client=None, model=None) -> None:
+                del llm_client, model
+
+            def implement(self, design_result, output_path, info_doc):
+                del design_result, info_doc
+                va_app = Path(output_path) / "va_app"
+                va_app.mkdir(parents=True, exist_ok=True)
+                (va_app / "index.html").write_text("<html>dashboard</html>")
+                return str(va_app)
+
+        async def _failing_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None):
+            assert task_id == "dashboard"
+            assert local_va_app_path is not None
+            assert source_archive_bytes is None
+            return {
+                "status": "error",
+                "url": f"/dashboards/deepeye-nl2dashboard-{task_id}/",
+            }
+
+        monkeypatch.setattr("app.node.dashboard.node.DashboardDesigner", _DummyDesigner)
+        monkeypatch.setattr("app.node.dashboard.node.DashboardEngineer", _DummyEngineer)
+        monkeypatch.setattr("app.node.dashboard.node.LLMClient", lambda api_key=None, base_url=None: object())
+        monkeypatch.setattr("app.services.dashboard_deploy_service.dashboard_deployer.deploy", _failing_dashboard_deploy)
+
+        dashboard_handler = NL2DashboardHandler(db, str(user.id), sandbox=sandbox)
+        emitted_logs: list[tuple[str, bool]] = []
+        emitted_events: list[tuple[str, dict | None, bool]] = []
+        dashboard_handler._emit_log = lambda text, sync=False: emitted_logs.append((text, sync))
+        dashboard_handler._emit_workflow_event = (
+            lambda phase, payload=None, sync=False: emitted_events.append((phase, payload, sync))
+        )
+
+        with pytest.raises(RuntimeError, match="Dashboard deployment returned non-running status"):
+            dashboard_handler.execute(
+                Node(id="dashboard", type="data.generate_dashboard", params={"question": "Show top city revenue"}),
+                {"dataset_ref": dataset_ref},
+                context=None,
+            )
+
+        assert [phase for phase, _, _ in emitted_events] == ["artifact_failed"]
+        assert any("Dashboard generation failed" in text for text, _ in emitted_logs)
+        assert all("deployment complete" not in text.lower() for text, _ in emitted_logs)
     finally:
         db.close()
 

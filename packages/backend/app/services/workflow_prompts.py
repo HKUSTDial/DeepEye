@@ -186,6 +186,8 @@ The latest user request asks for an answer grounded in the attached data sources
 - For `python.code`, only reference columns that are clearly present in upstream `dataset_ref.columns` or preview rows. Do not assume hidden columns or original source column names survive unchanged.
 - Before writing `python.code`, inspect the upstream `dataset_ref.columns` mentally and ensure every `merge`, `groupby`, column selection, arithmetic expression, and rename uses names that will actually exist at runtime.
 - For `python.code`, do not hardcode `pd.read_csv` / `pd.read_json` based on guesses. Use the preloaded helpers `load_dataset_ref(ref)` or `load_dataset_refs(data)` so file formats are handled correctly.
+- For `python.code`, never treat `data['dataset_ref']` as a single dict. It is always a list of dataset refs, even when only one upstream dataset is connected.
+- Do not use legacy keys like `preview` or `preview_path` inside `python.code`. The current dataset_ref contract uses `preview_rows` for metadata preview and `path` for the sandbox file path.
 
 ## Workflow Construction Rules
 1. Use only node types and exact port ids from the registry specification. Do NOT invent node types, ports, or schemas.
@@ -514,6 +516,8 @@ The latest user request asks for an answer grounded in the attached data sources
 - Treat each `dataset_ref` as the authoritative schema source. Read its `columns` and preview before writing column-sensitive logic.
 - Helpers are preloaded inside every `python.code` script: `json`, `sys`, `pd`, `load_dataset_ref(ref)`, `load_dataset_refs(data)`, `emit_dataframe(df)`, and `emit_json(value)`.
 - Prefer `load_dataset_ref(ref)` or `load_dataset_refs(data)` over handwritten `pd.read_csv` / `pd.read_json` calls.
+- `data['dataset_ref']` is always a list. For a single upstream dataset, use `load_dataset_ref(data.get('dataset_ref', []))` or `load_dataset_refs(data)[0]`.
+- The dataset_ref metadata keys are `path`, `format`, `columns`, `row_count`, and optional `preview_rows`. Do not use deprecated names such as `preview` or `preview_path`.
 - Never bypass source nodes by hardcoding attached datasource paths or database connections inside `python.code`. `python.code` should consume upstream `dataset_ref` inputs, not raw attached datasources.
 - Put the Python source directly in `params.code`.
 - For small outputs, return normal Python objects. For large tabular outputs, write a dataset file in the sandbox and print a `dataset_ref` JSON object instead.
@@ -531,7 +535,7 @@ Return tool calls only.
 ## Structured Run Failure Signals
 - `status`: `success` or `failed`
 - `repairable`: whether another workflow edit is worth attempting
-- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `workflow_wiring_invalid`, `workflow_artifact_input_missing`, `workflow_dataset_input_missing`, `workflow_dataset_output_missing`, `workflow_sql_query_invalid`, `draft_reuse_required`, `repair_limit_exceeded`
+- `error_type`: stable machine-readable category such as `workflow_definition_invalid`, `workflow_validation_failed`, `workflow_execution_failed`, `workflow_wiring_invalid`, `workflow_artifact_input_missing`, `workflow_dataset_input_missing`, `workflow_dataset_output_missing`, `workflow_sql_query_invalid`, `workflow_python_contract_invalid`, `workflow_python_schema_invalid`, `draft_reuse_required`, `repair_limit_exceeded`
 - `error_summary`: concise explanation of the failure
 - `issues`: short human-readable issue summaries
 - Raw fields such as `validation_errors` and `details` may still be present. Use `error_summary` and `issues` first, then consult the raw fields if needed.

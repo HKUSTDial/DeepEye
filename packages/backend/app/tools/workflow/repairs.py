@@ -384,6 +384,55 @@ def _sql_query_failure(
     return None
 
 
+def _python_dataset_ref_contract_failure(
+    *,
+    draft_id: str | None,
+    run_id: str | None,
+    details: list[Any],
+    error: str | None,
+) -> dict[str, Any] | None:
+    for detail in details:
+        if not isinstance(detail, dict):
+            continue
+        node_id = detail.get("node_id")
+        node_type = detail.get("node_type")
+        message = detail.get("message")
+        if not isinstance(node_id, str) or node_type != "python.code" or not isinstance(message, str):
+            continue
+        lower_message = message.lower()
+        error_text = f"{message}\n{error or ''}".lower()
+        if not any(
+            token in error_text
+            for token in (
+                "preview_path",
+                "preview_rows",
+                "attributeerror: 'list' object has no attribute 'get'",
+                'attributeerror: "list" object has no attribute "get"',
+                "data.get('dataset_ref', {})",
+            )
+        ):
+            continue
+        failure = _build_tool_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            error_type="workflow_python_contract_invalid",
+            error_summary=(
+                f"python.code node {node_id} used an outdated dataset_ref access pattern. "
+                "Fix the code to follow the current dataset_ref runtime contract and reuse the same draft_id."
+            ),
+            repairable=True,
+            details=details,
+            error=error,
+        )
+        failure["issues"] = [
+            "Treat `data.get('dataset_ref', [])` as a list of dataset refs, even when there is only one upstream dataset.",
+            "Use `load_dataset_ref(ref)` or `load_dataset_refs(data)` instead of manually reading `preview`, `preview_path`, or guessed file formats.",
+            "The current dataset_ref metadata keys are `path`, `format`, `columns`, `row_count`, and optional `preview_rows`.",
+        ]
+        return failure
+    return None
+
+
 def _python_schema_failure(
     *,
     draft_id: str | None,
@@ -557,6 +606,15 @@ def _normalize_workflow_run_result(
         if sql_failure:
             sql_failure["artifacts"] = artifacts
             return sql_failure
+        python_contract_failure = _python_dataset_ref_contract_failure(
+            draft_id=draft_id,
+            run_id=run_id,
+            details=details,
+            error=error,
+        )
+        if python_contract_failure:
+            python_contract_failure["artifacts"] = artifacts
+            return python_contract_failure
         python_failure = _python_schema_failure(
             draft_id=draft_id,
             run_id=run_id,

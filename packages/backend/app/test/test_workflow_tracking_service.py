@@ -23,6 +23,7 @@ from app.services.workflow_tracking_service import (
     replace_workflow_artifacts,
     upsert_workflow_draft,
 )
+from app.tools.workflow.workspace_state import _dedupe_summary_artifact_references
 
 
 def _build_test_db():
@@ -253,6 +254,41 @@ def test_workspace_state_for_turn_uses_turn_scoped_run_and_artifacts():
         assert state["artifacts"][0].payload["kind"] == "dashboard"
     finally:
         db.close()
+
+
+def test_dedupe_summary_artifact_references_strips_duplicate_dashboard_url_from_run_outputs():
+    workspace_state = {
+        "run": {
+            "status": "success",
+            "result": {
+                "outputs": {
+                    "dashboard": {
+                        "dashboard_url": "/dashboards/demo/",
+                        "output_path": "/workspace/.workflow_scripts/dashboard",
+                        "message": "ready",
+                    }
+                }
+            },
+        },
+        "artifacts": [
+            {
+                "id": "artifact-1",
+                "kind": "dashboard",
+                "payload": {
+                    "kind": "dashboard",
+                    "dashboard_url": "/dashboards/demo/",
+                    "output_path": "/workspace/.workflow_scripts/dashboard",
+                },
+            }
+        ],
+    }
+
+    deduped = _dedupe_summary_artifact_references(workspace_state)
+
+    assert deduped["run"]["result"]["outputs"]["dashboard"]["message"] == "ready"
+    assert "dashboard_url" not in deduped["run"]["result"]["outputs"]["dashboard"]
+    assert "output_path" not in deduped["run"]["result"]["outputs"]["dashboard"]
+    assert deduped["artifacts"][0]["payload"]["dashboard_url"] == "/dashboards/demo/"
 
 
 def test_finalize_tracked_workflow_run_compacts_large_row_outputs():

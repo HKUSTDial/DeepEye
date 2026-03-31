@@ -319,18 +319,20 @@ def test_golden_sql_to_dashboard_workflow(tmp_path, monkeypatch) -> None:
                 (va_app / "index.html").write_text("<html>dashboard</html>")
                 return str(va_app)
 
-        class _DummyThread:
-            def __init__(self, target=None, daemon=None) -> None:
-                self.target = target
-                self.daemon = daemon
-
-            def start(self) -> None:
-                return None
+        async def _fake_dashboard_deploy(task_id, local_va_app_path=None, source_archive_bytes=None):
+            assert task_id == "dashboard"
+            assert local_va_app_path is not None
+            assert Path(local_va_app_path).name == "va_app"
+            assert source_archive_bytes is None
+            return {
+                "status": "running",
+                "url": f"/dashboards/deepeye-nl2dashboard-{task_id}/",
+            }
 
         monkeypatch.setattr("app.node.dashboard.node.DashboardDesigner", _DummyDesigner)
         monkeypatch.setattr("app.node.dashboard.node.DashboardEngineer", _DummyEngineer)
         monkeypatch.setattr("app.node.dashboard.node.LLMClient", lambda api_key=None, base_url=None: object())
-        monkeypatch.setattr("threading.Thread", _DummyThread)
+        monkeypatch.setattr("app.services.dashboard_deploy_service.dashboard_deployer.deploy", _fake_dashboard_deploy)
 
         engine = build_engine(db, user.id, sandbox=sandbox, session_id=sandbox.session_id)
         workflow = Workflow(

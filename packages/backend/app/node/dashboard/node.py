@@ -8,6 +8,7 @@ import io
 import tarfile
 import shutil
 import asyncio
+import threading
 from pathlib import Path
         
 from typing import Any, Dict, List
@@ -42,7 +43,6 @@ class NL2DashboardHandler:
             return
         
         # Core: Use independent thread to execute immediately
-        import threading
         from app.infra import RedisEventBus
         from app.schemas import AgentEvent, AgentEventType
         from app.core.config import settings
@@ -311,71 +311,40 @@ class NL2DashboardHandler:
             else:
                 final_sandbox_path = va_app_path
 
-            # --- Auto-deploy to independent container and provide access link ---
+            # --- Deploy preview synchronously so workflow status matches real deploy outcome ---
             va_source_path = os.path.join(local_output_path, "va_app")
-            
-            # URL preset, must match container naming rules in DashboardDeployService
-            full_url = f"/dashboards/deepeye-nl2dashboard-{safe_id}/"
-            
-            if os.path.exists(va_source_path):
-                try:
-                    # 1. Local import to cut cyclic dependency
-                    
-                    print(f"[*] Starting independent dashboard service container (ID: {safe_id})...")
-                    
-                    # 2. Asynchronous trigger: use thread for background deployment
-                    import threading
-                    def _do_deploy():
-                        # Create independent event loop for new thread
-                        new_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(new_loop)
-                        try:
-                            # Local import and execute
-                            from app.services.dashboard_deploy_service import dashboard_deployer
-                            new_loop.run_until_complete(dashboard_deployer.deploy(safe_id, va_source_path))
-                            
-                            # Sequential send in sync mode to prevent frontend conflicts
-                            self._emit_log("Dashboard deployment complete!\n", sync=True)
-                            print(f"Dashboard deployment complete! Access it here: {full_url}\n")
-                            self._emit_workflow_event(
-                                "artifact_refresh",
-                                {
-                                    "artifact": build_workflow_artifact(
-                                        "dashboard",
-                                        dashboard_url=full_url,
-                                        output_path=final_sandbox_path,
-                                    ),
-                                },
-                                sync=True,
-                            )
-                        except Exception as e:
-                            print(f"[ERROR] Background deployment failed: {e}")
-                            self._emit_log(f"Dashboard deployment failed: {e}")
-                        finally:
-                            new_loop.close()
-                            # Cleanup local temporary directory after deployment
-                            try:
-                                if os.path.exists(local_tmp_dir):
-                                    shutil.rmtree(local_tmp_dir)
-                                    print(f"[DEBUG] Cleaned up local temporary directory: {local_tmp_dir}")
-                            except Exception as ce:
-                                print(f"[WARN] Failed to cleanup local directory {local_tmp_dir}: {ce}")
+            if not os.path.exists(va_source_path):
+                raise FileNotFoundError(f"Generated dashboard app not found: {va_source_path}")
 
-                    threading.Thread(target=_do_deploy, daemon=True).start()
-                    
-                    print(f"\n" + "-"*20)
-                    print(f"[SUCCESS] Dashboard deployment task submitted: {full_url}")
-                    print(f"-"*20 + "\n")
-                except Exception as de:
-                    print(f"[WARN] Failed to submit deployment task: {de}")
-                    traceback.print_exc()
+            print(f"[*] Starting independent dashboard service container (ID: {safe_id})...")
+            from app.services.dashboard_deploy_service import dashboard_deployer
 
+            deploy_loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(deploy_loop)
+                deploy_result = deploy_loop.run_until_complete(
+                    dashboard_deployer.deploy(safe_id, va_source_path)
+                )
+            finally:
+                asyncio.set_event_loop(None)
+                deploy_loop.close()
+
+            dashboard_url = str(deploy_result.get("url") or f"/dashboards/deepeye-nl2dashboard-{safe_id}/")
+            deploy_status = str(deploy_result.get("status") or "")
+            if deploy_status != "running":
+                raise RuntimeError(
+                    f"Dashboard deployment returned non-running status: {deploy_status or 'unknown'}"
+                )
+
+            self._emit_log("Dashboard deployment complete!\n", sync=True)
+            print(f"Dashboard deployment complete! Access it here: {dashboard_url}\n")
             self._emit_workflow_event(
                 "artifact_ready",
                 {
                     "artifact": build_workflow_artifact(
                         "dashboard",
-                        dashboard_url=full_url,
+                        node_id=str(node.id),
+                        dashboard_url=dashboard_url,
                         output_path=final_sandbox_path,
                     ),
                 },
@@ -383,11 +352,33 @@ class NL2DashboardHandler:
             )
             return {
                 "output_path": final_sandbox_path,
-                "dashboard_url": full_url,
+                "dashboard_url": dashboard_url,
             }
         except Exception as e:
+            self._emit_log(f"Dashboard generation failed: {e}", sync=True)
+            self._emit_workflow_event(
+                "artifact_failed",
+                {
+                    "artifact": build_workflow_artifact(
+                        "dashboard",
+                        node_id=str(node.id),
+                        output_path=locals().get("final_sandbox_path"),
+                        dashboard_url=locals().get("dashboard_url"),
+                    ),
+                    "error": str(e),
+                    "message": f"Dashboard generation failed: {e}",
+                },
+                sync=True,
+            )
             traceback.print_exc()
             raise RuntimeError(f"Execution failed: {e}")
+        finally:
+            try:
+                if os.path.exists(local_tmp_dir):
+                    shutil.rmtree(local_tmp_dir)
+                    print(f"[DEBUG] Cleaned up local temporary directory: {local_tmp_dir}")
+            except Exception as cleanup_error:
+                print(f"[WARN] Failed to cleanup local directory {local_tmp_dir}: {cleanup_error}")
 
 class NL2DashboardNode(BaseNode):
     node_type = "data.generate_dashboard"

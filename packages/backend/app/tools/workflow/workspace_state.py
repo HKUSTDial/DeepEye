@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from app.services.workflow_datasets import compact_value_for_transport, compact_workflow_result
+
+
+_SUMMARY_ARTIFACT_REFERENCE_KEYS = (
+    "dashboard_url",
+    "report_path",
+    "video_url",
+    "video_path",
+    "task_id",
+    "output_path",
+)
 
 
 def _serialize_workspace_state(snapshot: dict) -> dict:
@@ -51,6 +62,48 @@ def _serialize_workspace_state(snapshot: dict) -> dict:
             for artifact in artifacts
         ],
     }
+
+
+def _dedupe_summary_artifact_references(workspace_state: dict | None) -> dict:
+    if not isinstance(workspace_state, dict):
+        return {}
+
+    deduped = deepcopy(workspace_state)
+    artifacts = deduped.get("artifacts")
+    if not isinstance(artifacts, list):
+        return deduped
+
+    seen_references: dict[str, set[str]] = {}
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        payload = artifact.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        for key in _SUMMARY_ARTIFACT_REFERENCE_KEYS:
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                seen_references.setdefault(key, set()).add(value.strip())
+
+    run = deduped.get("run")
+    if not isinstance(run, dict):
+        return deduped
+    result = run.get("result")
+    if not isinstance(result, dict):
+        return deduped
+    outputs = result.get("outputs")
+    if not isinstance(outputs, dict):
+        return deduped
+
+    for node_output in outputs.values():
+        if not isinstance(node_output, dict):
+            continue
+        for key, values in seen_references.items():
+            value = node_output.get(key)
+            if isinstance(value, str) and value.strip() in values:
+                node_output.pop(key, None)
+
+    return deduped
 
 
 def _extract_final_answer(workspace_state: dict | None) -> str | None:

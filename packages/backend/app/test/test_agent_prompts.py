@@ -38,3 +38,4 @@ def test_workflow_summary_prompt_embeds_workspace_state():
     assert "Analyze revenue trends" in prompt
     assert '"status": "success"' in prompt
     assert '"kind": "report"' in prompt
+    assert "mention it only once" in prompt

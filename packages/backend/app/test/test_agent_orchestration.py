@@ -23,6 +23,7 @@ from app.tools.workflow_tools import (
     create_workflow_and_run_tool,
     create_update_workflow_tool,
     create_design_workflow_tool,
+    create_summarize_workflow_result_tool,
 )
 from deepeye.agents.factory import AgentFactory
 from deepeye.tools.base import tool
@@ -218,6 +219,51 @@ def test_message_collector_prefers_summary_tool_output() -> None:
     assert message.content == "Final concise answer."
 
 
+@pytest.mark.anyio
+async def test_summary_tool_marks_nested_model_call_as_sub_agent(monkeypatch) -> None:
+    class _FakeDb:
+        def close(self) -> None:
+            return None
+
+    class _CapturingModel:
+        def __init__(self) -> None:
+            self.config = None
+
+        async def ainvoke(self, messages, config=None):
+            self.config = config
+            assert len(messages) == 2
+            return AIMessage(content="Summary ready.")
+
+    monkeypatch.setattr("app.tools.workflow_tools.SessionLocal", lambda: _FakeDb())
+    monkeypatch.setattr(
+        "app.tools.workflow_tools.build_workspace_state",
+        lambda db, session_id: {
+            "session_id": session_id,
+            "turn": None,
+            "draft": None,
+            "run": type(
+                "Run",
+                (),
+                {
+                    "id": "run-1",
+                    "status": "success",
+                    "error": None,
+                    "result": {"outputs": {"dash": {"dashboard_url": "/dashboards/demo/"}}},
+                },
+            )(),
+            "artifacts": [],
+        },
+    )
+
+    model = _CapturingModel()
+    summarize_tool = create_summarize_workflow_result_tool(model, "session-1")
+
+    result = await summarize_tool.ainvoke({"question": "Summarize the dashboard"})
+
+    assert result == "Summary ready."
+    assert model.config == {"tags": ["sub_agent"]}
+
+
 def test_message_collector_uses_fallback_content_on_failure() -> None:
     collector = MessageCollector()
     collector.start_tool("supervisor", "workflow_agent", "{}")
@@ -314,6 +360,32 @@ def test_normalize_workflow_run_result_marks_python_schema_failures_repairable()
     assert normalized["repairable"] is True
     assert normalized["error_type"] == "workflow_python_schema_invalid"
     assert "total_revenue" in normalized["issues"][-1]
+
+
+def test_normalize_workflow_run_result_marks_python_dataset_ref_contract_failures_repairable() -> None:
+    normalized = _normalize_workflow_run_result(
+        {
+            "status": "failed",
+            "error": (
+                "Workflow execution failed at node analyze_campaign_data (python.code): "
+                "AttributeError: 'list' object has no attribute 'get'\n"
+                'INPUT_PREVIEW (first 10 lines): {"dataset_ref":[{"path":"/workspace/data/campaign.csv","preview_rows":[{"city":"Shanghai"}]}]}'
+            ),
+            "details": [
+                {
+                    "node_id": "analyze_campaign_data",
+                    "node_type": "python.code",
+                    "message": "AttributeError: 'list' object has no attribute 'get'",
+                }
+            ],
+        },
+        draft_id="draft-1",
+    )
+
+    assert normalized["status"] == "failed"
+    assert normalized["repairable"] is True
+    assert normalized["error_type"] == "workflow_python_contract_invalid"
+    assert "load_dataset_ref(ref)" in normalized["issues"][1]
 
 
 def test_normalize_workflow_run_result_marks_missing_artifact_dataset_ref_repairable() -> None:
