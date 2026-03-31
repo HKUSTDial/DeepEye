@@ -3,6 +3,7 @@
 import os
 import json
 import tarfile
+from pathlib import Path
 from types import SimpleNamespace
 
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
@@ -294,6 +295,28 @@ def test_python_code_handler_passes_dataset_refs_instead_of_full_rows() -> None:
     assert "def load_dataset_ref(ref):" in script
     assert "def load_dataset_refs(data):" in script
     assert "def emit_dataframe(df):" in script
+
+
+def test_python_code_helper_load_dataset_ref_accepts_singleton_list(tmp_path) -> None:
+    csv_path = Path(tmp_path) / "cities.csv"
+    csv_path.write_text("city,revenue\nShanghai,120\n", encoding="utf-8")
+
+    handler = PythonCodeHandler(sandbox=None)
+    namespace: dict[str, object] = {}
+    exec(handler._helper_prelude(), namespace)
+
+    df = namespace["load_dataset_ref"](
+        [
+            {
+                "kind": "dataset_ref",
+                "path": str(csv_path),
+                "format": "csv",
+            }
+        ]
+    )
+
+    assert list(df.columns) == ["city", "revenue"]
+    assert df.to_dict(orient="records") == [{"city": "Shanghai", "revenue": 120}]
 
 
 def test_workflow_engine_runs_rows_pipeline_with_llm_answer() -> None:

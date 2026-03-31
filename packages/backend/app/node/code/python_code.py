@@ -40,6 +40,13 @@ import sys
 import pandas as pd
 
 def load_dataset_ref(ref):
+    if isinstance(ref, list):
+        refs = [item for item in ref if isinstance(item, dict)]
+        if len(refs) != 1:
+            raise ValueError("load_dataset_ref expects exactly one dataset_ref; use load_dataset_refs(data) for multiple inputs")
+        ref = refs[0]
+    if not isinstance(ref, dict):
+        raise ValueError("dataset_ref must be an object")
     path = ref.get("path")
     if not path:
         raise ValueError("dataset_ref.path is required")
