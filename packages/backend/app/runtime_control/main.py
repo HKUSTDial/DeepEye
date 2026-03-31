@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 from contextlib import asynccontextmanager
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
@@ -42,6 +43,24 @@ def _serialize_sandbox(sandbox) -> dict[str, Any]:
         "is_running": sandbox.is_running(),
         "container": _serialize_container(container) if container is not None else None,
     }
+
+
+def _serialize_command_result(result) -> dict[str, Any]:
+    if hasattr(result, "model_dump"):
+        payload = result.model_dump()
+    elif is_dataclass(result):
+        payload = asdict(result)
+    elif hasattr(result, "dict"):
+        payload = result.dict()
+    else:
+        payload = {
+            "stdout": getattr(result, "stdout", ""),
+            "stderr": getattr(result, "stderr", ""),
+            "exit_code": getattr(result, "exit_code", -1),
+            "success": getattr(result, "success", False),
+            "execution_time_ms": getattr(result, "execution_time_ms", 0),
+        }
+    return dict(payload)
 
 
 def require_internal_api_key(
@@ -130,7 +149,7 @@ async def get_sandbox_stats() -> dict[str, Any]:
 async def exec_sandbox_command(session_id: str, payload: CommandRequest) -> dict[str, Any]:
     sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
     result = await sandbox.exec_command(payload.command)
-    return result.model_dump()
+    return _serialize_command_result(result)
 
 
 @app.post("/internal/runtime-control/sandbox/sessions/{session_id}/write-file", dependencies=router_dependencies)

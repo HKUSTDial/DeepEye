@@ -90,7 +90,7 @@ services:
       - /bin/sh
       - -lc
       - >
-        uvicorn app.runtime_control.main:app
+        /app/.venv/bin/python -m uvicorn app.runtime_control.main:app
         --host 0.0.0.0
         --port 8010
         --reload
@@ -134,7 +134,7 @@ services:
       - /bin/sh
       - -lc
       - >
-        uvicorn app.main:app
+        /app/.venv/bin/python -m uvicorn app.main:app
         --host 0.0.0.0
         --port 8000
         --reload

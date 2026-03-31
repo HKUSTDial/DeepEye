@@ -15,6 +15,7 @@ import docker
 from docker.errors import DockerException, NotFound
 
 from app.core.config import settings
+from app.services.docker_build_paths import resolve_docker_build_target
 from app.services.docker_control_client import get_docker_control_client
 from app.services.runtime_metrics import runtime_metrics
 from deepeye.sandbox import CommandResult, SandboxProtocol
@@ -501,10 +502,23 @@ class DockerSandbox:
             await self._build_image()
 
     async def _build_image(self) -> None:
+        build_context, dockerfile_name, dockerfile_path = resolve_docker_build_target(
+            dockerfile_setting=settings.SANDBOX_DOCKERFILE,
+            default_context_root=settings.SANDBOX_BUILD_CONTEXT,
+            anchor_file=__file__,
+        )
+        if not dockerfile_path.exists():
+            raise RuntimeError(f"Sandbox Dockerfile not found: {dockerfile_path}")
+        logger.info(
+            "[DockerSandbox] Building image %s from %s (context=%s)",
+            settings.SANDBOX_IMAGE,
+            dockerfile_path,
+            build_context,
+        )
         try:
             image, build_logs = self.docker_client.images.build(
-                path=settings.SANDBOX_BUILD_CONTEXT,
-                dockerfile=settings.SANDBOX_DOCKERFILE,
+                path=build_context,
+                dockerfile=dockerfile_name,
                 tag=settings.SANDBOX_IMAGE,
                 rm=True,
                 forcerm=True,
