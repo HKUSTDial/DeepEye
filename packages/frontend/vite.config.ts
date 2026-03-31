@@ -22,8 +22,13 @@ function manualChunks(id: string) {
   if (id.includes('/xlsx/')) {
     return 'file-vendor'
   }
-  if (id.includes('/shiki/')) {
-    return 'highlight-vendor'
+  if (
+    id.includes('/@shikijs/core/') ||
+    id.includes('/engine-javascript.mjs') ||
+    id.includes('/shiki/dist/core') ||
+    id.includes('/shiki/dist/engine-javascript')
+  ) {
+    return 'highlight-core'
   }
   if (
     id.includes('/react-markdown/') ||
