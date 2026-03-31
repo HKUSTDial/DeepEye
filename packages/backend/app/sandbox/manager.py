@@ -15,6 +15,7 @@ from app.sandbox.docker_sandbox import DockerSandbox
 from app.sandbox.factory import create_sandbox
 from app.sandbox.activity import ActivityTracker
 from app.core.config import settings
+from app.services.docker_control_client import get_docker_control_client
 from app.services.datasource_specs import get_datasource_filename, workspace_data_path
 from app.services.minio_service import download_bytes
 
@@ -65,9 +66,12 @@ class SandboxManager:
         
         # session_id -> list of sandboxes (in-memory cache)
         self._sandboxes: Dict[str, List[DockerSandbox]] = defaultdict(list)
-        
-        # Docker client for cross-process container discovery
-        self._docker = docker.from_env()
+
+        self._control_client = get_docker_control_client()
+        self._docker = None
+        if not self._use_remote_control():
+            # Docker client for cross-process container discovery
+            self._docker = docker.from_env()
         
         # Activity tracking
         self._activity = ActivityTracker()
@@ -78,6 +82,13 @@ class SandboxManager:
         self._running = False
         
         self._initialized = True
+
+    def _use_remote_control(self) -> bool:
+        return settings.DOCKER_CONTROL_MODE == "remote"
+
+    def _build_remote_sandbox(self, payload: dict[str, Any]) -> DockerSandbox:
+        sandbox = DockerSandbox.from_remote_state(payload)
+        return sandbox
 
     async def get_or_create_sandbox(
         self,
@@ -231,6 +242,27 @@ class SandboxManager:
         Returns:
             Sandbox instance or None
         """
+        if self._use_remote_control():
+            async with self._lock:
+                sandboxes = self._sandboxes.get(session_id, [])
+                if index < len(sandboxes):
+                    sandbox = sandboxes[index]
+                    if await sandbox.health_check():
+                        return sandbox
+                    logger.warning(
+                        f"[SandboxManager] Cached remote sandbox {sandbox.container_name} is no longer healthy, removing from cache"
+                    )
+                    self._sandboxes[session_id].pop(index)
+
+                payload = await self._control_client.get_sandbox(session_id)
+                if not payload:
+                    return None
+
+                sandbox = self._build_remote_sandbox(payload)
+                self._sandboxes[session_id] = [sandbox]
+                self._activity.record_activity(session_id)
+                return sandbox
+
         async with self._lock:
             sandboxes = self._sandboxes.get(session_id, [])
             if index < len(sandboxes):
@@ -312,6 +344,13 @@ class SandboxManager:
         Args:
             session_id: Session ID
         """
+        if self._use_remote_control():
+            await self._control_client.stop_sandbox(session_id)
+            sandbox = await self.get_sandbox(session_id)
+            if sandbox:
+                self._sandboxes[session_id] = [sandbox]
+            return
+
         async with self._lock:
             sandboxes = self._sandboxes.get(session_id, [])
             for sandbox in sandboxes:
@@ -328,6 +367,12 @@ class SandboxManager:
         Args:
             session_id: Session ID
         """
+        if self._use_remote_control():
+            payload = await self._control_client.start_sandbox(session_id)
+            self._sandboxes[session_id] = [self._build_remote_sandbox(payload)]
+            self._activity.record_activity(session_id)
+            return
+
         async with self._lock:
             sandboxes = self._sandboxes.get(session_id, [])
             for sandbox in sandboxes:
@@ -347,6 +392,13 @@ class SandboxManager:
         Args:
             session_id: Session ID
         """
+        if self._use_remote_control():
+            await self._control_client.stop_sandbox(session_id)
+            payload = await self._control_client.start_sandbox(session_id)
+            self._sandboxes[session_id] = [self._build_remote_sandbox(payload)]
+            self._activity.record_activity(session_id)
+            return
+
         async with self._lock:
             sandboxes = self._sandboxes.get(session_id, [])
             for sandbox in sandboxes:
@@ -371,6 +423,12 @@ class SandboxManager:
             session_id: Session ID
             delete_data: If True, also delete the Named Volume (all data lost!)
         """
+        if self._use_remote_control():
+            await self._control_client.destroy_sandbox(session_id, delete_data=delete_data)
+            self._sandboxes.pop(session_id, None)
+            self._activity.clear(session_id)
+            return
+
         async with self._lock:
             # First, destroy sandboxes in local cache
             sandboxes = self._sandboxes.pop(session_id, [])
@@ -419,6 +477,11 @@ class SandboxManager:
 
     async def cleanup_all(self) -> None:
         """Cleanup all sandboxes"""
+        if self._use_remote_control():
+            await self._control_client.cleanup_all_sandboxes()
+            self._sandboxes.clear()
+            return
+
         async with self._lock:
             sessions = list(self._sandboxes.keys())
         
@@ -434,6 +497,11 @@ class SandboxManager:
         Returns:
             Stats dict with session counts, sandbox counts, and volume counts
         """
+        if self._use_remote_control():
+            stats = self._control_client.get_sandbox_stats_sync()
+            stats["cleanup_running"] = bool(stats.get("cleanup_running"))
+            return stats
+
         total_sessions = len(self._sandboxes)
         total_sandboxes = sum(len(sandboxes) for sandboxes in self._sandboxes.values())
         
@@ -464,6 +532,9 @@ class SandboxManager:
         Returns:
             Status dict with local and Docker information
         """
+        if self._use_remote_control():
+            return self._control_client.get_sandbox_status_sync(session_id)
+
         # Local cache info
         sandboxes = self._sandboxes.get(session_id, [])
         idle_time = self._activity.get_idle_time(session_id)
@@ -496,6 +567,8 @@ class SandboxManager:
     
     def _volume_exists(self, volume_name: str) -> bool:
         """Check if a Docker volume exists."""
+        if not self._docker:
+            return False
         try:
             self._docker.volumes.get(volume_name)
             return True
@@ -504,6 +577,8 @@ class SandboxManager:
     
     def _find_volumes_by_session(self, session_id: str) -> list:
         """Find all volumes for a session by label."""
+        if not self._docker:
+            return []
         try:
             volumes = self._docker.volumes.list(
                 filters={"label": f"session_id={session_id}"}
@@ -520,6 +595,8 @@ class SandboxManager:
         Returns:
             List of volume info dicts
         """
+        if not self._docker:
+            return []
         try:
             volumes = self._docker.volumes.list(
                 filters={"label": "app=deepeye"}
@@ -546,6 +623,8 @@ class SandboxManager:
         Returns:
             List of Docker container objects
         """
+        if not self._docker:
+            return []
         try:
             return self._docker.containers.list(
                 all=True,  # Include stopped containers
@@ -568,6 +647,8 @@ class SandboxManager:
         Returns:
             List of Docker container objects
         """
+        if not self._docker:
+            return []
         try:
             return self._docker.containers.list(
                 all=True,
@@ -595,6 +676,9 @@ class SandboxManager:
         Raises:
             RuntimeError: If container cannot be accessed
         """
+        if self._use_remote_control():
+            raise RuntimeError("Remote control mode does not support direct container reconnection")
+
         try:
             # Create new sandbox instance
             sandbox = DockerSandbox()
@@ -633,6 +717,14 @@ class SandboxManager:
         Returns:
             Number of sandboxes reconnected
         """
+        if self._use_remote_control():
+            payload = await self._control_client.sync_sandbox_from_docker(session_id)
+            sandbox_payload = await self._control_client.get_sandbox(session_id)
+            if sandbox_payload:
+                self._sandboxes[session_id] = [self._build_remote_sandbox(sandbox_payload)]
+                self._activity.record_activity(session_id)
+            return int(payload.get("reconnected", 0))
+
         async with self._lock:
             containers = self._find_containers_by_session(session_id)
             if not containers:
@@ -717,6 +809,8 @@ class SandboxManager:
 
     def _discover_docker_sessions(self) -> list[str]:
         """Discover sandbox sessions directly from Docker labels."""
+        if not self._docker:
+            return []
         try:
             all_containers = self._docker.containers.list(
                 all=True,
@@ -796,6 +890,11 @@ class SandboxManager:
 
     def start_cleanup_task(self) -> None:
         """Start background cleanup task"""
+        if self._use_remote_control():
+            self._control_client.start_sandbox_cleanup_sync()
+            self._running = True
+            return
+
         if not self._running:
             self._running = True
             self._cleanup_task = asyncio.create_task(self._cleanup_idle_sessions())
@@ -803,6 +902,11 @@ class SandboxManager:
 
     async def stop_cleanup_task(self) -> None:
         """Stop background cleanup task"""
+        if self._use_remote_control():
+            self._control_client.stop_sandbox_cleanup_sync()
+            self._running = False
+            return
+
         if self._running:
             self._running = False
             if self._cleanup_task:

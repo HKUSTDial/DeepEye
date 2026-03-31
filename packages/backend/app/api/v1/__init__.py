@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter
 
-from . import chat, datasources, sessions, video, workflow_files, workflow_nodes, workflows
+from . import chat, datasources, sessions, system, video, workflow_files, workflow_nodes, workflows
 from .sandbox import router as sandbox_router
 
 router = APIRouter(prefix="/api/v1", tags=["v1"])
@@ -16,6 +16,7 @@ router.include_router(workflows.router)     # /api/v1/workflows
 router.include_router(workflow_files.router)      # /api/v1/workflow-files
 router.include_router(workflow_nodes.router)      # /api/v1/workflow-nodes
 router.include_router(video.router)         # /api/v1/video
+router.include_router(system.router)        # /api/v1/system
 router.include_router(sandbox_router)       # /api/v1/sandbox
 
 __all__ = ["router"]

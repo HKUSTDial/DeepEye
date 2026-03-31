@@ -16,6 +16,7 @@ from app.db.session import get_db
 from app.repositories import SessionRepository
 from app.schemas import ChatRequest, SSEMessage
 from app.services import get_or_create_session, start_agent_workflow
+from app.services.runtime_metrics import runtime_metrics
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -54,6 +55,8 @@ async def _event_generator(session_id: str) -> AsyncGenerator[str, None]:
     channel = f"session:{session_id}"
 
     await pubsub.subscribe(channel)
+    runtime_metrics.increment("sse.stream.open.count", tags={"stream": "chat"})
+    runtime_metrics.change_gauge("sse.stream.active", 1, tags={"stream": "chat"})
 
     try:
         # Initial heartbeat
@@ -72,12 +75,14 @@ async def _event_generator(session_id: str) -> AsyncGenerator[str, None]:
                 data_str = message["data"].decode("utf-8")
                 try:
                     payload = json.loads(data_str)
+                    runtime_metrics.increment("sse.stream.message.count", tags={"stream": "chat", "format": "json"})
                     yield SSEMessage(data=payload).to_sse_string()
                     # Also check for AgentEventType.AGENT_END or similar "done" markers
                     # Depending on how the end of stream is signaled
                     if payload.get("type") in ("done", "error"):
                         break
                 except json.JSONDecodeError:
+                    runtime_metrics.increment("sse.stream.message.count", tags={"stream": "chat", "format": "text"})
                     yield SSEMessage(data=data_str).to_sse_string()
             
             except asyncio.TimeoutError:
@@ -85,6 +90,8 @@ async def _event_generator(session_id: str) -> AsyncGenerator[str, None]:
                 yield SSEMessage(comment="heartbeat").to_sse_string()
                 continue
     finally:
+        runtime_metrics.change_gauge("sse.stream.active", -1, tags={"stream": "chat"})
+        runtime_metrics.increment("sse.stream.close.count", tags={"stream": "chat"})
         await pubsub.unsubscribe(channel)
         await redis_client.close()
 

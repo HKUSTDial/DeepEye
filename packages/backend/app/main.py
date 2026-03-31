@@ -33,6 +33,9 @@ def start_sandbox_cleanup() -> None:
     if not settings.SANDBOX_CLEANUP_ENABLED:
         logger.info("Skipping sandbox cleanup task startup.")
         return
+    if settings.DOCKER_CONTROL_MODE == "remote":
+        logger.info("Skipping local sandbox cleanup startup in remote Docker control mode.")
+        return
 
     sandbox_manager.start_cleanup_task()
     logger.info("Sandbox cleanup task started.")
@@ -40,6 +43,8 @@ def start_sandbox_cleanup() -> None:
 
 async def stop_sandbox_cleanup() -> None:
     if not settings.SANDBOX_CLEANUP_ENABLED:
+        return
+    if settings.DOCKER_CONTROL_MODE == "remote":
         return
 
     await sandbox_manager.stop_cleanup_task()

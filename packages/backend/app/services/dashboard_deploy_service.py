@@ -4,13 +4,17 @@ import json
 import os
 import socket
 import tarfile
+import time
 from typing import Dict
 
 import docker
 from docker.errors import ImageNotFound, NotFound
 
 from app.core.config import settings
+from app.services.docker_control_client import get_docker_control_client
 from app.services.docker_build_paths import resolve_docker_build_target
+from app.services.preview_runtime import preview_container_labels, preview_containers_to_cleanup
+from app.services.runtime_metrics import runtime_metrics
 from deepeye.utils.logger import logger
 
 
@@ -40,6 +44,10 @@ def _dashboard_container_environment() -> dict[str, str]:
 
 class DashboardDeployService:
     def __init__(self):
+        self._control_client = get_docker_control_client()
+        if settings.DOCKER_CONTROL_MODE == "remote":
+            self.docker_client = None
+            return
         try:
             self.docker_client = docker.from_env()
         except Exception as e:
@@ -61,6 +69,30 @@ class DashboardDeployService:
                 "url": str
             }
         """
+        start_time = time.perf_counter()
+        if settings.DOCKER_CONTROL_MODE == "remote":
+            try:
+                result = await self._control_client.deploy_dashboard_preview(
+                    task_id=task_id,
+                    local_va_app_path=local_va_app_path,
+                )
+                runtime_metrics.increment(
+                    "preview.deploy.count",
+                    tags={"kind": "dashboard", "mode": "remote", "status": "success"},
+                )
+                runtime_metrics.record_duration(
+                    "preview.deploy.duration_seconds",
+                    time.perf_counter() - start_time,
+                    tags={"kind": "dashboard", "mode": "remote"},
+                )
+                return result
+            except Exception:
+                runtime_metrics.increment(
+                    "preview.deploy.count",
+                    tags={"kind": "dashboard", "mode": "remote", "status": "failed"},
+                )
+                raise
+
         if not self.docker_client:
             raise RuntimeError("Docker not available")
 
@@ -68,6 +100,7 @@ class DashboardDeployService:
             raise FileNotFoundError(f"Dashboard source path not found: {local_va_app_path}")
 
         self._ensure_dashboard_image()
+        self._cleanup_preview_containers()
 
         container_name = f"deepeye-nl2dashboard-{task_id}"
         network_name = self._detect_network_name()
@@ -99,7 +132,10 @@ class DashboardDeployService:
             working_dir="/app",
             command=start_cmd,
             environment=_dashboard_container_environment(),
-            labels={"type": "dashboard-instance", "task_id": task_id},
+            labels={
+                **preview_container_labels(preview_kind="dashboard", task_id=task_id),
+                "type": "dashboard-instance",
+            },
             network=network_name,
         )
 
@@ -120,6 +156,10 @@ class DashboardDeployService:
                 logs = container.logs().decode("utf-8", errors="replace")
                 logger.error("[DashboardDeployService] Deployment timeout. Logs:\n%s", logs)
 
+            runtime_metrics.increment(
+                "preview.deploy.count",
+                tags={"kind": "dashboard", "mode": "local", "status": "success" if is_ready else "failed"},
+            )
             return {
                 "status": "running" if is_ready else "error",
                 "container_name": container_name,
@@ -127,7 +167,17 @@ class DashboardDeployService:
             }
         except Exception:
             logger.exception("[DashboardDeployService] Deployment failed for task_id=%s", task_id)
+            runtime_metrics.increment(
+                "preview.deploy.count",
+                tags={"kind": "dashboard", "mode": "local", "status": "failed"},
+            )
             raise
+        finally:
+            runtime_metrics.record_duration(
+                "preview.deploy.duration_seconds",
+                time.perf_counter() - start_time,
+                tags={"kind": "dashboard", "mode": "local"},
+            )
 
     def _remove_container_if_exists(self, container_name: str) -> None:
         try:
@@ -136,6 +186,26 @@ class DashboardDeployService:
             logger.info("[DashboardDeployService] Removed old container: %s", container_name)
         except NotFound:
             pass
+
+    def _cleanup_preview_containers(self) -> None:
+        containers = self.docker_client.containers.list(
+            all=True,
+            filters={"label": ["preview_kind=dashboard"]},
+        )
+        for container in preview_containers_to_cleanup(
+            containers,
+            ttl_seconds=settings.PREVIEW_RUNTIME_TTL_SECONDS,
+            max_running=settings.PREVIEW_RUNTIME_MAX_CONTAINERS,
+        ):
+            try:
+                container.remove(force=True)
+                logger.info("[DashboardDeployService] Removed stale preview container: %s", container.name)
+            except Exception as exc:
+                logger.warning(
+                    "[DashboardDeployService] Failed to remove preview container %s: %s",
+                    container.name,
+                    exc,
+                )
 
     def _detect_network_name(self) -> str:
         """Try to keep dashboard containers on the same network as current backend container."""

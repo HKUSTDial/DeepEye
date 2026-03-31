@@ -26,6 +26,7 @@ import json
 import os
 import re
 import tarfile
+import time
 import unicodedata
 from pathlib import Path
 from typing import Dict
@@ -34,7 +35,10 @@ import docker
 from docker.errors import ImageNotFound, NotFound
 
 from app.core.config import get_video_session_root, settings
+from app.services.docker_control_client import get_docker_control_client
 from app.services.docker_build_paths import resolve_docker_build_target
+from app.services.preview_runtime import preview_container_labels, preview_containers_to_cleanup
+from app.services.runtime_metrics import runtime_metrics
 from deepeye.utils.logger import logger
 
 
@@ -112,6 +116,10 @@ class VideoDeployService:
     IMAGE_NAME_ENV = "VIDEO_PREVIEW_IMAGE"
 
     def __init__(self) -> None:
+        self._control_client = get_docker_control_client()
+        if settings.DOCKER_CONTROL_MODE == "remote":
+            self.docker_client = None
+            return
         try:
             self.docker_client = docker.from_env()
         except Exception as e:
@@ -120,6 +128,22 @@ class VideoDeployService:
 
     def _get_image_name(self) -> str:
         return os.environ.get(self.IMAGE_NAME_ENV, settings.VIDEO_PREVIEW_IMAGE)
+
+    def _cleanup_preview_containers(self) -> None:
+        containers = self.docker_client.containers.list(
+            all=True,
+            filters={"label": ["preview_kind=video"]},
+        )
+        for container in preview_containers_to_cleanup(
+            containers,
+            ttl_seconds=settings.PREVIEW_RUNTIME_TTL_SECONDS,
+            max_running=settings.PREVIEW_RUNTIME_MAX_CONTAINERS,
+        ):
+            try:
+                container.remove(force=True)
+                logger.info("[VideoDeployService] Removed stale preview container: %s", container.name)
+            except Exception as exc:
+                logger.warning("[VideoDeployService] Failed to remove preview container %s: %s", container.name, exc)
 
     def _ensure_preview_image(self, image_name: str) -> None:
         try:
@@ -189,6 +213,30 @@ class VideoDeployService:
         Returns:
             {"status": "running"|"error", "container_name": str, "url": str}
         """
+        start_time = time.perf_counter()
+        if settings.DOCKER_CONTROL_MODE == "remote":
+            try:
+                result = await self._control_client.deploy_video_preview(
+                    task_id=task_id,
+                    session_id=session_id,
+                )
+                runtime_metrics.increment(
+                    "preview.deploy.count",
+                    tags={"kind": "video", "mode": "remote", "status": "success"},
+                )
+                runtime_metrics.record_duration(
+                    "preview.deploy.duration_seconds",
+                    time.perf_counter() - start_time,
+                    tags={"kind": "video", "mode": "remote"},
+                )
+                return result
+            except Exception:
+                runtime_metrics.increment(
+                    "preview.deploy.count",
+                    tags={"kind": "video", "mode": "remote", "status": "failed"},
+                )
+                raise
+
         if not self.docker_client:
             raise RuntimeError("[VideoDeployService] Docker not available")
 
@@ -213,6 +261,7 @@ class VideoDeployService:
 
         image = self._get_image_name()
         self._ensure_preview_image(image)
+        self._cleanup_preview_containers()
 
         # Remove old container if it exists
         try:
@@ -229,7 +278,10 @@ class VideoDeployService:
             image=image,
             name=container_name,
             detach=True,
-            labels={"type": "video-preview", "task_id": task_id, "session_id": session_id},
+            labels={
+                **preview_container_labels(preview_kind="video", task_id=task_id, session_id=session_id),
+                "type": "video-preview",
+            },
             network=network_name,
             environment={"VITE_BASE_PATH": video_url_prefix},
         )
@@ -295,6 +347,10 @@ class VideoDeployService:
                 logs = container.logs().decode("utf-8", errors="replace")
                 logger.error(f"[VideoDeployService] Deployment timed out.\n{logs[-2000:]}")
 
+            runtime_metrics.increment(
+                "preview.deploy.count",
+                tags={"kind": "video", "mode": "local", "status": "success" if is_ready else "failed"},
+            )
             return {
                 "status": "running" if is_ready else "error",
                 "container_name": container_name,
@@ -303,7 +359,17 @@ class VideoDeployService:
 
         except Exception as e:
             logger.error(f"[VideoDeployService] Deploy failed for task {task_id}: {e}")
+            runtime_metrics.increment(
+                "preview.deploy.count",
+                tags={"kind": "video", "mode": "local", "status": "failed"},
+            )
             raise
+        finally:
+            runtime_metrics.record_duration(
+                "preview.deploy.duration_seconds",
+                time.perf_counter() - start_time,
+                tags={"kind": "video", "mode": "local"},
+            )
 
 # Singleton
 video_deployer = VideoDeployService()

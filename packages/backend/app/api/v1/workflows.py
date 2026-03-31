@@ -14,6 +14,7 @@ from app.models.workflow import Workflow
 from app.models.workflow_run import WorkflowRun
 from app.repositories import WorkflowRepository, WorkflowRunRepository
 from app.schemas.workflow import WorkflowCreate, WorkflowResponse, WorkflowRunResponse, WorkflowUpdate
+from app.services.runtime_metrics import runtime_metrics
 from app.tasks.workflow_tasks import run_workflow_task
 from app.core.config import settings
 
@@ -158,6 +159,8 @@ async def _run_event_stream(run_id: str, user_id: str):
     channel = f"workflow_run:{run_id}"
 
     await pubsub.subscribe(channel)
+    runtime_metrics.increment("sse.stream.open.count", tags={"stream": "workflow_run"})
+    runtime_metrics.change_gauge("sse.stream.active", 1, tags={"stream": "workflow_run"})
     db = SessionLocal()
     try:
         latest = WorkflowRunRepository(db).get_by_id_and_user(run_id, user_id)
@@ -176,12 +179,15 @@ async def _run_event_stream(run_id: str, user_id: str):
                 payload = json.loads(data_str)
             except json.JSONDecodeError:
                 payload = {"raw": data_str}
+            runtime_metrics.increment("sse.stream.message.count", tags={"stream": "workflow_run"})
             yield f"data: {json.dumps(payload)}\n\n"
             if payload.get("type") == "run":
                 status = payload.get("status")
                 if status and status not in {"running", "pending"}:
                     break
     finally:
+        runtime_metrics.change_gauge("sse.stream.active", -1, tags={"stream": "workflow_run"})
+        runtime_metrics.increment("sse.stream.close.count", tags={"stream": "workflow_run"})
         await pubsub.unsubscribe(channel)
         await redis_client.close()
 

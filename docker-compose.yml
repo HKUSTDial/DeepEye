@@ -75,6 +75,41 @@ services:
       retries: 5
     restart: unless-stopped
 
+  runtime-control:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    env_file:
+      - .env
+    environment:
+      - DOCKER_CONTROL_MODE=local
+      - STARTUP_WARMUP_ENABLED=false
+      - CELERY_STARTUP_WARMUP_ENABLED=false
+      - LANGGRAPH_CHECKPOINTER_AUTO_SETUP=false
+    command:
+      - /bin/sh
+      - -lc
+      - >
+        uvicorn app.runtime_control.main:app
+        --host 0.0.0.0
+        --port 8010
+        --reload
+    expose:
+      - "8010"
+    volumes:
+      - ./packages/backend:/app/packages/backend
+      - ./packages/core:/app/packages/core
+      - .:/app/project
+      - workspace_data:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8010/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   backend-api:
     build:
       context: .
@@ -90,7 +125,21 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --limit-concurrency 1000 --timeout-keep-alive 300
+      runtime-control:
+        condition: service_healthy
+    environment:
+      - DOCKER_CONTROL_MODE=remote
+      - SANDBOX_CLEANUP_ENABLED=false
+    command:
+      - /bin/sh
+      - -lc
+      - >
+        uvicorn app.main:app
+        --host 0.0.0.0
+        --port 8000
+        --reload
+        --limit-concurrency "${API_LIMIT_CONCURRENCY:-200}"
+        --timeout-keep-alive "${API_TIMEOUT_KEEP_ALIVE_SECONDS:-60}"
     expose:
       - "8000"
     volumes:
@@ -98,8 +147,6 @@ services:
       - ./packages/core:/app/packages/core
       - .:/app/project
       - workspace_data:/workspace
-      # Mount Docker socket to manage sandbox containers
-      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
@@ -123,14 +170,22 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    command: /app/.venv/bin/python -m celery -A app.core.celery_app worker --loglevel=info
+      runtime-control:
+        condition: service_healthy
+    environment:
+      - DOCKER_CONTROL_MODE=remote
+    command:
+      - /bin/sh
+      - -lc
+      - >
+        /app/.venv/bin/python -m celery -A app.core.celery_app worker
+        --loglevel=info
+        --concurrency="${CELERY_WORKER_CONCURRENCY:-4}"
     volumes:
       - ./packages/backend:/app/packages/backend
       - ./packages/core:/app/packages/core
       - .:/app/project
       - workspace_data:/workspace
-      # Mount Docker socket to manage sandbox containers
-      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
   backend-migrate:

@@ -17,6 +17,7 @@ VIDEO_RUNTIME_BASE = Path(os.getenv("VIDEO_RUNTIME_BASE", "/workspace/video_runt
 DEFAULT_ANIMATED_OUTPUT_DIR = Path(
     os.getenv("VIDEO_ANIMATED_OUTPUT_BASE", str(VIDEO_RUNTIME_BASE / "claude_tsx_animated"))
 )
+DOCKER_CONTROL_MODE = os.getenv("DOCKER_CONTROL_MODE", "local")
 
 
 def calculate_total_duration(config_data):
@@ -694,56 +695,59 @@ def copy_components_to_frontend(
                 print(f"✅ 已复制 {container_copied_count} 个组件到前端容器运行目录")
             else:
                 # 方法2: 如果前端容器目录不存在，尝试通过 Docker API 复制
-                try:
-                    import docker
-                    docker_client = docker.from_env()
-                    # 查找前端容器（通常名称包含 frontend）
-                    containers = docker_client.containers.list(filters={'status': 'running'})
-                    frontend_container = None
-                    for container in containers:
-                        if 'frontend' in container.name.lower():
-                            frontend_container = container
-                            break
-                    
-                    if frontend_container:
-                        print(f"\n📦 通过 Docker API 复制到前端容器: {frontend_container.name}")
-                        # 创建临时目录并准备文件
-                        import tempfile
-                        import tarfile
-                        import io
+                if DOCKER_CONTROL_MODE == "remote":
+                    print("⚠️  Remote Docker control mode enabled, skip optional Docker API frontend sync")
+                else:
+                    try:
+                        import docker
+                        docker_client = docker.from_env()
+                        # 查找前端容器（通常名称包含 frontend）
+                        containers = docker_client.containers.list(filters={'status': 'running'})
+                        frontend_container = None
+                        for container in containers:
+                            if 'frontend' in container.name.lower():
+                                frontend_container = container
+                                break
                         
-                        with tempfile.TemporaryDirectory() as tmp_dir:
-                            tmp_path = Path(tmp_dir)
-                            # 创建目录结构
-                            component_tmp_dir = tmp_path / component_prefix / task_id
-                            component_tmp_dir.mkdir(parents=True, exist_ok=True)
+                        if frontend_container:
+                            print(f"\n📦 通过 Docker API 复制到前端容器: {frontend_container.name}")
+                            # 创建临时目录并准备文件
+                            import tempfile
+                            import tarfile
+                            import io
                             
-                            # 复制文件到临时目录
-                            for scene_id, (component_name, _) in found_components.items():
-                                source_file = animated_components_dir / f"{component_name}.tsx"
-                                if source_file.exists():
-                                    shutil.copy2(source_file, component_tmp_dir / f"{component_name}.tsx")
-                            
-                            # 创建 tar 归档
-                            tar_stream = io.BytesIO()
-                            with tarfile.open(fileobj=tar_stream, mode='w') as tar:
-                                tar.add(tmp_path / component_prefix, arcname=component_prefix)
-                            
-                            tar_stream.seek(0)
-                            
-                            # 复制到容器
-                            container_target_path = '/app/src/components/video/'
-                            frontend_container.put_archive(container_target_path, tar_stream.getvalue())
-                            
-                            print(f"✅ 已通过 Docker API 复制组件到前端容器")
-                    else:
-                        print(f"⚠️  未找到运行中的前端容器，跳过容器内复制")
-                except ImportError:
-                    print(f"⚠️  docker 库未安装，跳过容器内复制（需要: pip install docker）")
-                except Exception as e:
-                    print(f"⚠️  通过 Docker API 复制失败: {e}（这是可选的，不影响主要功能）")
-                    import traceback
-                    traceback.print_exc()
+                            with tempfile.TemporaryDirectory() as tmp_dir:
+                                tmp_path = Path(tmp_dir)
+                                # 创建目录结构
+                                component_tmp_dir = tmp_path / component_prefix / task_id
+                                component_tmp_dir.mkdir(parents=True, exist_ok=True)
+                                
+                                # 复制文件到临时目录
+                                for scene_id, (component_name, _) in found_components.items():
+                                    source_file = animated_components_dir / f"{component_name}.tsx"
+                                    if source_file.exists():
+                                        shutil.copy2(source_file, component_tmp_dir / f"{component_name}.tsx")
+                                
+                                # 创建 tar 归档
+                                tar_stream = io.BytesIO()
+                                with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+                                    tar.add(tmp_path / component_prefix, arcname=component_prefix)
+                                
+                                tar_stream.seek(0)
+                                
+                                # 复制到容器
+                                container_target_path = '/app/src/components/video/'
+                                frontend_container.put_archive(container_target_path, tar_stream.getvalue())
+                                
+                                print(f"✅ 已通过 Docker API 复制组件到前端容器")
+                        else:
+                            print(f"⚠️  未找到运行中的前端容器，跳过容器内复制")
+                    except ImportError:
+                        print(f"⚠️  docker 库未安装，跳过容器内复制（需要: pip install docker）")
+                    except Exception as e:
+                        print(f"⚠️  通过 Docker API 复制失败: {e}（这是可选的，不影响主要功能）")
+                        import traceback
+                        traceback.print_exc()
         
         return True
         
@@ -811,61 +815,64 @@ def update_frontend_video_composer(
                     print(f"⚠️  更新前端容器运行文件失败: {e}")
             else:
                 # 如果没有共享卷，尝试通过 Docker API 更新
-                try:
-                    import docker
-                    docker_client = docker.from_env()
-                    containers = docker_client.containers.list(filters={'status': 'running'})
-                    frontend_container = None
-                    for container in containers:
-                        if 'frontend' in container.name.lower():
-                            frontend_container = container
-                            break
-                    
-                    if frontend_container:
-                        print(f"📦 通过 Docker API 更新前端容器: {frontend_container.name}")
-                        # 先在后端容器中生成更新后的内容
-                        import tempfile
-                        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.tsx', delete=False, encoding='utf-8')
-                        temp_path = Path(temp_file.name)
-                        temp_file.close()
+                if DOCKER_CONTROL_MODE == "remote":
+                    print("⚠️  Remote Docker control mode enabled, skip optional Docker API frontend update")
+                else:
+                    try:
+                        import docker
+                        docker_client = docker.from_env()
+                        containers = docker_client.containers.list(filters={'status': 'running'})
+                        frontend_container = None
+                        for container in containers:
+                            if 'frontend' in container.name.lower():
+                                frontend_container = container
+                                break
                         
-                        try:
-                            # 读取当前前端容器的文件内容
-                            import io
-                            import tarfile
-                            bits, stat = frontend_container.get_archive('/app/src/components/video/VideoComposer.tsx')
-                            file_obj = io.BytesIO(b''.join(bits))
-                            with tarfile.open(fileobj=file_obj) as tar:
-                                tar.extractall(path=temp_path.parent)
-                                extracted_file = temp_path.parent / 'VideoComposer.tsx'
-                                if extracted_file.exists():
-                                    # 更新文件
-                                    if update_video_composer_with_mapping(
-                                        component_prefix,
-                                        config_data,
-                                        extracted_file,
-                                        task_id,
-                                        is_frontend=True
-                                    ):
-                                        # 打包并复制回容器
-                                        tar_stream = io.BytesIO()
-                                        with tarfile.open(fileobj=tar_stream, mode='w') as tar_out:
-                                            tar_out.add(extracted_file, arcname='VideoComposer.tsx')
-                                        tar_stream.seek(0)
-                                        frontend_container.put_archive('/app/src/components/video/', tar_stream.getvalue())
-                                        print(f"✅ 已通过 Docker API 更新前端容器")
-                                        success = True
-                        except Exception as e:
-                            print(f"⚠️  通过 Docker API 更新失败: {e}")
-                        finally:
-                            if temp_path.exists():
-                                temp_path.unlink()
-                            if (temp_path.parent / 'VideoComposer.tsx').exists():
-                                (temp_path.parent / 'VideoComposer.tsx').unlink()
-                except ImportError:
-                    print(f"⚠️  docker 库未安装，跳过 Docker API 更新（需要: pip install docker）")
-                except Exception as e:
-                    print(f"⚠️  通过 Docker API 更新失败: {e}（这是可选的，不影响主要功能）")
+                        if frontend_container:
+                            print(f"📦 通过 Docker API 更新前端容器: {frontend_container.name}")
+                            # 先在后端容器中生成更新后的内容
+                            import tempfile
+                            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.tsx', delete=False, encoding='utf-8')
+                            temp_path = Path(temp_file.name)
+                            temp_file.close()
+                            
+                            try:
+                                # 读取当前前端容器的文件内容
+                                import io
+                                import tarfile
+                                bits, stat = frontend_container.get_archive('/app/src/components/video/VideoComposer.tsx')
+                                file_obj = io.BytesIO(b''.join(bits))
+                                with tarfile.open(fileobj=file_obj) as tar:
+                                    tar.extractall(path=temp_path.parent)
+                                    extracted_file = temp_path.parent / 'VideoComposer.tsx'
+                                    if extracted_file.exists():
+                                        # 更新文件
+                                        if update_video_composer_with_mapping(
+                                            component_prefix,
+                                            config_data,
+                                            extracted_file,
+                                            task_id,
+                                            is_frontend=True
+                                        ):
+                                            # 打包并复制回容器
+                                            tar_stream = io.BytesIO()
+                                            with tarfile.open(fileobj=tar_stream, mode='w') as tar_out:
+                                                tar_out.add(extracted_file, arcname='VideoComposer.tsx')
+                                            tar_stream.seek(0)
+                                            frontend_container.put_archive('/app/src/components/video/', tar_stream.getvalue())
+                                            print(f"✅ 已通过 Docker API 更新前端容器")
+                                            success = True
+                            except Exception as e:
+                                print(f"⚠️  通过 Docker API 更新失败: {e}")
+                            finally:
+                                if temp_path.exists():
+                                    temp_path.unlink()
+                                if (temp_path.parent / 'VideoComposer.tsx').exists():
+                                    (temp_path.parent / 'VideoComposer.tsx').unlink()
+                    except ImportError:
+                        print(f"⚠️  docker 库未安装，跳过 Docker API 更新（需要: pip install docker）")
+                    except Exception as e:
+                        print(f"⚠️  通过 Docker API 更新失败: {e}（这是可选的，不影响主要功能）")
         
         return success
         
