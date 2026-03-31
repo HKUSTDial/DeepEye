@@ -1,63 +1,22 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { useChat } from '../hooks/useChat'
 import {
   selectCurrentMessages,
   selectIsStreaming,
   useChatStore,
 } from '../stores/chat'
-import { createReportProgressLine, parseChatProgressLine, type ChatProgressLine } from '../utils/chatProgress'
+import { type ChatProgressLine } from '../utils/chatProgress'
 import DataSourceManager from './DataSourceManager'
-import StepItem from './StepItem'
-import type { Message, ToolStep } from '../types'
+import { AssistantMessageBody } from './AssistantMessageBody'
+import { ChatEmptyState } from './ChatEmptyState'
+import { buildMessageActivityKey, hasText } from './chatBoxUtils'
 import './ChatBox.css'
 
 interface ChatBoxProps {
   dataSourceIds: string[]
   onDataSourceIdsChange?: (ids: string[]) => void
   compact?: boolean
-}
-
-function buildStepActivityKey(steps?: ToolStep[]): string {
-  if (!steps || steps.length === 0) return ''
-  return steps
-    .map((step) => {
-      const subKey = buildStepActivityKey(step.subSteps)
-      return [
-        step.type,
-        step.name,
-        step.status,
-        step.input?.length || 0,
-        step.output?.length || 0,
-        step.thought?.length || 0,
-        subKey,
-      ].join(':')
-    })
-    .join('|')
-}
-
-function buildMessageActivityKey(message?: Message): string {
-  if (!message) return ''
-  const timelineKey = (message.timeline || [])
-    .map((item) => {
-      if (item.kind === 'text') {
-        return `text:${item.content.length}:${item.isStreaming ? 1 : 0}`
-      }
-      if (item.kind === 'report_step') {
-        return `report:${item.stepIndex}:${item.label}`
-      }
-      return `step:${buildStepActivityKey([item.step])}`
-    })
-    .join('|')
-  return [
-    message.role,
-    message.content.length,
-    message.isStreaming ? 1 : 0,
-    buildStepActivityKey(message.steps),
-    timelineKey,
-  ].join('~')
 }
 
 export default function ChatBox({
@@ -241,7 +200,6 @@ export default function ChatBox({
       <span className={`chat-progress-state chat-progress-state--${progress.status}`}>{progress.status}</span>
     </div>
   )
-  const hasText = (value?: string) => Boolean(value && value.trim().length > 0)
   const showJumpButton = messages.length > 0 && !isNearBottom
   const sourceStatusText = dataSourceIds.length > 0
     ? `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}`
@@ -254,102 +212,20 @@ export default function ChatBox({
     ? 'Use the assistant to inspect attached data, explain outputs, write SQL, or draft next steps.'
     : 'Use + to add files or databases. Once attached, they are available automatically in this thread.'
 
-  const renderAssistantMessage = (msg: Message) => {
-    const timeline = msg.timeline && msg.timeline.length > 0 ? msg.timeline : null
-
-    if (timeline) {
-      return (
-        <div className="assistant-timeline">
-          {timeline.map((item, idx) => {
-            if (item.kind === 'step') {
-              return <StepItem key={`timeline-step-${idx}`} step={item.step} />
-            }
-            if (item.kind === 'report_step') {
-              return renderProgressLine(
-                createReportProgressLine(item.stepIndex, item.totalSteps, item.label),
-                `timeline-report-${idx}`,
-              )
-            }
-            if (item.kind === 'text') {
-              const progress = parseChatProgressLine(item.content || '')
-              if (progress) {
-                return renderProgressLine(progress, `timeline-progress-${idx}`)
-              }
-            }
-            return (
-              <div key={`timeline-text-${idx}`} className="message-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {item.content || ''}
-                </ReactMarkdown>
-                {item.isStreaming && hasText(item.content) && renderStreamingIndicator()}
-              </div>
-            )
-          })}
-        </div>
-      )
-    }
-
-    return (
-      <>
-        {msg.steps && msg.steps.length > 0 && (
-          <div className="space-y-2 mb-3">
-            {msg.steps.map((step, sIdx) => (
-              <StepItem key={`step-${sIdx}`} step={step} />
-            ))}
-          </div>
-        )}
-        {(msg.content || msg.isStreaming) && (
-          <div className="message-content">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {msg.content || ''}
-            </ReactMarkdown>
-            {msg.isStreaming && hasText(msg.content) && renderStreamingIndicator()}
-          </div>
-        )}
-      </>
-    )
-  }
-
   return (
     <div className={`chat-container ${compact ? 'compact' : ''}`}>
       {/* Messages Area */}
       <div ref={chatContainerRef} className="chat-messages">
         {/* Empty State */}
         {messages.length === 0 && (
-          <div className="chat-empty">
-            <svg className="chat-empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <h2 className="chat-empty-title">{emptyTitle}</h2>
-            <p className="chat-empty-subtitle">{emptySubtitle}</p>
-            <div className={`chat-empty-status ${dataSourceIds.length > 0 ? 'is-active' : ''}`}>
-              <span className="chat-empty-status-dot" aria-hidden="true"></span>
-              <span>{sourceStatusText}</span>
-            </div>
-            <div className="chat-empty-context">
-              <span className={`chat-empty-context-chip ${dataSourceIds.length > 0 ? 'active' : ''}`}>Files and databases join automatically</span>
-            </div>
-            <div className="chat-empty-prompts">
-              {starterPrompts.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  className="chat-empty-prompt"
-                  onClick={() => applyStarterPrompt(item.prompt)}
-                >
-                  <span className="chat-empty-prompt-copy">
-                    <span className="chat-empty-prompt-title">{item.label}</span>
-                    <span className="chat-empty-prompt-desc">{item.description}</span>
-                  </span>
-                  <span className="chat-empty-prompt-arrow" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M9 7h8v8" />
-                    </svg>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <ChatEmptyState
+            dataSourceCount={dataSourceIds.length}
+            emptyTitle={emptyTitle}
+            emptySubtitle={emptySubtitle}
+            sourceStatusText={sourceStatusText}
+            starterPrompts={starterPrompts}
+            onApplyStarterPrompt={applyStarterPrompt}
+          />
         )}
 
         {/* Messages */}
@@ -370,7 +246,11 @@ export default function ChatBox({
                         <div className="whitespace-pre-wrap">{msg.content}</div>
                       </div>
                     ) : (
-                      renderAssistantMessage(msg)
+                      <AssistantMessageBody
+                        message={msg}
+                        renderProgressLine={renderProgressLine}
+                        renderStreamingIndicator={renderStreamingIndicator}
+                      />
                     )}
 
                     {/* Thinking indicator */}
