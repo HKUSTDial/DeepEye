@@ -4,6 +4,8 @@ import type {
   WorkflowRun,
   WorkspaceState,
 } from '../types'
+import type { WorkflowRunPhaseState } from '../utils/workflowRunPhase'
+import { deriveRunPhaseFromSnapshot } from '../utils/workflowRunPhase'
 import {
   appendCappedLogEntry,
   artifactKey,
@@ -61,6 +63,7 @@ export interface WorkflowSessionState {
   runStatus: string | null
   runError: string | null
   error: string | null
+  runPhase: WorkflowRunPhaseState | null
   activeRun: WorkflowRun | null
   runOutput: string
   dashboardRefreshKey: number
@@ -92,6 +95,7 @@ interface WorkflowSessionsStore {
   setNodeStatus: (sessionId: string, nodeId: string, status: string, outputs?: Record<string, unknown>) => void
   setRunStatus: (sessionId: string, status: string | null, error?: string | null) => void
   setError: (sessionId: string, error: string | null) => void
+  setRunPhase: (sessionId: string, phase: WorkflowRunPhaseState | null) => void
   setActiveRun: (sessionId: string, run: WorkflowRun | null) => void
   setRunOutput: (sessionId: string, output: string) => void
   triggerDashboardRefresh: (sessionId: string) => void
@@ -136,6 +140,7 @@ const createEmptySession = (): WorkflowSessionState => ({
   runStatus: null,
   runError: null,
   error: null,
+  runPhase: null,
   activeRun: null,
   runOutput: '',
   dashboardRefreshKey: 0,
@@ -237,6 +242,7 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
             runStatus: run?.status ?? null,
             runError: run?.error ?? null,
             error: run?.status === 'failed' ? run?.error ?? null : null,
+            runPhase: deriveRunPhaseFromSnapshot(run, artifacts),
             activeRun: run,
             runOutput: deriveRunOutput(run),
             dashboardProgress: { ...initialDashboardProgress },
@@ -274,6 +280,7 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
         runStatus: null,
         runError: null,
         error: null,
+        runPhase: null,
         activeRun: null,
         runOutput: '',
       }),
@@ -361,6 +368,8 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
     })),
   setError: (sessionId, error) =>
     set((state) => ({ sessions: patchSessionState(state.sessions, sessionId, { error }) })),
+  setRunPhase: (sessionId, runPhase) =>
+    set((state) => ({ sessions: patchSessionState(state.sessions, sessionId, { runPhase }) })),
   setActiveRun: (sessionId, activeRun) =>
     set((state) => ({
       sessions: patchSessionState(state.sessions, sessionId, (current) => ({

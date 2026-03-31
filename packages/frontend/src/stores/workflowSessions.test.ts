@@ -84,5 +84,11 @@ describe('workflowSessions store', () => {
       }),
     ])
     expect(session.videoPreviewUrl).toBe('https://example.com/video')
+    expect(session.runPhase).toEqual(
+      expect.objectContaining({
+        label: 'Video preview ready',
+        status: 'done',
+      }),
+    )
   })
 })

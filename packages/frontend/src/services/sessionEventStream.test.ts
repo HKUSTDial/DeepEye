@@ -99,6 +99,12 @@ describe('sessionEventStream', () => {
         dashboard_url: 'https://example.com/dashboard',
       }),
     ])
+    expect(workflowSession.runPhase).toEqual(
+      expect.objectContaining({
+        label: 'Dashboard preview ready',
+        status: 'done',
+      }),
+    )
 
     const tabs = useRightPanelStore.getState().panes.flatMap((pane) => pane.tabs)
     expect(tabs).toEqual(
@@ -146,5 +152,129 @@ describe('sessionEventStream', () => {
     expect(workflowSession.runOutput).toBe('')
     expect(workflowSession.artifacts).toEqual([])
     expect(tabs).toHaveLength(0)
+  })
+
+  it('tracks the current node phase while a workflow run is active', () => {
+    useChatStore.setState({
+      currentSession: new SessionChat('session-1', 'Session 1'),
+    })
+
+    const source = new FakeEventSource()
+    createEventSourceMock.mockReturnValue(source)
+
+    ensureSessionEventStream('session-1')
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'create_workflow',
+        draft_id: 'draft-1',
+        payload: {
+          workflow: {
+            root: {
+              nodes: {
+                read_source: {
+                  id: 'read_source',
+                  type: 'datasource.read',
+                },
+              },
+              edges: {},
+            },
+          },
+        },
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'run_start',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {},
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'node_status',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {
+          node_id: 'read_source',
+          status: 'running',
+        },
+      },
+    })
+
+    const workflowSession = useWorkflowSessionsStore.getState().sessions['session-1']
+    expect(workflowSession.runPhase).toEqual(
+      expect.objectContaining({
+        label: 'Reading data',
+        status: 'running',
+        nodeId: 'read_source',
+      }),
+    )
+  })
+
+  it('surfaces failed node guidance for workflow errors', () => {
+    useChatStore.setState({
+      currentSession: new SessionChat('session-1', 'Session 1'),
+    })
+
+    const source = new FakeEventSource()
+    createEventSourceMock.mockReturnValue(source)
+
+    ensureSessionEventStream('session-1')
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'create_workflow',
+        draft_id: 'draft-1',
+        payload: {
+          workflow: {
+            root: {
+              nodes: {
+                build_dashboard: {
+                  id: 'build_dashboard',
+                  type: 'data.generate_dashboard',
+                },
+              },
+              edges: {},
+            },
+          },
+        },
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'run_start',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {},
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'node_status',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {
+          node_id: 'build_dashboard',
+          status: 'failed',
+          error: 'Port mismatch',
+        },
+      },
+    })
+
+    const workflowSession = useWorkflowSessionsStore.getState().sessions['session-1']
+    expect(workflowSession.runPhase).toEqual(
+      expect.objectContaining({
+        label: 'Building dashboard failed',
+        status: 'error',
+        nodeId: 'build_dashboard',
+        suggestion: expect.stringContaining('dashboard node'),
+      }),
+    )
   })
 })

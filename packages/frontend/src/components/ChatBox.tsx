@@ -3,14 +3,17 @@ import { createPortal } from 'react-dom'
 import { useChat } from '../hooks/useChat'
 import {
   selectCurrentMessages,
+  selectCurrentSessionId,
   selectIsStreaming,
   useChatStore,
 } from '../stores/chat'
+import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { type ChatProgressLine } from '../utils/chatProgress'
 import DataSourceManager from './DataSourceManager'
 import { AssistantMessageBody } from './AssistantMessageBody'
 import { ChatEmptyState } from './ChatEmptyState'
 import { buildMessageActivityKey, hasText } from './chatBoxUtils'
+import { WorkflowRunPhaseBanner } from './workflow/WorkflowRunPhaseBanner'
 import './ChatBox.css'
 
 interface ChatBoxProps {
@@ -27,7 +30,14 @@ export default function ChatBox({
   const { sendMessage, stopMessage, error } = useChat()
   // 每个属性单独订阅 - 最简单可靠的方式
   const messages = useChatStore(selectCurrentMessages)
+  const currentSessionId = useChatStore(selectCurrentSessionId)
   const isStreaming = useChatStore(selectIsStreaming)
+  const runPhase = useWorkflowSessionsStore((state) =>
+    currentSessionId ? state.sessions[currentSessionId]?.runPhase ?? null : null,
+  )
+  const runStatus = useWorkflowSessionsStore((state) =>
+    currentSessionId ? state.sessions[currentSessionId]?.runStatus ?? null : null,
+  )
   
   const [input, setInput] = useState('')
   const [showDataSourceManager, setShowDataSourceManager] = useState(false)
@@ -201,6 +211,7 @@ export default function ChatBox({
     </div>
   )
   const showJumpButton = messages.length > 0 && !isNearBottom
+  const showRunPhaseBanner = !!runPhase && (runPhase.status === 'running' || runPhase.status === 'error' || runStatus === 'running')
   const sourceStatusText = dataSourceIds.length > 0
     ? `${dataSourceIds.length} attached data source${dataSourceIds.length > 1 ? 's' : ''}`
     : 'No attached data yet'
@@ -216,6 +227,11 @@ export default function ChatBox({
     <div className={`chat-container ${compact ? 'compact' : ''}`}>
       {/* Messages Area */}
       <div ref={chatContainerRef} className="chat-messages">
+        {showRunPhaseBanner && runPhase ? (
+          <div className={`mx-auto mb-4 ${messages.length === 0 ? 'w-full max-w-[760px]' : 'w-full max-w-[960px]'}`}>
+            <WorkflowRunPhaseBanner phase={runPhase} compact={compact} />
+          </div>
+        ) : null}
         {/* Empty State */}
         {messages.length === 0 && (
           <ChatEmptyState

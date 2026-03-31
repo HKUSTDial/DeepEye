@@ -4,6 +4,7 @@ import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
+import { WorkflowRunPhaseBanner } from '../../workflow/WorkflowRunPhaseBanner'
 import { useTheme } from '../../../hooks/useTheme'
 import { WorkflowLiveEmptyState } from './WorkflowLiveEmptyState'
 import { WorkflowLiveToolbar } from './WorkflowLiveToolbar'
@@ -43,6 +44,7 @@ export function WorkflowLivePanel({
     runStatus,
     runError,
     error,
+    runPhase,
     displayFileError,
     activeRun,
     runOutput,
@@ -161,6 +163,11 @@ export function WorkflowLivePanel({
           await handleRun(flow.nodes, flow.edges)
         }}
       />
+      {runPhase ? (
+        <div className="px-4 pb-3">
+          <WorkflowRunPhaseBanner phase={runPhase} />
+        </div>
+      ) : null}
       <div className="flex min-h-0 flex-1">
         <div ref={graphHostRef} className="min-w-0 flex-1">
           <WorkflowGraph

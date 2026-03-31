@@ -16,6 +16,16 @@ import {
   matchesTrackedWorkflowEvent,
   parseWorkflowEvent,
 } from '../utils/workflowEvents'
+import {
+  createArtifactPhase,
+  createConnectionLostPhase,
+  createGenericErrorPhase,
+  createNodePhase,
+  createPlanningPhase,
+  createRunCompletionPhase,
+  createRunStartPhase,
+  createTokenPhase,
+} from '../utils/workflowRunPhase'
 
 type ErrorListener = (error: string | null) => void
 type WorkflowHandleResult = 'handled' | 'ignored' | 'unparsed'
@@ -88,6 +98,13 @@ function handleWorkflowArtifactEvent(
   const typedArtifact = artifact as WorkflowArtifactPayload
   const workflowStore = useWorkflowSessionsStore.getState()
   workflowStore.recordArtifact(sessionId, typedArtifact)
+  const artifactPhase = createArtifactPhase(
+    phase as 'artifact_progress' | 'artifact_ready' | 'artifact_refresh' | 'artifact_failed',
+    payload,
+  )
+  if (artifactPhase) {
+    workflowStore.setRunPhase(sessionId, artifactPhase)
+  }
 
   if (kind === 'report') {
     if (phase === 'artifact_progress') {
@@ -224,6 +241,7 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
       workflowStore.setDefinition(sessionId, workflow as Record<string, unknown>)
       workflowStore.setViewState(sessionId, 'switching')
       workflowStore.setError(sessionId, null)
+      workflowStore.setRunPhase(sessionId, createPlanningPhase(filePath))
       useChatStore.getState().notifyFilesChanged()
       openOrFocusTabIfCurrent(sessionId, 'workflow')
 
@@ -270,6 +288,7 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
     workflowStore.setViewState(sessionId, 'ready')
     workflowStore.setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, workflowEvent, 'running'))
     workflowStore.setError(sessionId, null)
+    workflowStore.setRunPhase(sessionId, createRunStartPhase(filePath))
     return 'handled'
   }
 
@@ -282,8 +301,16 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
       workflowStore.setNodeStatus(sessionId, nodeId, status, typedOutputs)
       const session = workflowStore.sessions[sessionId]
       const root = (session?.definition as Record<string, { nodes?: Record<string, { type?: string }> }> | null)?.root
-      const nodesMap = session?.validatedNodes ?? root?.nodes ?? {}
+      const validatedNodes = session?.validatedNodes ?? {}
+      const nodesMap =
+        Object.keys(validatedNodes).length > 0
+          ? validatedNodes
+          : root?.nodes ?? {}
       const nodeType = (nodesMap[nodeId] as { type?: string } | undefined)?.type
+      const nodePhase = createNodePhase(nodeId, nodeType ?? null, status, payload)
+      if (nodePhase) {
+        workflowStore.setRunPhase(sessionId, nodePhase)
+      }
       if (nodeType === 'data.generate_dashboard' && status === 'running') {
         workflowStore.setDashboardProgressVisible(sessionId, true)
       }
@@ -301,6 +328,10 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
     workflowStore.setVideoProgressVisible(sessionId, false)
     workflowStore.setRunStatus(sessionId, status, error)
     workflowStore.setActiveRun(sessionId, buildWorkflowRunFromEvent(sessionId, workflowEvent, status, { error }))
+    workflowStore.setRunPhase(
+      sessionId,
+      createRunCompletionPhase(status, error, workflowStore.sessions[sessionId]?.runPhase ?? null),
+    )
 
     const artifacts = getWorkflowArtifacts(payload)
     artifacts.forEach((artifact) => {
@@ -325,6 +356,7 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
     const message = typeof payload.message === 'string' ? payload.message : 'Workflow error'
     workflowStore.setError(sessionId, message)
     workflowStore.setViewState(sessionId, 'error')
+    workflowStore.setRunPhase(sessionId, createGenericErrorPhase(message))
     return 'handled'
   }
 
@@ -345,6 +377,11 @@ function handleWorkflowToken(sessionId: string, event: AgentEvent) {
     if (stage !== null) {
       workflowStore.setDashboardProgressStage(sessionId, stage)
     }
+  }
+
+  const phase = createTokenPhase(data.content)
+  if (phase) {
+    workflowStore.setRunPhase(sessionId, phase)
   }
 
   workflowStore.appendVideoProgressLog(sessionId, data.content)
@@ -417,6 +454,11 @@ function handleSessionEvent(sessionId: string, agentEvent: AgentEvent) {
   }
 
   if (agentEvent.type === 'error') {
+    if (useWorkflowSessionsStore.getState().sessions[sessionId]?.runStatus === 'running') {
+      useWorkflowSessionsStore
+        .getState()
+        .setRunPhase(sessionId, createGenericErrorPhase(agentEvent.content || 'Unknown error'))
+    }
     stopStreamingIfCurrent(sessionId)
     emitError(agentEvent.content || 'Unknown error')
     disconnectSessionEventStream({ clearError: false })
@@ -490,6 +532,7 @@ export function ensureSessionEventStream(sessionId: string) {
     }
     if (useWorkflowSessionsStore.getState().sessions[sessionId]?.runStatus === 'running') {
       useWorkflowSessionsStore.getState().setError(sessionId, 'Connection lost')
+      useWorkflowSessionsStore.getState().setRunPhase(sessionId, createConnectionLostPhase())
     }
     emitError('Connection lost')
   }

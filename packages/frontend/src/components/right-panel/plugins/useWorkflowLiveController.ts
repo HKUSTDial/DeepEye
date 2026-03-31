@@ -193,6 +193,7 @@ export function useWorkflowLiveController(sessionId: string | null) {
   const runStatus = sessionState?.runStatus ?? null
   const runError = sessionState?.runError ?? null
   const error = sessionState?.error ?? null
+  const runPhase = sessionState?.runPhase ?? null
   const displayFileError = sessionState?.fileError ?? null
   const activeRun = sessionState?.activeRun ?? null
   const runOutput = sessionState?.runOutput ?? ''
@@ -257,6 +258,7 @@ export function useWorkflowLiveController(sessionId: string | null) {
     runStatus,
     runError,
     error,
+    runPhase,
     displayFileError,
     activeRun,
     runOutput,
