@@ -93,7 +93,7 @@ def test_run_workflow_task_syncs_referenced_file_datasources(monkeypatch) -> Non
         async def _fake_sync_datasource_files(session_key: str, datasources: list[DataSource]) -> None:
             sync_calls.append((session_key, [str(item.id) for item in datasources]))
 
-        monkeypatch.setattr(workflow_tasks, "SessionLocal", lambda: db)
+        monkeypatch.setattr(workflow_tasks, "open_task_session", lambda: db)
         monkeypatch.setattr(workflow_tasks, "_publish_run", lambda run: None)
         monkeypatch.setattr(workflow_tasks, "_publish_node", lambda run, node_id, node_status, outputs=None: None)
         monkeypatch.setattr(workflow_tasks.sandbox_manager, "get_or_create_sandbox", _fake_get_or_create_sandbox)

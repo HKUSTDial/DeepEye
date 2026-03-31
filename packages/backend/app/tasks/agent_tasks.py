@@ -7,7 +7,6 @@ import uuid
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy import MetaData, Table, create_engine, inspect, select
-from sqlalchemy.orm import sessionmaker
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
@@ -25,6 +24,7 @@ from app.services.workflow_tracking_service import (
     fail_chat_turn_record,
 )
 from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
+from app.tasks.db import task_session_scope
 from deepeye.agents import AgentFactory
 from app.tools.workflow_tools import (
     create_design_workflow_tool,
@@ -45,10 +45,8 @@ def _build_failure_message(error: Exception) -> str:
 def _get_datasources_info(datasource_ids: list[str] | None, user_id: uuid.UUID | None = None) -> list[dict[str, str]]:
     if not datasource_ids:
         return []
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-    Session = sessionmaker(bind=engine)
     items = []
-    with Session() as db:
+    with task_session_scope() as db:
         for ds_id in datasource_ids:
             try:
                 ds_uuid = uuid.UUID(ds_id)
@@ -90,11 +88,9 @@ def _get_datasources_schema(
 ) -> list[dict[str, object]]:
     if not datasource_ids:
         return []
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-    Session = sessionmaker(bind=engine)
     all_schemas = []
     
-    with Session() as db:
+    with task_session_scope() as db:
         for ds_id in datasource_ids:
             try:
                 ds_uuid = uuid.UUID(ds_id)
@@ -160,9 +156,7 @@ def _get_user_id(session_id: str) -> uuid.UUID | None:
         session_uuid = uuid.UUID(session_id)
     except (TypeError, ValueError):
         return None
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    with Session() as db:
+    with task_session_scope() as db:
         session = SessionRepository(db).get(session_uuid)
         return session.user_id if session else None
 
@@ -172,9 +166,7 @@ def _get_session_attachment_ids(session_id: str) -> list[str]:
         session_uuid = uuid.UUID(session_id)
     except (TypeError, ValueError):
         return []
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    with Session() as db:
+    with task_session_scope() as db:
         return SessionAttachmentRepository(db).list_datasource_ids(session_uuid)
 
 
@@ -236,10 +228,8 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     )
     
     # Sync file datasources
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-    Session = sessionmaker(bind=engine)
     file_datasources = []
-    with Session() as db:
+    with task_session_scope() as db:
         for ds_id in datasource_ids:
             try:
                 ds_uuid = uuid.UUID(ds_id)

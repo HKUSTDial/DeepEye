@@ -23,11 +23,6 @@ class _FakeSessionContext:
         return False
 
 
-class _FakeSessionFactory:
-    def __call__(self):
-        return _FakeSessionContext()
-
-
 def test_get_datasources_schema_includes_database_preview(monkeypatch, tmp_path: Path) -> None:
     db_path = tmp_path / "sales.sqlite"
     conn = sqlite3.connect(db_path)
@@ -63,7 +58,7 @@ def test_get_datasources_schema_includes_database_preview(monkeypatch, tmp_path:
         def get(self, ds_uuid):
             return datasource if ds_uuid == datasource_id else None
 
-    monkeypatch.setattr(agent_tasks, "sessionmaker", lambda bind: _FakeSessionFactory())
+    monkeypatch.setattr(agent_tasks, "task_session_scope", lambda: _FakeSessionContext())
     monkeypatch.setattr(agent_tasks, "DataSourceRepository", _FakeDataSourceRepository)
 
     schemas = agent_tasks._get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())

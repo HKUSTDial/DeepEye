@@ -7,15 +7,13 @@ import json5
 from typing import Any, Literal
 
 from langchain_core.callbacks import AsyncCallbackHandler
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
 
-from app.core.config import settings
 from app.infra import EventBus
 from app.repositories import MessageRepository
 from app.schemas import AgentEvent, AgentEventType, AssistantMessage, Message, ToolStep
 from app.services.workflow_events import build_workflow_event_data
 from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft
+from app.tasks.db import open_task_session
 from deepeye.utils.logger import logger
 
 _WORKFLOW_TRACE_TOOL_NAMES = {
@@ -165,13 +163,6 @@ def _log_workflow_tool_trace(summary: dict[str, Any]) -> None:
         logger.warning("[workflow_tool_trace] %s", message)
     else:
         logger.info("[workflow_tool_trace] %s", message)
-
-
-
-def _get_db_session() -> Session:
-    """Create a new DB session per-call to avoid fork issues in Celery workers."""
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URL)
-    return sessionmaker(bind=engine)()
 
 
 class MessageCollector:
@@ -396,7 +387,7 @@ class AgentCallback(AsyncCallbackHandler):
             workflow = _extract_workflow_definition(payload)
             if isinstance(workflow, dict):
                 phase = "update_workflow" if name == "update_workflow" else "create_workflow"
-                db = _get_db_session()
+                db = open_task_session()
                 try:
                     draft = save_workflow_draft(
                         db,
@@ -475,7 +466,7 @@ class AgentCallback(AsyncCallbackHandler):
 def persist_message(session_id: str, message: Message):
     """Persist a message (user or assistant) to session_messages table."""
     try:
-        db = _get_db_session()
+        db = open_task_session()
         try:
             record = MessageRepository(db).append(session_id, message)
             logger.debug(f"[persist_message] Persisted {message.role} message for session {session_id}")

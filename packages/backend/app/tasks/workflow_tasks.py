@@ -9,7 +9,6 @@ from datetime import datetime
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
-from app.db.session import SessionLocal
 from app.models.workflow import Workflow
 from app.models.workflow_run import WorkflowRun
 from app.repositories import DataSourceRepository, WorkflowRepository, WorkflowRunRepository
@@ -17,6 +16,7 @@ from app.infra import RedisEventBus
 from app.services.workflow_service import run_workflow, update_workflow_run
 from app.sandbox import sandbox_manager
 from app.services.workflow_file_service import service_run_workflow_draft, service_run_workflow_from_file
+from app.tasks.db import open_task_session
 
 
 async def _publish(channel: str, payload: dict) -> None:
@@ -95,7 +95,7 @@ def _workflow_file_datasources(db, workflow: Workflow, user_id) -> list:
 
 @celery_app.task(bind=True)
 def run_workflow_task(self, run_id: str) -> dict:
-    db = SessionLocal()
+    db = open_task_session()
     try:
         run_repo = WorkflowRunRepository(db)
         workflow_repo = WorkflowRepository(db)
@@ -160,7 +160,7 @@ def run_workflow_file_task(
     draft_id: str | None = None,
     run_id: str | None = None,
 ) -> dict:
-    db = SessionLocal()
+    db = open_task_session()
     try:
         result = asyncio.run(
             service_run_workflow_from_file(
@@ -189,7 +189,7 @@ def run_workflow_draft_task(
     turn_id: str | None = None,
     run_id: str | None = None,
 ) -> dict:
-    db = SessionLocal()
+    db = open_task_session()
     try:
         result = asyncio.run(
             service_run_workflow_draft(

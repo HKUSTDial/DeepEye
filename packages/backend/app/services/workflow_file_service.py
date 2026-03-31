@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import shlex
-import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -311,7 +310,6 @@ async def service_run_workflow_definition(
 
         engine = build_engine(db, user_id, sandbox=sandbox, session_id=session_id)
         loop = asyncio.get_running_loop()
-        result_holder: list = []  # [ExecutionContext] or [Exception]
 
         # 进度回调：从 worker 线程通过主循环发送 TOKEN，保证中途过程能实时展示
         def _publish_progress_message(message: str):
@@ -346,24 +344,13 @@ async def service_run_workflow_definition(
             loop.call_soon_threadsafe(_schedule)
 
         def _run_workflow_sync():
-            try:
-                ctx = engine.run(
-                    core_workflow,
-                    on_node_start=_on_node_start,
-                    on_node_end=_on_node_end,
-                )
-                result_holder.append(ctx)
-            except Exception as e:
-                result_holder.append(e)
+            return engine.run(
+                core_workflow,
+                on_node_start=_on_node_start,
+                on_node_end=_on_node_end,
+            )
 
-        thread = threading.Thread(target=_run_workflow_sync)
-        thread.start()
-        while not result_holder:
-            await asyncio.sleep(0.05)
-
-        if isinstance(result_holder[0], Exception):
-            raise result_holder[0]
-        context = result_holder[0]
+        context = await asyncio.to_thread(_run_workflow_sync)
         if context.status != "success":
             error, details = _summarize_failed_context(graph, context)
             if tracked_run:

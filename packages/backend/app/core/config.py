@@ -106,9 +106,13 @@ class Settings(BaseSettings):
     LLM_MODEL: str
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 8192  # max tokens for completion across agent and artifact generation
+    AUTO_CREATE_DATABASE_SCHEMA: bool = True
     STARTUP_WARMUP_ENABLED: bool = True
     STARTUP_WARMUP_STRICT: bool = True
     STARTUP_WARMUP_TIMEOUT_SECONDS: float = 15.0
+    LANGGRAPH_CHECKPOINTER_AUTO_SETUP: bool = True
+    SANDBOX_CLEANUP_ENABLED: bool = True
+    CELERY_STARTUP_WARMUP_ENABLED: bool = True
     
     # Azure Speech TTS (optional, for data video narration)
     AZURE_SPEECH_KEY: str | None = None
