@@ -27,7 +27,6 @@ import os
 import re
 import tarfile
 import time
-import unicodedata
 from pathlib import Path
 from typing import Dict
 
@@ -39,23 +38,8 @@ from app.services.docker_control_client import get_docker_control_client
 from app.services.docker_build_paths import resolve_docker_build_target
 from app.services.preview_runtime import preview_container_labels, preview_containers_to_cleanup
 from app.services.runtime_metrics import runtime_metrics
+from app.services.video_component_naming import expected_scene_component_files
 from deepeye.utils.logger import logger
-
-
-def _dataset_name_from_config(config: dict) -> str:
-    title = (config.get("meta") or {}).get("title") or ""
-    s = "".join(c for c in title if c.isalnum() or unicodedata.category(c).startswith("L")) or ""
-    return s[:20] if s else "DataAnalysis"
-
-
-def _scene_id_to_filename(scene_id: str, dataset_name: str, task_id: str) -> str:
-    camel = "".join(w.capitalize() for w in scene_id.split("_"))
-    need_component = scene_id in ("scene_opening", "scene_closing") or (
-        "stat" in scene_id.lower() or scene_id.endswith("_statistics")
-    )
-    if need_component:
-        return f"{dataset_name}_{camel}_{task_id}ComponentAnimated.tsx"
-    return f"{dataset_name}_{camel}_{task_id}Animated.tsx"
 
 
 def _build_scene_registry_ts(
@@ -64,18 +48,13 @@ def _build_scene_registry_ts(
     existing_files: set[str],
 ) -> str:
     """Generate scene_registry.ts that imports each TSX scene component."""
-    dataset_name = _dataset_name_from_config(config)
     lines: list[str] = [
         "import type React from 'react'",
         "",
     ]
     entries: list[str] = []
 
-    for scene in config.get("scenes") or []:
-        sid = scene.get("id")
-        if not sid:
-            continue
-        fname = _scene_id_to_filename(sid, dataset_name, task_id)
+    for sid, fname in expected_scene_component_files(config, task_id).items():
         if fname not in existing_files:
             continue
         # Safe import alias (replace non-alnum with _)

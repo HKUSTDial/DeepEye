@@ -16,6 +16,7 @@ from app.core.config import get_video_session_root, normalize_session_id
 from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.repositories import SessionRepository
+from app.services.video_component_naming import expected_scene_component_files
 from deepeye.utils.logger import logger
 
 router = APIRouter(prefix="/video", tags=["video"])
@@ -60,25 +61,6 @@ def _video_dirs(session_id: str) -> tuple[Path, Path, Path]:
     root = get_video_session_root(session_id)
     return root / "video_configs", root / "video_components", root / "public" / "audio"
 
-
-def _dataset_name_from_config(config: dict) -> str:
-    title = (config.get("meta") or {}).get("title") or ""
-    import unicodedata
-
-    s = "".join(c for c in title if c.isalnum() or unicodedata.category(c).startswith("L")) or ""
-    return s[:20] if len(s) > 20 else s
-
-
-def _scene_id_to_filename(scene_id: str, dataset_name: str, task_id: str) -> str:
-    scene_id_camel = "".join(w.capitalize() for w in scene_id.split("_"))
-    need_component = scene_id in ("scene_opening", "scene_closing") or (
-        "stat" in scene_id.lower() or scene_id.endswith("_statistics")
-    )
-    if need_component:
-        return f"{dataset_name}_{scene_id_camel}_{task_id}ComponentAnimated.tsx"
-    return f"{dataset_name}_{scene_id_camel}_{task_id}Animated.tsx"
-
-
 def _build_component_registry(task_id: str, session_id: str) -> dict[str, str]:
     config_dir, components_dir, _ = _video_dirs(session_id)
     config_path = config_dir / f"generated_{task_id}_aligned.json"
@@ -86,17 +68,12 @@ def _build_component_registry(task_id: str, session_id: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail=f"Config not found for task_id: {task_id}")
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
-    dataset_name = _dataset_name_from_config(config) or "DataAnalysis"
     comp_dir = components_dir / task_id
     if not comp_dir.exists():
         raise HTTPException(status_code=404, detail=f"Components dir not found for task_id: {task_id}")
     existing = {f.name for f in comp_dir.iterdir() if f.suffix == ".tsx"}
     registry: dict[str, str] = {}
-    for scene in config.get("scenes") or []:
-        sid = scene.get("id")
-        if not sid:
-            continue
-        fname = _scene_id_to_filename(sid, dataset_name, task_id)
+    for sid, fname in expected_scene_component_files(config, task_id).items():
         if fname in existing:
             registry[sid] = fname
     return registry
