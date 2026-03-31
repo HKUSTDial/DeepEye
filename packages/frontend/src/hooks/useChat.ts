@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { datasourceApi, chatApi } from '../api'
-import { useChatStore } from '../stores/chat'
+import {
+  selectCurrentMessages,
+  selectCurrentSessionId,
+  useChatStore,
+} from '../stores/chat'
+import { useDatasourceSyncStore } from '../stores/datasourceSync'
 import {
   disconnectSessionEventStream,
   ensureSessionEventStream,
@@ -13,14 +18,15 @@ import {
  */
 export function useChat() {
   const currentSession = useChatStore((state) => state.currentSession)
-  const sessionId = useChatStore((state) => state.sessionId)
-  const messages = useChatStore((state) => state.messages)
+  const sessionId = useChatStore(selectCurrentSessionId)
+  const messages = useChatStore(selectCurrentMessages)
   const createSession = useChatStore((state) => state.createSession)
   const startStreaming = useChatStore((state) => state.startStreaming)
   const stopStreaming = useChatStore((state) => state.stopStreaming)
   const addUserMessage = useChatStore((state) => state.addUserMessage)
   const updateSessionTitle = useChatStore((state) => state.updateSessionTitle)
   const fetchSessions = useChatStore((state) => state.fetchSessions)
+  const notifyDatasourceUpdated = useDatasourceSyncStore((state) => state.notifyUpdated)
 
   const [requestError, setRequestError] = useState<string | null>(null)
   const [streamError, setStreamError] = useState<string | null>(null)
@@ -68,9 +74,7 @@ export function useChat() {
         for (const file of csvFiles) {
           await datasourceApi.upload(file, targetSessionId)
         }
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('datasources:updated'))
-        }
+        notifyDatasourceUpdated()
       }
 
       ensureSessionEventStream(targetSessionId)

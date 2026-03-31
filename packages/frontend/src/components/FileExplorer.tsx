@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronRight, RefreshCw, Home, FolderOpen } from 'lucide-react'
 import { sandboxApi } from '../api/sandbox'
-import { useChatStore } from '../stores/chat'
+import { selectIsStreaming, useChatStore } from '../stores/chat'
 import FileTreeItem, { type FileNode } from './FileTreeItem'
 import './FileExplorer.css'
 
@@ -12,7 +12,7 @@ interface FileExplorerProps {
 
 export default function FileExplorer({ sessionId, onSelectFile }: FileExplorerProps) {
   // 每个属性单独订阅 - 最简单可靠的方式
-  const isStreaming = useChatStore((state) => state.isStreaming)
+  const isStreaming = useChatStore(selectIsStreaming)
   const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
   const sandboxReadySessionId = useChatStore((state) => state.sandboxReadySessionId)
   const isSwitchingSession = useChatStore((state) => state.isSwitchingSession)

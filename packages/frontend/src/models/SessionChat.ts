@@ -1,4 +1,4 @@
-import type { Message, ToolStep } from '../types'
+import type { Message, MessageTimelineItem, ToolStep } from '../types'
 import type { AgentEvent } from '../api'
 
 interface SerializedSessionChat {
@@ -7,6 +7,35 @@ interface SerializedSessionChat {
   messages?: Message[]
   createdAt: string
   updatedAt: string
+}
+
+function cloneToolStep(step: ToolStep): ToolStep {
+  return {
+    ...step,
+    subSteps: step.subSteps?.map(cloneToolStep),
+  }
+}
+
+function cloneTimelineItem(item: MessageTimelineItem): MessageTimelineItem {
+  if (item.kind === 'step') {
+    return { kind: 'step', step: cloneToolStep(item.step) }
+  }
+  return { ...item }
+}
+
+function cloneMessage(message: Message): Message {
+  return {
+    ...message,
+    steps: message.steps?.map(cloneToolStep),
+    timeline: message.timeline?.map(cloneTimelineItem),
+  }
+}
+
+function cloneAgentEvent(event: AgentEvent): AgentEvent {
+  return {
+    ...event,
+    data: event.data ? { ...event.data } : undefined,
+  }
 }
 
 /**
@@ -95,6 +124,16 @@ export class SessionChat {
     this.messages = []
     this.streamEvents = []
     this.isStreaming = false
+  }
+
+  clone() {
+    const session = new SessionChat(this.id, this.title, this.isDraft)
+    session.messages = this.messages.map(cloneMessage)
+    session.streamEvents = this.streamEvents.map(cloneAgentEvent)
+    session.isStreaming = this.isStreaming
+    session.createdAt = new Date(this.createdAt)
+    session.updatedAt = new Date(this.updatedAt)
+    return session
   }
 
   /**

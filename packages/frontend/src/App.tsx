@@ -1,7 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useChatStore } from './stores/chat'
+import {
+  selectCurrentMessages,
+  selectCurrentSessionId,
+  useChatStore,
+} from './stores/chat'
 import { useAuthStore } from './stores/auth'
+import { useDatasourceSyncStore } from './stores/datasourceSync'
 import { useRightPanelStore } from './stores/rightPanel'
 import { useReportStore } from './stores/report'
 import { useWorkflowSessionsStore } from './stores/workflowSessions'
@@ -29,12 +34,13 @@ function App() {
   const mainAreaRef = useRef<HTMLDivElement>(null)
   const previousRightPanelSessionKeyRef = useRef<string | null>(null)
 
-  const sessionId = useChatStore((state) => state.sessionId)
+  const sessionId = useChatStore(selectCurrentSessionId)
   const currentSession = useChatStore((state) => state.currentSession)
-  const messages = useChatStore((state) => state.messages)
+  const messages = useChatStore(selectCurrentMessages)
   const createDraftSession = useChatStore((state) => state.createDraftSession)
   const currentUser = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
+  const datasourceRevision = useDatasourceSyncStore((state) => state.revision)
   const rightPanelRatio = useRightPanelStore((state) => state.panelRatio)
   const setRightPanelRatio = useRightPanelStore((state) => state.setPanelRatio)
   const openOrFocusTab = useRightPanelStore((state) => state.openOrFocusTab)
@@ -155,17 +161,10 @@ function App() {
     }
 
     void loadSessionAttachments()
-
-    const onUpdated = () => {
-      void loadSessionAttachments()
-    }
-
-    window.addEventListener('datasources:updated', onUpdated)
     return () => {
       cancelled = true
-      window.removeEventListener('datasources:updated', onUpdated)
     }
-  }, [sessionId])
+  }, [sessionId, datasourceRevision])
 
   const restoreReportState = useCallback((activeSessionId: string, workspaceState: WorkspaceState) => {
     const reportPayloads = workspaceState.artifacts

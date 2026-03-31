@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useChatStore } from '../stores/chat'
+import {
+  selectCurrentMessages,
+  selectCurrentSessionId,
+  useChatStore,
+} from '../stores/chat'
 import type { Session } from '../types'
 import './Sidebar.css'
 
@@ -20,10 +24,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
   
   // 每个属性单独订阅 - 最简单可靠的方式
   const sessions = useChatStore((state) => state.sessions)
-  const sessionId = useChatStore((state) => state.sessionId)
+  const sessionId = useChatStore(selectCurrentSessionId)
   const isLoadingSessions = useChatStore((state) => state.isLoadingSessions)
   const currentSession = useChatStore((state) => state.currentSession)
-  const messages = useChatStore((state) => state.messages)
+  const messages = useChatStore(selectCurrentMessages)
   const fetchSessions = useChatStore((state) => state.fetchSessions)
   const selectSession = useChatStore((state) => state.selectSession)
   const deleteSession = useChatStore((state) => state.deleteSession)

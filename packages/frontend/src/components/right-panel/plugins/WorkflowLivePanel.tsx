@@ -6,7 +6,12 @@ import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { sessionApi } from '../../../api'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
-import { useChatStore } from '../../../stores/chat'
+import {
+  selectCurrentMessages,
+  selectCurrentSessionId,
+  selectIsStreaming,
+  useChatStore,
+} from '../../../stores/chat'
 import { useWorkflowNodesStore, type NodeDef } from '../../../stores/workflowNodes'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useTheme } from '../../../hooks/useTheme'
@@ -232,9 +237,9 @@ export function WorkflowLivePanel({
   const setVideoProgressVisible = useWorkflowSessionsStore((state) => state.setVideoProgressVisible)
   const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
-  const isStreaming = useChatStore((state) => state.isStreaming)
-  const sessionIdFromStore = useChatStore((state) => state.sessionId)
-  const sessionMessages = useChatStore((state) => state.messages)
+  const isStreaming = useChatStore(selectIsStreaming)
+  const sessionIdFromStore = useChatStore(selectCurrentSessionId)
+  const sessionMessages = useChatStore(selectCurrentMessages)
 
   const nodeDefs = useWorkflowNodesStore((state) => state.nodeDefs)
   const loadNodeDefs = useWorkflowNodesStore((state) => state.loadNodeDefs)

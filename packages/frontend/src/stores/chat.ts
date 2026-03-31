@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import type { Session } from '../types'
+import type { Message, Session } from '../types'
 import { sandboxApi, sessionApi, type AgentEvent, type StoredMessage } from '../api'
 import { SessionChat } from '../models/SessionChat'
 
-interface ChatStore {
+export interface ChatStore {
   // State
   currentSession: SessionChat | null
   sessions: Session[]
@@ -11,12 +11,7 @@ interface ChatStore {
   filesChangedTrigger: number
   sandboxReadySessionId: string | null
   isSwitchingSession: boolean
-  
-  // Derived state (NOT getters, actual state values)
-  sessionId: string | null
-  messages: ReturnType<SessionChat['messages']['slice']>
-  isStreaming: boolean
-  
+
   // Actions
   pushEvent: (event: AgentEvent) => void
   addUserMessage: (content: string) => void
@@ -31,8 +26,14 @@ interface ChatStore {
   notifyFilesChanged: () => void
   setSandboxReady: (sessionId: string | null) => void
   resetSandboxSignals: () => void
-  _syncDerivedState: () => void  // Internal helper
 }
+
+export const EMPTY_CHAT_MESSAGES: Message[] = []
+
+export const selectCurrentSessionId = (state: ChatStore) => state.currentSession?.id ?? null
+export const selectCurrentMessages = (state: ChatStore) =>
+  state.currentSession?.messages ?? EMPTY_CHAT_MESSAGES
+export const selectIsStreaming = (state: ChatStore) => state.currentSession?.isStreaming ?? false
 
 function convertStoredMessages(stored: StoredMessage[]) {
   return stored.map((m) => ({
@@ -40,6 +41,25 @@ function convertStoredMessages(stored: StoredMessage[]) {
     content: m.content,
     steps: m.steps,
   }))
+}
+
+function updateCurrentSession(
+  get: () => ChatStore,
+  set: (
+    partial:
+      | Partial<ChatStore>
+      | ((state: ChatStore) => Partial<ChatStore> | ChatStore),
+  ) => void,
+  updater: (session: SessionChat) => void,
+) {
+  const current = get().currentSession
+  if (!current) {
+    return
+  }
+
+  const next = current.clone()
+  updater(next)
+  set({ currentSession: next })
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -50,59 +70,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   filesChangedTrigger: 0,
   sandboxReadySessionId: null,
   isSwitchingSession: false,
-  
-  // Derived state (actual values, NOT getters)
-  sessionId: null,
-  messages: [],
-  isStreaming: false,
-  
-  // Internal helper to sync derived state
-  _syncDerivedState: () => {
-    const current = get().currentSession
-    set({
-      sessionId: current?.id || null,
-      messages: current?.messages || [],
-      isStreaming: current?.isStreaming || false,
-    })
-  },
-  
+
   // Actions
-  pushEvent: (event) => {
-    const current = get().currentSession
-    if (current) {
-      current.pushEvent(event)
-      set({ currentSession: current })
-      get()._syncDerivedState()
-    }
-  },
-  
-  addUserMessage: (content) => {
-    const current = get().currentSession
-    if (current) {
-      current.addUserMessage(content)
-      set({ currentSession: current })
-      get()._syncDerivedState()
-    }
-  },
-  
-  startStreaming: () => {
-    const current = get().currentSession
-    if (current) {
-      current.startStreaming()
-      set({ currentSession: current })
-      get()._syncDerivedState()
-    }
-  },
-  
-  stopStreaming: () => {
-    const current = get().currentSession
-    if (current) {
-      current.stopStreaming()
-      set({ currentSession: current })
-      get()._syncDerivedState()
-    }
-  },
-  
+  pushEvent: (event) => updateCurrentSession(get, set, (session) => session.pushEvent(event)),
+
+  addUserMessage: (content) =>
+    updateCurrentSession(get, set, (session) => session.addUserMessage(content)),
+
+  startStreaming: () => updateCurrentSession(get, set, (session) => session.startStreaming()),
+
+  stopStreaming: () => updateCurrentSession(get, set, (session) => session.stopStreaming()),
+
   fetchSessions: async () => {
     set({ isLoadingSessions: true })
     try {
@@ -120,7 +98,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const newSession = await sessionApi.create()
       const sessionChat = new SessionChat(newSession.id, newSession.title)
       set({ currentSession: sessionChat })
-      get()._syncDerivedState()
       await get().fetchSessions() // Refresh session list
       return sessionChat
     } catch (e) {
@@ -132,7 +109,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   createDraftSession: () => {
     const sessionChat = new SessionChat('draft', 'New conversation', true)
     set({ currentSession: sessionChat })
-    get()._syncDerivedState()
     return sessionChat
   },
   
@@ -143,7 +119,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set({ sessions })
       if (get().currentSession?.id === id) {
         set({ currentSession: null })
-        get()._syncDerivedState()
         get().createDraftSession()
       }
     } catch (e) {
@@ -158,11 +133,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const sessions = get().sessions.map((s) => (s.id === id ? updated : s))
       set({ sessions })
       // Update current session if it's the same
-      const current = get().currentSession
-      if (current?.id === id) {
-        current.title = updated.title
-        set({ currentSession: current })
-        get()._syncDerivedState()
+      if (get().currentSession?.id === id) {
+        updateCurrentSession(get, set, (session) => {
+          session.title = updated.title
+        })
       }
     } catch (e) {
       console.error('Failed to update session title', e)
@@ -184,7 +158,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       session.loadMessages(convertStoredMessages(storedMessages))
       
       set({ currentSession: session })
-      get()._syncDerivedState()
 
       const hasChatHistory = storedMessages.some(
         (message) => message.role === 'user' || message.role === 'assistant',

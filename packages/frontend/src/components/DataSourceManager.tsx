@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../api/client'
 import { datasourceApi, sessionApi, type DatasourcePreviewResponse } from '../api'
-import { useChatStore } from '../stores/chat'
+import { selectCurrentSessionId, useChatStore } from '../stores/chat'
+import { useDatasourceSyncStore } from '../stores/datasourceSync'
 import type { DataSource, DataSourceConnectionTestResponse } from '../types'
 import './DataSourceManager.css'
 
@@ -23,12 +24,6 @@ const URI_EXAMPLES: Record<string, string> = {
 }
 
 const PREVIEW_PAGE_SIZE = 25
-
-const emitDatasourceUpdated = () => {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('datasources:updated'))
-  }
-}
 
 const isSupportedFile = (file: File) => {
   const name = file.name.toLowerCase()
@@ -146,8 +141,10 @@ function EngineSelect({ value, onChange }: EngineSelectProps) {
 }
 
 export default function DataSourceManager({ onDataSourcesChange, variant = 'sidebar' }: DataSourceManagerProps) {
-  const sessionId = useChatStore((state) => state.sessionId)
+  const sessionId = useChatStore(selectCurrentSessionId)
   const createSession = useChatStore((state) => state.createSession)
+  const datasourceRevision = useDatasourceSyncStore((state) => state.revision)
+  const notifyDatasourceUpdated = useDatasourceSyncStore((state) => state.notifyUpdated)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const onDataSourcesChangeRef = useRef(onDataSourcesChange)
   const [dataSources, setDataSources] = useState<DataSource[]>([])
@@ -296,7 +293,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         if (latest) {
           await loadPreview(latest, { page: 1 })
         }
-        emitDatasourceUpdated()
+        notifyDatasourceUpdated()
         if (ignoredCount > 0) {
           setError(`${ignoredCount} unsupported file(s) were skipped.`)
         }
@@ -307,7 +304,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         setIsDragOver(false)
       }
     },
-    [ensureSessionId, loadDataSources, loadPreview],
+    [ensureSessionId, loadDataSources, loadPreview, notifyDatasourceUpdated],
   )
 
   const createDataSource = async () => {
@@ -331,7 +328,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setIsCreating(false)
       setNewDs({ name: '', type: 'postgres', connection_string: '' })
       setCreateConnectionStatus(null)
-      emitDatasourceUpdated()
+      notifyDatasourceUpdated()
     } catch (e: unknown) {
       setError(getApiErrorDetail(e, 'Failed to create'))
     }
@@ -415,7 +412,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       setEditingDsId(null)
       setEditConnectionStatus(null)
       await loadPreview(updated, { page: 1 })
-      emitDatasourceUpdated()
+      notifyDatasourceUpdated()
     } catch (e: unknown) {
       setError(getApiErrorDetail(e, 'Update failed'))
     } finally {
@@ -495,7 +492,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
       })
       if (expandedDsId === id) setExpandedDsId(null)
       if (editingDsId === id) setEditingDsId(null)
-      emitDatasourceUpdated()
+      notifyDatasourceUpdated()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to delete')
     }
@@ -503,15 +500,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
 
   useEffect(() => {
     void loadDataSources()
-  }, [loadDataSources])
-
-  useEffect(() => {
-    const onUpdated = () => {
-      void loadDataSources()
-    }
-    window.addEventListener('datasources:updated', onUpdated)
-    return () => window.removeEventListener('datasources:updated', onUpdated)
-  }, [loadDataSources])
+  }, [loadDataSources, datasourceRevision])
 
   return (
     <div className={`data-source-manager ${variant === 'modal' ? 'is-modal' : variant === 'composer' ? 'is-composer' : 'is-sidebar'}`}>

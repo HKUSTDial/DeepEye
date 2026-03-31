@@ -1,6 +1,10 @@
 import { chatApi, type AgentEvent } from '../api'
 import { extractVideoOutputParams } from '../api/video'
-import { useChatStore } from '../stores/chat'
+import {
+  selectCurrentMessages,
+  selectCurrentSessionId,
+  useChatStore,
+} from '../stores/chat'
 import { useReportStore } from '../stores/report'
 import { useRightPanelStore } from '../stores/rightPanel'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
@@ -40,7 +44,7 @@ function emitError(error: string | null) {
 }
 
 function isCurrentSession(sessionId: string) {
-  return useChatStore.getState().sessionId === sessionId
+  return selectCurrentSessionId(useChatStore.getState()) === sessionId
 }
 
 function openOrFocusTabIfCurrent(
@@ -313,7 +317,7 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
       if (taskIdToOpen) {
         openOrFocusTabIfCurrent(sessionId, 'video-preview', { taskId: taskIdToOpen })
       } else if (isCurrentSession(sessionId)) {
-        const lastMessage = useChatStore.getState().messages.at(-1)
+        const lastMessage = selectCurrentMessages(useChatStore.getState()).at(-1)
         if (lastMessage?.role === 'assistant' && lastMessage.content) {
           const taskIdMatch = String(lastMessage.content).match(/Task ID:\s*(\d{8}_\d{6})/i)
           if (taskIdMatch) {

@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useChat } from '../hooks/useChat'
-import { useChatStore } from '../stores/chat'
+import {
+  selectCurrentMessages,
+  selectIsStreaming,
+  useChatStore,
+} from '../stores/chat'
 import { createReportProgressLine, parseChatProgressLine, type ChatProgressLine } from '../utils/chatProgress'
 import DataSourceManager from './DataSourceManager'
 import StepItem from './StepItem'
@@ -63,8 +67,8 @@ export default function ChatBox({
 }: ChatBoxProps) {
   const { sendMessage, stopMessage, error } = useChat()
   // 每个属性单独订阅 - 最简单可靠的方式
-  const messages = useChatStore((state) => state.messages)
-  const isStreaming = useChatStore((state) => state.isStreaming)
+  const messages = useChatStore(selectCurrentMessages)
+  const isStreaming = useChatStore(selectIsStreaming)
   
   const [input, setInput] = useState('')
   const [showDataSourceManager, setShowDataSourceManager] = useState(false)
