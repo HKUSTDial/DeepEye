@@ -13,7 +13,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.tasks import agent_tasks
+from app.tasks import agent_datasources
 from app.tasks.datasource_schema_cache import clear_datasource_schema_cache
 from app.services.datasource_specs import normalize_datasource_type
 
@@ -62,10 +62,10 @@ def test_get_datasources_schema_includes_database_preview(monkeypatch, tmp_path:
         def get(self, ds_uuid):
             return datasource if ds_uuid == datasource_id else None
 
-    monkeypatch.setattr(agent_tasks, "task_session_scope", lambda: _FakeSessionContext())
-    monkeypatch.setattr(agent_tasks, "DataSourceRepository", _FakeDataSourceRepository)
+    monkeypatch.setattr(agent_datasources, "task_session_scope", lambda: _FakeSessionContext())
+    monkeypatch.setattr(agent_datasources, "DataSourceRepository", _FakeDataSourceRepository)
 
-    schemas = agent_tasks._get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
+    schemas = agent_datasources.get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
 
     assert len(schemas) == 1
     table_schema = schemas[0]
@@ -114,12 +114,35 @@ def test_get_datasources_schema_reuses_cache_for_repeated_database_requests(monk
         create_engine_calls += 1
         return sqlalchemy.create_engine(*args, **kwargs)
 
-    monkeypatch.setattr(agent_tasks, "task_session_scope", lambda: _FakeSessionContext())
-    monkeypatch.setattr(agent_tasks, "DataSourceRepository", _FakeDataSourceRepository)
-    monkeypatch.setattr(agent_tasks, "create_engine", _counting_create_engine)
+    monkeypatch.setattr(agent_datasources, "task_session_scope", lambda: _FakeSessionContext())
+    monkeypatch.setattr(agent_datasources, "DataSourceRepository", _FakeDataSourceRepository)
+    monkeypatch.setattr(agent_datasources, "create_engine", _counting_create_engine)
 
-    first = agent_tasks._get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
-    second = agent_tasks._get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
+    first = agent_datasources.get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
+    second = agent_datasources.get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
 
     assert create_engine_calls == 1
     assert first == second
+
+
+def test_build_datasources_context_includes_file_paths() -> None:
+    context = agent_datasources.build_datasources_context(
+        [
+            {
+                "id": "ds-1",
+                "name": "sales_db",
+                "type": "sqlite",
+                "category": "database",
+            },
+            {
+                "id": "ds-2",
+                "name": "sales_csv",
+                "type": "csv",
+                "category": "file",
+                "local_path": "/workspace/data/sales.csv",
+            },
+        ]
+    )
+
+    assert "sales_db (database)" in context
+    assert "sales_csv (file), path: /workspace/data/sales.csv" in context
