@@ -1,8 +1,10 @@
 """Tests for builtin workflow transform and answer nodes."""
 
+import io
 import os
 import json
 import tarfile
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -317,6 +319,26 @@ def test_python_code_helper_load_dataset_ref_accepts_singleton_list(tmp_path) ->
 
     assert list(df.columns) == ["city", "revenue"]
     assert df.to_dict(orient="records") == [{"city": "Shanghai", "revenue": 120}]
+
+
+def test_python_code_helper_emit_json_serializes_pandas_timestamps() -> None:
+    handler = PythonCodeHandler(sandbox=None)
+    namespace: dict[str, object] = {}
+    exec(handler._helper_prelude(), namespace)
+
+    output = io.StringIO()
+    with redirect_stdout(output):
+        namespace["emit_json"](
+            {
+                "week_start": namespace["pd"].Timestamp("2025-10-06T00:00:00"),
+                "window_end": namespace["pd"].Timestamp("2025-10-12T23:59:59"),
+            }
+        )
+
+    assert json.loads(output.getvalue()) == {
+        "week_start": "2025-10-06T00:00:00",
+        "window_end": "2025-10-12T23:59:59",
+    }
 
 
 def test_workflow_engine_runs_rows_pipeline_with_llm_answer() -> None:
