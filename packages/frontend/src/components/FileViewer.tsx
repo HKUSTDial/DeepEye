@@ -1,6 +1,14 @@
 import { Suspense, lazy, useState, useEffect, useMemo, useCallback } from 'react'
 import { X, FileCode, FileText as FileTextIcon, Download } from 'lucide-react'
 import { sandboxApi, type FileContentResponse } from '../api/sandbox'
+import {
+  CODE_EXTENSIONS,
+  getFileExtension,
+  getFileIconColor,
+  getFileName,
+  getFileViewerType,
+  parseCsvPreviewData,
+} from './fileViewerUtils'
 import { useCodeHighlight } from '../hooks/useCodeHighlight'
 import { useTheme } from '../hooks/useTheme'
 import './FileViewer.css'
@@ -11,26 +19,10 @@ interface FileViewerProps {
   onClose: () => void
 }
 
-const CODE_EXTENSIONS = new Set([
-  'py',
-  'js',
-  'ts',
-  'jsx',
-  'tsx',
-  'json',
-  'html',
-  'css',
-  'xml',
-  'yaml',
-  'yml',
-  'vue',
-  'sh',
-  'bash',
-  'sql',
-])
-
 const MarkdownPreview = lazy(() => import('./file-viewers/MarkdownPreview'))
 const SpreadsheetPreview = lazy(() => import('./file-viewers/SpreadsheetPreview'))
+const CsvPreview = lazy(() => import('./file-viewers/CsvPreview'))
+const LineNumberTextPreview = lazy(() => import('./file-viewers/LineNumberTextPreview'))
 
 export default function FileViewer({ sessionId, filePath, onClose }: FileViewerProps) {
   const [fileContent, setFileContent] = useState<FileContentResponse | null>(null)
@@ -42,38 +34,11 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
   const { highlight, isInitializing: isHighlighterLoading } = useCodeHighlight()
   const { theme } = useTheme()
 
-  const fileName = useMemo(() => {
-    return filePath?.split('/').pop() || ''
-  }, [filePath])
+  const fileName = useMemo(() => getFileName(filePath), [filePath])
 
-  const fileExtension = useMemo(() => {
-    const name = fileName
-    return name.includes('.') ? name.split('.').pop()?.toLowerCase() : ''
-  }, [fileName])
+  const fileExtension = useMemo(() => getFileExtension(fileName), [fileName])
 
-  const viewerType = useMemo(() => {
-    if (!fileContent) return 'none'
-    
-    if (fileContent.content_type === 'image') {
-      return 'image'
-    }
-
-    if (fileContent.content_type === 'binary') {
-      const ext = fileExtension
-      if (ext === 'xlsx' || ext === 'xls') return 'xlsx'
-      return 'binary'
-    }
-    
-    const ext = fileExtension
-    
-    if (ext === 'md') return 'markdown'
-    if (ext === 'csv') return 'csv'
-    if (['py', 'js', 'ts', 'jsx', 'tsx', 'json', 'html', 'css', 'xml', 'yaml', 'yml'].includes(ext || '')) {
-      return 'code'
-    }
-    
-    return 'text'
-  }, [fileContent, fileExtension])
+  const viewerType = useMemo(() => getFileViewerType(fileContent, fileExtension), [fileContent, fileExtension])
 
   const handleDownload = async () => {
     if (!sessionId || !filePath) return
@@ -97,16 +62,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
   const csvData = useMemo(() => {
     if (viewerType !== 'csv' || !fileContent) return null
-    
-    const lines = fileContent.content.trim().split('\n')
-    if (lines.length === 0 || !lines[0]) return null
-    
-    const headers = lines[0].split(',').map(h => h.trim())
-    const rows = lines.slice(1).map(line => 
-      line.split(',').map(cell => cell.trim())
-    )
-    
-    return { headers, rows }
+    return parseCsvPreviewData(fileContent.content)
   }, [viewerType, fileContent])
 
   const codeLines = useMemo(() => {
@@ -114,21 +70,7 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
     return fileContent.content.split('\n')
   }, [fileContent])
 
-  const iconColor = useMemo(() => {
-    const ext = fileExtension
-    const colorMap: Record<string, string> = {
-      'py': '#3572A5',
-      'js': '#f1e05a',
-      'ts': '#3178c6',
-      'json': '#cbcb41',
-      'html': '#e34c26',
-      'css': '#563d7c',
-      'vue': '#41b883',
-      'md': '#083fa1',
-      'csv': '#217346',
-    }
-    return colorMap[ext || ''] || '#75beff'
-  }, [fileExtension])
+  const iconColor = useMemo(() => getFileIconColor(fileExtension), [fileExtension])
 
   const loadFile = useCallback(async (sessionId: string, path: string) => {
     setIsLoading(true)
@@ -248,28 +190,9 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
 
         {/* CSV Viewer */}
         {!isLoading && !error && viewerType === 'csv' && csvData && (
-          <div className="csv-viewer">
-            <table className="csv-table">
-              <thead>
-                <tr>
-                  <th className="csv-row-number">#</th>
-                  {csvData.headers.map((header, idx) => (
-                    <th key={idx}>{header}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {csvData.rows.map((row, rowIdx) => (
-                  <tr key={rowIdx}>
-                    <td className="csv-row-number">{rowIdx + 1}</td>
-                    {row.map((cell, cellIdx) => (
-                      <td key={cellIdx}>{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading CSV preview...</p></div>}>
+            <CsvPreview headers={csvData.headers} rows={csvData.rows} />
+          </Suspense>
         )}
 
         {/* XLSX Viewer */}
@@ -314,40 +237,18 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
                 <div dangerouslySetInnerHTML={{ __html: highlightedCode }} className="shiki-wrapper"></div>
               </div>
             ) : (
-              <div className="text-viewer">
-                <table className="text-viewer-table">
-                  <tbody>
-                    {codeLines.map((line, idx) => (
-                      <tr key={idx} className="text-line">
-                        <td className="line-number">{idx + 1}</td>
-                        <td className="line-content">
-                          <pre>{line}</pre>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading code preview...</p></div>}>
+                <LineNumberTextPreview lines={codeLines} />
+              </Suspense>
             )}
           </div>
         )}
 
         {/* Text Viewer with Line Numbers */}
         {!isLoading && !error && viewerType === 'text' && fileContent && (
-          <div className="text-viewer">
-            <table className="text-viewer-table">
-              <tbody>
-                {codeLines.map((line, idx) => (
-                  <tr key={idx} className="text-line">
-                    <td className="line-number">{idx + 1}</td>
-                    <td className="line-content">
-                      <pre>{line}</pre>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Suspense fallback={<div className="file-viewer-loading"><div className="loading-spinner small"></div><p className="loading-text">Loading text preview...</p></div>}>
+            <LineNumberTextPreview lines={codeLines} />
+          </Suspense>
         )}
 
         {/* No File Selected */}
