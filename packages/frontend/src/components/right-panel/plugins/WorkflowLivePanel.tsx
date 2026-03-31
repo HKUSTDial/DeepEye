@@ -1,27 +1,26 @@
 import { useMemo, useEffect, useState, useCallback, useRef, type CSSProperties } from 'react'
-import { BackgroundVariant, type ReactFlowInstance } from 'reactflow'
-import { Loader2, Workflow as WorkflowIcon } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
+import { BackgroundVariant } from 'reactflow'
 import 'reactflow/dist/style.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { sessionApi } from '../../../api'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
-import {
-  selectCurrentMessages,
-  selectCurrentSessionId,
-  selectIsStreaming,
-  useChatStore,
-} from '../../../stores/chat'
+import { selectCurrentMessages, selectCurrentSessionId, selectIsStreaming, useChatStore } from '../../../stores/chat'
 import { useWorkflowNodesStore } from '../../../stores/workflowNodes'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useTheme } from '../../../hooks/useTheme'
 import { ensureSessionEventStream } from '../../../services/sessionEventStream'
 import type { WorkflowDraft } from '../../../types'
 import { WorkflowLiveEmptyState } from './WorkflowLiveEmptyState'
+import { WorkflowLiveToolbar } from './WorkflowLiveToolbar'
+import { useTransientWorkflowHighlights } from './useTransientWorkflowHighlights'
+import { useWorkflowViewportFit } from './useWorkflowViewportFit'
 import {
   buildOptimisticRun,
   dedupeFilePaths,
-  getDraftDisplayName,
+  getWorkflowMiniMapNodeColor,
+  hasRenderableWorkflow,
   toDefinition,
   toFlow,
   type DefinitionEdge,
@@ -41,38 +40,73 @@ export function WorkflowLivePanel({
 }) {
   const [displaySessionId, setDisplaySessionId] = useState<string | null>(sessionId)
   const [isViewSwitching, setIsViewSwitching] = useState(false)
-  const sessionState = useWorkflowSessionsStore((state) =>
-    displaySessionId ? state.sessions[displaySessionId] : undefined,
+  const {
+    sessionState,
+    activeSessionState,
+    ensureSession,
+    setWorkflowError,
+    setRunStatus,
+    setWorkflowDefinition,
+    clearWorkflow,
+    addWorkflowNode,
+    addWorkflowEdge,
+    updateWorkflowNodeParam,
+    setActiveFilePath,
+    setActiveDraftId,
+    setActiveRun,
+    setRunOutput,
+    setViewState,
+    setFiles,
+    setFileError,
+    setValidatedGraph,
+    clearValidated,
+    setVideoProgressVisible,
+  } = useWorkflowSessionsStore(
+    useShallow((state) => ({
+      sessionState: displaySessionId ? state.sessions[displaySessionId] : undefined,
+      activeSessionState: sessionId ? state.sessions[sessionId] : undefined,
+      ensureSession: state.ensureSession,
+      setWorkflowError: state.setError,
+      setRunStatus: state.setRunStatus,
+      setWorkflowDefinition: state.setDefinition,
+      clearWorkflow: state.clearDraft,
+      addWorkflowNode: state.addDraftNode,
+      addWorkflowEdge: state.addDraftEdge,
+      updateWorkflowNodeParam: state.updateDraftNodeParam,
+      setActiveFilePath: state.setActiveFilePath,
+      setActiveDraftId: state.setActiveDraftId,
+      setActiveRun: state.setActiveRun,
+      setRunOutput: state.setRunOutput,
+      setViewState: state.setViewState,
+      setFiles: state.setFiles,
+      setFileError: state.setFileError,
+      setValidatedGraph: state.setValidatedGraph,
+      clearValidated: state.clearValidated,
+      setVideoProgressVisible: state.setVideoProgressVisible,
+    })),
   )
-  const activeSessionState = useWorkflowSessionsStore((state) =>
-    sessionId ? state.sessions[sessionId] : undefined,
+  const {
+    filesChangedTrigger,
+    notifyFilesChanged,
+    isStreaming,
+    sessionIdFromStore,
+    sessionMessages,
+  } = useChatStore(
+    useShallow((state) => ({
+      filesChangedTrigger: state.filesChangedTrigger,
+      notifyFilesChanged: state.notifyFilesChanged,
+      isStreaming: selectIsStreaming(state),
+      sessionIdFromStore: selectCurrentSessionId(state),
+      sessionMessages: selectCurrentMessages(state),
+    })),
   )
-  const ensureSession = useWorkflowSessionsStore((state) => state.ensureSession)
-  const setWorkflowError = useWorkflowSessionsStore((state) => state.setError)
-  const setRunStatus = useWorkflowSessionsStore((state) => state.setRunStatus)
-  const setWorkflowDefinition = useWorkflowSessionsStore((state) => state.setDefinition)
-  const clearWorkflow = useWorkflowSessionsStore((state) => state.clearDraft)
-  const addWorkflowNode = useWorkflowSessionsStore((state) => state.addDraftNode)
-  const addWorkflowEdge = useWorkflowSessionsStore((state) => state.addDraftEdge)
-  const updateWorkflowNodeParam = useWorkflowSessionsStore((state) => state.updateDraftNodeParam)
-  const setActiveFilePath = useWorkflowSessionsStore((state) => state.setActiveFilePath)
-  const setActiveDraftId = useWorkflowSessionsStore((state) => state.setActiveDraftId)
-  const setActiveRun = useWorkflowSessionsStore((state) => state.setActiveRun)
-  const setRunOutput = useWorkflowSessionsStore((state) => state.setRunOutput)
-  const setViewState = useWorkflowSessionsStore((state) => state.setViewState)
-  const setFiles = useWorkflowSessionsStore((state) => state.setFiles)
-  const setFileError = useWorkflowSessionsStore((state) => state.setFileError)
-  const setValidatedGraph = useWorkflowSessionsStore((state) => state.setValidatedGraph)
-  const clearValidated = useWorkflowSessionsStore((state) => state.clearValidated)
-  const setVideoProgressVisible = useWorkflowSessionsStore((state) => state.setVideoProgressVisible)
-  const filesChangedTrigger = useChatStore((state) => state.filesChangedTrigger)
-  const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
-  const isStreaming = useChatStore(selectIsStreaming)
-  const sessionIdFromStore = useChatStore(selectCurrentSessionId)
-  const sessionMessages = useChatStore(selectCurrentMessages)
 
-  const nodeDefs = useWorkflowNodesStore((state) => state.nodeDefs)
-  const loadNodeDefs = useWorkflowNodesStore((state) => state.loadNodeDefs)
+  const { nodeDefs, loadNodeDefs } = useWorkflowNodesStore(
+    useShallow((state) => ({
+      nodeDefs: state.nodeDefs,
+      loadNodeDefs: state.loadNodeDefs,
+    })),
+  )
 
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -80,20 +114,14 @@ export function WorkflowLivePanel({
   const [isLoadingFiles, setIsLoadingFiles] = useState(false)
   const [availableDrafts, setAvailableDrafts] = useState<WorkflowDraft[]>([])
   const [isLoadingFile, setIsLoadingFile] = useState(false)
-  const [newNodeIds, setNewNodeIds] = useState<Set<string>>(new Set())
-  const [newEdgeIds, setNewEdgeIds] = useState<Set<string>>(new Set())
   const [isSaving, setIsSaving] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const reactFlowRef = useRef<ReactFlowInstance | null>(null)
-  const graphHostRef = useRef<HTMLDivElement | null>(null)
 
   const activeFilePathRef = useRef<string | null>(null)
   const activeDraftIdRef = useRef<string | null>(null)
   const isLoadingFilesRef = useRef(false)
-  const prevNodeIdsRef = useRef<Set<string>>(new Set())
-  const prevEdgeIdsRef = useRef<Set<string>>(new Set())
 
   const definition = sessionState?.definition ?? null
   const validatedNodes = useMemo(
@@ -142,6 +170,12 @@ export function WorkflowLivePanel({
     Object.keys(activeDraftEdges).length > 0 ||
     Object.keys(validatedNodes).length > 0 ||
     Object.keys(validatedEdges).length > 0
+  const activeDraftNodeIds = useMemo(() => Object.keys(activeDraftNodes), [activeDraftNodes])
+  const activeDraftEdgeIds = useMemo(() => Object.keys(activeDraftEdges), [activeDraftEdges])
+  const { newNodeIds, newEdgeIds } = useTransientWorkflowHighlights(
+    activeDraftNodeIds,
+    activeDraftEdgeIds,
+  )
 
   useEffect(() => {
     if (sessionId) {
@@ -408,51 +442,6 @@ export function WorkflowLivePanel({
     setViewState,
   ])
 
-  useEffect(() => {
-    const currentNodeIds = new Set(Object.keys(activeDraftNodes))
-    const currentEdgeIds = new Set(Object.keys(activeDraftEdges))
-
-    const newNodes = Array.from(currentNodeIds).filter((id) => !prevNodeIdsRef.current.has(id))
-    const newEdges = Array.from(currentEdgeIds).filter((id) => !prevEdgeIdsRef.current.has(id))
-
-    if (newNodes.length > 0) {
-      setNewNodeIds((prev) => {
-        const next = new Set(prev)
-        newNodes.forEach((id) => next.add(id))
-        return next
-      })
-      newNodes.forEach((id) => {
-        setTimeout(() => {
-          setNewNodeIds((prev) => {
-            const next = new Set(prev)
-            next.delete(id)
-            return next
-          })
-        }, 900)
-      })
-    }
-
-    if (newEdges.length > 0) {
-      setNewEdgeIds((prev) => {
-        const next = new Set(prev)
-        newEdges.forEach((id) => next.add(id))
-        return next
-      })
-      newEdges.forEach((id) => {
-        setTimeout(() => {
-          setNewEdgeIds((prev) => {
-            const next = new Set(prev)
-            next.delete(id)
-            return next
-          })
-        }, 900)
-      })
-    }
-
-    prevNodeIdsRef.current = currentNodeIds
-    prevEdgeIdsRef.current = currentEdgeIds
-  }, [activeDraftNodes, activeDraftEdges])
-
   const flow = useMemo(() => {
     if (Object.keys(validatedNodes).length > 0 || Object.keys(validatedEdges).length > 0) {
       return toFlow({ root: { nodes: validatedNodes, edges: validatedEdges } }, nodeDefs)
@@ -480,6 +469,13 @@ export function WorkflowLivePanel({
       })),
     }
   }, [flow, nodeStatus, newNodeIds, newEdgeIds])
+  const { graphHostRef, handleGraphInit } = useWorkflowViewportFit({
+    nodeCount: flowWithStatus.nodes.length,
+    edgeCount: flowWithStatus.edges.length,
+    displaySessionId,
+    activeViewState,
+    lastUpdated: sessionState?.lastUpdated,
+  })
 
   const persistWorkflowDraft = useCallback(async () => {
     if (!sessionId) return null
@@ -533,6 +529,120 @@ export function WorkflowLivePanel({
     notifyFilesChanged,
   ])
 
+  const handleSave = useCallback(async () => {
+    if (!sessionId) return
+    setIsSaving(true)
+    try {
+      await persistWorkflowDraft()
+    } finally {
+      setIsSaving(false)
+    }
+  }, [sessionId, persistWorkflowDraft])
+
+  const handleExport = useCallback(
+    (filename: string) => {
+      if (Object.keys(nodeDefs).length === 0) {
+        if (sessionId) {
+          setWorkflowError(sessionId, 'Node definitions are not loaded yet.')
+        }
+        return
+      }
+      setIsExporting(true)
+      try {
+        const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
+        const json = JSON.stringify(definition, null, 2)
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        if (sessionId) {
+          setWorkflowError(sessionId, null)
+        }
+      } finally {
+        setIsExporting(false)
+      }
+    },
+    [nodeDefs, sessionId, setWorkflowError, flow.nodes, flow.edges],
+  )
+
+  const handleRun = useCallback(async () => {
+    if (!sessionId) return
+    setIsRunning(true)
+    setVideoProgressVisible(sessionId, false)
+    try {
+      const saved = await persistWorkflowDraft()
+      if (!saved) return
+      const filePath = saved.filePath
+      const draftId = saved.draft.id
+      setRunStatus(sessionId, 'running', null)
+      setActiveRun(
+        sessionId,
+        buildOptimisticRun(sessionId, filePath, 'running', { draftId }),
+      )
+      setRunOutput(sessionId, '')
+      ensureSessionEventStream(sessionId)
+      const response = await sessionApi.runWorkflowDraft(sessionId, draftId)
+      if (response.error) {
+        setRunStatus(sessionId, 'failed', response.error)
+        setWorkflowError(sessionId, response.error)
+        setActiveRun(
+          sessionId,
+          buildOptimisticRun(sessionId, filePath, 'failed', {
+            error: response.error,
+            draftId,
+            runId: response.run_id ?? null,
+          }),
+        )
+        setRunOutput(sessionId, response.error)
+        return
+      }
+      const nextStatus = response.status === 'queued' ? 'running' : response.status
+      setRunStatus(sessionId, nextStatus, null)
+      setWorkflowError(sessionId, null)
+      setActiveRun(
+        sessionId,
+        buildOptimisticRun(sessionId, filePath, nextStatus, {
+          taskId: response.task_id ?? null,
+          turnId: response.turn_id ?? null,
+          draftId: response.draft_id ?? draftId,
+          runId: response.run_id ?? null,
+        }),
+      )
+      if (response.status && response.status !== 'queued') {
+        setRunOutput(sessionId, '')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to run workflow.'
+      setRunStatus(sessionId, 'failed', message)
+      setWorkflowError(sessionId, message)
+      setActiveRun(
+        sessionId,
+        buildOptimisticRun(sessionId, activeFilePathForControls, 'failed', {
+          error: message,
+          draftId: activeDraftIdForSession || null,
+        }),
+      )
+      setRunOutput(sessionId, message)
+    } finally {
+      setIsRunning(false)
+    }
+  }, [
+    sessionId,
+    setVideoProgressVisible,
+    persistWorkflowDraft,
+    setRunStatus,
+    setActiveRun,
+    setRunOutput,
+    setWorkflowError,
+    activeFilePathForControls,
+    activeDraftIdForSession,
+  ])
+
   const nodeTypes = useMemo(() => NODE_TYPES, [])
   const workflowToneStyle = useMemo(
     () =>
@@ -546,57 +656,7 @@ export function WorkflowLivePanel({
       }) as CSSProperties,
     [isDark],
   )
-  const fitWorkflowView = useCallback(
-    (duration = 260) => {
-      if (!reactFlowRef.current || flowWithStatus.nodes.length === 0) return
-      window.requestAnimationFrame(() => {
-        reactFlowRef.current?.fitView({
-          padding: 0.22,
-          minZoom: 0.55,
-          maxZoom: 1.08,
-          duration,
-        })
-      })
-    },
-    [flowWithStatus.nodes.length],
-  )
-
-  useEffect(() => {
-    if (flowWithStatus.nodes.length === 0) return
-    fitWorkflowView(flowWithStatus.nodes.length > 12 ? 340 : 260)
-  }, [
-    fitWorkflowView,
-    flowWithStatus.nodes.length,
-    flowWithStatus.edges.length,
-    displaySessionId,
-    activeViewState,
-    sessionState?.lastUpdated,
-  ])
-
-  useEffect(() => {
-    const host = graphHostRef.current
-    if (!host || flowWithStatus.nodes.length === 0) return
-    let timeoutId: number | null = null
-    const observer = new ResizeObserver(() => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId)
-      }
-      timeoutId = window.setTimeout(() => fitWorkflowView(180), 90)
-    })
-    observer.observe(host)
-    return () => {
-      observer.disconnect()
-      if (timeoutId) {
-        window.clearTimeout(timeoutId)
-      }
-    }
-  }, [fitWorkflowView, flowWithStatus.nodes.length])
-
-  if (
-    !definition &&
-    Object.keys(validatedNodes).length === 0 &&
-    Object.keys(validatedEdges).length === 0
-  ) {
+  if (!hasRenderableWorkflow(definition, validatedNodes, validatedEdges)) {
     return <WorkflowLiveEmptyState dataSourceCount={dataSourceIds.length} />
   }
 
@@ -605,174 +665,29 @@ export function WorkflowLivePanel({
       className={`workflow-live-panel workflow-live-panel--${isDark ? 'dark' : 'light'} panel-view`}
       style={workflowToneStyle}
     >
-      <div className="panel-toolbar">
-        <div className="panel-toolbar-main">
-          <div className="panel-toolbar-icon">
-            <WorkflowIcon />
-          </div>
-          <div className="panel-toolbar-copy">
-            <div className="panel-toolbar-label">Workflow</div>
-            <div className="panel-toolbar-title">Live graph</div>
-            <div className="panel-toolbar-meta">
-              {isViewSwitching && (
-                <span className="panel-toolbar-status">
-                  <Loader2 className="animate-spin" />
-                  Switching session...
-                </span>
-              )}
-              {runStatus && <span>Run: {runStatus}</span>}
-              {runError && <span className="panel-toolbar-error">{runError}</span>}
-              {error && <span className="panel-toolbar-error">{error}</span>}
-              {displayFileError && <span className="panel-toolbar-error">{displayFileError}</span>}
-            </div>
-          </div>
-        </div>
-        <div className="panel-toolbar-actions">
-          <select
-            value={activeDraftIdForSession || ''}
-            disabled={!sessionId || isLoadingFiles || availableDrafts.length === 0 || isStreaming}
-            onChange={(event) => loadWorkflowDraft(event.target.value)}
-            className="panel-toolbar-select"
-          >
-            {availableDrafts.length === 0 ? (
-              <option value="">No workflow drafts</option>
-            ) : (
-              availableDrafts.map((draft) => (
-                <option key={draft.id} value={draft.id}>
-                  {getDraftDisplayName(draft)}
-                </option>
-              ))
-            )}
-          </select>
-          <button
-            type="button"
-            disabled={!sessionId || isLoadingFile || isStreaming || isSaving}
-            onClick={async () => {
-              if (!sessionId) return
-              setIsSaving(true)
-              try {
-                await persistWorkflowDraft()
-              } finally {
-                setIsSaving(false)
-              }
-            }}
-            className="panel-toolbar-btn"
-          >
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            type="button"
-            disabled={
-              Object.keys(nodeDefs).length === 0 ||
-              isStreaming ||
-              isExporting
-            }
-            onClick={() => {
-              if (Object.keys(nodeDefs).length === 0) {
-                if (sessionId) {
-                  setWorkflowError(sessionId, 'Node definitions are not loaded yet.')
-                }
-                return
-              }
-              setIsExporting(true)
-              try {
-                const definition = toDefinition(flow.nodes, flow.edges, nodeDefs)
-                const filename =
-                  (activeDraftForSession?.display_name ? `${activeDraftForSession.display_name}.json` : null) ||
-                  (activeDraftIdForSession ? `draft-${activeDraftIdForSession.slice(0, 8)}.json` : 'workflow.json')
-                const json = JSON.stringify(definition, null, 2)
-                const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
-                const url = URL.createObjectURL(blob)
-                const link = document.createElement('a')
-                link.href = url
-                link.download = filename
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-                URL.revokeObjectURL(url)
-                if (sessionId) {
-                  setWorkflowError(sessionId, null)
-                }
-              } finally {
-                setIsExporting(false)
-              }
-            }}
-            className="panel-toolbar-btn"
-          >
-            {isExporting ? 'Exporting...' : 'Export'}
-          </button>
-          <button
-            type="button"
-            disabled={!sessionId || isStreaming || isRunning || flow.nodes.length === 0}
-            onClick={async () => {
-              if (sessionId) {
-                setIsRunning(true)
-                setVideoProgressVisible(sessionId, false)
-                try {
-                  const saved = await persistWorkflowDraft()
-                  if (!saved) return
-                  const filePath = saved.filePath
-                  const draftId = saved.draft.id
-                  setRunStatus(sessionId, 'running', null)
-                  setActiveRun(
-                    sessionId,
-                    buildOptimisticRun(sessionId, filePath, 'running', { draftId }),
-                  )
-                  setRunOutput(sessionId, '')
-                  ensureSessionEventStream(sessionId)
-                  const response = await sessionApi.runWorkflowDraft(sessionId, draftId)
-                  if (response.error) {
-                    setRunStatus(sessionId, 'failed', response.error)
-                    setWorkflowError(sessionId, response.error)
-                    setActiveRun(
-                      sessionId,
-                      buildOptimisticRun(sessionId, filePath, 'failed', {
-                        error: response.error,
-                        draftId,
-                        runId: response.run_id ?? null,
-                      }),
-                    )
-                    setRunOutput(sessionId, response.error)
-                  } else {
-                    const nextStatus = response.status === 'queued' ? 'running' : response.status
-                    setRunStatus(sessionId, nextStatus, null)
-                    setWorkflowError(sessionId, null)
-                    setActiveRun(
-                      sessionId,
-                      buildOptimisticRun(sessionId, filePath, nextStatus, {
-                        taskId: response.task_id ?? null,
-                        turnId: response.turn_id ?? null,
-                        draftId: response.draft_id ?? draftId,
-                        runId: response.run_id ?? null,
-                      }),
-                    )
-                    if (response.status && response.status !== 'queued') {
-                      setRunOutput(sessionId, '')
-                    }
-                  }
-                } catch (err) {
-                  const message = err instanceof Error ? err.message : 'Failed to run workflow.'
-                  setRunStatus(sessionId, 'failed', message)
-                  setWorkflowError(sessionId, message)
-                  setActiveRun(
-                    sessionId,
-                    buildOptimisticRun(sessionId, activeFilePathForControls, 'failed', {
-                      error: message,
-                      draftId: activeDraftIdForSession || null,
-                    }),
-                  )
-                  setRunOutput(sessionId, message)
-                } finally {
-                  setIsRunning(false)
-                }
-              }
-            }}
-            className="panel-toolbar-btn panel-toolbar-btn--primary"
-          >
-            {isRunning ? 'Running...' : 'Run'}
-          </button>
-        </div>
-      </div>
+      <WorkflowLiveToolbar
+        sessionId={sessionId}
+        availableDrafts={availableDrafts}
+        activeDraft={activeDraftForSession}
+        activeDraftId={activeDraftIdForSession}
+        runStatus={runStatus}
+        runError={runError}
+        error={error}
+        displayFileError={displayFileError}
+        isViewSwitching={isViewSwitching}
+        isLoadingFiles={isLoadingFiles}
+        isLoadingFile={isLoadingFile}
+        isSaving={isSaving}
+        isStreaming={isStreaming}
+        isExporting={isExporting}
+        isRunning={isRunning}
+        hasNodeDefinitions={Object.keys(nodeDefs).length > 0}
+        hasFlowNodes={flow.nodes.length > 0}
+        onSelectDraft={(draftId) => void loadWorkflowDraft(draftId)}
+        onSave={handleSave}
+        onExport={handleExport}
+        onRun={handleRun}
+      />
       <div className="flex min-h-0 flex-1">
         <div ref={graphHostRef} className="min-w-0 flex-1">
           <WorkflowGraph
@@ -786,10 +701,7 @@ export function WorkflowLivePanel({
             panOnScroll
             fitView
             fitViewOptions={{ padding: 0.22, minZoom: 0.55, maxZoom: 1.08 }}
-            onInit={(instance) => {
-              reactFlowRef.current = instance
-              fitWorkflowView(0)
-            }}
+            onInit={handleGraphInit}
             className="workflow-canvas workflow-canvas--panel"
             defaultEdgeOptions={{
               style: { stroke: 'var(--workflow-link)', strokeWidth: 2.25 },
@@ -801,20 +713,7 @@ export function WorkflowLivePanel({
             backgroundColor="var(--workflow-grid)"
             showControls
             showMiniMap
-            miniMapNodeColor={(node) => {
-              switch (node.data.runStatus) {
-                case 'running':
-                  return isDark ? '#7ed9ca' : '#0f766e'
-                case 'success':
-                  return isDark ? '#4ade80' : '#15803d'
-                case 'failed':
-                  return '#ef4444'
-                case 'pending':
-                  return isDark ? '#f3b560' : '#c27a1a'
-                default:
-                  return isDark ? '#385250' : '#7aa59b'
-              }
-            }}
+            miniMapNodeColor={(node) => getWorkflowMiniMapNodeColor(node.data.runStatus, isDark)}
           />
         </div>
         <WorkflowInspector

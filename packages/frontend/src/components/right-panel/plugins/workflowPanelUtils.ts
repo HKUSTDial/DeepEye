@@ -80,6 +80,44 @@ export function getDraftDisplayName(draft: WorkflowDraft) {
   return `draft-${draft.id.slice(0, 8)}`
 }
 
+export function buildWorkflowExportFilename(
+  activeDraft: WorkflowDraft | null,
+  activeDraftId: string | null,
+) {
+  return (
+    (activeDraft?.display_name ? `${activeDraft.display_name}.json` : null) ||
+    (activeDraftId ? `draft-${activeDraftId.slice(0, 8)}.json` : 'workflow.json')
+  )
+}
+
+export function hasRenderableWorkflow(
+  definition: WorkflowDefinitionLike,
+  validatedNodes: Record<string, DefinitionNode>,
+  validatedEdges: Record<string, DefinitionEdge>,
+) {
+  return !!definition || Object.keys(validatedNodes).length > 0 || Object.keys(validatedEdges).length > 0
+}
+
+export function getWorkflowMiniMapNodeColor(
+  runStatus: string | undefined,
+  isDark: boolean,
+) {
+  switch (runStatus) {
+    case 'running':
+      return isDark ? '#7ed9ca' : '#0f766e'
+    case 'success':
+      return isDark ? '#4ade80' : '#15803d'
+    case 'failed':
+      return '#ef4444'
+    case 'pending':
+      return isDark ? '#f3b560' : '#c27a1a'
+    default:
+      return isDark ? '#385250' : '#7aa59b'
+  }
+}
+
+type WorkflowDefinitionLike = Record<string, unknown> | null
+
 export function validateGraph(
   nodesMap: Record<string, DefinitionNode>,
   edgesMap: Record<string, DefinitionEdge>,
