@@ -465,7 +465,8 @@ def test_normalize_workflow_run_result_marks_missing_artifact_dataset_output_rep
     assert normalized["repairable"] is True
     assert normalized["error_type"] == "workflow_dataset_output_missing"
     assert "already has incoming dataset_ref edge" in normalized["issues"][0]
-    assert "prints tabular JSON rows" in normalized["issues"][0]
+    assert "Keep `join_and_aggregate` if it performs a required transform" in normalized["issues"][0]
+    assert "`emit_dataframe(df)`" in normalized["issues"][0]
 
 
 def test_normalize_workflow_run_result_marks_missing_transform_dataset_ref_repairable() -> None:

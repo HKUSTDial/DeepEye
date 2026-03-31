@@ -142,15 +142,19 @@ def _dataset_ref_repair_hint(
         )
         if len(incoming_sources) == 1 and nodes.get(incoming_sources[0], {}).get("type") == "python.code":
             hint += (
-                f" Update `{incoming_sources[0]}` so it prints tabular JSON rows "
-                "or an explicit dataset_ref object instead of narrative text."
+                f" Keep `{incoming_sources[0]}` if it performs a required transform, but rewrite it so the final stdout "
+                "is tabular JSON rows or an explicit dataset_ref object."
+            )
+            hint += (
+                " Use `load_dataset_ref(ref)` or `load_dataset_refs(data)` to read upstream datasets, then finish with "
+                "`emit_dataframe(df)` or by printing a dataset_ref JSON object."
             )
             upstream_sources = _incoming_dataset_sources(workflow_definition, node_id=incoming_sources[0])
             if upstream_sources:
                 source_list = ", ".join(f"`{source}`" for source in upstream_sources[:3])
                 hint += (
-                    f" If `{incoming_sources[0]}` is only producing narrative analysis, remove it and connect "
-                    f"{source_list}.dataset_ref directly to `{node_id}`."
+                    f" Only bypass `{incoming_sources[0]}` and connect {source_list}.dataset_ref directly to `{node_id}` "
+                    "if that node is truly narrative-only and no transform is required."
                 )
         else:
             hint += (

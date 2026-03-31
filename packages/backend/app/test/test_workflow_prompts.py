@@ -90,7 +90,9 @@ def test_workflow_prompt_requires_repair_loop_on_validation_failures():
     assert "its stdout MUST be either a JSON array of row objects or a JSON `dataset_ref` object" in prompt
     assert "The workflow must stay connected end-to-end." in prompt
     assert "Do NOT insert a second narrative `python.code` or `llm.answer` between the final tabular dataset and the artifact node." in prompt
-    assert "If the last `python.code` step is only summarizing or explaining results, remove it" in prompt
+    assert "KEEP that node and make its final line emit tabular output via `emit_dataframe(df)`" in prompt
+    assert "Only remove or bypass a `python.code` node before an artifact when it is clearly narrative-only" in prompt
+    assert "Narrative observations belong in the artifact node params" in prompt
     assert "\"planning_notes\": \"1) ... 2) ...\"" in prompt
     assert "`workflow_wiring_invalid`" in prompt
     assert "`workflow_artifact_input_missing`" in prompt

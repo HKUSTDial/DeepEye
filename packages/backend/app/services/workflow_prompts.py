@@ -208,7 +208,9 @@ The latest user request asks for an answer grounded in the attached data sources
 14. If `python.code` feeds any downstream `dataset_ref` consumer, its stdout MUST be either a JSON array of row objects or a JSON `dataset_ref` object. Do not print narrative text, explanations, or mixed logs when a downstream node expects `dataset_ref`.
 15. The workflow must stay connected end-to-end. Every non-source node must have its required upstream inputs, and every intermediate node must eventually feed the final answer or artifact.
 16. For artifact workflows, put narrative intent into the artifact node params (`report.generate.query`, `data.generate_dashboard.question`, `video.generator.query`). Do NOT insert a second narrative `python.code` or `llm.answer` between the final tabular dataset and the artifact node.
-17. The node immediately feeding `report.generate`, `data.generate_dashboard`, or `video.generator` must emit a usable `dataset_ref`. If the last `python.code` step is only summarizing or explaining results, remove it and connect the previous tabular transform directly to the artifact node.
+17. The node immediately feeding `report.generate`, `data.generate_dashboard`, or `video.generator` must emit a usable `dataset_ref`.
+18. If a `python.code` node is needed for filtering, joining, grouping, enrichment, ranking, or any other transform before an artifact node, KEEP that node and make its final line emit tabular output via `emit_dataframe(df)` or an explicit `dataset_ref` object.
+19. Only remove or bypass a `python.code` node before an artifact when it is clearly narrative-only and performs no required transform.
 
 ## Tool Discipline
 1. For a new task, prefer `create_workflow_and_run` with the complete workflow.
@@ -522,6 +524,7 @@ The latest user request asks for an answer grounded in the attached data sources
 - Put the Python source directly in `params.code`.
 - For small outputs, return normal Python objects. For large tabular outputs, write a dataset file in the sandbox and print a `dataset_ref` JSON object instead.
 - If a downstream node consumes `python.code.dataset_ref`, print only tabular JSON rows or a `dataset_ref` object. Do not print prose, markdown, or extra debug lines.
+- If a transform feeds `report.generate`, `data.generate_dashboard`, or `video.generator`, keep the transform in `python.code` and end it with `emit_dataframe(df)` or a printed `dataset_ref` object. Narrative observations belong in the artifact node params, not in `python.code` stdout.
 - For multi-line text, use triple quotes or explicit `\\n`. Never emit malformed Python strings.
 
 # Output Format
