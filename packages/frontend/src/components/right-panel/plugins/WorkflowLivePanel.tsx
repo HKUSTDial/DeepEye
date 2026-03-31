@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { BackgroundVariant } from 'reactflow'
 import 'reactflow/dist/style.css'
+import '../../workflow/Workflow.css'
 import WorkflowNode from '../../workflow/WorkflowNode'
 import { WorkflowGraph } from '../../workflow/WorkflowGraph'
 import { WorkflowInspector } from '../../workflow/WorkflowInspector'
 import { WorkflowRecoveryCard } from '../../workflow/WorkflowRecoveryCard'
-import { WorkflowRunPhaseBanner } from '../../workflow/WorkflowRunPhaseBanner'
 import { useTheme } from '../../../hooks/useTheme'
 import { useRightPanelStore } from '../../../stores/rightPanel'
 import { useWorkspaceUiStore } from '../../../stores/workspaceUi'
@@ -159,13 +159,8 @@ export function WorkflowLivePanel({
         className={`workflow-live-panel workflow-live-panel--${isDark ? 'dark' : 'light'} panel-view`}
         style={workflowToneStyle}
       >
-        {runPhase ? (
-          <div className="px-4 pt-4 pb-3">
-            <WorkflowRunPhaseBanner phase={runPhase} />
-          </div>
-        ) : null}
         {recovery ? (
-          <div className="px-4 pb-3">
+          <div className="px-4 pt-4 pb-3">
             <WorkflowRecoveryCard
               recovery={recovery}
               canRetry={flow.nodes.length > 0}
@@ -216,11 +211,6 @@ export function WorkflowLivePanel({
           await handleRun(flow.nodes, flow.edges)
         }}
       />
-      {runPhase ? (
-        <div className="px-4 pb-3">
-          <WorkflowRunPhaseBanner phase={runPhase} />
-        </div>
-      ) : null}
       {recovery ? (
         <div className="px-4 pb-3">
           <WorkflowRecoveryCard

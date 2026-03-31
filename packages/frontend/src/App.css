@@ -303,12 +303,16 @@
 }
 
 .workspace-main-body {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
 .workspace-main-body > .right-panel-container {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .chat-rail-splitter {

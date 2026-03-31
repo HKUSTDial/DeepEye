@@ -15,7 +15,6 @@ import type { WorkspaceState, WorkflowArtifactPayload } from './types'
 import Sidebar from './components/Sidebar'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
-import { SessionOutputCenter } from './components/output-center/SessionOutputCenter'
 import { GlobalDataSourceManagerModal } from './components/ui/GlobalDataSourceManagerModal'
 import './App.css'
 
@@ -344,10 +343,6 @@ function App() {
                   </div>
                 </div>
                 <div className="workspace-main-body">
-                  <SessionOutputCenter
-                    sessionId={sessionId}
-                    onOpenPanel={openOrFocusTab}
-                  />
                   <RightPanelLayout sessionId={sessionId} dataSourceIds={dataSourceIds} />
                 </div>
               </div>
