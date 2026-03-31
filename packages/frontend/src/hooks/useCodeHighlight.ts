@@ -1,8 +1,16 @@
 import { useState, useCallback } from 'react'
-import { createHighlighter, type Highlighter, type BundledLanguage } from 'shiki'
+import type { Highlighter, BundledLanguage } from 'shiki'
 
 let highlighterInstance: Highlighter | null = null
 let initPromise: Promise<Highlighter> | null = null
+let shikiModulePromise: Promise<typeof import('shiki')> | null = null
+
+async function loadShikiModule() {
+  if (!shikiModulePromise) {
+    shikiModulePromise = import('shiki')
+  }
+  return shikiModulePromise
+}
 
 export function useCodeHighlight() {
   const [isReady, setIsReady] = useState(Boolean(highlighterInstance))
@@ -17,25 +25,27 @@ export function useCodeHighlight() {
 
     setIsInitializing(true)
     
-    initPromise = createHighlighter({
-      themes: ['github-dark', 'github-light'],
-      langs: [
-        'python',
-        'javascript',
-        'typescript',
-        'json',
-        'html',
-        'css',
-        'bash',
-        'yaml',
-        'xml',
-        'sql',
-        'markdown',
-        'vue',
-        'jsx',
-        'tsx',
-      ],
-    }).then((h) => {
+    initPromise = loadShikiModule().then(({ createHighlighter }) =>
+      createHighlighter({
+        themes: ['github-dark', 'github-light'],
+        langs: [
+          'python',
+          'javascript',
+          'typescript',
+          'json',
+          'html',
+          'css',
+          'bash',
+          'yaml',
+          'xml',
+          'sql',
+          'markdown',
+          'vue',
+          'jsx',
+          'tsx',
+        ],
+      }),
+    ).then((h) => {
       highlighterInstance = h
       setIsReady(true)
       setIsInitializing(false)
