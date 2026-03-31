@@ -1,9 +1,10 @@
 """Docker Sandbox Implementation"""
 
-import time
 import asyncio
 import os
 import shlex
+import time
+from typing import Any
 
 import docker
 from docker.errors import DockerException, NotFound
@@ -79,20 +80,7 @@ class DockerSandbox:
                 labels["session_id"] = session_id
 
             # Create and start container with volume mounted
-            self.container = self.docker_client.containers.run(
-                image=settings.SANDBOX_IMAGE,
-                name=self.container_name,
-                detach=True,
-                working_dir="/workspace",
-                command="sleep infinity",
-                labels=labels,
-                volumes={
-                    self.volume_name: {
-                        "bind": "/workspace",
-                        "mode": "rw"
-                    }
-                }
-            )
+            self.container = self.docker_client.containers.run(**self._build_container_run_kwargs(labels))
             self._created = True
 
             # Wait until ready
@@ -196,7 +184,7 @@ class DockerSandbox:
 
         try:
             exit_code, output = self.container.exec_run(
-                cmd=["bash", "-c", command],
+                cmd=self._build_exec_command(command),
                 demux=True,
                 workdir="/workspace",
             )
@@ -345,6 +333,76 @@ class DockerSandbox:
 
         except DockerException as e:
             raise RuntimeError(f"Failed to build image: {e}")
+
+    def _build_container_run_kwargs(self, labels: dict[str, str]) -> dict[str, Any]:
+        tmpfs_size_bytes = max(int(settings.SANDBOX_TMPFS_SIZE_MB), 16) * 1024 * 1024
+        run_kwargs: dict[str, Any] = {
+            "image": settings.SANDBOX_IMAGE,
+            "name": self.container_name,
+            "detach": True,
+            "working_dir": "/workspace",
+            "command": "sleep infinity",
+            "labels": labels,
+            "init": settings.SANDBOX_INIT_PROCESS,
+            "network_disabled": settings.SANDBOX_NETWORK_DISABLED,
+            "environment": {
+                "HOME": "/tmp",
+                "XDG_CACHE_HOME": "/tmp/.cache",
+                "MPLCONFIGDIR": "/tmp/matplotlib",
+                "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+                "PIP_NO_CACHE_DIR": "1",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONUNBUFFERED": "1",
+            },
+            "tmpfs": {
+                "/tmp": f"rw,nosuid,nodev,size={tmpfs_size_bytes}",
+                "/run": "rw,nosuid,nodev,size=16777216",
+            },
+            "volumes": {
+                self.volume_name: {
+                    "bind": "/workspace",
+                    "mode": "rw",
+                }
+            },
+        }
+
+        security_opt: list[str] = []
+        if settings.SANDBOX_NO_NEW_PRIVILEGES:
+            security_opt.append("no-new-privileges:true")
+        if security_opt:
+            run_kwargs["security_opt"] = security_opt
+
+        if settings.SANDBOX_DROP_ALL_CAPABILITIES:
+            run_kwargs["cap_drop"] = ["ALL"]
+
+        if settings.SANDBOX_PIDS_LIMIT > 0:
+            run_kwargs["pids_limit"] = settings.SANDBOX_PIDS_LIMIT
+
+        if settings.SANDBOX_MEMORY_LIMIT:
+            run_kwargs["mem_limit"] = settings.SANDBOX_MEMORY_LIMIT
+
+        if settings.SANDBOX_MEMORY_SWAP_LIMIT:
+            run_kwargs["memswap_limit"] = settings.SANDBOX_MEMORY_SWAP_LIMIT
+
+        if settings.SANDBOX_CPU_LIMIT and settings.SANDBOX_CPU_LIMIT > 0:
+            run_kwargs["nano_cpus"] = int(settings.SANDBOX_CPU_LIMIT * 1_000_000_000)
+
+        return run_kwargs
+
+    def _build_exec_command(self, command: str) -> list[str]:
+        timeout_seconds = int(settings.SANDBOX_EXEC_TIMEOUT_SECONDS)
+        if timeout_seconds <= 0:
+            return ["bash", "-c", command]
+
+        kill_after_seconds = max(5, min(30, timeout_seconds // 10 or 5))
+        return [
+            "timeout",
+            f"--kill-after={kill_after_seconds}s",
+            f"{timeout_seconds}s",
+            "bash",
+            "-c",
+            command,
+        ]
 
     async def _wait_until_ready(self, max_retries: int = 30, interval: float = 0.5) -> None:
         """Wait until container is ready"""

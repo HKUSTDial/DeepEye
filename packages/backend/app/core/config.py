@@ -75,6 +75,16 @@ class Settings(BaseSettings):
     # Project root: /path/to/DeepEye_refact
     SANDBOX_BUILD_CONTEXT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
     SANDBOX_AUTO_BUILD: bool = True
+    SANDBOX_NO_NEW_PRIVILEGES: bool = True
+    SANDBOX_DROP_ALL_CAPABILITIES: bool = True
+    SANDBOX_NETWORK_DISABLED: bool = False
+    SANDBOX_INIT_PROCESS: bool = True
+    SANDBOX_PIDS_LIMIT: int = 256
+    SANDBOX_MEMORY_LIMIT: str | None = "2g"
+    SANDBOX_MEMORY_SWAP_LIMIT: str | None = "2g"
+    SANDBOX_CPU_LIMIT: float | None = 2.0
+    SANDBOX_TMPFS_SIZE_MB: int = 256
+    SANDBOX_EXEC_TIMEOUT_SECONDS: int = 300
     
     # Sandbox Lifecycle Management
     SANDBOX_IDLE_TIMEOUT: int = 30 * 60        # 30 minutes - stop container
