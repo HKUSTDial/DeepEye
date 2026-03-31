@@ -6,12 +6,15 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
+import sqlalchemy
+
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.tasks import agent_tasks
+from app.tasks.datasource_schema_cache import clear_datasource_schema_cache
 from app.services.datasource_specs import normalize_datasource_type
 
 
@@ -24,6 +27,7 @@ class _FakeSessionContext:
 
 
 def test_get_datasources_schema_includes_database_preview(monkeypatch, tmp_path: Path) -> None:
+    clear_datasource_schema_cache()
     db_path = tmp_path / "sales.sqlite"
     conn = sqlite3.connect(db_path)
     conn.execute("CREATE TABLE sales (client_id INTEGER, city TEXT, revenue REAL)")
@@ -73,3 +77,49 @@ def test_get_datasources_schema_includes_database_preview(monkeypatch, tmp_path:
 def test_normalize_datasource_type_accepts_postgresql_alias() -> None:
     assert normalize_datasource_type("postgresql") == "postgres"
     assert normalize_datasource_type("postgres") == "postgres"
+
+
+def test_get_datasources_schema_reuses_cache_for_repeated_database_requests(monkeypatch, tmp_path: Path) -> None:
+    clear_datasource_schema_cache()
+    db_path = tmp_path / "sales.sqlite"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE sales (client_id INTEGER, city TEXT, revenue REAL)")
+    conn.execute("INSERT INTO sales (client_id, city, revenue) VALUES (1, 'Shanghai', 120.5)")
+    conn.commit()
+    conn.close()
+
+    datasource_id = uuid.uuid4()
+    datasource = SimpleNamespace(
+        id=datasource_id,
+        name="sales_db",
+        type="sqlite",
+        category="database",
+        connection_string=f"sqlite:///{db_path}",
+    )
+
+    class _FakeDataSourceRepository:
+        def __init__(self, db) -> None:
+            self.db = db
+
+        def get_by_id_and_user(self, ds_uuid, user_id):
+            return datasource if ds_uuid == datasource_id else None
+
+        def get(self, ds_uuid):
+            return datasource if ds_uuid == datasource_id else None
+
+    create_engine_calls = 0
+
+    def _counting_create_engine(*args, **kwargs):
+        nonlocal create_engine_calls
+        create_engine_calls += 1
+        return sqlalchemy.create_engine(*args, **kwargs)
+
+    monkeypatch.setattr(agent_tasks, "task_session_scope", lambda: _FakeSessionContext())
+    monkeypatch.setattr(agent_tasks, "DataSourceRepository", _FakeDataSourceRepository)
+    monkeypatch.setattr(agent_tasks, "create_engine", _counting_create_engine)
+
+    first = agent_tasks._get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
+    second = agent_tasks._get_datasources_schema([str(datasource_id)], user_id=uuid.uuid4())
+
+    assert create_engine_calls == 1
+    assert first == second

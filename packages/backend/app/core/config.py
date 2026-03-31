@@ -68,6 +68,10 @@ class Settings(BaseSettings):
 
     # Sandbox
     SANDBOX_TYPE: str = "docker"  # docker, e2b, daytona
+    DOCKER_CONTROL_MODE: Literal["local", "remote"] = "local"
+    DOCKER_CONTROL_URL: str = "http://runtime-control:8010"
+    DOCKER_CONTROL_API_KEY: str = "change-me-runtime-control-key"
+    DOCKER_CONTROL_TIMEOUT_SECONDS: float = 30.0
     SANDBOX_HOST: str = "code-sandbox"
     SANDBOX_PORT: int = 8000
     SANDBOX_IMAGE: str = "deepeye-sandbox:latest"
@@ -122,6 +126,10 @@ class Settings(BaseSettings):
     LANGGRAPH_CHECKPOINTER_AUTO_SETUP: bool = True
     SANDBOX_CLEANUP_ENABLED: bool = True
     CELERY_STARTUP_WARMUP_ENABLED: bool = True
+    AGENT_DATASOURCE_SCHEMA_CACHE_TTL_SECONDS: int = 300
+    AGENT_DATASOURCE_SCHEMA_CACHE_MAX_ENTRIES: int = 128
+    PREVIEW_RUNTIME_TTL_SECONDS: int = 60 * 60
+    PREVIEW_RUNTIME_MAX_CONTAINERS: int = 8
     
     # Azure Speech TTS (optional, for data video narration)
     AZURE_SPEECH_KEY: str | None = None

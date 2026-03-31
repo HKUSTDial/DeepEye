@@ -24,6 +24,11 @@ from app.services.workflow_tracking_service import (
     fail_chat_turn_record,
 )
 from app.tasks.callbacks import AgentCallback, MessageCollector, persist_message
+from app.tasks.datasource_schema_cache import (
+    build_datasource_schema_cache_key,
+    get_cached_datasource_schema,
+    set_cached_datasource_schema,
+)
 from app.tasks.db import task_session_scope
 from deepeye.agents import AgentFactory
 from app.tools.workflow_tools import (
@@ -99,46 +104,81 @@ def _get_datasources_schema(
             ds = DataSourceRepository(db).get_by_id_and_user(ds_uuid, user_id) if user_id else DataSourceRepository(db).get(ds_uuid)
             if not ds:
                 continue
-            
-            category = getattr(ds, "category", "database")
-            if category == "database":
-                connection_string = ds.connection_string
-                if not connection_string:
-                    continue
-                try:
-                    from app.node.core.db_utils import normalize_connection_string
-                    from app.node.core.db_utils import json_safe_row
-
-                    data_engine = create_engine(normalize_connection_string(connection_string))
-                    inspector = inspect(data_engine)
-                    tables = inspector.get_table_names()[:max_tables]
-                    
-                    for name in tables:
-                        columns = inspector.get_columns(name)[:max_columns]
-                        preview = _get_database_table_preview(data_engine, name, limit=preview_rows)
-                        all_schemas.append({
-                            "datasource_id": str(ds.id),
-                            "datasource_name": ds.name,
-                            "name": name,
-                            "kind": "table",
-                            "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
-                            "preview": [json_safe_row(dict(row)) for row in preview],
-                        })
-                except Exception as e:
-                    logger.warning(f"Failed to get schema for DB {ds.name}: {e}")
-            elif category == "file":
-                metadata = getattr(ds, "file_metadata", {})
-                if metadata and "columns" in metadata:
-                    all_schemas.append({
-                        "datasource_id": str(ds.id),
-                        "datasource_name": ds.name,
-                        "name": ds.name,
-                        "kind": "file",
-                        "local_path": f"/workspace/data/{_get_datasource_filename(ds)}",
-                        "columns": metadata["columns"],
-                        "preview": (metadata.get("preview", []) or [])[:preview_rows],
-                    })
+            all_schemas.extend(
+                _get_single_datasource_schema(
+                    ds,
+                    max_tables=max_tables,
+                    max_columns=max_columns,
+                    preview_rows=preview_rows,
+                )
+            )
     return all_schemas
+
+
+def _get_single_datasource_schema(
+    datasource,
+    *,
+    max_tables: int,
+    max_columns: int,
+    preview_rows: int,
+) -> list[dict[str, object]]:
+    cache_key = build_datasource_schema_cache_key(
+        datasource,
+        max_tables=max_tables,
+        max_columns=max_columns,
+        preview_rows=preview_rows,
+    )
+    cached = get_cached_datasource_schema(cache_key)
+    if cached is not None:
+        return cached
+
+    category = getattr(datasource, "category", "database")
+    schemas: list[dict[str, object]] = []
+
+    if category == "database":
+        connection_string = datasource.connection_string
+        if not connection_string:
+            return []
+        try:
+            from app.node.core.db_utils import json_safe_row
+            from app.node.core.db_utils import normalize_connection_string
+
+            data_engine = create_engine(normalize_connection_string(connection_string))
+            try:
+                inspector = inspect(data_engine)
+                tables = inspector.get_table_names()[:max_tables]
+
+                for name in tables:
+                    columns = inspector.get_columns(name)[:max_columns]
+                    preview = _get_database_table_preview(data_engine, name, limit=preview_rows)
+                    schemas.append({
+                        "datasource_id": str(datasource.id),
+                        "datasource_name": datasource.name,
+                        "name": name,
+                        "kind": "table",
+                        "columns": [{"name": col.get("name"), "type": str(col.get("type"))} for col in columns],
+                        "preview": [json_safe_row(dict(row)) for row in preview],
+                    })
+            finally:
+                data_engine.dispose()
+        except Exception as e:
+            logger.warning(f"Failed to get schema for DB {datasource.name}: {e}")
+            return []
+    elif category == "file":
+        metadata = getattr(datasource, "file_metadata", {})
+        if metadata and "columns" in metadata:
+            schemas.append({
+                "datasource_id": str(datasource.id),
+                "datasource_name": datasource.name,
+                "name": datasource.name,
+                "kind": "file",
+                "local_path": f"/workspace/data/{_get_datasource_filename(datasource)}",
+                "columns": metadata["columns"],
+                "preview": (metadata.get("preview", []) or [])[:preview_rows],
+            })
+
+    set_cached_datasource_schema(cache_key, schemas)
+    return schemas
 
 
 def _create_model() -> ChatOpenAI:
