@@ -111,6 +111,13 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
+  const latestVideoArtifact = useMemo(
+    () =>
+      [...(sessionState?.artifacts ?? [])]
+        .reverse()
+        .find((artifact) => artifact.kind === 'video'),
+    [sessionState?.artifacts],
+  )
   const runOutput = sessionState?.runOutput ?? ''
   const videoProgress = sessionState?.videoProgress ?? { visible: false, step: 0, percent: 0, logs: [] }
   const runStatus = (sessionState?.runStatus as string | null | undefined) ?? null
@@ -124,7 +131,12 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const previewDeclaredReady = Boolean(videoPreviewUrl)
 
   const pastedNormalized = normalizePastedTaskId(pastedTaskId)
-  const displayTaskId = taskId || extractTaskIdFromOutput(runOutput) || manualTaskId || undefined
+  const artifactTaskId =
+    latestVideoArtifact && typeof latestVideoArtifact.task_id === 'string'
+      ? latestVideoArtifact.task_id
+      : undefined
+  const displayTaskId =
+    taskId || artifactTaskId || extractTaskIdFromOutput(runOutput) || manualTaskId || undefined
 
   const constructedPreviewUrl =
     displayTaskId && typeof window !== 'undefined'

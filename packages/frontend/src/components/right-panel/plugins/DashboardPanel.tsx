@@ -54,16 +54,14 @@ export function DashboardPanel({
   const refreshKey = useMemo(() => localRefreshKey + dashboardRefreshKey, [localRefreshKey, dashboardRefreshKey])
 
   const dashboardUrls = useMemo(() => {
-    if (!sessionState?.nodeStatus) return []
+    if (!sessionState?.artifacts) return []
 
     const urls: { nodeId: string; url: string }[] = []
-    Object.entries(sessionState.nodeStatus).forEach(([nodeId, statusInfo]) => {
-      const info = statusInfo as { outputs?: Record<string, unknown> }
-      const outputs = info.outputs
-      if (outputs?.dashboard_url && typeof outputs.dashboard_url === 'string') {
+    sessionState.artifacts.forEach((artifact) => {
+      if (artifact.kind === 'dashboard' && typeof artifact.dashboard_url === 'string') {
         urls.push({
-          nodeId,
-          url: outputs.dashboard_url,
+          nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : 'dashboard',
+          url: artifact.dashboard_url,
         })
       }
     })

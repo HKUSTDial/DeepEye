@@ -1,7 +1,6 @@
 import { chatApi, type AgentEvent } from '../api'
 import { extractVideoOutputParams } from '../api/video'
 import {
-  selectCurrentMessages,
   selectCurrentSessionId,
   useChatStore,
 } from '../stores/chat'
@@ -9,6 +8,7 @@ import { useReportStore } from '../stores/report'
 import { useRightPanelStore } from '../stores/rightPanel'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
 import { getDashboardProgressStage, isDashboardProgressMessage } from '../utils/dashboardProgress'
+import type { WorkflowArtifactPayload } from '../types'
 import {
   buildWorkflowRunFromEvent,
   getWorkflowArtifacts,
@@ -85,6 +85,10 @@ function handleWorkflowArtifactEvent(
     return false
   }
 
+  const typedArtifact = artifact as WorkflowArtifactPayload
+  const workflowStore = useWorkflowSessionsStore.getState()
+  workflowStore.recordArtifact(sessionId, typedArtifact)
+
   if (kind === 'report') {
     if (phase === 'artifact_progress') {
       const stepContent = typeof payload.message === 'string' ? payload.message : ''
@@ -133,7 +137,6 @@ function handleWorkflowArtifactEvent(
   }
 
   if (kind === 'dashboard') {
-    const workflowStore = useWorkflowSessionsStore.getState()
     if (phase === 'artifact_ready') {
       workflowStore.setDashboardProgressPercent(sessionId, 100)
       workflowStore.setDashboardProgressVisible(sessionId, false)
@@ -284,11 +287,6 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
       if (nodeType === 'data.generate_dashboard' && status === 'running') {
         workflowStore.setDashboardProgressVisible(sessionId, true)
       }
-      if (typedOutputs?.dashboard_url) {
-        workflowStore.setDashboardProgressPercent(sessionId, 100)
-        workflowStore.setDashboardProgressVisible(sessionId, false)
-        openOrFocusTabIfCurrent(sessionId, 'dashboard')
-      }
       if (nodeType === 'video.generator') {
         workflowStore.setVideoProgressVisible(sessionId, status === 'running')
       }
@@ -316,16 +314,6 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
       const taskIdToOpen = videoParams.taskId ?? null
       if (taskIdToOpen) {
         openOrFocusTabIfCurrent(sessionId, 'video-preview', { taskId: taskIdToOpen })
-      } else if (isCurrentSession(sessionId)) {
-        const lastMessage = selectCurrentMessages(useChatStore.getState()).at(-1)
-        if (lastMessage?.role === 'assistant' && lastMessage.content) {
-          const taskIdMatch = String(lastMessage.content).match(/Task ID:\s*(\d{8}_\d{6})/i)
-          if (taskIdMatch) {
-            const currentRunOutput = workflowStore.sessions[sessionId]?.runOutput || ''
-            workflowStore.setRunOutput(sessionId, `${currentRunOutput}\nTask ID: ${taskIdMatch[1]}`)
-            openOrFocusTabIfCurrent(sessionId, 'video-preview', { taskId: taskIdMatch[1] })
-          }
-        }
       }
     } else if (error) {
       workflowStore.setRunOutput(sessionId, error)

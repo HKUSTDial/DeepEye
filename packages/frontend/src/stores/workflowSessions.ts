@@ -1,5 +1,11 @@
 import { create } from 'zustand'
-import type { WorkflowArtifact, WorkflowDraft, WorkflowRun, WorkspaceState } from '../types'
+import type {
+  WorkflowArtifact,
+  WorkflowArtifactPayload,
+  WorkflowDraft,
+  WorkflowRun,
+  WorkspaceState,
+} from '../types'
 
 export type WorkflowDefinition = Record<string, unknown> | null
 export type WorkflowNode = Record<string, unknown>
@@ -28,6 +34,7 @@ export interface VideoProgressState {
 }
 
 export interface WorkflowSessionState {
+  artifacts: WorkflowArtifactPayload[]
   files: string[]
   fileError: string | null
   viewState: WorkflowViewState
@@ -57,6 +64,7 @@ interface WorkflowSessionsStore {
   ensureSession: (sessionId: string) => WorkflowSessionState
   resetSession: (sessionId: string) => void
   hydrateWorkspaceState: (sessionId: string, snapshot: WorkspaceState | null) => void
+  recordArtifact: (sessionId: string, artifact: WorkflowArtifactPayload) => void
   setViewState: (sessionId: string, state: WorkflowViewState) => void
   setFiles: (sessionId: string, files: string[]) => void
   setFileError: (sessionId: string, error: string | null) => void
@@ -101,6 +109,7 @@ const initialVideoProgress: VideoProgressState = {
 }
 
 const createEmptySession = (): WorkflowSessionState => ({
+  artifacts: [],
   files: [],
   fileError: null,
   viewState: 'idle',
@@ -180,6 +189,13 @@ const deriveVideoPreviewUrl = (artifacts: WorkflowArtifact[]) => {
   return null
 }
 
+const deriveArtifactPayloads = (artifacts: WorkflowArtifact[]) => artifacts.map((artifact) => artifact.payload)
+
+const artifactKey = (artifact: WorkflowArtifactPayload) => {
+  const nodeId = typeof artifact.node_id === 'string' ? artifact.node_id : ''
+  return `${artifact.kind}:${nodeId}`
+}
+
 const deriveViewState = (definition: WorkflowDefinition, run: WorkflowRun | null): WorkflowViewState => {
   if (definition || run) {
     return 'ready'
@@ -200,6 +216,21 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
     set((state) => ({
       sessions: { ...state.sessions, [sessionId]: createEmptySession() },
     })),
+  recordArtifact: (sessionId, artifact) =>
+    set((state) => {
+      const current = withSession(state.sessions, sessionId)
+      const key = artifactKey(artifact)
+      const artifacts = [
+        ...current.artifacts.filter((item) => artifactKey(item) !== key),
+        artifact,
+      ]
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: { ...current, artifacts, lastUpdated: Date.now() },
+        },
+      }
+    }),
   hydrateWorkspaceState: (sessionId, snapshot) =>
     set((state) => {
       const current = withSession(state.sessions, sessionId)
@@ -223,16 +254,18 @@ export const useWorkflowSessionsStore = create<WorkflowSessionsStore>((set, get)
       const draft = snapshot.draft ?? null
       const run = snapshot.run ?? null
       const artifacts = Array.isArray(snapshot.artifacts) ? snapshot.artifacts : []
+      const artifactPayloads = deriveArtifactPayloads(artifacts)
       const definition = getDraftDefinition(draft)
 
       return {
         sessions: {
           ...state.sessions,
-          [sessionId]: {
-            ...createEmptySession(),
-            files: current.files,
-            fileError: current.fileError,
-            dashboardRefreshKey: current.dashboardRefreshKey,
+            [sessionId]: {
+              ...createEmptySession(),
+              artifacts: artifactPayloads,
+              files: current.files,
+              fileError: current.fileError,
+              dashboardRefreshKey: current.dashboardRefreshKey,
             viewState: deriveViewState(definition, run),
             activeFilePath: draft?.file_path ?? run?.file_path ?? null,
             activeDraftId: draft?.id ?? run?.draft_id ?? null,
