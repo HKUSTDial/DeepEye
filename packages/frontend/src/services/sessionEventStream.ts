@@ -66,6 +66,27 @@ function openOrFocusTabIfCurrent(
   useRightPanelStore.getState().openOrFocusTab(pluginId, params)
 }
 
+function openOrFocusPluginTabIfCurrent(
+  sessionId: string,
+  pluginId: string,
+  params?: Record<string, unknown>,
+) {
+  if (!isCurrentSession(sessionId)) return
+
+  const rightPanel = useRightPanelStore.getState()
+  for (const pane of rightPanel.panes) {
+    const existing = pane.tabs.find((tab) => tab.pluginId === pluginId)
+    if (existing) {
+      rightPanel.setActiveTab(pane.id, existing.id)
+      rightPanel.setActivePane(pane.id)
+      rightPanel.setCollapsed(false)
+      return
+    }
+  }
+
+  rightPanel.openOrFocusTab(pluginId, params)
+}
+
 function setRightPanelRatioIfCurrent(sessionId: string, ratio: number) {
   if (!isCurrentSession(sessionId)) return
   useRightPanelStore.getState().setPanelRatio(ratio)
@@ -114,7 +135,7 @@ function handleWorkflowArtifactEvent(
         const currentlyGenerating = !!reportStore.sessions[sessionId]?.isGenerating
         if (!currentlyGenerating) {
           reportStore.startGeneration(sessionId)
-          openOrFocusTabIfCurrent(sessionId, 'report')
+          openOrFocusPluginTabIfCurrent(sessionId, 'report')
           setRightPanelRatioIfCurrent(sessionId, 28)
         }
         reportStore.addReportStep(sessionId, stepContent)
@@ -147,7 +168,7 @@ function handleWorkflowArtifactEvent(
       const reportStore = useReportStore.getState()
       reportStore.setReportResult(sessionId, reportHtml, steps, reportFilename, error)
       reportStore.stopGeneration(sessionId)
-      openOrFocusTabIfCurrent(sessionId, 'report')
+      openOrFocusPluginTabIfCurrent(sessionId, 'report')
       setRightPanelRatioIfCurrent(sessionId, 28)
       return true
     }
@@ -157,13 +178,13 @@ function handleWorkflowArtifactEvent(
     if (phase === 'artifact_ready') {
       workflowStore.setDashboardProgressPercent(sessionId, 100)
       workflowStore.setDashboardProgressVisible(sessionId, false)
-      openOrFocusTabIfCurrent(sessionId, 'dashboard')
+      openOrFocusPluginTabIfCurrent(sessionId, 'dashboard')
       return true
     }
     if (phase === 'artifact_refresh') {
       workflowStore.setDashboardProgressVisible(sessionId, false)
       workflowStore.triggerDashboardRefresh(sessionId)
-      openOrFocusTabIfCurrent(sessionId, 'dashboard')
+      openOrFocusPluginTabIfCurrent(sessionId, 'dashboard')
       return true
     }
   }
@@ -175,7 +196,7 @@ function handleWorkflowArtifactEvent(
       useWorkflowSessionsStore.getState().setVideoPreviewUrl(sessionId, videoUrl)
     }
     if (phase === 'artifact_ready') {
-      openOrFocusTabIfCurrent(sessionId, 'video-preview', taskId ? { taskId } : {})
+      openOrFocusPluginTabIfCurrent(sessionId, 'video-preview', taskId ? { taskId } : {})
       return true
     }
   }
@@ -311,11 +332,24 @@ function handleWorkflowEvent(sessionId: string, agentEvent: AgentEvent): Workflo
       if (nodePhase) {
         workflowStore.setRunPhase(sessionId, nodePhase)
       }
+      if (nodeType === 'report.generate' && status === 'running') {
+        const reportStore = useReportStore.getState()
+        const currentlyGenerating = !!reportStore.sessions[sessionId]?.isGenerating
+        if (!currentlyGenerating) {
+          reportStore.startGeneration(sessionId)
+        }
+        openOrFocusPluginTabIfCurrent(sessionId, 'report')
+        setRightPanelRatioIfCurrent(sessionId, 28)
+      }
       if (nodeType === 'data.generate_dashboard' && status === 'running') {
         workflowStore.setDashboardProgressVisible(sessionId, true)
+        openOrFocusPluginTabIfCurrent(sessionId, 'dashboard')
       }
       if (nodeType === 'video.generator') {
         workflowStore.setVideoProgressVisible(sessionId, status === 'running')
+        if (status === 'running') {
+          openOrFocusPluginTabIfCurrent(sessionId, 'video-preview')
+        }
       }
     }
     return 'handled'
@@ -374,6 +408,7 @@ function handleWorkflowToken(sessionId: string, event: AgentEvent) {
     const stage = getDashboardProgressStage(data.content)
     workflowStore.setDashboardProgressVisible(sessionId, true)
     workflowStore.appendDashboardProgressLog(sessionId, data.content)
+    openOrFocusPluginTabIfCurrent(sessionId, 'dashboard')
     if (stage !== null) {
       workflowStore.setDashboardProgressStage(sessionId, stage)
     }
@@ -387,12 +422,13 @@ function handleWorkflowToken(sessionId: string, event: AgentEvent) {
   workflowStore.appendVideoProgressLog(sessionId, data.content)
   const taskIdMatch = data.content.match(/Task ID:\s*(\d{8}_\d{6})/i)
   if (taskIdMatch) {
-    openOrFocusTabIfCurrent(sessionId, 'video-preview', { taskId: taskIdMatch[1] })
+    openOrFocusPluginTabIfCurrent(sessionId, 'video-preview', { taskId: taskIdMatch[1] })
   }
 
   const stepMatch = data.content.match(/Step\s*(\d)\s*\/\s*4/)
   if (stepMatch?.[1]) {
     workflowStore.setVideoProgressVisible(sessionId, true)
+    openOrFocusPluginTabIfCurrent(sessionId, 'video-preview')
     const stepIndex = parseInt(stepMatch[1], 10) - 1
     if (stepIndex >= 0 && stepIndex <= 3) {
       workflowStore.setVideoProgressStep(sessionId, stepIndex)
@@ -424,14 +460,8 @@ function handleSessionEvent(sessionId: string, agentEvent: AgentEvent) {
   }
 
   if (agentEvent.type === 'workflow_event') {
-    const workflowResult = handleWorkflowEvent(sessionId, agentEvent)
-    if (workflowResult === 'handled') {
-      pushChatEventIfCurrent(sessionId, agentEvent)
-      return
-    }
-    if (workflowResult === 'ignored') {
-      return
-    }
+    handleWorkflowEvent(sessionId, agentEvent)
+    return
   }
 
   if (agentEvent.type === 'tool_end') {
@@ -443,6 +473,16 @@ function handleSessionEvent(sessionId: string, agentEvent: AgentEvent) {
 
   if (agentEvent.type === 'token') {
     handleWorkflowToken(sessionId, agentEvent)
+  }
+
+  const tokenSource =
+    typeof agentEvent.data?.source === 'string'
+      ? agentEvent.data.source
+      : typeof agentEvent.source === 'string'
+        ? agentEvent.source
+        : ''
+  if (agentEvent.type === 'token' && tokenSource === 'workflow') {
+    return
   }
 
   pushChatEventIfCurrent(sessionId, agentEvent)

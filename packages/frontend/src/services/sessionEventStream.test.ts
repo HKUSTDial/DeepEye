@@ -215,6 +215,158 @@ describe('sessionEventStream', () => {
     )
   })
 
+  it('opens the report panel when report generation starts without mirroring workflow progress into chat', () => {
+    const currentSession = new SessionChat('session-1', 'Session 1')
+    useChatStore.setState({ currentSession })
+
+    const source = new FakeEventSource()
+    createEventSourceMock.mockReturnValue(source)
+
+    ensureSessionEventStream('session-1')
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'create_workflow',
+        draft_id: 'draft-1',
+        payload: {
+          workflow: {
+            root: {
+              nodes: {
+                generate_report: {
+                  id: 'generate_report',
+                  type: 'report.generate',
+                },
+              },
+              edges: {},
+            },
+          },
+        },
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'run_start',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {},
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'node_status',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {
+          node_id: 'generate_report',
+          status: 'running',
+        },
+      },
+    })
+
+    const reportSession = useReportStore.getState().sessions['session-1']
+    const tabs = useRightPanelStore.getState().panes.flatMap((pane) => pane.tabs)
+
+    expect(reportSession?.isGenerating).toBe(true)
+    expect(tabs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pluginId: 'report',
+        }),
+      ]),
+    )
+    expect(useChatStore.getState().currentSession?.messages).toEqual([])
+  })
+
+  it('opens dashboard and video panels at generation start and keeps workflow tokens out of chat', () => {
+    const currentSession = new SessionChat('session-1', 'Session 1')
+    useChatStore.setState({ currentSession })
+
+    const source = new FakeEventSource()
+    createEventSourceMock.mockReturnValue(source)
+
+    ensureSessionEventStream('session-1')
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'create_workflow',
+        draft_id: 'draft-1',
+        payload: {
+          workflow: {
+            root: {
+              nodes: {
+                build_dashboard: {
+                  id: 'build_dashboard',
+                  type: 'data.generate_dashboard',
+                },
+                generate_video: {
+                  id: 'generate_video',
+                  type: 'video.generator',
+                },
+              },
+              edges: {},
+            },
+          },
+        },
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'run_start',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {},
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'node_status',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {
+          node_id: 'build_dashboard',
+          status: 'running',
+        },
+      },
+    })
+    source.emit({
+      type: 'token',
+      source: 'system',
+      data: {
+        source: 'workflow',
+        content: 'Generating visualization for the dashboard layout',
+      },
+    })
+    source.emit({
+      type: 'workflow_event',
+      data: {
+        phase: 'node_status',
+        run_id: 'run-1',
+        draft_id: 'draft-1',
+        payload: {
+          node_id: 'generate_video',
+          status: 'running',
+        },
+      },
+    })
+
+    const workflowSession = useWorkflowSessionsStore.getState().sessions['session-1']
+    const tabs = useRightPanelStore.getState().panes.flatMap((pane) => pane.tabs)
+
+    expect(workflowSession.dashboardProgress.visible).toBe(true)
+    expect(workflowSession.videoProgress.visible).toBe(true)
+    expect(tabs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ pluginId: 'dashboard' }),
+        expect.objectContaining({ pluginId: 'video-preview' }),
+      ]),
+    )
+    expect(useChatStore.getState().currentSession?.messages).toEqual([])
+  })
+
   it('surfaces failed node guidance for workflow errors', () => {
     useChatStore.setState({
       currentSession: new SessionChat('session-1', 'Session 1'),
