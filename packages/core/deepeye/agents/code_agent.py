@@ -2,7 +2,6 @@ from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from deepeye.agents.react_agent import ReActAgent
-from deepeye.sandbox import SandboxProtocol
 
 CODE_AGENT_SYSTEM_PROMPT = """You are an Expert Data Analyst and Python Programmer.
 Your goal is to analyze data, perform calculations, and generate visualizations using bash commands.
@@ -58,16 +57,14 @@ class CodeAgent(ReActAgent):
         
         Args:
             model: LLM model
-            tools: Sandbox tools (from backend's get_sandbox_tools)
+            tools: Tool callables supplied by the application runtime
             checkpointer: LangGraph checkpointer
             system_prompt: System prompt
             max_steps: Maximum execution steps
             
         Example:
-            from app.sandbox import sandbox_manager, get_sandbox_tools
-            
-            sandbox = await sandbox_manager.create_for_session(session_id)
-            tools = get_sandbox_tools(sandbox)
+            sandbox = await runtime.create_sandbox(session_id)
+            tools = runtime.create_sandbox_tools(sandbox)
             agent = CodeAgent(model=model, tools=tools)
         """
         super().__init__(

@@ -97,7 +97,7 @@ def create_code_agent_tool(
     Factory that creates a Tool wrapping a CodeAgent.
     
     Args:
-        sandbox_tools: Sandbox tools (from backend's get_sandbox_tools)
+        sandbox_tools: Tool callables supplied by the application runtime
         model: LLM model
         session_id: Session ID for maintaining conversation context across calls
         callbacks: Callbacks for event tracking
@@ -106,10 +106,8 @@ def create_code_agent_tool(
         analyze_data tool function
         
     Example:
-        from app.sandbox import sandbox_manager, get_sandbox_tools
-        
-        sandbox = await sandbox_manager.create_for_session(session_id)
-        tools = get_sandbox_tools(sandbox)
+        sandbox = await runtime.create_sandbox(session_id)
+        tools = runtime.create_sandbox_tools(sandbox)
         analyze_data = create_code_agent_tool(tools, model, session_id)
     """
     from deepeye.agents.code_agent import CodeAgent

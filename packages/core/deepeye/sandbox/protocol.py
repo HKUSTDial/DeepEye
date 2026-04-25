@@ -1,8 +1,9 @@
 """
 Sandbox Protocol Definition
 
-Defines the minimal interface for sandbox implementations.
-Concrete implementations (Docker, E2B, Daytona) should be in backend services.
+Defines the minimal interface for sandbox implementations. Concrete runtimes
+such as Docker, E2B, or Daytona should live outside the core package and satisfy
+this protocol.
 """
 
 from dataclasses import dataclass
@@ -97,4 +98,3 @@ class SandboxProtocol(Protocol):
         - Idempotent operation
         """
         ...
-
