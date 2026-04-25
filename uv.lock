@@ -706,7 +706,7 @@ requires-dist = [
 provides-extras = ["openai", "anthropic", "qdrant"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0.0" }]
+dev = [{ name = "pytest", specifier = ">=9.0.3" }]
 
 [[package]]
 name = "deepeye-backend"
@@ -807,7 +807,7 @@ requires-dist = [{ name = "deepeye-backend", editable = "packages/backend" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
     { name = "ruff", specifier = ">=0.15.4" },
 ]
