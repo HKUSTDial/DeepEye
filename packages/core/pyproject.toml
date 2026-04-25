@@ -15,6 +15,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "rich>=14.2.0",
     "llm-sandbox[docker]>=0.3.31",
+    "langgraph-prebuilt<1.0.9",
 ]
 
 [project.optional-dependencies]

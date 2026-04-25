@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import readExcelFile from 'read-excel-file/browser'
 
 import type { FileContentResponse } from '../../api/sandbox'
 import { useLocale } from '../../locale'
@@ -11,41 +11,71 @@ type SpreadsheetPreviewProps = {
   onDownload: () => void
 }
 
+type SpreadsheetData = {
+  sheetName: string
+  rows: unknown[][]
+  truncated: boolean
+  loading?: boolean
+  error?: string
+}
+
 export default function SpreadsheetPreview({
   fileContent,
   isDownloading,
   onDownload,
 }: SpreadsheetPreviewProps) {
   const { t } = useLocale()
-  const xlsxData = useMemo(() => {
-    if (fileContent.encoding !== 'base64') return null
+  const [xlsxData, setXlsxData] = useState<SpreadsheetData | null>(null)
 
-    try {
-      const binaryStr = atob(fileContent.content)
-      const bytes = new Uint8Array(binaryStr.length)
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i)
+  useEffect(() => {
+    let isCancelled = false
+
+    const parseSpreadsheet = async () => {
+      if (fileContent.encoding !== 'base64') {
+        if (!isCancelled) {
+          setXlsxData(null)
+        }
+        return
       }
 
-      const workbook = XLSX.read(bytes, { type: 'array' })
-      const sheetName = workbook.SheetNames[0]
-      const sheet = sheetName ? workbook.Sheets[sheetName] : undefined
-      if (!sheetName || !sheet) return { sheetName: 'Sheet1', rows: [], truncated: false }
+      try {
+        setXlsxData({ sheetName: 'Sheet1', rows: [], truncated: false, loading: true })
 
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true }) as unknown[][]
-      const maxRows = 200
-      const maxCols = 50
-      const limitedRows = rows.slice(0, maxRows).map((row) => (Array.isArray(row) ? row.slice(0, maxCols) : []))
-      const truncated = rows.length > maxRows || limitedRows.some((row) => row.length > maxCols)
+        const binaryStr = atob(fileContent.content)
+        const bytes = new Uint8Array(binaryStr.length)
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i)
+        }
 
-      return { sheetName, rows: limitedRows, truncated }
-    } catch (error) {
-      return {
-        sheetName: 'Sheet1',
-        rows: [],
-        truncated: false,
-        error: error instanceof Error ? error.message : String(error),
+        const workbook = await readExcelFile(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
+        const firstSheet = workbook[0]
+        const rows = firstSheet?.data ?? []
+        const sheetName = firstSheet?.sheet || 'Sheet1'
+
+        const maxRows = 200
+        const maxCols = 50
+        const limitedRows = rows.slice(0, maxRows).map((row) => (Array.isArray(row) ? row.slice(0, maxCols) : []))
+        const truncated = rows.length > maxRows || limitedRows.some((row) => row.length > maxCols)
+
+        if (!isCancelled) {
+          setXlsxData({ sheetName, rows: limitedRows, truncated })
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setXlsxData({
+            sheetName: 'Sheet1',
+            rows: [],
+            truncated: false,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
+    }
+
+    void parseSpreadsheet()
+
+    return () => {
+      isCancelled = true
     }
   }, [fileContent])
 
@@ -54,8 +84,9 @@ export default function SpreadsheetPreview({
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-[var(--main-text-muted)]">
           {t('files.sheet')}: <span className="font-mono">{xlsxData?.sheetName || 'Sheet1'}</span>
+          {xlsxData?.loading ? <span className="ml-2">{t('files.loadingSpreadsheet')}</span> : null}
           {xlsxData?.truncated ? <span> {t('files.showingRowsCols')}</span> : null}
-          {xlsxData && 'error' in xlsxData && xlsxData.error ? (
+          {xlsxData?.error ? (
             <span className="ml-2 text-[#ff3b30]">{t('files.parseFailed', { error: xlsxData.error })}</span>
           ) : null}
         </div>
