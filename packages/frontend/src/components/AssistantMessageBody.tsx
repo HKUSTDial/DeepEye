@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -29,12 +29,7 @@ export function AssistantMessageBody({
   const [showProcess, setShowProcess] = useState(
     () => message.isStreaming || !hasFinalContent || processEntries.length > 0,
   )
-
-  useEffect(() => {
-    if (message.isStreaming || !hasFinalContent) {
-      setShowProcess(true)
-    }
-  }, [hasFinalContent, message.isStreaming])
+  const isProcessVisible = showProcess || message.isStreaming || !hasFinalContent
 
   return (
     <div className="assistant-message-stack">
@@ -44,7 +39,7 @@ export function AssistantMessageBody({
             type="button"
             className="assistant-process-toggle"
             onClick={() => setShowProcess((current) => !current)}
-            aria-expanded={showProcess}
+            aria-expanded={isProcessVisible}
           >
             <span className="assistant-process-toggle-copy">
               <span className="assistant-process-toggle-label">{t('assistant.activity')}</span>
@@ -52,13 +47,13 @@ export function AssistantMessageBody({
                 {t('assistant.activityUpdates', { count: processEntries.length })}
               </span>
             </span>
-            <span className={`assistant-process-toggle-chevron ${showProcess ? 'is-open' : ''}`}>
+            <span className={`assistant-process-toggle-chevron ${isProcessVisible ? 'is-open' : ''}`}>
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
           </button>
-          {showProcess && (
+          {isProcessVisible && (
             <div className="assistant-process-body">
               {processEntries.map((entry, index) => {
                 if (entry.kind === 'step') {

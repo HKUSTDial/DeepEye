@@ -1,6 +1,7 @@
 import { Suspense, lazy, type ReactNode } from 'react'
 import { FolderOpen, Workflow as WorkflowIcon, FileText, LayoutDashboard, Video } from 'lucide-react'
 import { translateApp } from '../../locale'
+import { PanelLoadingFallback } from './PanelLoadingFallback'
 
 export type PanelRenderContext = {
   sessionId: string | null
@@ -30,14 +31,6 @@ const DashboardPanel = lazy(() =>
 const VideoPreviewPanel = lazy(() =>
   import('./plugins/VideoPreviewPanel').then((module) => ({ default: module.VideoPreviewPanel })),
 )
-
-function PanelLoadingFallback({ title }: { title: string }) {
-  return (
-    <div className="right-panel-empty">
-      <div className="right-panel-empty-title">{translateApp('rightPanel.loadingPanel', { title })}</div>
-    </div>
-  )
-}
 
 function renderLazyPanel(node: ReactNode, title: string) {
   return <Suspense fallback={<PanelLoadingFallback title={title} />}>{node}</Suspense>

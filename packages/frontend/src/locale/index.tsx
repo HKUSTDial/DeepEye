@@ -1,19 +1,12 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+export { useLocale } from './LocaleContext'
 
 export type AppLocale = 'en' | 'zh-CN'
 export type LocaleTranslate = (key: string, params?: MessageParams) => string
 
-type MessageParams = Record<string, string | number | boolean | null | undefined>
+export type MessageParams = Record<string, string | number | boolean | null | undefined>
 type MessageValue = string | ((params: MessageParams) => string)
 
-const STORAGE_KEY = 'deepeye:locale'
+export const STORAGE_KEY = 'deepeye:locale'
 export const DEFAULT_CONVERSATION_TITLE = 'New conversation'
 const DEFAULT_CONVERSATION_TITLE_ALIASES = new Set([DEFAULT_CONVERSATION_TITLE, '新对话'])
 
@@ -1062,7 +1055,7 @@ function normalizeLocale(value?: string | null): AppLocale {
   return 'en'
 }
 
-function detectInitialLocale(): AppLocale {
+export function detectInitialLocale(): AppLocale {
   if (typeof window === 'undefined') {
     return 'en'
   }
@@ -1073,58 +1066,13 @@ function detectInitialLocale(): AppLocale {
   return normalizeLocale(window.navigator.language)
 }
 
-function translate(locale: AppLocale, key: string, params?: MessageParams): string {
+export function translate(locale: AppLocale, key: string, params?: MessageParams): string {
   const value = resolveMessage(locale, key)
   if (!value) return key
   if (typeof value === 'function') {
     return value(params ?? {})
   }
   return value.replace(/\{(\w+)\}/g, (_, token) => String(params?.[token] ?? ''))
-}
-
-interface LocaleContextValue {
-  locale: AppLocale
-  isZh: boolean
-  setLocale: (locale: AppLocale) => void
-  toggleLocale: () => void
-  t: (key: string, params?: MessageParams) => string
-}
-
-const defaultLocale: LocaleContextValue = {
-  locale: 'en',
-  isZh: false,
-  setLocale: () => {},
-  toggleLocale: () => {},
-  t: (key, params) => translate('en', key, params),
-}
-
-const LocaleContext = createContext<LocaleContextValue>(defaultLocale)
-
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<AppLocale>(() => detectInitialLocale())
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem(STORAGE_KEY, locale)
-  }, [locale])
-
-  const value = useMemo<LocaleContextValue>(() => ({
-    locale,
-    isZh: locale === 'zh-CN',
-    setLocale,
-    toggleLocale: () => setLocale((current) => (current === 'zh-CN' ? 'en' : 'zh-CN')),
-    t: (key, params) => translate(locale, key, params),
-  }), [locale])
-
-  return (
-    <LocaleContext.Provider value={value}>
-      {children}
-    </LocaleContext.Provider>
-  )
-}
-
-export function useLocale() {
-  return useContext(LocaleContext)
 }
 
 export function getActiveLocale(): AppLocale {

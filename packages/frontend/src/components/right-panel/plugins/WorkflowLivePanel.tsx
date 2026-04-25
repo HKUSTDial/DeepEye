@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { BackgroundVariant } from 'reactflow'
 import 'reactflow/dist/style.css'
 import '../../workflow/Workflow.css'
@@ -63,11 +63,15 @@ export function WorkflowLivePanel({
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-
-  useEffect(() => {
-    setSelectedNodeId(null)
-  }, [activeDraftId, displaySessionId])
+  const [selectedNodeState, setSelectedNodeState] = useState<{
+    activeDraftId: string | null
+    displaySessionId: string | null
+    nodeId: string | null
+  }>({ activeDraftId: null, displaySessionId: null, nodeId: null })
+  const selectedNodeId =
+    selectedNodeState.activeDraftId === activeDraftId && selectedNodeState.displaySessionId === displaySessionId
+      ? selectedNodeState.nodeId
+      : null
 
   const activeDraftNodeIds = useMemo(() => Object.keys(activeDraftNodes), [activeDraftNodes])
   const activeDraftEdgeIds = useMemo(() => Object.keys(activeDraftEdges), [activeDraftEdges])
@@ -179,7 +183,7 @@ export function WorkflowLivePanel({
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+            onNodeClick={(_, node) => setSelectedNodeState({ activeDraftId, displaySessionId, nodeId: node.id })}
             panOnScroll
             fitView
             fitViewOptions={{ padding: 0.22, minZoom: 0.55, maxZoom: 1.08 }}

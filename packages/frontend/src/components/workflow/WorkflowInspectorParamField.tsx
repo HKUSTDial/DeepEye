@@ -63,10 +63,6 @@ export function WorkflowInspectorParamField({
       : getEmptyDatasourceMessage(datasourceCategory)
 
   useEffect(() => {
-    setDatasourceMenuOpen(false)
-  }, [fieldKey, nodeType])
-
-  useEffect(() => {
     if (!datasourceMenuOpen) return
 
     const onMouseDown = (event: MouseEvent) => {

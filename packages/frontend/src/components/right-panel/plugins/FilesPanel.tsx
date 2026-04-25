@@ -12,16 +12,24 @@ const MIN_EXPLORER_RATIO = 20
 const MAX_EXPLORER_RATIO = 50
 
 export function FilesPanel({ sessionId }: FilesPanelProps) {
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const [manualSelection, setManualSelection] = useState<{
+    sessionId: string | null
+    revealRequestId: number | null
+    path: string | null
+  }>({ sessionId: null, revealRequestId: null, path: null })
   const [explorerRatio, setExplorerRatio] = useState(35)
   const [isDraggingExplorer, setIsDraggingExplorer] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
-  const lastRevealRequestIdRef = useRef<number | null>(null)
 
   const notifyFilesChanged = useChatStore((state) => state.notifyFilesChanged)
   const fileRevealRequest = useWorkspaceUiStore((state) =>
     sessionId ? state.fileRevealRequests[sessionId] ?? null : null,
   )
+  const revealRequestId = fileRevealRequest?.requestId ?? null
+  const selectedFile =
+    manualSelection.sessionId === sessionId && manualSelection.revealRequestId === revealRequestId
+      ? manualSelection.path
+      : fileRevealRequest?.path ?? null
 
   useEffect(() => {
     if (sessionId) {
@@ -29,25 +37,12 @@ export function FilesPanel({ sessionId }: FilesPanelProps) {
     }
   }, [sessionId, notifyFilesChanged])
 
-  useEffect(() => {
-    setSelectedFile(null)
-    lastRevealRequestIdRef.current = null
-  }, [sessionId])
-
-  useEffect(() => {
-    if (!fileRevealRequest) return
-    if (fileRevealRequest.requestId === lastRevealRequestIdRef.current) return
-
-    lastRevealRequestIdRef.current = fileRevealRequest.requestId
-    setSelectedFile(fileRevealRequest.path)
-  }, [fileRevealRequest])
-
   const handleFileSelect = (path: string) => {
-    setSelectedFile(path)
+    setManualSelection({ sessionId, revealRequestId, path })
   }
 
   const closeFileViewer = () => {
-    setSelectedFile(null)
+    setManualSelection({ sessionId, revealRequestId, path: null })
   }
 
   const startExplorerDrag = (e: React.MouseEvent) => {

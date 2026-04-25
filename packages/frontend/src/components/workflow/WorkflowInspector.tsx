@@ -58,7 +58,10 @@ export function WorkflowInspector({
   const [isLoadingDatasources, setIsLoadingDatasources] = useState(false)
   const [datasourceError, setDatasourceError] = useState<string | null>(null)
 
-  const selectedNodeParams = (resolvedSelectedNode?.data.params as Record<string, unknown> | undefined) || {}
+  const selectedNodeParams = useMemo(
+    () => (resolvedSelectedNode?.data.params as Record<string, unknown> | undefined) || {},
+    [resolvedSelectedNode],
+  )
   const hasDatasourceParam = Object.prototype.hasOwnProperty.call(selectedNodeParams, 'datasource_id')
   const datasourceCategory = getDatasourceCategoryForNodeType(resolvedSelectedNode?.data.type)
 

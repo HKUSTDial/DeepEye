@@ -138,7 +138,7 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
         setLoadingPreviewId(null)
       }
     },
-    [getApiErrorDetail, previewByDsId],
+    [getApiErrorDetail, previewByDsId, t],
   )
 
   const uploadFiles = useCallback(

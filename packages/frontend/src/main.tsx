@@ -16,7 +16,7 @@ import {
 import ProtectedRoute from './components/ProtectedRoute'
 import { initTheme } from './hooks/useTheme'
 import { clearVideoCache } from './api/videoRegistration'
-import { LocaleProvider } from './locale'
+import { LocaleProvider } from './locale/LocaleProvider'
 
 initTheme()
 
