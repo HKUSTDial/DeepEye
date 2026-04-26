@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@babel/standalone": "^7.29.1",
-    "@remotion/player": "^4.0.434",
+    "@remotion/player": "^4.0.451",
     "d3": "^7.9.0",
     "framer-motion": "^12.23.28",
     "lucide-react": "^0.562.0",
