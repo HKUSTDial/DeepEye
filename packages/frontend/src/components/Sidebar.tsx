@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   selectCurrentMessages,
@@ -104,6 +104,27 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
 
+  const animateTitle = useCallback((sessionId: string, fullTitle: string) => {
+    setAnimatingTitles((prev) => new Map(prev).set(sessionId, ''))
+
+    let index = 0
+    const interval = setInterval(() => {
+      if (index < fullTitle.length) {
+        setAnimatingTitles((prev) => new Map(prev).set(sessionId, fullTitle.slice(0, index + 1)))
+        index++
+      } else {
+        clearInterval(interval)
+        setTimeout(() => {
+          setAnimatingTitles((prev) => {
+            const newMap = new Map(prev)
+            newMap.delete(sessionId)
+            return newMap
+          })
+        }, 100)
+      }
+    }, 100)
+  }, [])
+
   useEffect(() => {
     fetchSessions()
   }, [fetchSessions])
@@ -141,29 +162,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
     }
 
     previousSessionsRef.current = currentSessions
-  }, [sessions])
-
-  const animateTitle = (sessionId: string, fullTitle: string) => {
-    setAnimatingTitles((prev) => new Map(prev).set(sessionId, ''))
-
-    let index = 0
-    const interval = setInterval(() => {
-      if (index < fullTitle.length) {
-        setAnimatingTitles((prev) => new Map(prev).set(sessionId, fullTitle.slice(0, index + 1)))
-        index++
-      } else {
-        clearInterval(interval)
-        // Remove from animating map after animation completes
-        setTimeout(() => {
-          setAnimatingTitles((prev) => {
-            const newMap = new Map(prev)
-            newMap.delete(sessionId)
-            return newMap
-          })
-        }, 100)
-      }
-    }, 100) // 100ms per character
-  }
+  }, [animateTitle, sessions])
 
   const getDisplayTitle = (session: { id: string; title: string }) => {
     // If animating, show animated title

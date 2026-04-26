@@ -1,7 +1,14 @@
-import { Suspense, lazy, type ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { FolderOpen, Workflow as WorkflowIcon, FileText, LayoutDashboard, Video } from 'lucide-react'
 import { translateApp } from '../../locale'
 import { PanelLoadingFallback } from './PanelLoadingFallback'
+import {
+  DashboardPanel,
+  FilesPanel,
+  ReportPanel,
+  VideoPreviewPanel,
+  WorkflowLivePanel,
+} from './panelComponents'
 
 export type PanelRenderContext = {
   sessionId: string | null
@@ -15,22 +22,6 @@ export type PanelPlugin = {
   icon?: ReactNode
   render: (context: PanelRenderContext, params?: Record<string, unknown>) => ReactNode
 }
-
-const FilesPanel = lazy(() =>
-  import('./plugins/FilesPanel').then((module) => ({ default: module.FilesPanel })),
-)
-const WorkflowLivePanel = lazy(() =>
-  import('./plugins/WorkflowLivePanel').then((module) => ({ default: module.WorkflowLivePanel })),
-)
-const ReportPanel = lazy(() =>
-  import('./plugins/ReportPanel').then((module) => ({ default: module.ReportPanel })),
-)
-const DashboardPanel = lazy(() =>
-  import('./plugins/DashboardPanel').then((module) => ({ default: module.DashboardPanel })),
-)
-const VideoPreviewPanel = lazy(() =>
-  import('./plugins/VideoPreviewPanel').then((module) => ({ default: module.VideoPreviewPanel })),
-)
 
 function renderLazyPanel(node: ReactNode, title: string) {
   return <Suspense fallback={<PanelLoadingFallback title={title} />}>{node}</Suspense>
