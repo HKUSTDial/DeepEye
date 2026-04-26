@@ -7,6 +7,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
+from app.schemas.workflow_artifact import WorkflowArtifactPayload
 from app.services.workflow_artifacts import normalize_workflow_artifact
 
 
@@ -95,3 +96,33 @@ def test_normalize_existing_artifact_is_idempotent():
     assert normalized["preview"] == {"type": "iframe", "url": "/dashboards/demo/"}
     assert normalized["payload"]["custom"] == "value"
     assert normalized["payload"]["dashboard_url"] == "/dashboards/demo/"
+
+
+def test_normalized_artifact_payload_matches_typed_protocol_model():
+    artifact = normalize_workflow_artifact(
+        "dashboard",
+        node_id="dashboard_node",
+        dashboard_url="/dashboards/demo/",
+        status="completed",
+    )
+    payload = WorkflowArtifactPayload.model_validate(artifact)
+
+    assert payload.kind == "dashboard"
+    assert payload.status == "ready"
+    assert payload.node_id == "dashboard_node"
+    assert payload.preview.url == "/dashboards/demo/"
+    assert payload.payload["dashboard_url"] == "/dashboards/demo/"
+
+
+def test_artifact_payload_model_accepts_legacy_payloads():
+    payload = WorkflowArtifactPayload.model_validate(
+        {
+            "kind": "report",
+            "status": "success",
+            "report_path": "/workspace/legacy.html",
+        }
+    )
+
+    assert payload.status == "ready"
+    assert payload.title is None
+    assert payload.model_dump(exclude_none=True)["report_path"] == "/workspace/legacy.html"

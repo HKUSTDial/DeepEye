@@ -27,6 +27,12 @@ from app.schemas.events import (
     UserMessage,
 )
 from app.schemas.input import AgentInput
+from app.schemas.workflow_artifact import (
+    WorkflowArtifactFile,
+    WorkflowArtifactPayload,
+    WorkflowArtifactPreview,
+    WorkflowArtifactStatus,
+)
 from app.schemas.workflow import (
     ChatTurnResponse,
     WorkflowArtifactResponse,
@@ -69,6 +75,10 @@ __all__ = [
     "AgentInput",
     "ChatTurnResponse",
     "WorkflowArtifactResponse",
+    "WorkflowArtifactFile",
+    "WorkflowArtifactPayload",
+    "WorkflowArtifactPreview",
+    "WorkflowArtifactStatus",
     "WorkflowCreate",
     "WorkflowDraftResponse",
     "WorkflowDraftUpsertRequest",

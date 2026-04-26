@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.schemas.workflow_artifact import WorkflowArtifactPayload
+
 
 class WorkflowCreate(BaseModel):
     name: str
@@ -40,7 +42,7 @@ class WorkflowRunResponse(BaseModel):
     file_path: str | None = None
     status: str
     result: dict | None
-    artifacts: list[dict[str, Any]] | None = None
+    artifacts: list[WorkflowArtifactPayload] | None = None
     error: str | None
     created_at: datetime
     finished_at: datetime | None
@@ -103,7 +105,7 @@ class WorkflowArtifactResponse(BaseModel):
     turn_id: UUID | None
     draft_id: UUID | None
     kind: str
-    payload: dict[str, Any]
+    payload: WorkflowArtifactPayload
     created_at: datetime
 
     model_config = {"from_attributes": True}

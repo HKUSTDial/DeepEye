@@ -82,9 +82,6 @@ class SandboxManager:
 
         self._control_client = get_docker_control_client()
         self._docker = None
-        if not self._use_remote_control():
-            # Docker client for cross-process container discovery
-            self._docker = docker.from_env()
         
         # Activity tracking
         self._activity = ActivityTracker()
@@ -98,6 +95,14 @@ class SandboxManager:
 
     def _use_remote_control(self) -> bool:
         return settings.DOCKER_CONTROL_MODE == "remote"
+
+    def _get_docker_client(self):
+        """Create the Docker client only when local sandbox operations need it."""
+        if self._use_remote_control():
+            return None
+        if self._docker is None:
+            self._docker = docker.from_env()
+        return self._docker
 
     def _build_remote_sandbox(self, payload: dict[str, Any]) -> DockerSandbox:
         sandbox = DockerSandbox.from_remote_state(payload)
@@ -288,7 +293,8 @@ class SandboxManager:
                     self._sandboxes[session_id].pop(index)
             
             # Not in local cache or cache was stale - query Docker directly by label
-            containers = find_containers_by_session(self._docker, session_id)
+            docker_client = self._get_docker_client()
+            containers = find_containers_by_session(docker_client, session_id)
             if containers and index < len(containers):
                 container = containers[index]
                 container_name = container.name
@@ -464,7 +470,8 @@ class SandboxManager:
                     logger.error(f"[SandboxManager] Error destroying sandbox: {e}")
             
             # Also destroy any containers in Docker not in local cache
-            containers = find_containers_by_session(self._docker, session_id)
+            docker_client = self._get_docker_client()
+            containers = find_containers_by_session(docker_client, session_id)
             for container in containers:
                 if container.name not in destroyed_names:
                     try:
@@ -478,7 +485,7 @@ class SandboxManager:
             if delete_data:
                 volume_name = volume_name or f"deepeye-ws-{session_id}"
                 try:
-                    volume = self._docker.volumes.get(volume_name)
+                    volume = docker_client.volumes.get(volume_name)
                     volume.remove(force=True)
                     logger.info(f"[SandboxManager] Deleted volume {volume_name}")
                 except NotFound:
@@ -517,7 +524,7 @@ class SandboxManager:
 
         return build_manager_stats(
             sandboxes_by_session=self._sandboxes,
-            docker_client=self._docker,
+            docker_client=self._get_docker_client(),
             activity=self._activity,
             cleanup_running=self._running,
         )
@@ -538,7 +545,7 @@ class SandboxManager:
         return build_session_status(
             session_id=session_id,
             sandboxes_by_session=self._sandboxes,
-            docker_client=self._docker,
+            docker_client=self._get_docker_client(),
             activity=self._activity,
         )
     
@@ -549,7 +556,7 @@ class SandboxManager:
         Returns:
             List of volume info dicts
         """
-        return list_all_volumes(self._docker)
+        return list_all_volumes(self._get_docker_client())
     
     async def sync_from_docker(self, session_id: str) -> int:
         """
@@ -573,7 +580,7 @@ class SandboxManager:
             return int(payload.get("reconnected", 0))
 
         async with self._lock:
-            containers = find_containers_by_session(self._docker, session_id)
+            containers = find_containers_by_session(self._get_docker_client(), session_id)
             if not containers:
                 return 0
             
@@ -606,7 +613,7 @@ class SandboxManager:
 
         sessions = collect_cleanup_sessions(
             cached_sessions=sessions,
-            docker_client=self._docker,
+            docker_client=self._get_docker_client(),
             activity=self._activity,
         )
 

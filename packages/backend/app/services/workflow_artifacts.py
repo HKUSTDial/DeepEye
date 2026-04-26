@@ -11,6 +11,8 @@ import os
 from collections.abc import Mapping
 from typing import Any
 
+from app.schemas.workflow_artifact import WorkflowArtifactPayload
+
 ARTIFACT_STATUS_ALIASES = {
     "complete": "ready",
     "completed": "ready",
@@ -296,12 +298,18 @@ def normalize_workflow_artifact(
     normalized["title"] = _derive_title(artifact_kind, raw)
 
     summary = _derive_summary(raw)
-    if summary:
-        normalized["summary"] = summary
-
-    normalized["preview"] = _derive_preview(artifact_kind, raw)
-    normalized["files"] = _merge_file_descriptors(raw.get("files"), _derive_files(artifact_kind, raw))
-    normalized["payload"] = _derive_payload(raw)
+    artifact = WorkflowArtifactPayload(
+        **{key: value for key, value in raw.items() if key not in NORMALIZED_ARTIFACT_KEYS},
+        kind=artifact_kind,
+        status=_normalize_status(raw.get("status"), raw, artifact_kind),
+        title=_derive_title(artifact_kind, raw),
+        summary=summary,
+        node_id=raw.get("node_id") if isinstance(raw.get("node_id"), str) else None,
+        preview=_derive_preview(artifact_kind, raw),
+        files=_merge_file_descriptors(raw.get("files"), _derive_files(artifact_kind, raw)),
+        payload=_derive_payload(raw),
+    )
+    normalized.update(artifact.model_dump(exclude_none=True))
     return normalized
 
 
