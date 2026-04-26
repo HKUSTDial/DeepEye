@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from deepeye.workflows.models import Edge, Graph, Node, Port
+from deepeye.workflows.models import Graph, Node, Port
 from deepeye.workflows.registry import NodeRegistry, NodeSpec
 
 

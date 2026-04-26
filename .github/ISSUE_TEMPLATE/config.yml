@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/HKUSTDial/DeepEye/security/advisories
+    about: Please report exploitable security issues privately when possible.
+  - name: Documentation
+    url: https://github.com/HKUSTDial/DeepEye/tree/master/docs
+    about: Check the documentation before opening a question or setup issue.

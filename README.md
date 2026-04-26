@@ -1,5 +1,8 @@
 # DeepEye
 
+[![CI](https://github.com/HKUSTDial/DeepEye/actions/workflows/pytest.yml/badge.svg)](https://github.com/HKUSTDial/DeepEye/actions/workflows/pytest.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
 > **Project Status: Active Development Preview**
 >
 > DeepEye is being shared publicly while the codebase, documentation, tests, deployment workflow, and security hardening are still being actively improved. The repository is useful for local evaluation, collaboration, and understanding the architecture, but APIs, internal contracts, and setup details may continue to change as the project is refined.
@@ -150,11 +153,25 @@ Before exposing DeepEye beyond a trusted local environment:
 
 ## Documentation
 
+- [Documentation index](docs/README.md)
 - [Backend README](packages/backend/README.md)
 - [Frontend README](packages/frontend/README.md)
 - [Core README](packages/core/README.md)
 - [Workflow-native agent refactor RFC](docs/rfcs/workflow_native_agent_refactor.md)
 - [Open-source remediation checklist](docs/open_source_remediation_checklist.md)
+
+## Community And Governance
+
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+
+## License
+
+DeepEye is licensed under the [Apache License 2.0](LICENSE).
 
 ## Project Maturity
 
