@@ -4,6 +4,7 @@ import { sessionApi } from '../../../api'
 import type { WorkflowDraft, WorkflowRun } from '../../../types'
 import type { WorkflowViewState } from '../../../stores/workflowSessions'
 import type { NodeDef } from '../../../stores/workflowNodes'
+import { deferEffectWork } from '../../../utils/effects'
 import { validateGraph, type DefinitionEdge, type DefinitionNode } from './workflowPanelUtils'
 import {
   buildWorkflowDraftFileList,
@@ -102,21 +103,25 @@ export function useWorkflowDraftCatalog({
   }, [sessionId, actions])
 
   useEffect(() => {
-    if (!sessionId) {
-      setDisplaySessionId(null)
-      setIsViewSwitching(false)
-      return
-    }
-    if (displaySessionId !== sessionId) {
-      setIsViewSwitching(true)
-    }
+    return deferEffectWork(() => {
+      if (!sessionId) {
+        setDisplaySessionId(null)
+        setIsViewSwitching(false)
+        return
+      }
+      if (displaySessionId !== sessionId) {
+        setIsViewSwitching(true)
+      }
+    })
   }, [sessionId, displaySessionId])
 
   useEffect(() => {
     if (!sessionId) return
     if (activeViewState === 'ready' || activeViewState === 'empty' || activeViewState === 'error') {
-      setDisplaySessionId(sessionId)
-      setIsViewSwitching(false)
+      return deferEffectWork(() => {
+        setDisplaySessionId(sessionId)
+        setIsViewSwitching(false)
+      })
     }
   }, [sessionId, activeViewState])
 
@@ -222,25 +227,31 @@ export function useWorkflowDraftCatalog({
 
   useEffect(() => {
     if (!sessionId) return
-    void refreshDrafts(true)
+    return deferEffectWork(() => {
+      void refreshDrafts(true)
+    })
   }, [sessionId, refreshDrafts])
 
   useEffect(() => {
     if (!sessionId) return
     if (filesChangedTrigger === 0 || sessionIdFromStore !== sessionId) return
-    void refreshDrafts(true)
+    return deferEffectWork(() => {
+      void refreshDrafts(true)
+    })
   }, [filesChangedTrigger, refreshDrafts, sessionId, sessionIdFromStore])
 
   useEffect(() => {
     if (!sessionId) return
     if (sessionIdFromStore !== sessionId) return
     if (sessionMessagesCount > 0 || hasTrackedWorkspaceState) return
-    actions.setActiveFilePath(sessionId, null)
-    actions.setWorkflowDefinition(sessionId, null)
-    actions.clearValidated(sessionId)
-    actions.setViewState(sessionId, 'empty')
-    setDisplaySessionId(sessionId)
-    setIsViewSwitching(false)
+    return deferEffectWork(() => {
+      actions.setActiveFilePath(sessionId, null)
+      actions.setWorkflowDefinition(sessionId, null)
+      actions.clearValidated(sessionId)
+      actions.setViewState(sessionId, 'empty')
+      setDisplaySessionId(sessionId)
+      setIsViewSwitching(false)
+    })
   }, [
     sessionId,
     sessionIdFromStore,
@@ -252,12 +263,14 @@ export function useWorkflowDraftCatalog({
   useEffect(() => {
     if (!sessionId) return
     if (isLoadingFiles || isStreaming || activeFiles.length > 0 || hasTrackedWorkspaceState) return
-    actions.setActiveFilePath(sessionId, null)
-    actions.setWorkflowDefinition(sessionId, null)
-    actions.clearValidated(sessionId)
-    actions.setViewState(sessionId, 'empty')
-    setDisplaySessionId(sessionId)
-    setIsViewSwitching(false)
+    return deferEffectWork(() => {
+      actions.setActiveFilePath(sessionId, null)
+      actions.setWorkflowDefinition(sessionId, null)
+      actions.clearValidated(sessionId)
+      actions.setViewState(sessionId, 'empty')
+      setDisplaySessionId(sessionId)
+      setIsViewSwitching(false)
+    })
   }, [
     sessionId,
     isLoadingFiles,
@@ -271,13 +284,16 @@ export function useWorkflowDraftCatalog({
     if (!sessionId) return
     if (activeFiles.length > 0 || hasTrackedWorkspaceState) return
     if (activeViewState === 'empty') {
-      actions.clearValidated(sessionId)
-      actions.setWorkflowDefinition(sessionId, null)
-      setDisplaySessionId(sessionId)
-      setIsViewSwitching(false)
-      return
+      return deferEffectWork(() => {
+        actions.clearValidated(sessionId)
+        actions.setWorkflowDefinition(sessionId, null)
+        setDisplaySessionId(sessionId)
+        setIsViewSwitching(false)
+      })
     }
-    void refreshDrafts(true)
+    return deferEffectWork(() => {
+      void refreshDrafts(true)
+    })
   }, [
     sessionId,
     activeFiles.length,

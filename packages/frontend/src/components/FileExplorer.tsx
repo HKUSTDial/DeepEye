@@ -3,6 +3,7 @@ import { ChevronRight, RefreshCw, Home, FolderOpen } from 'lucide-react'
 import { sandboxApi } from '../api/sandbox'
 import { selectIsStreaming, useChatStore } from '../stores/chat'
 import { useLocale } from '../locale'
+import { deferEffectWork } from '../utils/effects'
 import FileTreeItem, { type FileNode } from './FileTreeItem'
 import './FileExplorer.css'
 
@@ -44,7 +45,9 @@ export default function FileExplorer({
   }, [sessionId])
 
   useEffect(() => {
-    setCurrentSelectedPath(selectedPath)
+    return deferEffectWork(() => {
+      setCurrentSelectedPath(selectedPath)
+    })
   }, [selectedPath])
 
   // Helper functions
@@ -262,18 +265,20 @@ export default function FileExplorer({
     previousSessionIdRef.current = sessionId
     if (isSwitchingSession) return
 
-    if (sessionId && sandboxReadySessionId === sessionId) {
-      if (oldSessionId !== undefined && oldSessionId !== null) {
-        loadRootFiles()
+    return deferEffectWork(() => {
+      if (sessionId && sandboxReadySessionId === sessionId) {
+        if (oldSessionId !== undefined && oldSessionId !== null) {
+          loadRootFiles()
+        } else {
+          setSandboxNotCreated(true)
+          setRootFiles([])
+        }
       } else {
-        setSandboxNotCreated(true)
         setRootFiles([])
+        setSandboxNotCreated(Boolean(sessionId))
+        setError(null)
       }
-    } else {
-      setRootFiles([])
-      setSandboxNotCreated(Boolean(sessionId))
-      setError(null)
-    }
+    })
     // We intentionally react only to session/stream flags; `loadRootFiles` is stable enough for this lifecycle hook.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, sandboxReadySessionId, isSwitchingSession])
@@ -295,7 +300,9 @@ export default function FileExplorer({
   // Refresh when files change (via event from backend)
   useEffect(() => {
     if (sessionId && sandboxReadySessionId === sessionId && filesChangedTrigger > 0) {
-      refreshWithExpandedState()
+      return deferEffectWork(() => {
+        refreshWithExpandedState()
+      })
     }
     // This effect is keyed by backend file-change signals and active session.
     // eslint-disable-next-line react-hooks/exhaustive-deps

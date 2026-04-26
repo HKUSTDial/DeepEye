@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useWorkflowStore } from '../../stores/workflow'
 import type { NodeDef } from '../../stores/workflowNodes'
 import { useLocale } from '../../locale'
+import { deferEffectWork } from '../../utils/effects'
 import { WorkflowInspectorOutputView } from './WorkflowInspectorOutput'
 import { WorkflowInspectorParamField } from './WorkflowInspectorParamField'
 import {
@@ -157,7 +158,9 @@ export function WorkflowInspector({
     if (!hasDatasourceParam || datasources.length > 0 || datasourceError || isLoadingDatasources) {
       return
     }
-    void loadDatasources()
+    return deferEffectWork(() => {
+      void loadDatasources()
+    })
   }, [hasDatasourceParam, datasources.length, datasourceError, isLoadingDatasources, loadDatasources])
 
   // 处理参数更新

@@ -12,6 +12,7 @@ import {
 import { useCodeHighlight } from '../hooks/useCodeHighlight'
 import { useTheme } from '../hooks/useTheme'
 import { useLocale } from '../locale'
+import { deferEffectWork } from '../utils/effects'
 import './FileViewer.css'
 
 interface FileViewerProps {
@@ -100,12 +101,14 @@ export default function FileViewer({ sessionId, filePath, onClose }: FileViewerP
   }, [highlight, t])
 
   useEffect(() => {
-    if (sessionId && filePath) {
-      loadFile(sessionId, filePath)
-    } else {
-      setFileContent(null)
-      setHighlightedCode('')
-    }
+    return deferEffectWork(() => {
+      if (sessionId && filePath) {
+        loadFile(sessionId, filePath)
+      } else {
+        setFileContent(null)
+        setHighlightedCode('')
+      }
+    })
   }, [sessionId, filePath, loadFile])
 
   useEffect(() => {

@@ -7,6 +7,7 @@ import {
 } from '../ArtifactProgressCard'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useLocale } from '../../../locale'
+import { deferEffectWork } from '../../../utils/effects'
 
 interface VideoPreviewPanelProps {
   taskId?: string
@@ -153,23 +154,27 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
   useEffect(() => {
     if (!effectivePreviewUrlWithSession) {
-      setIsPreviewReady(false)
-      setPreviewCheckCount(0)
-      return
+      return deferEffectWork(() => {
+        setIsPreviewReady(false)
+        setPreviewCheckCount(0)
+      })
     }
 
     if (previewDeclaredReady) {
-      setIsPreviewReady(true)
-      setPreviewCheckCount(0)
-      if (previewCheckIntervalRef.current) {
-        window.clearInterval(previewCheckIntervalRef.current)
-        previewCheckIntervalRef.current = null
-      }
-      return
+      return deferEffectWork(() => {
+        setIsPreviewReady(true)
+        setPreviewCheckCount(0)
+        if (previewCheckIntervalRef.current) {
+          window.clearInterval(previewCheckIntervalRef.current)
+          previewCheckIntervalRef.current = null
+        }
+      })
     }
 
-    setIsPreviewReady(false)
-    setPreviewCheckCount(0)
+    const resetCleanup = deferEffectWork(() => {
+      setIsPreviewReady(false)
+      setPreviewCheckCount(0)
+    })
 
     const checkReady = async () => {
       setIsCheckingPreview(true)
@@ -199,6 +204,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     }, 3000)
 
     return () => {
+      resetCleanup()
       window.clearTimeout(timeoutId)
       if (previewCheckIntervalRef.current) {
         window.clearInterval(previewCheckIntervalRef.current)

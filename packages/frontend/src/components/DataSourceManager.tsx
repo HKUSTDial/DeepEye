@@ -5,6 +5,7 @@ import { selectCurrentSessionId, useChatStore } from '../stores/chat'
 import { useDatasourceSyncStore } from '../stores/datasourceSync'
 import type { DataSource } from '../types'
 import { useLocale } from '../locale'
+import { deferEffectWork } from '../utils/effects'
 import { DataSourceConnectionForm } from './data-source/DataSourceConnectionForm'
 import { DataSourcePreviewPanel } from './data-source/DataSourcePreviewPanel'
 import {
@@ -373,7 +374,9 @@ export default function DataSourceManager({ onDataSourcesChange, variant = 'side
   }
 
   useEffect(() => {
-    void loadDataSources()
+    return deferEffectWork(() => {
+      void loadDataSources()
+    })
   }, [loadDataSources, datasourceRevision])
 
   return (

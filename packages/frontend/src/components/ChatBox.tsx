@@ -16,6 +16,7 @@ import { ChatErrorNotice } from './ChatErrorNotice'
 import { buildFollowUpPrompts, buildMessageActivityKey, hasText } from './chatBoxUtils'
 import type { DataSource } from '../types'
 import { useLocale } from '../locale'
+import { deferEffectWork } from '../utils/effects'
 import './ChatBox.css'
 
 interface ChatBoxProps {
@@ -253,11 +254,13 @@ export default function ChatBox({
     if (isStreaming || error || !queuedPrompt) {
       return
     }
-    const nextPrompt = queuedPrompt
-    setQueuedPrompt(null)
-    void sendMessage(nextPrompt, dataSourceIds)
-    setIsNearBottom(true)
-    scrollToBottom()
+    return deferEffectWork(() => {
+      const nextPrompt = queuedPrompt
+      setQueuedPrompt(null)
+      void sendMessage(nextPrompt, dataSourceIds)
+      setIsNearBottom(true)
+      scrollToBottom()
+    })
   }, [dataSourceIds, error, isStreaming, queuedPrompt, sendMessage])
 
   const handleCompositionStart = () => {

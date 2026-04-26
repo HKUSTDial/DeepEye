@@ -7,6 +7,7 @@ import {
 } from '../stores/chat'
 import type { Session } from '../types'
 import { getLocalizedConversationTitle, isDefaultConversationTitle, useLocale } from '../locale'
+import { deferEffectWork } from '../utils/effects'
 import './Sidebar.css'
 
 interface SidebarProps {
@@ -135,7 +136,9 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
   }, [PINNED_SESSIONS_STORAGE_KEY, pinnedSessionIds])
 
   useEffect(() => {
-    setPinnedSessionIds((current) => current.filter((id) => sessions.some((session) => session.id === id)))
+    return deferEffectWork(() => {
+      setPinnedSessionIds((current) => current.filter((id) => sessions.some((session) => session.id === id)))
+    })
   }, [sessions])
 
   useEffect(() => {
