@@ -11,7 +11,7 @@ dependencies = [
     "uvicorn>=0.27.0",
     "redis>=5.0.1",
     "python-multipart>=0.0.26",
-    "python-jose[cryptography]>=3.4.0",
+    "PyJWT[crypto]>=2.10.1",
     "passlib[bcrypt]==1.7.4",
     "bcrypt<4.0.0",
     "email-validator>=2.0.0",

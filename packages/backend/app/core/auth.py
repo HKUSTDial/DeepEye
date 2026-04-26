@@ -7,7 +7,8 @@ import secrets
 import uuid
 from typing import Any, Literal
 
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -88,7 +89,7 @@ def verify_token(
             algorithms=[ALGORITHM],
             options={"verify_exp": not allow_expired},
         )
-    except JWTError as e:
+    except PyJWTError as e:
         raise ValueError(f"Invalid token: {str(e)}") from e
 
     if expected_type:
