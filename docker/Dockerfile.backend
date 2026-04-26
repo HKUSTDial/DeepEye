@@ -1,5 +1,5 @@
-# 使用国内镜像，避免 pull docker.io 超时；可改为 python:3.11-slim（需能访问 Docker Hub）
-FROM docker.m.daocloud.io/library/python:3.11-slim
+# 使用国内镜像，避免 pull docker.io 超时；可改为 python:3.14-slim（需能访问 Docker Hub）
+FROM docker.m.daocloud.io/library/python:3.14-slim
 
 ARG DEBIAN_MIRROR=mirrors.tuna.tsinghua.edu.cn
 ARG PYPI_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
