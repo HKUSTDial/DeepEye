@@ -148,7 +148,7 @@ export function WorkflowSidebar({
                       whileTap={{ scale: 0.98 }}
                       onClick={() => onAddNode(type)}
                       draggable
-                      onDragStart={(event) => handleDragStart(event, type)}
+                      onDragStartCapture={(event) => handleDragStart(event, type)}
                       className="workflow-node-palette-item"
                     >
                       <Icon className="workflow-node-palette-icon-small" />
