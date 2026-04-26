@@ -7,7 +7,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.workflow_events import build_workflow_event_data, extract_workflow_artifacts
+from app.workflow.events import build_workflow_event_data, extract_workflow_artifacts
 
 
 def test_build_workflow_event_data_includes_standard_fields():

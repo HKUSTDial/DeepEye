@@ -61,7 +61,7 @@ class ReActAgent(BaseAgent):
         response = await self._bound_model.ainvoke(messages, config=config)
         return {"messages": [response]}
 
-    def _should_continue(self, state: AgentState) -> str:
+    async def _should_continue(self, state: AgentState) -> str:
         last_message = state["messages"][-1]
         return "continue" if last_message.tool_calls else "end"
 

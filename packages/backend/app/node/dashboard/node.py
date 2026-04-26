@@ -27,7 +27,7 @@ from app.node.dashboard.nl2dashboard.design import DashboardDesigner
 from app.node.dashboard.nl2dashboard.engineering import DashboardEngineer
 from app.node.dashboard.nl2dashboard.llm_compat import LLMClient
 from app.core.config import settings
-from app.services.workflow_events import build_workflow_artifact, publish_workflow_event_sync
+from app.workflow.events import build_workflow_artifact, publish_workflow_event_sync
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class NL2DashboardHandler:
                 
                 temp_loop.run_until_complete(_task())
                 temp_loop.close()
-            except:
+            except Exception:
                 pass
 
         if sync:
@@ -88,7 +88,7 @@ class NL2DashboardHandler:
                     phase,
                     payload or {},
                 )
-            except:
+            except Exception:
                 pass
 
         if sync:
@@ -298,7 +298,7 @@ class NL2DashboardHandler:
             
             # 5. Sync entire results folder to sandbox
             if self.sandbox:
-                print(f"[*] Moving generation results to sandbox workspace...")
+                print("[*] Moving generation results to sandbox workspace...")
                 # self._emit_log("Synchronizing results to the sandbox workspace...")
                 # Compress local directory
                 tar_stream = io.BytesIO()
@@ -314,7 +314,7 @@ class NL2DashboardHandler:
                     self.sandbox.container.exec_run(f"mkdir -p {sandbox_base}")
                     self.sandbox.container.put_archive(sandbox_base, tar_stream)
                 else:
-                    print(f"[ERROR] No valid sandbox container available for put_archive")
+                    print("[ERROR] No valid sandbox container available for put_archive")
                 
                 final_sandbox_path = f"{sandbox_base}/{sandbox_folder_name}"
                 print(f"[✓] Synchronization successful, sandbox path: {final_sandbox_path}")

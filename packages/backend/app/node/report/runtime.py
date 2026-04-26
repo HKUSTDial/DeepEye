@@ -15,7 +15,7 @@ from pathlib import Path
 
 from app.core.config import get_report_session_root, settings
 from app.sandbox.manager import SandboxManager
-from app.services.workflow_events import build_workflow_artifact, publish_workflow_event_sync
+from app.workflow.events import build_workflow_artifact, publish_workflow_event_sync
 
 from .report_module.pipeline import AutoReportPipeline
 

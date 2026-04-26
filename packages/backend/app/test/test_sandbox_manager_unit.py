@@ -12,6 +12,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.sandbox import manager as manager_module
+from app.sandbox import control_plane as control_plane_module
 from app.sandbox.manager import SandboxManager
 
 
@@ -21,7 +22,7 @@ def test_sandbox_manager_does_not_initialize_docker_client_until_needed(monkeypa
     def _raise_if_called():
         raise AssertionError("docker.from_env should be lazy")
 
-    monkeypatch.setattr(manager_module.docker, "from_env", _raise_if_called)
+    monkeypatch.setattr(control_plane_module.docker, "from_env", _raise_if_called)
 
     manager = SandboxManager()
 

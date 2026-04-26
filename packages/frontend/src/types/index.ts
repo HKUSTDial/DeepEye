@@ -143,8 +143,10 @@ export interface WorkflowArtifactPreview {
   [key: string]: unknown
 }
 
+export type WorkflowArtifactStatus = 'pending' | 'running' | 'ready' | 'failed' | 'expired'
+
 export interface WorkflowArtifactFile {
-  name: string
+  name?: string
   path?: string
   url?: string
   role?: string
@@ -154,7 +156,7 @@ export interface WorkflowArtifactFile {
 
 export interface WorkflowArtifactPayload {
   kind: string
-  status?: string
+  status?: WorkflowArtifactStatus
   title?: string
   summary?: string
   node_id?: string

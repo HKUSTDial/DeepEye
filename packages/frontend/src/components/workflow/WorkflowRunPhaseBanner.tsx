@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
 
-import type { WorkflowRunPhaseState } from '../../utils/workflowRunPhase'
+import type { WorkflowRunPhaseState } from '../../features/workflow/runPhase'
 import { useLocale } from '../../locale'
 
 type WorkflowRunPhaseBannerProps = {

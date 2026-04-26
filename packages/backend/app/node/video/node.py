@@ -19,7 +19,7 @@ from app.services.workflow_file_service import (
     get_progress_publisher_by_workflow_id,
     get_session_id_by_workflow_id,
 )
-from app.services.workflow_events import build_workflow_artifact, publish_workflow_event
+from app.workflow.events import build_workflow_artifact, publish_workflow_event
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.runtime import ExecutionContext
@@ -432,7 +432,7 @@ class VideoGeneratorHandler:
                 else:
                     # 目录存在但没有文件，说明脚本执行失败但没有正确返回错误码
                     logger.warning(f"Output directory exists but no TSX files found: {video_output_dir}")
-                    logger.warning(f"This usually means the render script failed silently. Check stdout/stderr above.")
+                    logger.warning("This usually means the render script failed silently. Check stdout/stderr above.")
                     # 返回失败状态，包含 stdout/stderr 信息用于调试
                     error_msg = "No TSX files generated. Render script may have failed silently."
                     if result.stdout:

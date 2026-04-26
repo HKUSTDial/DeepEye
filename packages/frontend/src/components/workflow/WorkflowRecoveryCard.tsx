@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type {
   WorkflowRecoveryAction,
   WorkflowRecoveryState,
-} from '../../utils/workflowRecovery'
+} from '../../features/workflow/recovery'
 
 interface WorkflowRecoveryCardProps {
   recovery: WorkflowRecoveryState

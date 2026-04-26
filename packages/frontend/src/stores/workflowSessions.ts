@@ -4,8 +4,8 @@ import type {
   WorkflowRun,
   WorkspaceState,
 } from '../types'
-import type { WorkflowRunPhaseState } from '../utils/workflowRunPhase'
-import { deriveRunPhaseFromSnapshot } from '../utils/workflowRunPhase'
+import type { WorkflowRunPhaseState } from '../features/workflow/runPhase'
+import { deriveRunPhaseFromSnapshot } from '../features/workflow/runPhase'
 import {
   appendCappedLogEntry,
   artifactKey,

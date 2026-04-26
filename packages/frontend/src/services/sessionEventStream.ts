@@ -7,15 +7,13 @@ import {
 import { useReportStore } from '../stores/report'
 import { useRightPanelStore } from '../stores/rightPanel'
 import { useWorkflowSessionsStore } from '../stores/workflowSessions'
-import { getDashboardProgressStage, isDashboardProgressMessage } from '../utils/dashboardProgress'
-import type { WorkflowArtifactPayload } from '../types'
 import {
   buildWorkflowRunFromEvent,
   getWorkflowArtifacts,
   getWorkflowOutputs,
   matchesTrackedWorkflowEvent,
   parseWorkflowEvent,
-} from '../utils/workflowEvents'
+} from '../features/workflow/events'
 import {
   createArtifactPhase,
   createConnectionLostPhase,
@@ -25,7 +23,9 @@ import {
   createRunCompletionPhase,
   createRunStartPhase,
   createTokenPhase,
-} from '../utils/workflowRunPhase'
+} from '../features/workflow/runPhase'
+import { getDashboardProgressStage, isDashboardProgressMessage } from '../utils/dashboardProgress'
+import type { WorkflowArtifactPayload } from '../types'
 
 type ErrorListener = (error: string | null) => void
 type WorkflowHandleResult = 'handled' | 'ignored' | 'unparsed'

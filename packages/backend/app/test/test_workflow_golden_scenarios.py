@@ -333,6 +333,11 @@ def test_golden_sql_to_dashboard_workflow(tmp_path, monkeypatch) -> None:
         monkeypatch.setattr("app.node.dashboard.node.DashboardDesigner", _DummyDesigner)
         monkeypatch.setattr("app.node.dashboard.node.DashboardEngineer", _DummyEngineer)
         monkeypatch.setattr("app.node.dashboard.node.LLMClient", lambda api_key=None, base_url=None: object())
+        monkeypatch.setattr("app.node.dashboard.node.NL2DashboardHandler._emit_log", lambda self, *args, **kwargs: None)
+        monkeypatch.setattr(
+            "app.node.dashboard.node.NL2DashboardHandler._emit_workflow_event",
+            lambda self, *args, **kwargs: None,
+        )
         monkeypatch.setattr("app.services.dashboard_deploy_service.dashboard_deployer.deploy", _fake_dashboard_deploy)
 
         engine = build_engine(db, user.id, sandbox=sandbox, session_id=sandbox.session_id)

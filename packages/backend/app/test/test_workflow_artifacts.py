@@ -8,7 +8,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.schemas.workflow_artifact import WorkflowArtifactPayload
-from app.services.workflow_artifacts import normalize_workflow_artifact
+from app.workflow.artifacts import normalize_workflow_artifact
 
 
 def test_normalize_report_artifact_adds_protocol_fields_without_dropping_legacy_fields():

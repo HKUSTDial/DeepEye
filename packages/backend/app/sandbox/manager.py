@@ -5,7 +5,6 @@ import shlex
 from collections import defaultdict
 from typing import Any, Dict, List
 
-import docker
 from docker.errors import NotFound
 
 from deepeye.sandbox import CommandResult
@@ -13,6 +12,7 @@ from deepeye.utils.logger import logger
 from app.core.config import settings
 from app.sandbox.activity import ActivityTracker
 from app.sandbox.cleanup import cleanup_idle_session, collect_cleanup_sessions
+from app.sandbox.control_plane import build_remote_sandbox, get_local_docker_client, use_remote_control
 from app.sandbox.datasource_sync import (
     DATASOURCE_SYNC_MANIFEST_PATH,
     build_datasource_manifest_entry,
@@ -94,19 +94,15 @@ class SandboxManager:
         self._initialized = True
 
     def _use_remote_control(self) -> bool:
-        return settings.DOCKER_CONTROL_MODE == "remote"
+        return use_remote_control()
 
     def _get_docker_client(self):
         """Create the Docker client only when local sandbox operations need it."""
-        if self._use_remote_control():
-            return None
-        if self._docker is None:
-            self._docker = docker.from_env()
+        self._docker = get_local_docker_client(self._docker)
         return self._docker
 
     def _build_remote_sandbox(self, payload: dict[str, Any]) -> DockerSandbox:
-        sandbox = DockerSandbox.from_remote_state(payload)
-        return sandbox
+        return build_remote_sandbox(payload)
 
     async def get_or_create_sandbox(
         self,

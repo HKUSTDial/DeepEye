@@ -2,10 +2,14 @@
 
 import json
 import os
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
+from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("LLM_API_KEY", "test-key")
@@ -29,9 +33,36 @@ from deepeye.agents.factory import AgentFactory
 from deepeye.tools.base import tool
 
 
-class ToolCallingFakeChatModel(GenericFakeChatModel):
+class ToolCallingFakeChatModel(BaseChatModel):
+    messages: Iterator[AIMessage | str]
+
     def bind_tools(self, tools, *, tool_choice=None, **kwargs):
         return self
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        del messages, stop, run_manager, kwargs
+        message = next(self.messages)
+        generated = AIMessage(content=message) if isinstance(message, str) else message
+        return ChatResult(generations=[ChatGeneration(message=generated)])
+
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        return self._generate(messages, stop=stop, run_manager=None, **kwargs)
+
+    @property
+    def _llm_type(self) -> str:
+        return "tool-calling-fake-chat-model"
 
 
 @pytest.mark.anyio

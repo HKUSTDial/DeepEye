@@ -16,8 +16,9 @@ from app.repositories import (
     WorkflowDraftRepository,
     WorkflowRunRepository,
 )
-from app.services.workflow_artifacts import normalize_workflow_artifact
 from app.services.workflow_datasets import compact_value_for_transport, compact_workflow_result
+from app.workflow.artifacts import normalize_workflow_artifact
+from app.workflow.lifecycle import next_turn_status_after_run_finalized
 
 
 TrackedRecord = TypeVar("TrackedRecord")
@@ -292,8 +293,9 @@ def finalize_tracked_workflow_run(
     saved = WorkflowRunRepository(db).save(run)
     if saved.turn_id:
         turn = ChatTurnRepository(db).get(saved.turn_id)
-        if turn and turn.status != "failed":
-            update_chat_turn(db, turn, status="summarizing")
+        next_turn_status = next_turn_status_after_run_finalized(status, getattr(turn, "status", None))
+        if turn and next_turn_status:
+            update_chat_turn(db, turn, status=next_turn_status)
     return saved
 
 

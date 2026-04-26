@@ -11,7 +11,7 @@ from langchain_core.callbacks import AsyncCallbackHandler
 from app.infra import EventBus
 from app.repositories import MessageRepository
 from app.schemas import AgentEvent, AgentEventType, AssistantMessage, Message, ToolStep
-from app.services.workflow_events import build_workflow_event_data
+from app.workflow.events import build_workflow_event_data
 from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft
 from app.tasks.db import open_task_session
 from deepeye.utils.logger import logger
@@ -34,7 +34,7 @@ def _to_single_object(payload: str | dict | Any) -> dict | None:
         # LangChain sometimes passes non-string types (e.g., dict objects directly)
         # Try to handle them gracefully
         if hasattr(payload, '__dict__'):
-            logger.debug(f"[_to_single_object] converting object with __dict__ to dict")
+            logger.debug("[_to_single_object] converting object with __dict__ to dict")
             return vars(payload)
         logger.warning(f"[_to_single_object] unexpected payload type: {type(payload)}, attempting str conversion")
         try:
@@ -49,7 +49,7 @@ def _to_single_object(payload: str | dict | Any) -> dict | None:
         logger.debug(f"[_to_single_object] json5 parse failed: {str(e1)[:100]}")
         try:
             return json.loads(payload)
-        except Exception as e2:
+        except Exception:
             # Fallback for Python-style dict strings (single quotes)
             try:
                 val = ast.literal_eval(payload)

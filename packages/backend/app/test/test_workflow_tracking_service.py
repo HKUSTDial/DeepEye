@@ -146,6 +146,35 @@ def test_message_append_keeps_primary_key_accessible_after_session_close():
     assert message_id is not None
 
 
+def test_failed_workflow_run_does_not_move_turn_to_summarizing() -> None:
+    db = _build_test_db()
+    try:
+        user = _create_user(db, email="failed-run@example.com")
+        session = _create_session(db, user)
+        turn = create_chat_turn(db, session.id, user.id, "Run a fragile workflow")
+        run = create_tracked_workflow_run(
+            db,
+            user_id=user.id,
+            session_id=session.id,
+            turn_id=turn.id,
+        )
+
+        finalized = finalize_tracked_workflow_run(
+            db,
+            run,
+            status="failed",
+            result={"status": "failed"},
+            error="workflow failed",
+            artifacts=[],
+        )
+        state = build_workspace_state_for_turn(db, turn.id)
+
+        assert finalized.status == "failed"
+        assert state["turn"].status == "running"
+    finally:
+        db.close()
+
+
 def test_fail_chat_turn_record_persists_assistant_message_id(monkeypatch) -> None:
     db = _build_test_db()
     try:

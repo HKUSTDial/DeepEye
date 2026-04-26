@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildWorkflowRecoveryState } from './workflowRecovery'
+import { buildWorkflowRecoveryState } from './recovery'
 
 describe('workflowRecovery', () => {
   it('suggests datasource review for datasource execution failures', () => {
