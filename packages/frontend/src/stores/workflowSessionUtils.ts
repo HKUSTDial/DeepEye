@@ -56,9 +56,17 @@ export const deriveRunOutput = (run: WorkflowRun | null) => {
 export const deriveVideoPreviewUrl = (artifacts: WorkflowArtifact[]) => {
   const videoArtifact = [...artifacts]
     .reverse()
-    .find((artifact) => artifact.kind === 'video' && typeof artifact.payload?.video_url === 'string')
-  if (videoArtifact && typeof videoArtifact.payload.video_url === 'string') {
-    return videoArtifact.payload.video_url
+    .find((artifact) => artifact.kind === 'video' && getArtifactPreviewUrl(artifact.payload))
+  return videoArtifact ? getArtifactPreviewUrl(videoArtifact.payload) : null
+}
+
+const getArtifactPreviewUrl = (payload: WorkflowArtifactPayload) => {
+  const preview = asObjectRecord(payload.preview)
+  if (typeof preview?.url === 'string') {
+    return preview.url
+  }
+  if (typeof payload.video_url === 'string') {
+    return payload.video_url
   }
   return null
 }

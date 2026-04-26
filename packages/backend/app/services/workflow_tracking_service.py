@@ -16,6 +16,7 @@ from app.repositories import (
     WorkflowDraftRepository,
     WorkflowRunRepository,
 )
+from app.services.workflow_artifacts import normalize_workflow_artifact
 from app.services.workflow_datasets import compact_value_for_transport, compact_workflow_result
 
 
@@ -305,13 +306,14 @@ def replace_workflow_artifacts(
     repo.delete_by_run(run.id)
     created: list[WorkflowArtifact] = []
     for artifact in artifacts:
+        normalized_artifact = normalize_workflow_artifact(artifact.get("kind"), artifact)
         record = WorkflowArtifact(
             run_id=run.id,
             session_id=run.session_id,
             turn_id=run.turn_id,
             draft_id=run.draft_id,
-            kind=str(artifact.get("kind") or "artifact"),
-            payload=artifact,
+            kind=str(normalized_artifact.get("kind") or "artifact"),
+            payload=normalized_artifact,
         )
         created.append(repo.save(record))
     return created

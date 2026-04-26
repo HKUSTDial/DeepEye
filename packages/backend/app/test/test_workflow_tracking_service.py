@@ -123,6 +123,12 @@ def test_workflow_tracking_persists_turn_draft_run_artifacts_and_workspace_state
         assert state["run"].draft_id == second_draft.id
         assert len(state["artifacts"]) == 1
         assert state["artifacts"][0].payload["kind"] == "report"
+        assert state["artifacts"][0].payload["status"] == "ready"
+        assert state["artifacts"][0].payload["preview"] == {
+            "mime_type": "text/html",
+            "path": "/workspace/analysis_report.html",
+            "type": "file",
+        }
     finally:
         db.close()
 
@@ -205,6 +211,10 @@ def test_workspace_state_falls_back_to_latest_session_run_without_turn():
         assert state["run"].id == run.id
         assert len(state["artifacts"]) == 1
         assert state["artifacts"][0].payload["kind"] == "dashboard"
+        assert state["artifacts"][0].payload["preview"] == {
+            "type": "iframe",
+            "url": "http://localhost:3000/dashboard/manual",
+        }
     finally:
         db.close()
 
@@ -252,6 +262,7 @@ def test_workspace_state_for_turn_uses_turn_scoped_run_and_artifacts():
         assert state["run"].id == run.id
         assert len(state["artifacts"]) == 1
         assert state["artifacts"][0].payload["kind"] == "dashboard"
+        assert state["artifacts"][0].payload["payload"]["dashboard_url"] == "http://localhost:3000/dashboard/demo"
     finally:
         db.close()
 

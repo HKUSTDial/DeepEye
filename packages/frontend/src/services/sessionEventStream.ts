@@ -191,7 +191,15 @@ function handleWorkflowArtifactEvent(
 
   if (kind === 'video') {
     const taskId = typeof artifact?.task_id === 'string' ? artifact.task_id : null
-    const videoUrl = typeof artifact?.video_url === 'string' ? artifact.video_url : null
+    const preview = typeof artifact?.preview === 'object' && artifact.preview
+      ? artifact.preview as Record<string, unknown>
+      : null
+    const videoUrl =
+      typeof preview?.url === 'string'
+        ? preview.url
+        : typeof artifact?.video_url === 'string'
+          ? artifact.video_url
+          : null
     if (videoUrl) {
       useWorkflowSessionsStore.getState().setVideoPreviewUrl(sessionId, videoUrl)
     }

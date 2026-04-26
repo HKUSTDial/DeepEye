@@ -51,5 +51,13 @@ def test_extract_workflow_artifacts_from_outputs():
 
     assert [artifact["kind"] for artifact in artifacts] == ["report", "dashboard", "video"]
     assert artifacts[0]["report_filename"] == "analysis_report.html"
+    assert artifacts[0]["status"] == "ready"
+    assert artifacts[0]["preview"]["type"] == "html"
+    assert artifacts[0]["payload"]["report_path"] == "/workspace/analysis_report.html"
     assert artifacts[1]["dashboard_url"] == "/dashboards/demo/"
+    assert artifacts[1]["preview"] == {"type": "iframe", "url": "/dashboards/demo/"}
     assert artifacts[2]["task_id"] == "20260306_120000"
+    assert artifacts[2]["preview"] == {
+        "type": "iframe",
+        "url": "/video-previews/deepeye-video-20260306_120000/",
+    }

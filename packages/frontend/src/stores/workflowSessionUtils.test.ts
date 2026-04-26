@@ -51,7 +51,12 @@ describe('workflowSessionUtils', () => {
         id: 'artifact-3',
         run_id: 'run-2',
         kind: 'video',
-        payload: { kind: 'video', node_id: 'node-3', video_url: 'https://example.com/new' },
+        payload: {
+          kind: 'video',
+          node_id: 'node-3',
+          preview: { type: 'iframe', url: 'https://example.com/new' },
+          video_url: 'https://example.com/fallback',
+        },
         created_at: '2026-03-31T00:00:02Z',
       },
     ])

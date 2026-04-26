@@ -132,8 +132,35 @@ export interface WorkflowDraft {
   updated_at: string
 }
 
+export interface WorkflowArtifactPreview {
+  type: string
+  url?: string
+  path?: string
+  content_key?: string
+  mime_type?: string
+  rows?: unknown[]
+  columns?: string[]
+  [key: string]: unknown
+}
+
+export interface WorkflowArtifactFile {
+  name: string
+  path?: string
+  url?: string
+  role?: string
+  mime_type?: string
+  [key: string]: unknown
+}
+
 export interface WorkflowArtifactPayload {
   kind: string
+  status?: string
+  title?: string
+  summary?: string
+  node_id?: string
+  preview?: WorkflowArtifactPreview
+  files?: WorkflowArtifactFile[]
+  payload?: Record<string, unknown>
   [key: string]: unknown
 }
 
