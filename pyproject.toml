@@ -18,7 +18,7 @@ members = ["packages/core", "packages/backend"]
 dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.23.0",
-    "ruff>=0.15.4",
+    "ruff>=0.15.12",
 ]
 
 [tool.pytest.ini_options]
