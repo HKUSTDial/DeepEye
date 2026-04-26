@@ -112,7 +112,7 @@ jobs:
           enable-cache: true
 
       - name: Export Python requirements
-        run: uv export --all-packages --all-extras --all-groups --no-hashes --no-emit-workspace --frozen --output-file /tmp/deepeye-requirements.txt
+        run: uv export --all-packages --all-extras --all-groups --no-hashes --no-emit-workspace --frozen --output-file /tmp/deepeye-requirements.txt > /dev/null
 
       - name: Audit Python dependencies
         run: uv run --with pip-audit pip-audit -r /tmp/deepeye-requirements.txt --format columns --progress-spinner off
@@ -133,3 +133,18 @@ jobs:
       - name: Audit video preview dependencies
         working-directory: docker/video-preview-app
         run: npm audit --registry=https://registry.npmjs.org --audit-level=high
+
+  compose:
+    name: Compose Config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prepare example environment
+        run: cp env.example .env
+
+      - name: Validate compose config
+        run: scripts/smoke-compose.sh

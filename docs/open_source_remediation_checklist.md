@@ -43,7 +43,7 @@
   - 验收: 去掉占位作者、模板文案、错误示例
 - [ ] 区分开发配置与生产配置
   - 验收: `.env.example` 能表达安全默认值与必要开关
-- [ ] 补开源运行/安全说明
+- [x] 补开源运行/安全说明
   - 验收: 明确哪些能力需要 Docker/MinIO/Postgres/Redis，哪些属于高权限执行
 
 ## Execution Order
@@ -63,3 +63,5 @@
 - [x] 收紧 dashboard/video 预览面的默认浏览器与 CORS 暴露面
 - [x] 移除工作区到 legacy `Workflow` 的上传桥，并隐藏侧边栏旧入口
 - [x] 下线公开 `/workflows` 入口，收敛到 session-scoped workspace 与单一会话事件流
+- [x] 增加一键本地质量检查入口、Compose 配置校验和 CodeQL 工作流
+- [x] 补充安全模型、quickstart、artifact 协议 RFC、重构路线和发布流程文档

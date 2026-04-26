@@ -4,7 +4,11 @@ This directory collects architecture notes, operational guidance, UI references,
 
 ## Start Here
 
+- [Local quickstart](quickstart_local.md)
 - [Open-source remediation checklist](open_source_remediation_checklist.md)
+- [Security model](security_model.md)
+- [Release process](release_process.md)
+- [Maintainer guide](maintainer_guide.md)
 - [Dependency management](dependency_management.md)
 - [Agent module](agent_module.md)
 - [Workflow node system](workflow_node_system.md)
@@ -14,6 +18,8 @@ This directory collects architecture notes, operational guidance, UI references,
 ## Architecture RFCs
 
 - [Workflow-native agent refactor](rfcs/workflow_native_agent_refactor.md)
+- [Artifact protocol](rfcs/artifact_protocol.md)
+- [Maintainability refactor plan](rfcs/maintainability_refactor_plan.md)
 
 ## UI References
 

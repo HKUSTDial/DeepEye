@@ -101,6 +101,24 @@ Use `docker compose down -v` only when you intentionally want to remove local vo
 
 ## Development
 
+Run the full local quality gate:
+
+```bash
+make check
+```
+
+Install dependencies before checking:
+
+```bash
+make check-install
+```
+
+Validate Docker Compose configuration:
+
+```bash
+make compose-config
+```
+
 ### Backend and Core
 
 Run the default backend/core test set:
@@ -154,11 +172,16 @@ Before exposing DeepEye beyond a trusted local environment:
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Local quickstart](docs/quickstart_local.md)
+- [Security model](docs/security_model.md)
 - [Backend README](packages/backend/README.md)
 - [Frontend README](packages/frontend/README.md)
 - [Core README](packages/core/README.md)
 - [Workflow-native agent refactor RFC](docs/rfcs/workflow_native_agent_refactor.md)
+- [Artifact protocol RFC](docs/rfcs/artifact_protocol.md)
+- [Maintainability refactor plan](docs/rfcs/maintainability_refactor_plan.md)
 - [Open-source remediation checklist](docs/open_source_remediation_checklist.md)
+- [Release process](docs/release_process.md)
 
 ## Community And Governance
 
@@ -168,6 +191,7 @@ Before exposing DeepEye beyond a trusted local environment:
 - [Roadmap](ROADMAP.md)
 - [Changelog](CHANGELOG.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
+- [Maintainer guide](docs/maintainer_guide.md)
 
 ## License
 

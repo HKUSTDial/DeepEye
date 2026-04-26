@@ -2,6 +2,8 @@
 
 DeepEye orchestrates LLM-assisted workflows, uploaded data, database connections, generated artifacts, and Docker-backed execution runtimes. Treat the current repository as an active development preview unless you have reviewed and hardened it for your own deployment environment.
 
+For a component-level trust boundary overview, see [docs/security_model.md](docs/security_model.md).
+
 ## Supported Versions
 
 Security fixes are currently targeted at the default branch.
@@ -45,3 +47,10 @@ Before production-like use:
 - restrict outbound network access for generated-code workloads where possible
 - enable audit logging and container cleanup policies
 - review dependency and container image vulnerability scans
+
+Recommended local checks:
+
+```bash
+make check
+make security-scan
+```

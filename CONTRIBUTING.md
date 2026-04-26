@@ -40,6 +40,24 @@ npm test -- --maxWorkers=1 --no-file-parallelism
 npm run build
 ```
 
+For the full local CI equivalent:
+
+```bash
+make check
+```
+
+Install dependencies and then run all checks:
+
+```bash
+make check-install
+```
+
+Validate Docker Compose configuration:
+
+```bash
+make compose-config
+```
+
 ## Project Boundaries
 
 - `packages/core` contains reusable agent, datasource, sandbox protocol, and workflow engine primitives.
@@ -52,6 +70,7 @@ npm run build
 - Add or update tests for behavioral changes.
 - Update docs when setup, architecture, API behavior, or security posture changes.
 - Run the relevant checks locally before opening a PR.
+- Use `make check` for broad changes and mention any skipped checks.
 - Keep generated files and local artifacts out of commits.
 - Explain user-visible behavior and migration impact in the PR description.
 

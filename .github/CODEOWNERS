@@ -1,0 +1,18 @@
+# Default ownership for public preview maintenance.
+* @BugMaker-Boyan
+
+# Security-sensitive runtime and backend areas.
+/packages/backend/ @BugMaker-Boyan
+/docker/ @BugMaker-Boyan
+/docker-compose.yml @BugMaker-Boyan
+/SECURITY.md @BugMaker-Boyan
+
+# Shared workflow primitives.
+/packages/core/ @BugMaker-Boyan
+
+# Frontend workspace.
+/packages/frontend/ @BugMaker-Boyan
+
+# Project governance and CI.
+/.github/ @BugMaker-Boyan
+/docs/ @BugMaker-Boyan
