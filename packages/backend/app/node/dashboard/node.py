@@ -123,47 +123,58 @@ class NL2DashboardHandler:
         """Ensure sandbox reference is up-to-date and available"""
         if not self.sandbox:
             return False
-            
-        try:
-            if self.sandbox.container:
-                self.sandbox.container.reload()
-                if self.sandbox.container.status == "running":
-                    return True
-                else:
-                    self.sandbox.container.start()
-                    return True
-        except Exception:
-            pass
-            
-        # Try to refresh (rediscover container via session_id)
-        if getattr(self.sandbox, 'session_id', None):
+
+        container = getattr(self.sandbox, "container", None)
+        if container is not None:
             try:
-                from app.sandbox.manager import sandbox_manager
-                import asyncio
-                import threading
-                from concurrent.futures import Future
-                
-                # Always run async logic in separate thread to avoid loop conflicts
-                def _get_sb_thread(f, sid):
-                    try:
-                        new_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(new_loop)
-                        res = new_loop.run_until_complete(sandbox_manager.get_or_create_sandbox(sid))
-                        f.set_result(res)
-                        new_loop.close()
-                    except Exception as te:
-                        f.set_exception(te)
-                
-                fut = Future()
-                t = threading.Thread(target=_get_sb_thread, args=(fut, self.sandbox.session_id))
-                t.start()
-                self.sandbox = fut.result(timeout=30)
-                
-                print(f"[INFO] Sandbox refreshed: {self.sandbox.container_name}")
-                return True
-            except Exception as e:
-                print(f"[ERROR] Failed to refresh sandbox: {e}")
+                reload_container = getattr(container, "reload", None)
+                if callable(reload_container):
+                    reload_container()
+
+                status = getattr(container, "status", None)
+                if status == "running":
+                    return True
+                if status is None and callable(getattr(container, "exec_run", None)):
+                    return True
+
+                start_container = getattr(container, "start", None)
+                if callable(start_container):
+                    start_container()
+                    return True
+            except Exception:
+                pass
+
+        try:
+            session_id = getattr(self.sandbox, 'session_id', None)
+            if not session_id:
                 return False
+
+            from app.sandbox.manager import sandbox_manager
+            from concurrent.futures import Future
+
+            # Always run async refresh logic in a daemon thread to avoid loop conflicts.
+            def _get_sb_thread(f, sid):
+                new_loop = asyncio.new_event_loop()
+                try:
+                    asyncio.set_event_loop(new_loop)
+                    res = new_loop.run_until_complete(sandbox_manager.get_or_create_sandbox(sid))
+                    f.set_result(res)
+                except Exception as te:
+                    f.set_exception(te)
+                finally:
+                    asyncio.set_event_loop(None)
+                    new_loop.close()
+
+            fut = Future()
+            t = threading.Thread(target=_get_sb_thread, args=(fut, session_id), daemon=True)
+            t.start()
+            self.sandbox = fut.result(timeout=30)
+
+            print(f"[INFO] Sandbox refreshed: {self.sandbox.container_name}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to refresh sandbox: {e}")
+            return False
         return False
 
     def _write_to_sandbox(self, path: str, content: str):
