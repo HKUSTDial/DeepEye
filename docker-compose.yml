@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     env_file:
       - .env
     environment:
@@ -43,7 +43,7 @@ services:
 
   # Global sales ops DB for heterogeneous workflow test (global_sales_workflow_sample)
   # global-ops-db:
-  #   image: postgres:15-alpine
+  #   image: postgres:18-alpine
   #   environment:
   #     - POSTGRES_USER=${GLOBAL_OPS_DB_USER}
   #     - POSTGRES_PASSWORD=${GLOBAL_OPS_DB_PASSWORD}
@@ -60,7 +60,7 @@ services:
 
   # 异构工作流手测样例数据库
   retail-ops-db:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     environment:
       - POSTGRES_USER=${RETAIL_OPS_DB_USER}
       - POSTGRES_PASSWORD=${RETAIL_OPS_DB_PASSWORD}
