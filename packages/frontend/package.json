@@ -24,7 +24,7 @@
     "read-excel-file": "^9.0.6",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
-    "remotion": "^4.0.451",
+    "remotion": "^4.0.452",
     "shiki": "^4.0.2",
     "zustand": "^5.0.12"
   },
