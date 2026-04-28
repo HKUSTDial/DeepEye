@@ -3,11 +3,11 @@
 [![CI](https://github.com/HKUSTDial/DeepEye/actions/workflows/pytest.yml/badge.svg)](https://github.com/HKUSTDial/DeepEye/actions/workflows/pytest.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
+DeepEye harnesses the reasoning capabilities of large language models to autonomously orchestrate complex data analysis workflows. It combines a chat workspace, workflow orchestration, sandboxed execution, and artifact rendering for analytical outputs such as reports, dashboards, and data videos.
+
 > **Project Status: Active Development Preview**
 >
 > DeepEye is being shared publicly while the codebase, documentation, tests, deployment workflow, and security hardening are still being actively improved. The repository is useful for local evaluation, collaboration, and understanding the architecture, but APIs, internal contracts, and setup details may continue to change as the project is refined.
-
-DeepEye is a workflow-native data agent system for multi-step analysis over uploaded files and live databases. It combines a chat workspace, workflow orchestration, sandboxed execution, and artifact rendering for analytical outputs such as reports, dashboards, and data videos.
 
 ## What DeepEye Does
 
