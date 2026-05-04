@@ -14,7 +14,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.workflow_run_events import WorkflowRunEventPublisher
+from app.workflow.services.run_events import WorkflowRunEventPublisher
 
 
 class FakeEventBus:

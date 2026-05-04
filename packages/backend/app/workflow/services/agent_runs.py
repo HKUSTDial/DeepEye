@@ -7,7 +7,7 @@ from typing import Any
 from app.db.session import SessionLocal
 from app.repositories import SessionRepository
 from app.services.workflow_file_service import service_run_workflow_draft, service_run_workflow_from_file
-from app.services.workflow_targets import resolve_workflow_target, save_workflow_draft
+from app.workflow.services.targets import resolve_workflow_target, save_workflow_draft
 from deepeye.utils.logger import logger
 
 

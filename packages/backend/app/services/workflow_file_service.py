@@ -10,12 +10,12 @@ from app.core.config import settings
 from app.sandbox import sandbox_manager
 from app.workflow.services.datasets import compact_workflow_outputs
 from app.services.workflow_engine import build_engine
-from app.services.workflow_run_preparation import (
+from app.workflow.services.run_preparation import (
     prepare_tracked_workflow_draft_run as prepare_tracked_workflow_draft_run,
     prepare_tracked_workflow_file_run as prepare_tracked_workflow_file_run,
     prepare_tracked_workflow_run,
 )
-from app.services.workflow_run_result import (
+from app.workflow.services.run_result import (
     build_tracking_refs,
     build_workflow_identity,
     collect_final_outputs,
@@ -24,7 +24,7 @@ from app.services.workflow_run_result import (
     summarize_failed_context,
     timestamp_utc,
 )
-from app.services.workflow_run_events import WorkflowRunEventPublisher
+from app.workflow.services.run_events import WorkflowRunEventPublisher
 from app.services.workflow_runtime_registry import (
     clear_workflow_runtime_state,
     get_progress_publisher as get_progress_publisher,
@@ -32,7 +32,7 @@ from app.services.workflow_runtime_registry import (
     get_session_id_by_workflow_id as get_session_id_by_workflow_id,
     register_workflow_progress,
 )
-from app.services.workflow_targets import resolve_workflow_target
+from app.workflow.services.targets import resolve_workflow_target
 from app.workflow.events import extract_workflow_artifacts
 from pydantic import ValidationError
 from deepeye.workflows.models import Graph, Workflow as CoreWorkflow

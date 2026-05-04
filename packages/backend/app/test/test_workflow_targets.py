@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, User
-from app.services.workflow_targets import resolve_workflow_target, save_workflow_draft
+from app.workflow.services.targets import resolve_workflow_target, save_workflow_draft
 
 
 def _build_test_db():

@@ -16,7 +16,7 @@ from app.services.workflow_file_service import (
     prepare_tracked_workflow_draft_run,
     prepare_tracked_workflow_file_run,
 )
-from app.services.workflow_tracking_service import create_chat_turn
+from app.workflow.services.tracking import create_chat_turn
 from deepeye.workflows.models import Graph, Node
 from deepeye.workflows.runtime import ExecutionContext, NodeRun
 

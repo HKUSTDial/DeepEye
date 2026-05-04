@@ -33,8 +33,8 @@ from app.services.workflow_file_service import (
     prepare_tracked_workflow_draft_run,
     write_workflow_definition_to_file,
 )
-from app.services.workflow_targets import save_workflow_draft
-from app.services.workflow_tracking_service import build_workspace_state
+from app.workflow.services.targets import save_workflow_draft
+from app.workflow.services.tracking import build_workspace_state
 from app.tasks.workflow_tasks import run_workflow_draft_task
 from deepeye.utils.logger import logger
 

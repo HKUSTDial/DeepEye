@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models import Base, ChatSession, User
 from app.repositories import MessageRepository
 from app.schemas import AssistantMessage, UserMessage
-from app.services.workflow_tracking_service import (
+from app.workflow.services.tracking import (
     build_workspace_state,
     build_workspace_state_for_turn,
     create_chat_turn,
@@ -186,7 +186,7 @@ def test_fail_chat_turn_record_persists_assistant_message_id(monkeypatch) -> Non
             AssistantMessage(content="Workflow planning failed."),
         )
         assistant_message_id = assistant_message.id
-        monkeypatch.setattr("app.services.workflow_tracking_service.SessionLocal", lambda: db)
+        monkeypatch.setattr("app.workflow.services.tracking.SessionLocal", lambda: db)
         failed = fail_chat_turn_record(turn.id, "workflow failed", assistant_message_id=assistant_message_id)
 
         assert failed is not None

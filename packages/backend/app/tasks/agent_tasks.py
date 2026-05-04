@@ -14,7 +14,7 @@ from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, San
 from app.services.workflow_engine import build_registry
 from app.services.agent_prompts import build_supervisor_prompt
 from app.workflow.prompts import build_workflow_prompt
-from app.services.workflow_tracking_service import (
+from app.workflow.services.tracking import (
     complete_chat_turn_record,
     create_chat_turn_record,
     fail_chat_turn_record,

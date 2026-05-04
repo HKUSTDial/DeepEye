@@ -15,7 +15,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, User, WorkflowDraft
 from app.workflow.services import agent_runs as workflow_agent_runs
-from app.services.workflow_targets import save_workflow_draft
+from app.workflow.services.targets import save_workflow_draft
 
 
 def _build_test_session_local():

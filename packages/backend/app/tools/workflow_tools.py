@@ -18,7 +18,7 @@ from app.workflow.services.agent_runs import (
     run_agent_workflow_draft,
     run_agent_workflow_file,
 )
-from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
+from app.workflow.services.tracking import build_workspace_state, build_workspace_state_for_turn
 from app.workflow.repair.state import (
     _build_tool_failure,
     _guard_repair_limit,

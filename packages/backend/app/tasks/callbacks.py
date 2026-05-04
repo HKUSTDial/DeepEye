@@ -12,7 +12,7 @@ from app.infra import EventBus
 from app.repositories import MessageRepository
 from app.schemas import AgentEvent, AgentEventType, AssistantMessage, Message, ToolStep
 from app.workflow.events import build_workflow_event_data
-from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft
+from app.workflow.services.targets import normalize_workflow_path, save_workflow_draft
 from app.tasks.db import open_task_session
 from deepeye.utils.logger import logger
 

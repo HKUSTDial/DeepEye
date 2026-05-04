@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
+from app.workflow.services.tracking import build_workspace_state, build_workspace_state_for_turn
 from app.workflow.repair.state import _terminal_failure_reply
 from app.workflow.services.workspace_state import extract_final_answer, serialize_workspace_state
 from deepeye.utils.logger import logger

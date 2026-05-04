@@ -8,7 +8,7 @@ from typing import Any, Literal
 from app.db.session import SessionLocal
 from app.sandbox import sandbox_manager
 from app.services.workflow_file_service import write_workflow_definition_to_file
-from app.services.workflow_targets import normalize_workflow_path, resolve_workflow_target, save_workflow_draft
+from app.workflow.services.targets import normalize_workflow_path, resolve_workflow_target, save_workflow_draft
 
 
 @dataclass(frozen=True)
