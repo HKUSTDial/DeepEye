@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@babel/standalone": "^7.29.2",
+    "@babel/standalone": "^7.29.3",
     "@remotion/player": "^4.0.456",
     "d3": "^7.9.0",
     "framer-motion": "^12.38.0",
