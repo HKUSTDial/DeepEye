@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, User, WorkflowDraft
-from app.services import workflow_agent_drafts
+from app.workflow.services import agent_drafts as workflow_agent_drafts
 from app.services.workflow_targets import save_workflow_draft
 
 

@@ -6,12 +6,12 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.db.session import SessionLocal
 from app.services.agent_prompts import build_workflow_summary_prompt
-from app.services.workflow_agent_drafts import read_workflow_definition, save_agent_workflow_draft
-from app.services.workflow_agent_response import (
+from app.workflow.services.agent_drafts import read_workflow_definition, save_agent_workflow_draft
+from app.workflow.services.agent_response import (
     build_workflow_agent_response,
     serialize_workflow_agent_workspace_state,
 )
-from app.services.workflow_agent_runs import (
+from app.workflow.services.agent_runs import (
     WorkflowAgentRunOutcome,
     create_and_run_agent_workflow_draft,
     get_workflow_session,

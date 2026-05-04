@@ -7,7 +7,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.workflow_agent_response import build_workflow_agent_response
+from app.workflow.services.agent_response import build_workflow_agent_response
 
 
 def test_build_workflow_agent_response_replies_directly_when_final_answer_exists() -> None:
