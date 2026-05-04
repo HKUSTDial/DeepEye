@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 import pytest
 
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
@@ -7,7 +8,12 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.node.video.config.generator import LLMClient, calculate_retry_wait_time, should_retry_on_error
+from app.node.video.config.generator import (
+    LLMClient,
+    SimpleConfigGenerator,
+    calculate_retry_wait_time,
+    should_retry_on_error,
+)
 
 
 class _FakeLLMClient(LLMClient):
@@ -89,3 +95,38 @@ def test_call_with_json_mode_reports_debug_context_when_no_json_object_exists() 
     assert "Cannot parse JSON response" in message
     assert "model=test-model" in message
     assert "--- response_head ---" in message
+
+
+def test_accumulate_token_usage_adds_known_usage_fields() -> None:
+    generator = SimpleConfigGenerator("http://llm.test/v1", "test-key", "test-model")
+    totals = {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+
+    generator._accumulate_token_usage({"prompt_tokens": 1, "completion_tokens": 2}, totals)
+    generator._accumulate_token_usage({"total_tokens": 3}, totals)
+    generator._accumulate_token_usage({"prompt_tokens": 99}, None)
+
+    assert totals == {"prompt_tokens": 11, "completion_tokens": 22, "total_tokens": 33}
+
+
+def test_compare_numeric_value_handles_numeric_strings_and_invalid_values() -> None:
+    generator = SimpleConfigGenerator("http://llm.test/v1", "test-key", "test-model")
+
+    assert generator._compare_numeric_value("10.5", 10, ">") is True
+    assert generator._compare_numeric_value(10, 10, ">=") is True
+    assert generator._compare_numeric_value(9.9, 10, "<") is True
+    assert generator._compare_numeric_value(None, 10, ">") is False
+    assert generator._compare_numeric_value("not-a-number", 10, ">") is False
+    assert generator._compare_numeric_value(10, 10, "!=") is False
+
+
+def test_dataframe_helpers_handle_empty_and_missing_values() -> None:
+    generator = SimpleConfigGenerator("http://llm.test/v1", "test-key", "test-model")
+
+    assert generator._list_to_dataframe([]).empty is True
+    df = generator._list_to_dataframe([{"name": "A", "value": 1}, {"name": "B", "value": pd.NA}])
+    assert list(df.columns) == ["name", "value"]
+
+    rows = generator._dataframe_to_list(df)
+
+    assert rows == [{"name": "A", "value": 1}, {"name": "B", "value": None}]
+    assert generator._dataframe_to_list(pd.DataFrame()) == []
