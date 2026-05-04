@@ -4,16 +4,14 @@ Simplified Config Generator - Two-Phase Generation
 2. Scene Designer: Generate complete config (without timing)
 """
 
+import functools
 import json
 import requests
 import time
-import functools
-from typing import Dict, List, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import pandas as pd
+from typing import Dict, List, Any, Tuple
 
-# Force all print statements to flush immediately for real-time logging
-print = functools.partial(print, flush=True)
+import pandas as pd
 
 from app.core.config import settings
 
@@ -32,80 +30,15 @@ from .prompts import (
     format_scene_planner_prompt,
     format_scene_animation_generator_prompt
 )
+from .response_parser import parse_llm_json_response
+from .retry import calculate_retry_wait_time, should_retry_on_error
+
+# Force all print statements to flush immediately for real-time logging
+print = functools.partial(print, flush=True)
 
 
 # MAX_TOKENS: from env/config LLM_MAX_TOKENS
 MAX_TOKENS = settings.LLM_MAX_TOKENS
-
-# ============================================================================
-# Retry Helper Functions
-# ============================================================================
-
-def should_retry_on_error(error_msg: str, attempt: int, elapsed_time: float, max_general_retries: int = 10) -> tuple[bool, str]:
-    """
-    判断是否应该根据错误类型重试
-    
-    Args:
-        error_msg: 错误信息
-        attempt: 当前尝试次数
-        elapsed_time: 已经过的时间（秒）
-        max_general_retries: 普通错误的最大重试次数
-    
-    Returns:
-        (should_retry, reason): 是否应该重试和原因
-    """
-    error_lower = str(error_msg).lower()
-    
-    # 永久性错误：不应重试
-    if any(keyword in error_lower for keyword in ['余额不足', 'insufficient', 'quota exceeded', 'no credit']):
-        return False, "余额不足（永久性错误）"
-    
-    if any(keyword in error_lower for keyword in ['401', '403', 'unauthorized', 'forbidden']):
-        return False, "认证失败（永久性错误）"
-    
-    if '400' in error_lower and 'format' in error_lower:
-        return False, "请求格式错误（永久性错误）"
-    
-    # Context length exceeded：不应重试（prompt 太长，重试只会浪费 token）
-    if any(keyword in error_lower for keyword in ['context length', 'maximum context']):
-        if 'exceeded' in error_lower or 'too long' in error_lower or '128000' in error_lower:
-            return False, "Context length 超出限制（永久性错误，重试会浪费 token）"
-    
-    # 429 Rate Limit：允许长时间重试（最多30分钟）
-    if any(keyword in error_lower for keyword in ['429', 'rate limit', 'throttling', 'too many requests']):
-        max_time = 30 * 60  # 30分钟
-        if elapsed_time < max_time:
-            return True, f"Rate Limit（允许重试至{max_time/60:.0f}分钟）"
-        return False, f"Rate Limit 超过最大时间限制（{max_time/60:.0f}分钟）"
-    
-    # 其他临时性错误：有限重试
-    if attempt < max_general_retries:
-        return True, f"临时性错误（最多{max_general_retries}次）"
-    
-    return False, f"已达到最大重试次数（{max_general_retries}次）"
-
-
-def calculate_retry_wait_time(error_msg: str, attempt: int) -> int:
-    """
-    根据错误类型和尝试次数计算等待时间（指数退避）
-    
-    Args:
-        error_msg: 错误信息
-        attempt: 当前尝试次数
-    
-    Returns:
-        等待时间（秒）
-    """
-    error_lower = str(error_msg).lower()
-    
-    # 429 Rate Limit：使用指数退避，最多60秒
-    if any(keyword in error_lower for keyword in ['429', 'rate limit', 'throttling', 'too many requests']):
-        wait_time = min(2 ** attempt, 60)  # 2, 4, 8, 16, 32, 60, 60...
-        return wait_time
-    
-    # 其他错误：固定2秒
-    return 2
-
 
 # ============================================================================
 # Custom Exceptions for Fatal Errors
@@ -426,272 +359,8 @@ class LLMClient:
         Returns:
             Tuple[Dict, Dict]: (parsed_json, usage) where usage contains token information
         """
-        import re
-        
         response, usage = self.call(prompt, temperature, max_tokens, verbose=verbose)
-
-        def _format_response_for_debug(raw: str, head: int = 500, tail: int = 300) -> str:
-            """Build a helpful diagnostic string for bad JSON responses."""
-            if raw is None:
-                return f"model={self.model} raw=None"
-            raw_len = len(raw)
-            stripped = raw.strip()
-            stripped_len = len(stripped)
-            if stripped_len == 0:
-                return f"model={self.model} raw_len={raw_len} stripped_len=0 (empty/whitespace)"
-            head_txt = stripped[:head]
-            tail_txt = stripped[-tail:] if stripped_len > tail else stripped
-            return (
-                f"model={self.model} raw_len={raw_len} stripped_len={stripped_len}\n"
-                f"--- response_head ---\n{head_txt}\n"
-                f"--- response_tail ---\n{tail_txt}\n"
-            )
-        
-        def _clean_json_control_chars(json_str: str) -> str:
-            """清理 JSON 字符串中的无效控制字符
-            
-            LLM 有时会返回包含未转义控制字符的 JSON（如真实的换行符而非 \\n）
-            这会导致 JSONDecodeError: Invalid control character
-            
-            Args:
-                json_str: 原始 JSON 字符串
-            
-            Returns:
-                清理后的 JSON 字符串
-            """
-            # 转义常见的控制字符
-            # 注意：只替换真实的控制字符，不影响已经转义的 \n, \t 等
-            json_str = json_str.replace('\n', '\\n')  # 真实换行符 → \\n 转义
-            json_str = json_str.replace('\r', '\\r')  # 回车符 → \\r 转义
-            json_str = json_str.replace('\t', '\\t')  # 制表符 → \\t 转义
-            json_str = json_str.replace('\b', '\\b')  # 退格符 → \\b 转义
-            json_str = json_str.replace('\f', '\\f')  # 换页符 → \\f 转义
-            
-            # 移除其他控制字符（ASCII 0-31，除了已处理的）
-            # \x00-\x08: NUL to BS (除了 \b 已处理)
-            # \x0b-\x0c: VT, FF (除了 \f 已处理)
-            # \x0e-\x1f: SO to US
-            json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', json_str)
-            
-            return json_str
-        
-        # Try to extract JSON
-        json_str = None
-        try:
-            parsed_json = json.loads(response)
-            
-            # 自动修复：如果返回的是单元素数组，提取第一个元素
-            if isinstance(parsed_json, list) and len(parsed_json) == 1:
-                if verbose:
-                    print(f"      ⚠️  LLM returned array instead of object, auto-extracting first element")
-                parsed_json = parsed_json[0]
-            
-            return parsed_json, usage
-        except json.JSONDecodeError:
-            # Try to extract content from ```json ... ```
-            if "```json" in response:
-                start = response.find("```json") + 7
-                end = response.find("```", start)
-                json_str = response[start:end].strip()
-            elif "```" in response:
-                start = response.find("```") + 3
-                end = response.find("```", start)
-                json_str = response[start:end].strip()
-            else:
-                # Try to find JSON object in response
-                # Look for { ... } pattern (non-greedy to avoid matching too much)
-                # Use balanced braces matching
-                json_str = None
-                brace_count = 0
-                start_idx = -1
-                for i, char in enumerate(response):
-                    if char == '{':
-                        if start_idx == -1:
-                            start_idx = i
-                        brace_count += 1
-                    elif char == '}':
-                        brace_count -= 1
-                        if brace_count == 0 and start_idx != -1:
-                            json_str = response[start_idx:i+1]
-                            break
-                
-                # Fallback: use regex if balanced matching failed
-                if not json_str:
-                    match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response, re.DOTALL)
-                    if match:
-                        json_str = match.group(0)
-                    else:
-                        raise ValueError(
-                            "Cannot parse JSON response (no JSON object found).\n"
-                            + _format_response_for_debug(response)
-                        )
-        
-        # Clean and parse JSON string
-        if json_str:
-            try:
-                # 🔧 Step 1: Remove trailing commas before closing braces/brackets
-                json_str_cleaned = re.sub(r',\s*}', '}', json_str)
-                json_str_cleaned = re.sub(r',\s*]', ']', json_str_cleaned)
-                
-                # 🔧 Step 2: Remove comments (// and /* */)
-                json_str_cleaned = re.sub(r'//.*?$', '', json_str_cleaned, flags=re.MULTILINE)
-                json_str_cleaned = re.sub(r'/\*.*?\*/', '', json_str_cleaned, flags=re.DOTALL)
-                
-                # 🔧 Step 3: Try to parse directly first (don't touch control chars unless necessary)
-                try:
-                    parsed_json = json.loads(json_str_cleaned)
-                    return parsed_json, usage
-                except json.JSONDecodeError as e:
-                    # Only if we get "Invalid control character" error, then clean them
-                    if "Invalid control character" in str(e) or "control character" in str(e):
-                        json_str_cleaned = _clean_json_control_chars(json_str_cleaned)
-                        parsed_json = json.loads(json_str_cleaned)
-                        return parsed_json, usage
-                    else:
-                        # Re-raise for other JSON errors
-                        raise
-            except json.JSONDecodeError as e:
-                # Try to fix common JSON errors
-                try:
-                    json_str_fixed = json_str
-                    
-                    # 🔧 Fix: number followed by quote (missing comma) - most common issue
-                    # Pattern: number" -> number,"
-                    # Handle both with and without whitespace
-                    try:
-                        json_str_fixed = re.sub(r'(\d+)\s*"', r'\1, "', json_str_fixed)
-                    except re.error:
-                        pass  # 正则失败，跳过这个修复
-                    
-                    # Fix: number followed by newline and quote
-                    try:
-                        json_str_fixed = re.sub(r'(\d+)\s*\n\s*"', r'\1,\n"', json_str_fixed)
-                    except re.error:
-                        pass
-                    
-                    # Fix: quote followed by number (missing comma)
-                    try:
-                        json_str_fixed = re.sub(r'"\s*(\d+)', r'", \1', json_str_fixed)
-                    except re.error:
-                        pass
-                    
-                    # Fix: boolean/null followed by quote (missing comma)
-                    try:
-                        json_str_fixed = re.sub(r'(true|false|null)\s*"', r'\1, "', json_str_fixed)
-                    except re.error:
-                        pass
-                    
-                    # Fix: closing brace/bracket followed by quote (missing comma)
-                    try:
-                        json_str_fixed = re.sub(r'([}\])\s*"', r'\1, "', json_str_fixed)
-                    except re.error:
-                        pass
-                    
-                    # Fix: number followed by quote and comma (like "2332",)
-                    try:
-                        json_str_fixed = re.sub(r'(\d+)\s*",', r'\1,', json_str_fixed)
-                    except re.error:
-                        pass
-                    
-                    # Fix: number followed by quote and newline (array/object item)
-                    try:
-                        json_str_fixed = re.sub(r'(\d+)\s*"\s*\n', r'\1,\n', json_str_fixed)
-                    except re.error:
-                        pass
-                    
-                    # Remove trailing commas again after fixes
-                    try:
-                        json_str_fixed = re.sub(r',\s*}', '}', json_str_fixed)
-                        json_str_fixed = re.sub(r',\s*]', ']', json_str_fixed)
-                    except re.error:
-                        pass
-                    
-                    parsed_json = json.loads(json_str_fixed)
-                    return parsed_json, usage
-                except (json.JSONDecodeError, ValueError) as e2:
-                    # Try to fix unterminated string errors
-                    if "Unterminated string" in str(e2) or "Unterminated string" in str(e):
-                        try:
-                            error_pos = e2.pos if hasattr(e2, 'pos') else (e.pos if hasattr(e, 'pos') else 0)
-                            
-                            # Find the last unclosed quote before error position
-                            # Look backwards from error_pos to find the opening quote
-                            quote_pos = -1
-                            
-                            # Scan backwards to find the opening quote
-                            for i in range(error_pos - 1, max(0, error_pos - 200), -1):
-                                char = json_str_fixed[i]
-                                # Check if this quote is escaped
-                                if char == '"':
-                                    # Count backslashes before this quote
-                                    backslash_count = 0
-                                    j = i - 1
-                                    while j >= 0 and json_str_fixed[j] == '\\':
-                                        backslash_count += 1
-                                        j -= 1
-                                    # If even number of backslashes, quote is not escaped
-                                    if backslash_count % 2 == 0:
-                                        quote_pos = i
-                                        break
-                            
-                            if quote_pos >= 0:
-                                # Found opening quote, now look forward for closing quote or object end
-                                # Look for next unescaped quote or end of object/array
-                                end_pos = len(json_str_fixed)
-                                found_closing = False
-                                
-                                # Look forward from error_pos
-                                for i in range(error_pos, min(len(json_str_fixed), error_pos + 500)):
-                                    char = json_str_fixed[i]
-                                    if char == '"':
-                                        # Check if escaped
-                                        backslash_count = 0
-                                        j = i - 1
-                                        while j >= 0 and json_str_fixed[j] == '\\':
-                                            backslash_count += 1
-                                            j -= 1
-                                        if backslash_count % 2 == 0:
-                                            # Found closing quote
-                                            end_pos = i + 1
-                                            found_closing = True
-                                            break
-                                    elif char in ['}', ']', ',', '\n']:
-                                        # If we hit object/array end or comma/newline, try to close the string
-                                        # Check if we're in a reasonable position (after a colon or in a value)
-                                        if i > quote_pos + 1:
-                                            # Try inserting closing quote before this character
-                                            end_pos = i
-                                            break
-                                
-                                if not found_closing and end_pos < len(json_str_fixed):
-                                    # Insert closing quote
-                                    json_str_fixed = json_str_fixed[:end_pos] + '"' + json_str_fixed[end_pos:]
-                                    if verbose:
-                                        print(f"      🔧 Fixed unterminated string: inserted closing quote at position {end_pos}")
-                                    
-                                    # Try parsing again
-                                    parsed_json = json.loads(json_str_fixed)
-                                    return parsed_json, usage
-                                elif found_closing:
-                                    # String was actually closed, might be a different issue
-                                    pass
-                        except Exception:
-                            # If fix attempt fails, fall through to error message
-                            pass
-                    
-                    # If fixes don't work, provide better error message
-                    error_pos = e2.pos if hasattr(e2, 'pos') else (e.pos if hasattr(e, 'pos') else 0)
-                    context_start = max(0, error_pos - 50)
-                    context_end = min(len(json_str), error_pos + 50)
-                    raise ValueError(
-                        f"JSON parse error at position {error_pos}: {e2.msg if hasattr(e2, 'msg') else str(e2)}\n"
-                        f"Context: {json_str[context_start:context_end]}"
-                    )
-        
-        raise ValueError(
-            "Cannot parse JSON response.\n"
-            + _format_response_for_debug(response)
-        )
+        return parse_llm_json_response(response, usage, model=self.model, verbose=verbose)
 
 
 class SimpleConfigGenerator:
