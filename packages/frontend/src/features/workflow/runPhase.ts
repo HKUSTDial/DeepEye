@@ -8,6 +8,7 @@ import {
   parseVideoProgressLine,
 } from '../../utils/chatProgress'
 import { translateApp } from '../../locale'
+import { getArtifactFileName } from '../../utils/artifactUtils'
 
 export type WorkflowRunPhaseStatus = 'running' | 'done' | 'error'
 export type WorkflowRunPhaseSource = 'workflow' | 'artifact' | 'token' | 'system'
@@ -136,12 +137,7 @@ function buildArtifactDonePhase(artifact: WorkflowArtifactPayload) {
     })
   }
   if (artifact.kind === 'report') {
-    const filename =
-      typeof artifact.report_filename === 'string'
-        ? artifact.report_filename
-        : typeof artifact.report_path === 'string'
-          ? artifact.report_path.split('/').pop() ?? null
-          : null
+    const filename = getArtifactFileName(artifact, 'report')
     return buildPhase('report-ready', translateApp('workflow.phaseReportReady'), 'done', {
       detail: filename ? translateApp('workflow.phaseReportGenerated', { filename }) : translateApp('workflow.phaseReportSuccess'),
       suggestion: null,

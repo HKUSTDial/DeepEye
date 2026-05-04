@@ -11,12 +11,20 @@ import { useRightPanelStore } from './stores/rightPanel'
 import { useReportStore } from './stores/report'
 import { useWorkflowSessionsStore } from './stores/workflowSessions'
 import { sessionApi } from './api'
-import type { DataSource, WorkspaceState, WorkflowArtifactPayload } from './types'
+import type { DataSource, WorkspaceState } from './types'
 import Sidebar from './components/Sidebar'
 import ChatBox from './components/ChatBox'
 import { RightPanelLayout } from './components/right-panel/RightPanelLayout'
 import { GlobalDataSourceManagerModal } from './components/ui/GlobalDataSourceManagerModal'
 import { getLocalizedConversationTitle, isDefaultConversationTitle, useLocale } from './locale'
+import {
+  getArtifactError,
+  getArtifactFileName,
+  getArtifactHtml,
+  getArtifactSteps,
+  getArtifactTaskId,
+  latestArtifactByKind,
+} from './utils/artifactUtils'
 import './App.css'
 
 function App() {
@@ -223,12 +231,10 @@ function App() {
     }
 
     const latestReport = reportPayloads[reportPayloads.length - 1]
-    const reportHtml = typeof latestReport.report_html === 'string' ? latestReport.report_html : null
-    const reportFilename = typeof latestReport.report_filename === 'string' ? latestReport.report_filename : null
-    const reportError = typeof latestReport.error === 'string' ? latestReport.error : null
-    const steps = Array.isArray(latestReport.steps)
-      ? latestReport.steps.filter((item): item is string => typeof item === 'string')
-      : []
+    const reportHtml = getArtifactHtml(latestReport)
+    const reportFilename = getArtifactFileName(latestReport, 'report')
+    const reportError = getArtifactError(latestReport)
+    const steps = getArtifactSteps(latestReport)
 
     setReportResult(activeSessionId, reportHtml, steps, reportFilename, reportError)
   }, [clearReport, setReportResult])
@@ -252,11 +258,9 @@ function App() {
       openOrFocusTab('dashboard')
     }
 
-    const latestVideo = [...artifactPayloads]
-      .reverse()
-      .find((artifact): artifact is WorkflowArtifactPayload => artifact.kind === 'video')
+    const latestVideo = latestArtifactByKind(artifactPayloads, 'video')
     if (latestVideo) {
-      const taskId = typeof latestVideo.task_id === 'string' ? latestVideo.task_id : undefined
+      const taskId = getArtifactTaskId(latestVideo) ?? undefined
       openOrFocusTab('video-preview', taskId ? { taskId } : {})
     }
   }, [openOrFocusTab])

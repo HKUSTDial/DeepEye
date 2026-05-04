@@ -4,6 +4,7 @@ import { ArtifactProgressCard } from '../ArtifactProgressCard'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { config } from '../../../config'
 import { useLocale } from '../../../locale'
+import { getArtifactNodeId, getArtifactPreviewUrl } from '../../../utils/artifactUtils'
 
 function extractDashboardNodeIds(definition: unknown): string[] {
   if (!definition || typeof definition !== 'object') return []
@@ -67,10 +68,12 @@ export function DashboardPanel({
 
     const urls: { nodeId: string; url: string }[] = []
     sessionState.artifacts.forEach((artifact) => {
-      if (artifact.kind === 'dashboard' && typeof artifact.dashboard_url === 'string') {
+      if (artifact.kind === 'dashboard') {
+        const url = getArtifactPreviewUrl(artifact)
+        if (!url) return
         urls.push({
-          nodeId: typeof artifact.node_id === 'string' ? artifact.node_id : 'dashboard',
-          url: artifact.dashboard_url,
+          nodeId: getArtifactNodeId(artifact) ?? 'dashboard',
+          url,
         })
       }
     })

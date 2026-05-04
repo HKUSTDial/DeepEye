@@ -8,6 +8,7 @@ import {
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useLocale } from '../../../locale'
 import { deferEffectWork } from '../../../utils/effects'
+import { getArtifactTaskId, latestArtifactByKind } from '../../../utils/artifactUtils'
 
 interface VideoPreviewPanelProps {
   taskId?: string
@@ -113,10 +114,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
     3: `🎬 ${t('video.stepMessage4')}`,
   }
   const latestVideoArtifact = useMemo(
-    () =>
-      [...(sessionState?.artifacts ?? [])]
-        .reverse()
-        .find((artifact) => artifact.kind === 'video'),
+    () => latestArtifactByKind(sessionState?.artifacts, 'video'),
     [sessionState?.artifacts],
   )
   const runOutput = sessionState?.runOutput ?? ''
@@ -132,10 +130,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const previewDeclaredReady = Boolean(videoPreviewUrl)
 
   const pastedNormalized = normalizePastedTaskId(pastedTaskId)
-  const artifactTaskId =
-    latestVideoArtifact && typeof latestVideoArtifact.task_id === 'string'
-      ? latestVideoArtifact.task_id
-      : undefined
+  const artifactTaskId = getArtifactTaskId(latestVideoArtifact) ?? undefined
   const displayTaskId =
     taskId || artifactTaskId || extractTaskIdFromOutput(runOutput) || manualTaskId || undefined
 

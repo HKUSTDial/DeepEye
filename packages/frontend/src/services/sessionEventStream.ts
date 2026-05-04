@@ -25,6 +25,15 @@ import {
   createTokenPhase,
 } from '../features/workflow/runPhase'
 import { getDashboardProgressStage, isDashboardProgressMessage } from '../utils/dashboardProgress'
+import {
+  getArtifactError,
+  getArtifactFileName,
+  getArtifactHtml,
+  getArtifactKind,
+  getArtifactPreviewUrl,
+  getArtifactSteps,
+  getArtifactTaskId,
+} from '../utils/artifactUtils'
 import type { WorkflowArtifactPayload } from '../types'
 
 type ErrorListener = (error: string | null) => void
@@ -110,13 +119,13 @@ function handleWorkflowArtifactEvent(
   const artifact = typeof payload.artifact === 'object' && payload.artifact
     ? (payload.artifact as Record<string, unknown>)
     : null
-  const kind = typeof artifact?.kind === 'string' ? artifact.kind : ''
+  const typedArtifact = artifact as WorkflowArtifactPayload | null
+  const kind = getArtifactKind(typedArtifact) ?? ''
 
-  if (!kind) {
+  if (!typedArtifact || !kind) {
     return false
   }
 
-  const typedArtifact = artifact as WorkflowArtifactPayload
   const workflowStore = useWorkflowSessionsStore.getState()
   workflowStore.recordArtifact(sessionId, typedArtifact)
   const artifactPhase = createArtifactPhase(
@@ -146,25 +155,21 @@ function handleWorkflowArtifactEvent(
     if (phase === 'artifact_ready' || phase === 'artifact_failed') {
       const steps = Array.isArray(payload.steps)
         ? payload.steps.filter((item): item is string => typeof item === 'string')
-        : []
+        : getArtifactSteps(typedArtifact)
       const reportHtml =
         typeof payload.report_html === 'string'
           ? payload.report_html
-          : typeof artifact?.report_html === 'string'
-            ? artifact.report_html
-            : null
+          : getArtifactHtml(typedArtifact)
       const reportFilename =
         typeof payload.report_filename === 'string'
           ? payload.report_filename
-          : typeof artifact?.report_filename === 'string'
-            ? artifact.report_filename
-            : null
+          : getArtifactFileName(typedArtifact, 'report')
       const error =
         typeof payload.error === 'string'
           ? payload.error
           : phase === 'artifact_failed'
-            ? 'Report generation failed'
-            : null
+            ? getArtifactError(typedArtifact) ?? 'Report generation failed'
+            : getArtifactError(typedArtifact)
       const reportStore = useReportStore.getState()
       reportStore.setReportResult(sessionId, reportHtml, steps, reportFilename, error)
       reportStore.stopGeneration(sessionId)
@@ -190,16 +195,8 @@ function handleWorkflowArtifactEvent(
   }
 
   if (kind === 'video') {
-    const taskId = typeof artifact?.task_id === 'string' ? artifact.task_id : null
-    const preview = typeof artifact?.preview === 'object' && artifact.preview
-      ? artifact.preview as Record<string, unknown>
-      : null
-    const videoUrl =
-      typeof preview?.url === 'string'
-        ? preview.url
-        : typeof artifact?.video_url === 'string'
-          ? artifact.video_url
-          : null
+    const taskId = getArtifactTaskId(typedArtifact)
+    const videoUrl = getArtifactPreviewUrl(typedArtifact)
     if (videoUrl) {
       useWorkflowSessionsStore.getState().setVideoPreviewUrl(sessionId, videoUrl)
     }

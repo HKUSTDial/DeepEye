@@ -8,7 +8,14 @@ import {
 import { useMemo, type ReactNode } from 'react'
 
 import { useWorkflowSessionsStore } from '../../stores/workflowSessions'
-import type { WorkflowArtifactPayload } from '../../types'
+import {
+  getArtifactError,
+  getArtifactFileName,
+  getArtifactPreviewUrl,
+  getArtifactStatus,
+  getArtifactTaskId,
+  latestArtifactByKind,
+} from '../../utils/artifactUtils'
 
 type PanelTarget = {
   pluginId: string
@@ -29,15 +36,6 @@ type OutputCard = {
   status: OutputCardStatus
   icon: ReactNode
   target: PanelTarget
-}
-
-function latestArtifactByKind(
-  artifacts: WorkflowArtifactPayload[],
-  kind: string,
-) {
-  return [...artifacts]
-    .reverse()
-    .find((artifact) => artifact.kind === kind) ?? null
 }
 
 function getStatusClasses(status: OutputCardStatus) {
@@ -114,15 +112,12 @@ export function SessionOutputCenter({
 
     const reportArtifact = latestArtifactByKind(sessionState.artifacts, 'report')
     if (reportArtifact) {
-      const filename =
-        typeof reportArtifact.report_filename === 'string'
-          ? reportArtifact.report_filename
-          : 'Generated report available'
+      const filename = getArtifactFileName(reportArtifact, 'report') ?? 'Generated report available'
       nextCards.push({
         id: 'report',
         title: 'Report',
         detail: filename,
-        status: typeof reportArtifact.error === 'string' ? 'error' : 'ready',
+        status: getArtifactError(reportArtifact) || getArtifactStatus(reportArtifact) === 'failed' ? 'error' : 'ready',
         icon: <FileText className="h-4 w-4" />,
         target: { pluginId: 'report' },
       })
@@ -130,11 +125,12 @@ export function SessionOutputCenter({
 
     const dashboardArtifact = latestArtifactByKind(sessionState.artifacts, 'dashboard')
     if (dashboardArtifact) {
+      const dashboardUrl = getArtifactPreviewUrl(dashboardArtifact)
       nextCards.push({
         id: 'dashboard',
         title: 'Dashboard',
-        detail: 'Latest dashboard preview is ready to open.',
-        status: 'ready',
+        detail: dashboardUrl ? 'Latest dashboard preview is ready to open.' : 'Dashboard artifact is available.',
+        status: getArtifactStatus(dashboardArtifact) === 'failed' ? 'error' : 'ready',
         icon: <LayoutDashboard className="h-4 w-4" />,
         target: { pluginId: 'dashboard' },
       })
@@ -142,15 +138,12 @@ export function SessionOutputCenter({
 
     const videoArtifact = latestArtifactByKind(sessionState.artifacts, 'video')
     if (videoArtifact) {
-      const taskId =
-        typeof videoArtifact.task_id === 'string'
-          ? videoArtifact.task_id
-          : null
+      const taskId = getArtifactTaskId(videoArtifact)
       nextCards.push({
         id: 'video',
         title: 'Video',
         detail: taskId ? `Preview ready for task ${taskId}` : 'Latest video preview is ready to open.',
-        status: 'ready',
+        status: getArtifactStatus(videoArtifact) === 'failed' ? 'error' : 'ready',
         icon: <Video className="h-4 w-4" />,
         target: {
           pluginId: 'video-preview',
