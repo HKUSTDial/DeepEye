@@ -13,7 +13,14 @@ MOVED_WORKFLOW_SERVICE_MODULES = {
     "app.services.workflow_agent_drafts",
     "app.services.workflow_agent_response",
     "app.services.workflow_agent_runs",
+    "app.services.workflow_datasets",
+    "app.services.workflow_prompts",
     "app.services.workflow_repair_state",
+    "app.services.workflow_run_events",
+    "app.services.workflow_run_preparation",
+    "app.services.workflow_run_result",
+    "app.services.workflow_targets",
+    "app.services.workflow_tracking_service",
     "app.services.workflow_workspace_state",
 }
 
@@ -60,7 +67,14 @@ def test_moved_workflow_services_use_domain_import_paths() -> None:
         SERVICES_DIR / "workflow_agent_drafts.py",
         SERVICES_DIR / "workflow_agent_response.py",
         SERVICES_DIR / "workflow_agent_runs.py",
+        SERVICES_DIR / "workflow_datasets.py",
+        SERVICES_DIR / "workflow_prompts.py",
         SERVICES_DIR / "workflow_repair_state.py",
+        SERVICES_DIR / "workflow_run_events.py",
+        SERVICES_DIR / "workflow_run_preparation.py",
+        SERVICES_DIR / "workflow_run_result.py",
+        SERVICES_DIR / "workflow_targets.py",
+        SERVICES_DIR / "workflow_tracking_service.py",
         SERVICES_DIR / "workflow_workspace_state.py",
     }
     for path in sorted(APP_DIR.rglob("*.py")):
