@@ -21,7 +21,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.14.2",
     "reactflow": "^11.11.4",
-    "read-excel-file": "^9.0.6",
+    "read-excel-file": "^9.0.9",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remotion": "^4.0.456",
