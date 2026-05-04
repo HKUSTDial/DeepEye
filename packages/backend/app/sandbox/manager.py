@@ -28,9 +28,9 @@ from app.sandbox.docker_discovery import (
 )
 from app.sandbox.factory import create_sandbox
 from app.sandbox.session_status import build_manager_stats, build_session_status
-from app.services.docker_control_client import get_docker_control_client
 from app.datasource.services.specs import get_datasource_filename, workspace_data_path
-from app.services.minio_service import download_bytes
+from app.infra.services.docker_control import get_docker_control_client
+from app.infra.services.minio import download_bytes
 
 
 def _get_datasource_filename(ds) -> str:

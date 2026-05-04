@@ -270,7 +270,7 @@ async def delete_datasource(
 
     # If it's a file datasource, cleanup storage
     if ds.category == "file" and ds.storage_path:
-        from app.services.minio_service import delete_object
+        from app.infra.services.minio import delete_object
         from deepeye.utils.logger import logger
         
         # 1. Delete from MinIO

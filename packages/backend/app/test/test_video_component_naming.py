@@ -5,13 +5,13 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.video_component_naming import (
+from app.deploy.services.video_naming import (
     expected_scene_component_files,
     extract_dataset_name_from_config,
     scene_id_to_filename,
     scene_needs_component_suffix,
 )
-from app.services.video_deploy_service import _build_scene_registry_ts
+from app.deploy.services.video import _build_scene_registry_ts
 
 
 def test_extract_dataset_name_from_config_trims_special_chars_and_length() -> None:

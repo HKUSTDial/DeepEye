@@ -622,7 +622,7 @@ class VideoGeneratorHandler:
         video_url: str | None = None
         if video_status == "success" and session_id:
             try:
-                from app.services.video_deploy_service import video_deployer
+                from app.deploy.services.video import video_deployer
                 import threading
 
                 def _do_deploy():

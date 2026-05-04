@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Dict, Tuple
 
-from app.services.video_component_naming import (
+from app.deploy.services.video_naming import (
     extract_dataset_name_from_config,
     scene_id_to_filename,
     scene_needs_component_suffix,

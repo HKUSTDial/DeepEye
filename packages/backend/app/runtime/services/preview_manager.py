@@ -6,7 +6,7 @@ import docker
 
 from app.core.config import settings
 from app.runtime.services.preview import preview_containers_to_cleanup
-from app.services.docker_control_client import get_docker_control_client
+from app.infra.services.docker_control import get_docker_control_client
 from deepeye.utils.logger import logger
 
 

@@ -16,7 +16,7 @@ from app.core.config import get_video_session_root, normalize_session_id
 from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.repositories import SessionRepository
-from app.services.video_component_naming import expected_scene_component_files
+from app.deploy.services.video_naming import expected_scene_component_files
 from deepeye.utils.logger import logger
 
 router = APIRouter(prefix="/video", tags=["video"])

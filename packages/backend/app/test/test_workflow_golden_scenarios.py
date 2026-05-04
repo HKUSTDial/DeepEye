@@ -338,7 +338,7 @@ def test_golden_sql_to_dashboard_workflow(tmp_path, monkeypatch) -> None:
             "app.node.dashboard.node.NL2DashboardHandler._emit_workflow_event",
             lambda self, *args, **kwargs: None,
         )
-        monkeypatch.setattr("app.services.dashboard_deploy_service.dashboard_deployer.deploy", _fake_dashboard_deploy)
+        monkeypatch.setattr("app.deploy.services.dashboard.dashboard_deployer.deploy", _fake_dashboard_deploy)
 
         engine = build_engine(db, user.id, sandbox=sandbox, session_id=sandbox.session_id)
         workflow = Workflow(

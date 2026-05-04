@@ -11,6 +11,8 @@ SERVICES_DIR = APP_DIR / "services"
 AGENT_DIR = APP_DIR / "agent"
 AUTH_DIR = APP_DIR / "auth"
 DATASOURCE_DIR = APP_DIR / "datasource"
+DEPLOY_DIR = APP_DIR / "deploy"
+INFRA_DIR = APP_DIR / "infra"
 RUNTIME_DIR = APP_DIR / "runtime"
 SESSION_DIR = APP_DIR / "session"
 WORKFLOW_DIR = APP_DIR / "workflow"
@@ -26,6 +28,16 @@ LEGACY_DATASOURCE_SERVICE_MODULES = {
     "app.services.datasource_file_service",
     "app.services.datasource_preview_service",
     "app.services.datasource_specs",
+}
+LEGACY_DEPLOY_SERVICE_MODULES = {
+    "app.services.dashboard_deploy_service",
+    "app.services.video_component_naming",
+    "app.services.video_deploy_service",
+}
+LEGACY_INFRA_SERVICE_MODULES = {
+    "app.services.docker_build_paths",
+    "app.services.docker_control_client",
+    "app.services.minio_service",
 }
 LEGACY_WORKFLOW_SERVICE_MODULES = {
     "app.services.workflow_agent_drafts",
@@ -132,6 +144,25 @@ def test_auth_session_agent_domains_do_not_depend_on_tools_layer() -> None:
     assert violations == []
 
 
+def test_deploy_and_infra_domains_do_not_depend_on_tools_layer() -> None:
+    violations: list[str] = []
+    for domain_dir in (DEPLOY_DIR, INFRA_DIR):
+        for path in sorted(domain_dir.rglob("*.py")):
+            if path.name == "__init__.py":
+                continue
+            for module in sorted(_imported_modules(path)):
+                if module == "app.tools" or module.startswith("app.tools."):
+                    violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
+def test_services_root_contains_only_package_initializer() -> None:
+    root_modules = sorted(path.name for path in SERVICES_DIR.glob("*.py"))
+
+    assert root_modules == ["__init__.py"]
+
+
 def test_services_root_does_not_contain_workflow_modules() -> None:
     workflow_modules = sorted(path.name for path in SERVICES_DIR.glob("workflow_*.py"))
 
@@ -162,6 +193,17 @@ def test_services_root_does_not_contain_auth_session_agent_modules() -> None:
     )
 
     assert moved_modules == []
+
+
+def test_moved_deploy_and_infra_services_use_domain_import_paths() -> None:
+    legacy_modules = LEGACY_DEPLOY_SERVICE_MODULES | LEGACY_INFRA_SERVICE_MODULES
+    violations: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        legacy_imports = sorted(_imported_modules(path) & legacy_modules)
+        for module in legacy_imports:
+            violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
 
 
 def test_moved_datasource_services_use_domain_import_paths() -> None:

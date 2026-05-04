@@ -10,10 +10,10 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.sandbox import sandbox_manager
-from app.services.dashboard_deploy_service import dashboard_deployer
+from app.deploy.services.dashboard import dashboard_deployer
+from app.deploy.services.video import video_deployer
 from app.runtime.services.preview_manager import preview_runtime_manager
-from app.services.video_deploy_service import video_deployer
+from app.sandbox import sandbox_manager
 
 
 def _container_or_404(sandbox):

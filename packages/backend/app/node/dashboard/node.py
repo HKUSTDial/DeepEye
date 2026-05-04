@@ -328,7 +328,7 @@ class NL2DashboardHandler:
                 raise FileNotFoundError(f"Generated dashboard app not found: {va_source_path}")
 
             print(f"[*] Starting independent dashboard service container (ID: {safe_id})...")
-            from app.services.dashboard_deploy_service import dashboard_deployer
+            from app.deploy.services.dashboard import dashboard_deployer
 
             deploy_loop = asyncio.new_event_loop()
             try:

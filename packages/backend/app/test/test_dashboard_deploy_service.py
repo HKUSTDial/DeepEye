@@ -14,8 +14,8 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.core.config import settings
-from app.services import dashboard_deploy_service as dashboard_module
-from app.services.dashboard_deploy_service import (
+from app.deploy.services import dashboard as dashboard_module
+from app.deploy.services.dashboard import (
     _DASHBOARD_IMAGE_SOURCE_HASH_LABEL,
     _compute_file_sha256,
     _dashboard_container_environment,

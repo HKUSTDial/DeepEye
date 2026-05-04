@@ -17,7 +17,7 @@ from sqlalchemy import MetaData, Table, func, inspect, select
 from app.core.config import settings
 from app.node.core.db_utils import create_engine, normalize_connection_string
 from app.datasource.services.specs import normalize_datasource_type, validate_database_datasource_type, validate_file_type
-from app.services.minio_service import download_bytes
+from app.infra.services.minio import download_bytes
 
 DEFAULT_PREVIEW_PAGE_SIZE = 25
 MAX_PREVIEW_PAGE_SIZE = 100

@@ -349,7 +349,7 @@ def test_sql_dataset_ref_flows_to_python_and_dashboard(tmp_path, monkeypatch) ->
         monkeypatch.setattr("app.node.dashboard.node.DashboardDesigner", _DummyDesigner)
         monkeypatch.setattr("app.node.dashboard.node.DashboardEngineer", _DummyEngineer)
         monkeypatch.setattr("app.node.dashboard.node.LLMClient", lambda api_key=None, base_url=None: object())
-        monkeypatch.setattr("app.services.dashboard_deploy_service.dashboard_deployer.deploy", _fake_dashboard_deploy)
+        monkeypatch.setattr("app.deploy.services.dashboard.dashboard_deployer.deploy", _fake_dashboard_deploy)
 
         dashboard_handler = NL2DashboardHandler(db, str(user.id), sandbox=sandbox)
         dashboard_handler._emit_log = lambda *args, **kwargs: None
@@ -413,7 +413,7 @@ def test_dashboard_handler_emits_failure_without_ready_when_deploy_fails(monkeyp
         monkeypatch.setattr("app.node.dashboard.node.DashboardDesigner", _DummyDesigner)
         monkeypatch.setattr("app.node.dashboard.node.DashboardEngineer", _DummyEngineer)
         monkeypatch.setattr("app.node.dashboard.node.LLMClient", lambda api_key=None, base_url=None: object())
-        monkeypatch.setattr("app.services.dashboard_deploy_service.dashboard_deployer.deploy", _failing_dashboard_deploy)
+        monkeypatch.setattr("app.deploy.services.dashboard.dashboard_deployer.deploy", _failing_dashboard_deploy)
 
         dashboard_handler = NL2DashboardHandler(db, str(user.id), sandbox=sandbox)
         emitted_logs: list[tuple[str, bool]] = []
