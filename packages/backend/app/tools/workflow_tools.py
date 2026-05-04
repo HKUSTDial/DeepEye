@@ -19,13 +19,7 @@ from app.workflow.services.agent_runs import (
     run_agent_workflow_file,
 )
 from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
-from app.services.workflow_workspace_state import (
-    dedupe_summary_artifact_references,
-    extract_final_answer,
-    serialize_workspace_state,
-)
-from app.tools.workflow.payloads import _normalize_workflow_payload_shape
-from app.services.workflow_repair_state import (
+from app.workflow.repair.state import (
     _build_tool_failure,
     _guard_repair_limit,
     _mark_terminal_failure,
@@ -36,6 +30,12 @@ from app.services.workflow_repair_state import (
     _repair_limit_failure,
     _require_reuse_after_failure,
 )
+from app.workflow.services.workspace_state import (
+    dedupe_summary_artifact_references,
+    extract_final_answer,
+    serialize_workspace_state,
+)
+from app.tools.workflow.payloads import _normalize_workflow_payload_shape
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
 

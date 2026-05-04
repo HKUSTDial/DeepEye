@@ -23,7 +23,7 @@ from app.services.workflow_tracking_service import (
     replace_workflow_artifacts,
     upsert_workflow_draft,
 )
-from app.services.workflow_workspace_state import dedupe_summary_artifact_references
+from app.workflow.services.workspace_state import dedupe_summary_artifact_references
 
 
 def _build_test_db():
