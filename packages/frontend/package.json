@@ -15,7 +15,7 @@
     "@remotion/player": "^4.0.452",
     "d3": "^7.9.0",
     "framer-motion": "^12.38.0",
-    "lucide-react": "^1.11.0",
+    "lucide-react": "^1.14.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",
