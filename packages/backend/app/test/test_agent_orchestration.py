@@ -751,7 +751,7 @@ async def test_workflow_agent_uses_compact_toolset(monkeypatch) -> None:
     )
     monkeypatch.setattr("app.tools.workflow_tools.WorkflowAgent", _FakeWorkflowAgent)
     monkeypatch.setattr(
-        "app.tools.workflow_tools.build_workspace_state",
+        "app.services.workflow_agent_response.build_workspace_state",
         lambda db, session_id: {
             "session_id": session_id,
             "draft": type("Draft", (), {"id": "draft-1", "status": "ready", "version": 1, "source": "workflow_agent"})(),
@@ -824,7 +824,7 @@ async def test_workflow_agent_returns_terminal_failure_without_summary(monkeypat
     )
     monkeypatch.setattr("app.tools.workflow_tools.WorkflowAgent", _FakeWorkflowAgent)
     monkeypatch.setattr(
-        "app.tools.workflow_tools.build_workspace_state",
+        "app.services.workflow_agent_response.build_workspace_state",
         lambda db, session_id: {"session_id": session_id, "draft": None, "run": None, "artifacts": []},
     )
 

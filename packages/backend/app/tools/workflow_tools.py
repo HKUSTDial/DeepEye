@@ -7,6 +7,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.db.session import SessionLocal
 from app.services.agent_prompts import build_workflow_summary_prompt
 from app.services.workflow_agent_drafts import read_workflow_definition, save_agent_workflow_draft
+from app.services.workflow_agent_response import (
+    build_workflow_agent_response,
+    serialize_workflow_agent_workspace_state,
+)
 from app.services.workflow_agent_runs import (
     WorkflowAgentRunOutcome,
     create_and_run_agent_workflow_draft,
@@ -31,11 +35,9 @@ from app.services.workflow_repair_state import (
     _register_repairable_failure,
     _repair_limit_failure,
     _require_reuse_after_failure,
-    _terminal_failure_reply,
 )
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
-from deepeye.utils.logger import logger
 
 
 def _build_run_failure_response(
@@ -311,55 +313,14 @@ def create_design_workflow_tool(
                 thread_id=f"workflow_agent_{session_id}",
                 config={"callbacks": callbacks},
             )
-            terminal_failure = repair_state.get("terminal_failure")
-            try:
-                snapshot = (
-                    build_workspace_state_for_turn(db, turn_id)
-                    if turn_id
-                    else build_workspace_state(db, session_id)
-                )
-            except Exception as exc:
-                logger.warning("[workflow_agent tool] failed to build workspace state: %s", exc)
-                snapshot = None
-            serialized = serialize_workspace_state(snapshot) if snapshot else {}
-            run = serialized.get("run") or {}
-            run_result = run.get("result") or {}
-            run_status = run.get("status") or "pending"
-            final_answer = extract_final_answer(serialized)
-            if terminal_failure:
-                return {
-                    "status": "failed",
-                    "next_action": "reply_directly",
-                    "turn_id": turn_id,
-                    "draft_id": terminal_failure.get("draft_id") or (serialized.get("draft") or {}).get("id"),
-                    "run_id": terminal_failure.get("run_id") or run.get("id"),
-                    "run_status": "failed",
-                    "error": terminal_failure.get("error"),
-                    "error_type": terminal_failure.get("error_type"),
-                    "error_summary": terminal_failure.get("error_summary"),
-                    "issues": terminal_failure.get("issues") or [],
-                    "validation_errors": terminal_failure.get("validation_errors"),
-                    "details": terminal_failure.get("details"),
-                    "artifacts": [artifact.get("kind") for artifact in serialized.get("artifacts", [])],
-                    "workspace_state": serialized,
-                    "final_answer": _terminal_failure_reply(goal, terminal_failure),
-                    "message_count": len(result.get("messages", [])),
-                }
-            return {
-                "status": "success" if run_status == "success" else run_status,
-                "next_action": "reply_directly" if final_answer and run_status == "success" else "summarize_workflow_result",
-                "turn_id": turn_id,
-                "draft_id": (serialized.get("draft") or {}).get("id"),
-                "run_id": run.get("id"),
-                "run_status": run_status,
-                "error": run.get("error"),
-                "validation_errors": run_result.get("validation_errors"),
-                "details": run_result.get("details"),
-                "artifacts": [artifact.get("kind") for artifact in serialized.get("artifacts", [])],
-                "workspace_state": serialized,
-                "final_answer": final_answer,
-                "message_count": len(result.get("messages", [])),
-            }
+            serialized = serialize_workflow_agent_workspace_state(db, session_id=session_id, turn_id=turn_id)
+            return build_workflow_agent_response(
+                goal=goal,
+                agent_result=result,
+                turn_id=turn_id,
+                terminal_failure=repair_state.get("terminal_failure"),
+                workspace_state=serialized,
+            )
         finally:
             db.close()
 
