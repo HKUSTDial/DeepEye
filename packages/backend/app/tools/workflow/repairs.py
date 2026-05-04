@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from app.tools.workflow.workspace_state import _extract_final_answer
+from app.services.workflow_workspace_state import extract_final_answer
 
 _MAX_REPAIR_ATTEMPTS = 2
 _ARTIFACT_NODE_TYPES = {"report.generate", "data.generate_dashboard", "video.generator"}
@@ -403,7 +403,6 @@ def _python_dataset_ref_contract_failure(
         message = detail.get("message")
         if not isinstance(node_id, str) or node_type != "python.code" or not isinstance(message, str):
             continue
-        lower_message = message.lower()
         error_text = f"{message}\n{error or ''}".lower()
         if not any(
             token in error_text
@@ -558,7 +557,7 @@ def _normalize_workflow_run_result(
             "error": None,
             "issues": [],
             "artifacts": artifacts,
-            "final_answer_present": _extract_final_answer(
+            "final_answer_present": extract_final_answer(
                 {"run": {"result": {"outputs": run_result.get("outputs", {})}}}
             )
             is not None,

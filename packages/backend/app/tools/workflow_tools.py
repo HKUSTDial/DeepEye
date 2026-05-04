@@ -15,6 +15,11 @@ from app.services.workflow_agent_runs import (
     run_agent_workflow_file,
 )
 from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
+from app.services.workflow_workspace_state import (
+    dedupe_summary_artifact_references,
+    extract_final_answer,
+    serialize_workspace_state,
+)
 from app.tools.workflow.payloads import _normalize_workflow_payload_shape
 from app.tools.workflow.repairs import (
     _build_tool_failure,
@@ -27,11 +32,6 @@ from app.tools.workflow.repairs import (
     _repair_limit_failure,
     _require_reuse_after_failure,
     _terminal_failure_reply,
-)
-from app.tools.workflow.workspace_state import (
-    _dedupe_summary_artifact_references,
-    _extract_final_answer,
-    _serialize_workspace_state,
 )
 from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
@@ -321,11 +321,11 @@ def create_design_workflow_tool(
             except Exception as exc:
                 logger.warning("[workflow_agent tool] failed to build workspace state: %s", exc)
                 snapshot = None
-            serialized = _serialize_workspace_state(snapshot) if snapshot else {}
+            serialized = serialize_workspace_state(snapshot) if snapshot else {}
             run = serialized.get("run") or {}
             run_result = run.get("result") or {}
             run_status = run.get("status") or "pending"
-            final_answer = _extract_final_answer(serialized)
+            final_answer = extract_final_answer(serialized)
             if terminal_failure:
                 return {
                     "status": "failed",
@@ -387,17 +387,17 @@ def create_summarize_workflow_result_tool(
         finally:
             db.close()
 
-        serialized = _serialize_workspace_state(snapshot)
+        serialized = serialize_workspace_state(snapshot)
         run = serialized.get("run")
         if not run:
             return "No workflow run is available to summarize yet."
-        final_answer = _extract_final_answer(serialized)
+        final_answer = extract_final_answer(serialized)
         if final_answer:
             return final_answer
 
         prompt = build_workflow_summary_prompt(
             question,
-            _dedupe_summary_artifact_references(serialized),
+            dedupe_summary_artifact_references(serialized),
         )
         response = await model.ainvoke(
             [

@@ -17,9 +17,9 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.services.agent_prompts import build_supervisor_prompt
+from app.services.workflow_workspace_state import extract_final_answer
 from app.tasks.callbacks import MessageCollector, _workflow_tool_trace_summary
 from app.tools.workflow_tools import (
-    _extract_final_answer,
     _new_repair_state,
     _normalize_workflow_payload_shape,
     _normalize_workflow_run_result,
@@ -611,7 +611,7 @@ def test_extract_final_answer_prefers_workflow_answer_output() -> None:
         }
     }
 
-    assert _extract_final_answer(workspace_state) == "The final grounded answer."
+    assert extract_final_answer(workspace_state) == "The final grounded answer."
 
 
 def test_normalize_workflow_payload_shape_converts_list_nodes_and_edges() -> None:

@@ -23,7 +23,7 @@ from app.services.workflow_tracking_service import (
     replace_workflow_artifacts,
     upsert_workflow_draft,
 )
-from app.tools.workflow.workspace_state import _dedupe_summary_artifact_references
+from app.services.workflow_workspace_state import dedupe_summary_artifact_references
 
 
 def _build_test_db():
@@ -323,7 +323,7 @@ def test_dedupe_summary_artifact_references_strips_duplicate_dashboard_url_from_
         ],
     }
 
-    deduped = _dedupe_summary_artifact_references(workspace_state)
+    deduped = dedupe_summary_artifact_references(workspace_state)
 
     assert deduped["run"]["result"]["outputs"]["dashboard"]["message"] == "ready"
     assert "dashboard_url" not in deduped["run"]["result"]["outputs"]["dashboard"]
