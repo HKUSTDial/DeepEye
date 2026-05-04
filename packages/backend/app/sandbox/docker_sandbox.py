@@ -17,8 +17,8 @@ from docker.errors import DockerException, NotFound
 from app.core.config import settings
 from app.services.docker_build_paths import resolve_docker_build_target
 from app.services.docker_control_client import get_docker_control_client
-from app.services.runtime_metrics import runtime_metrics
-from deepeye.sandbox import CommandResult, SandboxProtocol
+from app.runtime.services.metrics import runtime_metrics
+from deepeye.sandbox import CommandResult
 from deepeye.utils.logger import logger
 
 

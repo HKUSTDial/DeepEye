@@ -36,8 +36,8 @@ from docker.errors import ImageNotFound, NotFound
 from app.core.config import get_video_session_root, settings
 from app.services.docker_control_client import get_docker_control_client
 from app.services.docker_build_paths import resolve_docker_build_target
-from app.services.preview_runtime import preview_container_labels, preview_containers_to_cleanup
-from app.services.runtime_metrics import runtime_metrics
+from app.runtime.services.metrics import runtime_metrics
+from app.runtime.services.preview import preview_container_labels, preview_containers_to_cleanup
 from app.services.video_component_naming import expected_scene_component_files
 from deepeye.utils.logger import logger
 

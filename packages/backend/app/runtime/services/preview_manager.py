@@ -5,8 +5,8 @@ import asyncio
 import docker
 
 from app.core.config import settings
+from app.runtime.services.preview import preview_containers_to_cleanup
 from app.services.docker_control_client import get_docker_control_client
-from app.services.preview_runtime import preview_containers_to_cleanup
 from deepeye.utils.logger import logger
 
 

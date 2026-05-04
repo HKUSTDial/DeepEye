@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.sandbox import sandbox_manager
 from app.services.dashboard_deploy_service import dashboard_deployer
-from app.services.preview_runtime_manager import preview_runtime_manager
+from app.runtime.services.preview_manager import preview_runtime_manager
 from app.services.video_deploy_service import video_deployer
 
 

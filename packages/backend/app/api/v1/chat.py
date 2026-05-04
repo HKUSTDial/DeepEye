@@ -16,7 +16,7 @@ from app.db.session import get_db
 from app.repositories import SessionRepository
 from app.schemas import ChatRequest, SSEMessage
 from app.services import get_or_create_session, start_agent_workflow
-from app.services.runtime_metrics import runtime_metrics
+from app.runtime.services.metrics import runtime_metrics
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 

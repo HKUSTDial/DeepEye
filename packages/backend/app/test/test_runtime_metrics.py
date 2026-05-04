@@ -6,7 +6,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.api.v1.system import get_runtime_summary
-from app.services.runtime_metrics import runtime_metrics
+from app.runtime.services.metrics import runtime_metrics
 
 
 def test_runtime_metrics_snapshot_and_summary_endpoint() -> None:

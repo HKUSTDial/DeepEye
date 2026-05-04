@@ -9,6 +9,7 @@ from pathlib import Path
 APP_DIR = Path(__file__).resolve().parents[1]
 SERVICES_DIR = APP_DIR / "services"
 DATASOURCE_DIR = APP_DIR / "datasource"
+RUNTIME_DIR = APP_DIR / "runtime"
 WORKFLOW_DIR = APP_DIR / "workflow"
 LEGACY_DATASOURCE_SERVICE_MODULES = {
     "app.services.datasource_connection_service",
@@ -35,6 +36,11 @@ LEGACY_WORKFLOW_SERVICE_MODULES = {
     "app.services.workflow_targets",
     "app.services.workflow_tracking_service",
     "app.services.workflow_workspace_state",
+}
+LEGACY_RUNTIME_SERVICE_MODULES = {
+    "app.services.preview_runtime",
+    "app.services.preview_runtime_manager",
+    "app.services.runtime_metrics",
 }
 
 
@@ -86,6 +92,18 @@ def test_datasource_domain_does_not_depend_on_tools_layer() -> None:
     assert violations == []
 
 
+def test_runtime_domain_does_not_depend_on_tools_layer() -> None:
+    violations: list[str] = []
+    for path in sorted(RUNTIME_DIR.rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        for module in sorted(_imported_modules(path)):
+            if module == "app.tools" or module.startswith("app.tools."):
+                violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
 def test_services_root_does_not_contain_workflow_modules() -> None:
     workflow_modules = sorted(path.name for path in SERVICES_DIR.glob("workflow_*.py"))
 
@@ -98,10 +116,30 @@ def test_services_root_does_not_contain_datasource_modules() -> None:
     assert datasource_modules == []
 
 
+def test_services_root_does_not_contain_runtime_modules() -> None:
+    runtime_modules = sorted(
+        path.name
+        for pattern in ("preview_runtime*.py", "runtime_metrics.py")
+        for path in SERVICES_DIR.glob(pattern)
+    )
+
+    assert runtime_modules == []
+
+
 def test_moved_datasource_services_use_domain_import_paths() -> None:
     violations: list[str] = []
     for path in sorted(APP_DIR.rglob("*.py")):
         legacy_imports = sorted(_imported_modules(path) & LEGACY_DATASOURCE_SERVICE_MODULES)
+        for module in legacy_imports:
+            violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
+def test_moved_runtime_services_use_domain_import_paths() -> None:
+    violations: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        legacy_imports = sorted(_imported_modules(path) & LEGACY_RUNTIME_SERVICE_MODULES)
         for module in legacy_imports:
             violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
 

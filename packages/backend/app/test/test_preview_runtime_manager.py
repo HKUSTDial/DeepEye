@@ -7,7 +7,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services import preview_runtime_manager as preview_runtime_manager_module
+from app.runtime.services import preview_manager as preview_runtime_manager_module
 
 
 class _FakeContainer:

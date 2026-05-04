@@ -14,7 +14,7 @@ from app.models.workflow import Workflow
 from app.models.workflow_run import WorkflowRun
 from app.repositories import WorkflowRepository, WorkflowRunRepository
 from app.schemas.workflow import WorkflowCreate, WorkflowResponse, WorkflowRunResponse, WorkflowUpdate
-from app.services.runtime_metrics import runtime_metrics
+from app.runtime.services.metrics import runtime_metrics
 from app.tasks.workflow_tasks import run_workflow_task
 from app.core.config import settings
 

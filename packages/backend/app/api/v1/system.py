@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.services.runtime_metrics import runtime_metrics
+from app.runtime.services.metrics import runtime_metrics
 
 router = APIRouter(prefix="/system", tags=["system"])
 

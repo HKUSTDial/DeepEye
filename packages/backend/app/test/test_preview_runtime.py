@@ -9,7 +9,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.preview_runtime import preview_container_labels, preview_containers_to_cleanup
+from app.runtime.services.preview import preview_container_labels, preview_containers_to_cleanup
 
 
 def _container(name: str, *, status: str, created_at_epoch: int):
