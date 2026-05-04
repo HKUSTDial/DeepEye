@@ -7,7 +7,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.workflow_engine import build_registry
+from app.workflow.services.engine import build_registry
 from app.workflow.prompts import build_workflow_prompt, render_node_specs
 from deepeye.workflows.registry import NodeRegistry
 

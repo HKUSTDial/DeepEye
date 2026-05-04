@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.services.workflow_engine import build_registry
+from app.workflow.services.engine import build_registry
 
 router = APIRouter(prefix="/workflow-nodes", tags=["workflow-nodes"])
 

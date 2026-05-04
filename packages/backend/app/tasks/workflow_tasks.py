@@ -13,7 +13,7 @@ from app.models.workflow import Workflow
 from app.models.workflow_run import WorkflowRun
 from app.repositories import DataSourceRepository, WorkflowRepository, WorkflowRunRepository
 from app.infra import RedisEventBus
-from app.services.workflow_service import run_workflow, update_workflow_run
+from app.workflow.services.execution import run_workflow, update_workflow_run
 from app.sandbox import sandbox_manager
 from app.services.workflow_file_service import service_run_workflow_draft, service_run_workflow_from_file
 from app.tasks.db import open_task_session

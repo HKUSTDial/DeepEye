@@ -1,4 +1,4 @@
-from app.services.workflow_engine import build_registry
+from app.workflow.services.engine import build_registry
 from deepeye.workflows.models import Graph, Node
 from deepeye.workflows.validation import validate_workflow_graph
 

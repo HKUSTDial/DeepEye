@@ -9,7 +9,7 @@ from app.infra import RedisEventBus
 from app.core.config import settings
 from app.sandbox import sandbox_manager
 from app.workflow.services.datasets import compact_workflow_outputs
-from app.services.workflow_engine import build_engine
+from app.workflow.services.engine import build_engine
 from app.workflow.services.run_preparation import (
     prepare_tracked_workflow_draft_run as prepare_tracked_workflow_draft_run,
     prepare_tracked_workflow_file_run as prepare_tracked_workflow_file_run,
@@ -25,7 +25,7 @@ from app.workflow.services.run_result import (
     timestamp_utc,
 )
 from app.workflow.services.run_events import WorkflowRunEventPublisher
-from app.services.workflow_runtime_registry import (
+from app.workflow.services.runtime_registry import (
     clear_workflow_runtime_state,
     get_progress_publisher as get_progress_publisher,
     get_progress_publisher_by_workflow_id as get_progress_publisher_by_workflow_id,

@@ -16,7 +16,7 @@ from langchain_core.messages import AIMessage
 
 from app.models import DataSource
 from app.workflow.services.datasets import materialize_rows_to_sandbox_dataset
-from app.services.workflow_engine import build_engine
+from app.workflow.services.engine import build_engine
 from app.test.test_workflow_dataset_ref_integration import (
     _FakeSandbox,
     _build_test_db,

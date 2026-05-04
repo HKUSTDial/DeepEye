@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.infra import RedisEventBus
 from app.sandbox import sandbox_manager
 from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
-from app.services.workflow_engine import build_registry
+from app.workflow.services.engine import build_registry
 from app.services.agent_prompts import build_supervisor_prompt
 from app.workflow.prompts import build_workflow_prompt
 from app.workflow.services.tracking import (

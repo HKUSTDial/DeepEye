@@ -16,7 +16,7 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 from langchain_core.messages import AIMessage
 
 from app.node.code.python_code import PythonCodeHandler
-from app.services.workflow_engine import build_engine
+from app.workflow.services.engine import build_engine
 from app.node.llm.answer import LLMAnswerHandler
 from app.node.rows.basic import (
     RowsAggregateHandler,
