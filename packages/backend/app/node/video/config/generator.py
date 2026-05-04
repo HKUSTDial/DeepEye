@@ -15,6 +15,7 @@ import pandas as pd
 
 from app.core.config import settings
 
+from .data_utils import accumulate_token_usage, dataframe_to_list, list_to_dataframe
 from .prompts import (
     format_data_analyst_prompt,
     format_scene_designer_prompt,
@@ -374,82 +375,7 @@ class SimpleConfigGenerator:
         debug_prompts: bool = False
     ):
         self.client = LLMClient(api_base, api_key, model, debug_prompts=debug_prompts)
-    
-    def _accumulate_token_usage(self, usage: Dict, token_usage: Dict):
-        """累计 token 使用量到总统计中"""
-        if token_usage is not None:
-            token_usage["prompt_tokens"] += usage.get("prompt_tokens", 0)
-            token_usage["completion_tokens"] += usage.get("completion_tokens", 0)
-            token_usage["total_tokens"] += usage.get("total_tokens", 0)
-    
-    def _compare_numeric_value(self, value: Any, threshold: float, operator: str) -> bool:
-        """
-        Compare a value with a threshold, handling both numeric and string numeric values.
-        
-        Args:
-            value: The value to compare (can be int, float, or numeric string)
-            threshold: The threshold value (float)
-            operator: Comparison operator (">", "<", ">=", "<=")
-        
-        Returns:
-            bool: True if comparison succeeds, False otherwise
-        """
-        if value is None:
-            return False
-        
-        # Try to convert to float if it's a string
-        try:
-            if isinstance(value, str):
-                # Try to convert string to number
-                numeric_value = float(value)
-            elif isinstance(value, (int, float)):
-                numeric_value = float(value)
-            else:
-                return False
-        except (ValueError, TypeError):
-            return False
-        
-        # Perform comparison
-        if operator == ">":
-            return numeric_value > threshold
-        elif operator == "<":
-            return numeric_value < threshold
-        elif operator == ">=":
-            return numeric_value >= threshold
-        elif operator == "<=":
-            return numeric_value <= threshold
-        else:
-            return False
-    
-    def _list_to_dataframe(self, data: List[Dict]) -> pd.DataFrame:
-        """
-        Convert List[Dict] to pandas DataFrame.
-        
-        Args:
-            data: List of dictionaries
-        
-        Returns:
-            pandas DataFrame
-        """
-        if not data:
-            return pd.DataFrame()
-        return pd.DataFrame(data)
-    
-    def _dataframe_to_list(self, df: pd.DataFrame) -> List[Dict]:
-        """
-        Convert pandas DataFrame to List[Dict].
-        
-        Args:
-            df: pandas DataFrame
-        
-        Returns:
-            List of dictionaries
-        """
-        if df.empty:
-            return []
-        # Replace NaN with None for JSON compatibility
-        return df.replace({pd.NA: None, pd.NaT: None}).to_dict('records')
-    
+
     def generate(self, query: str, data: List[Dict], language: str = "English", verbose: bool = True, skip_animations: bool = False, skip_orchestration: bool = False, skip_decomposition: bool = False, progress_callback=None) -> Dict[str, Any]:
         """Generate video config (Storyboard-driven)
         
@@ -513,7 +439,7 @@ class SimpleConfigGenerator:
             
         scene_plans = self._plan_scenes(query, metadata, language, verbose, phase_token_usage["phase_0_scene_planning"])
         # 累计到总统计
-        self._accumulate_token_usage(phase_token_usage["phase_0_scene_planning"], total_token_usage)
+        accumulate_token_usage(phase_token_usage["phase_0_scene_planning"], total_token_usage)
         
         # Filter out stat_cards scenes - they will be generated in Phase 2
         # Only process chart scenes in Phase 0-1
@@ -603,7 +529,7 @@ class SimpleConfigGenerator:
                 filtered_data_list = [results_map.get(scene['id'], []) for scene in data_scenes]
         
         # 累计 Phase 0.5 的 token 到总统计
-        self._accumulate_token_usage(phase_token_usage["phase_0_5_data_preparation"], total_token_usage)
+        accumulate_token_usage(phase_token_usage["phase_0_5_data_preparation"], total_token_usage)
 
         # Check data preparation failure rate - if too high, stop
         if data_scenes:
@@ -669,7 +595,7 @@ class SimpleConfigGenerator:
                     include_narration=skip_orchestration  # Pass through for ablation study
                 )
                 # 累计到阶段统计
-                self._accumulate_token_usage(task_token_usage, phase_token_usage["phase_1_visual_generation"])
+                accumulate_token_usage(task_token_usage, phase_token_usage["phase_1_visual_generation"])
                 if scene_config:
                     scene_config['id'] = scene_plan.get('id')
                     # Store narrative goal and priority from scene plan
@@ -696,7 +622,7 @@ class SimpleConfigGenerator:
                 for future in as_completed(futures):
                     sid, config, usage = future.result()
                     # 累计 token 使用量（已经在 _design_visual_only 中累计到阶段统计了）
-                    self._accumulate_token_usage(usage, total_token_usage)
+                    accumulate_token_usage(usage, total_token_usage)
                     if config:
                         generated_scenes_map[sid] = config
                         if verbose:
@@ -765,7 +691,7 @@ class SimpleConfigGenerator:
                 token_usage=phase_token_usage["phase_2_narrative_generation"]
             )
             # 累计到总统计
-            self._accumulate_token_usage(phase_token_usage["phase_2_narrative_generation"], total_token_usage)
+            accumulate_token_usage(phase_token_usage["phase_2_narrative_generation"], total_token_usage)
         
         # Apply narrations to scenes
         if narrative_result:
@@ -854,7 +780,7 @@ class SimpleConfigGenerator:
                 progress_callback('animating', 80)
              config, animations_added = self._add_animations(config, verbose, phase_token_usage["phase_4_animation"])
              # 累计到总统计
-             self._accumulate_token_usage(phase_token_usage["phase_4_animation"], total_token_usage)
+             accumulate_token_usage(phase_token_usage["phase_4_animation"], total_token_usage)
              if verbose:
                 if animations_added:
                     print(f"✅ Added animations")
@@ -1165,7 +1091,7 @@ class SimpleConfigGenerator:
                 print(f"   📋 Planning analysis scenes...")
             response, usage = self.client.call_with_json_mode(prompt, temperature=0.7, verbose=verbose)
             # 累计 token 使用量
-            self._accumulate_token_usage(usage, token_usage)
+            accumulate_token_usage(usage, token_usage)
             scenes = response.get("scenes", [])
             
             if not scenes:
@@ -1648,7 +1574,7 @@ class SimpleConfigGenerator:
             return []
         
         # Convert to DataFrame
-        df = self._list_to_dataframe(data)
+        df = list_to_dataframe(data)
         if df.empty:
             return []
         
@@ -1666,7 +1592,7 @@ class SimpleConfigGenerator:
                 df = df[available_fields]
         
         # Convert back to List[Dict]
-        return self._dataframe_to_list(df)
+        return dataframe_to_list(df)
     
     def _plan_data_transformation(
         self,
@@ -1704,7 +1630,7 @@ class SimpleConfigGenerator:
             
             # 成功：累计 token 使用量
             if phase_token_usage is not None:
-                self._accumulate_token_usage(usage, phase_token_usage)
+                accumulate_token_usage(usage, phase_token_usage)
             
             if verbose:
                 trans_type = plan.get('transformation_type', 'unknown')
@@ -1807,7 +1733,7 @@ class SimpleConfigGenerator:
             
             # Success: accumulate token usage
             if phase_token_usage is not None:
-                self._accumulate_token_usage(usage, phase_token_usage)
+                accumulate_token_usage(usage, phase_token_usage)
             
             if verbose:
                 print(f"      ✅ Batch planning complete: {len(plans_dict)} transformation plans generated")
@@ -1932,7 +1858,7 @@ class SimpleConfigGenerator:
         if not data:
             return []
         
-        df = self._list_to_dataframe(data)
+        df = list_to_dataframe(data)
         if df.empty:
             return []
         
@@ -2126,7 +2052,7 @@ class SimpleConfigGenerator:
             result_df = result_df.head(limit)
         
         # Convert back to List[Dict]
-        return self._dataframe_to_list(result_df)
+        return dataframe_to_list(result_df)
     
     def _execute_time_series_aggregate(
         self,
@@ -2138,7 +2064,7 @@ class SimpleConfigGenerator:
         if not data:
             return []
         
-        df = self._list_to_dataframe(data)
+        df = list_to_dataframe(data)
         if df.empty:
             return []
         
@@ -2261,7 +2187,7 @@ class SimpleConfigGenerator:
             result_df = result_df.head(limit)
         
         # Convert back to List[Dict]
-        return self._dataframe_to_list(result_df)
+        return dataframe_to_list(result_df)
     
     def _execute_filter_and_select(
         self,
@@ -2273,7 +2199,7 @@ class SimpleConfigGenerator:
         if not data:
             return []
         
-        df = self._list_to_dataframe(data)
+        df = list_to_dataframe(data)
         if df.empty:
             return []
         
@@ -2302,7 +2228,7 @@ class SimpleConfigGenerator:
         if limit:
             df = df.head(limit)
         
-        return self._dataframe_to_list(df)
+        return dataframe_to_list(df)
     
     def _execute_top_n(
         self,
@@ -2320,7 +2246,7 @@ class SimpleConfigGenerator:
         group_by_fields = plan.get('group_by_fields', [])
         
         # Convert to DataFrame
-        df = self._list_to_dataframe(data)
+        df = list_to_dataframe(data)
         if df.empty:
             return []
         
@@ -2350,7 +2276,7 @@ class SimpleConfigGenerator:
                 # No sort_by specified, just take first N records
                 result_df = df.head(limit)
         
-        return self._dataframe_to_list(result_df)
+        return dataframe_to_list(result_df)
     
     def _execute_correlation_data(
         self,
@@ -2370,7 +2296,7 @@ class SimpleConfigGenerator:
             return data[:sample_size]
         
         # Convert to DataFrame for cleaning
-        df = self._list_to_dataframe(data)
+        df = list_to_dataframe(data)
         if df.empty:
             return []
         
@@ -2405,7 +2331,7 @@ class SimpleConfigGenerator:
                 print(f"      📉 Sampling correlation data: {len(result_df)} → {sample_size} points")
             result_df = result_df.sample(n=sample_size, random_state=42)
         
-        return self._dataframe_to_list(result_df)
+        return dataframe_to_list(result_df)
     
     def _calculate_derived_field(
         self,
@@ -2946,7 +2872,7 @@ class SimpleConfigGenerator:
                 verbose=verbose
             )
             # 累计 token 使用量
-            self._accumulate_token_usage(usage, token_usage)
+            accumulate_token_usage(usage, token_usage)
             
             # Validate config
             if "scenes" not in config:
@@ -3075,7 +3001,7 @@ class SimpleConfigGenerator:
                 verbose=verbose
             )
             # 累计 token 使用量
-            self._accumulate_token_usage(usage, token_usage)
+            accumulate_token_usage(usage, token_usage)
             
             # Validate result
             if 'scene_order' not in result:
@@ -3607,7 +3533,7 @@ class SimpleConfigGenerator:
                 scene_index, scene_id, animations, error, usage = future.result()
                 # 累计 token 使用量
                 if token_usage is not None:
-                    self._accumulate_token_usage(usage, token_usage)
+                    accumulate_token_usage(usage, token_usage)
                 if error:
                     if verbose:
                         print(f"   ⚠️  Failed to generate animations for {scene_id}: {error}")
@@ -3859,8 +3785,8 @@ class SimpleConfigGenerator:
                 temperature=0.7, 
                 verbose=verbose
             )
-            self._accumulate_token_usage(usage, phase_token_usage["phase_0_scene_planning"])
-            self._accumulate_token_usage(usage, total_token_usage)
+            accumulate_token_usage(usage, phase_token_usage["phase_0_scene_planning"])
+            accumulate_token_usage(usage, total_token_usage)
             
             scenes_plan = response.get("scenes", [])
             if not scenes_plan:
@@ -3957,8 +3883,8 @@ class SimpleConfigGenerator:
                 max_tokens=MAX_TOKENS,
                 verbose=verbose
             )
-            self._accumulate_token_usage(usage, phase_token_usage["phase_1_visual_generation"])
-            self._accumulate_token_usage(usage, total_token_usage)
+            accumulate_token_usage(usage, phase_token_usage["phase_1_visual_generation"])
+            accumulate_token_usage(usage, total_token_usage)
             
             generated_scenes = visual_config.get("scenes", [])
             if not generated_scenes:
@@ -4022,7 +3948,7 @@ class SimpleConfigGenerator:
                 verbose=verbose,
                 token_usage=phase_token_usage["phase_2_narrative_generation"]
             )
-            self._accumulate_token_usage(phase_token_usage["phase_2_narrative_generation"], total_token_usage)
+            accumulate_token_usage(phase_token_usage["phase_2_narrative_generation"], total_token_usage)
         
         # Apply narrations to scenes
         if narrative_result:
