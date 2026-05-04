@@ -13,7 +13,7 @@
     "d3": "^7.9.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "remotion": "^4.0.452"
+    "remotion": "^4.0.456"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
