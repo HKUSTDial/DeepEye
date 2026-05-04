@@ -144,7 +144,7 @@ def _get_single_datasource_schema(
         if not connection_string:
             return []
         try:
-            from app.node.core.db_utils import json_safe_row, normalize_connection_string
+            from app.infra.db import json_safe_row, normalize_connection_string
 
             data_engine = create_engine(normalize_connection_string(connection_string))
             try:

@@ -9,7 +9,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from app.node.core.db_utils import create_engine, json_safe_row
+from app.infra.db import create_engine, json_safe_row
 from app.repositories import DataSourceRepository
 from app.datasource.services.specs import (
     get_datasource_filename,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy import inspect, text
 
-from app.node.core.db_utils import create_engine, normalize_connection_string
 from app.datasource.services.specs import normalize_datasource_type, validate_database_datasource_type
+from app.infra.db import create_engine, normalize_connection_string
 
 
 def validate_database_connection(

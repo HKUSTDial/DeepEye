@@ -4,9 +4,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.datasource.services.specs import validate_database_datasource_type
+from app.infra.db import create_engine, fetch_rows
 from app.repositories import DataSourceRepository
 from app.node.core.base import BaseNode
-from app.node.core.db_utils import create_engine, fetch_rows, validate_datasource_type
 from app.workflow.services.datasets import build_dataset_ref, materialize_sql_query_to_sandbox_result
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
@@ -36,7 +37,7 @@ class SqlExecuteHandler:
 
         connection_string = ds.connection_string
         datasource_type = getattr(ds, "type", None)
-        validate_datasource_type(datasource_type)
+        validate_database_datasource_type(datasource_type)
         if not connection_string:
             raise ValueError("database datasource is missing connection_string")
 

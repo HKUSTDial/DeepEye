@@ -39,6 +39,9 @@ LEGACY_INFRA_SERVICE_MODULES = {
     "app.services.docker_control_client",
     "app.services.minio_service",
 }
+LEGACY_NODE_DB_UTILITY_MODULES = {
+    "app.node.core.db_utils",
+}
 LEGACY_WORKFLOW_SERVICE_MODULES = {
     "app.services.workflow_agent_drafts",
     "app.services.workflow_agent_response",
@@ -114,6 +117,18 @@ def test_datasource_domain_does_not_depend_on_tools_layer() -> None:
             continue
         for module in sorted(_imported_modules(path)):
             if module == "app.tools" or module.startswith("app.tools."):
+                violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
+def test_datasource_domain_does_not_depend_on_node_layer() -> None:
+    violations: list[str] = []
+    for path in sorted(DATASOURCE_DIR.rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        for module in sorted(_imported_modules(path)):
+            if module == "app.node" or module.startswith("app.node."):
                 violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
 
     assert violations == []
@@ -216,6 +231,16 @@ def test_moved_deploy_and_infra_services_use_domain_import_paths() -> None:
     violations: list[str] = []
     for path in sorted(APP_DIR.rglob("*.py")):
         legacy_imports = sorted(_imported_modules(path) & legacy_modules)
+        for module in legacy_imports:
+            violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
+def test_moved_database_helpers_use_infra_import_paths() -> None:
+    violations: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        legacy_imports = sorted(_imported_modules(path) & LEGACY_NODE_DB_UTILITY_MODULES)
         for module in legacy_imports:
             violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
 

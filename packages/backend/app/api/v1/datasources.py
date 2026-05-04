@@ -214,7 +214,7 @@ def list_datasource_tables(
         raise HTTPException(status_code=400, detail="Datasource has no connection_string")
     try:
         from sqlalchemy import create_engine, inspect
-        from app.node.core.db_utils import normalize_connection_string
+        from app.infra.db import normalize_connection_string
         engine = create_engine(normalize_connection_string(ds.connection_string))
         inspector = inspect(engine)
         tables = inspector.get_table_names()
