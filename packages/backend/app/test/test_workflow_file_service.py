@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models import Base, ChatSession, User
-from app.services.workflow_file_service import (
+from app.workflow.services.file_service import (
     _summarize_failed_context,
     prepare_tracked_workflow_draft_run,
     prepare_tracked_workflow_file_run,

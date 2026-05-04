@@ -15,7 +15,7 @@ from app.core.config import get_video_session_root, settings
 from app.node.core.base import BaseNode
 from app.workflow.services.datasets import dataset_ref_preview, is_dataset_ref, read_dataset_ref_rows
 from app.node.video.config.generator import create_generator
-from app.services.workflow_file_service import (
+from app.workflow.services.file_service import (
     get_progress_publisher_by_workflow_id,
     get_session_id_by_workflow_id,
 )

@@ -10,7 +10,7 @@ from app.core.deps import CurrentUserId
 from app.db.session import get_db
 from app.repositories import SessionRepository
 from app.schemas.workflow import WorkflowFileRunRequest
-from app.services.workflow_file_service import load_workflow_definition_from_file, prepare_tracked_workflow_file_run
+from app.workflow.services.file_service import load_workflow_definition_from_file, prepare_tracked_workflow_file_run
 from app.tasks.workflow_tasks import run_workflow_file_task
 
 router = APIRouter(prefix="/workflow-files", tags=["workflow-files"])

@@ -29,7 +29,7 @@ from app.schemas import (
 from app.sandbox import sandbox_manager
 from app.services.preview_runtime_manager import preview_runtime_manager
 from app.services import attach_datasource_to_session, detach_datasource_from_session, list_session_attachments
-from app.services.workflow_file_service import (
+from app.workflow.services.file_service import (
     prepare_tracked_workflow_draft_run,
     write_workflow_definition_to_file,
 )
