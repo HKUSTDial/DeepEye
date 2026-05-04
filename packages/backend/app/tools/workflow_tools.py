@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import shlex
 import uuid
 from typing import Any
 
@@ -9,14 +7,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.db.session import SessionLocal
 from app.repositories import SessionRepository
-from app.sandbox import sandbox_manager
 from app.services.agent_prompts import build_workflow_summary_prompt
+from app.services.workflow_agent_drafts import read_workflow_definition, save_agent_workflow_draft
 from app.services.workflow_file_service import (
     service_run_workflow_draft,
     service_run_workflow_from_file,
-    write_workflow_definition_to_file,
 )
-from app.services.workflow_targets import normalize_workflow_path, save_workflow_draft, resolve_workflow_target
+from app.services.workflow_targets import save_workflow_draft, resolve_workflow_target
 from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
 from app.tools.workflow.payloads import _normalize_workflow_payload_shape
 from app.tools.workflow.repairs import (
@@ -50,21 +47,6 @@ def _get_session(db, session_id: str):
     return SessionRepository(db).get(session_uuid)
 
 
-async def _read_workflow_file(session_id: str, path: str) -> dict:
-    sandbox = await sandbox_manager.get_or_create_sandbox(session_id)
-    if not sandbox:
-        raise ValueError("failed to get or create sandbox")
-    result = await sandbox.exec_command(f"cat {shlex.quote(path)}")
-    if result.exit_code != 0:
-        raise ValueError(result.stderr or "failed to read workflow file")
-    if not result.stdout.strip():
-        raise ValueError("workflow file is empty")
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"invalid workflow json: {exc}") from exc
-
-
 def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | None = None) -> callable:
     @tool
     async def create_workflow(
@@ -85,25 +67,16 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             planning_notes: Concise step-by-step planning notes explaining nodes, schemas, and edges.
         """
         workflow = _normalize_workflow_payload_shape(workflow)
-        db = SessionLocal()
-        try:
-            draft = save_workflow_draft(
-                db,
-                session_id=session_id,
-                user_id=user_id,
-                definition=workflow,
-                turn_id=turn_id,
-                draft_id=draft_id,
-                file_path=file_path,
-                name=name,
-                source="workflow_agent",
-            )
-        finally:
-            db.close()
-
-        norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
-        await write_workflow_definition_to_file(session_id, norm_path, workflow)
-        return {"status": "success", "draft_id": str(draft.id)}
+        saved = await save_agent_workflow_draft(
+            session_id=session_id,
+            user_id=user_id,
+            definition=workflow,
+            turn_id=turn_id,
+            draft_id=draft_id,
+            file_path=file_path,
+            name=name,
+        )
+        return {"status": "success", "draft_id": saved.draft_id}
 
     return create_workflow
 
@@ -118,31 +91,8 @@ def create_read_workflow_tool(session_id: str) -> callable:
             draft_id: Workflow draft id. Preferred.
             file_path: Explicit legacy sandbox workflow JSON file path. Fallback only.
         """
-        if not draft_id and not file_path:
-            return {"status": "error", "error": "Provide draft_id. Use file_path only for an explicit legacy workflow file."}
-
-        db = SessionLocal()
-        try:
-            existing_draft, norm_path = resolve_workflow_target(
-                db,
-                session_id,
-                draft_id=draft_id,
-                file_path=file_path,
-            )
-            if existing_draft and isinstance(existing_draft.definition, dict) and existing_draft.definition:
-                return {
-                    "status": "success",
-                    "workflow": existing_draft.definition,
-                    "draft_id": str(existing_draft.id),
-                }
-        finally:
-            db.close()
-
-        try:
-            workflow = await _read_workflow_file(session_id, norm_path)
-            return {"status": "success", "workflow": workflow, "draft_id": draft_id}
-        except Exception as exc:
-            return {"status": "error", "error": str(exc), "draft_id": draft_id}
+        result = await read_workflow_definition(session_id=session_id, draft_id=draft_id, file_path=file_path)
+        return result.to_tool_response()
 
     return read_workflow
 
@@ -179,25 +129,16 @@ def create_update_workflow_tool(
             if reuse_failure:
                 return reuse_failure
         workflow = _normalize_workflow_payload_shape(workflow)
-        db = SessionLocal()
-        try:
-            draft = save_workflow_draft(
-                db,
-                session_id=session_id,
-                user_id=user_id,
-                definition=workflow,
-                turn_id=turn_id,
-                draft_id=draft_id,
-                file_path=file_path,
-                name=name,
-                source="workflow_agent",
-            )
-        finally:
-            db.close()
-
-        norm_path = draft.file_path or normalize_workflow_path(file_path or name or "workflow.json")
-        await write_workflow_definition_to_file(session_id, norm_path, workflow)
-        return {"status": "success", "draft_id": str(draft.id)}
+        saved = await save_agent_workflow_draft(
+            session_id=session_id,
+            user_id=user_id,
+            definition=workflow,
+            turn_id=turn_id,
+            draft_id=draft_id,
+            file_path=file_path,
+            name=name,
+        )
+        return {"status": "success", "draft_id": saved.draft_id}
 
     return update_workflow
 
