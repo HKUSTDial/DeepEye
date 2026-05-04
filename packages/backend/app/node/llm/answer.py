@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
 from app.node.core.base import BaseNode
-from app.services.workflow_datasets import compact_value_for_transport, dataset_ref_columns, dataset_ref_preview, is_dataset_ref
+from app.workflow.services.datasets import compact_value_for_transport, dataset_ref_columns, dataset_ref_preview, is_dataset_ref
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 

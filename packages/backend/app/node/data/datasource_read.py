@@ -13,7 +13,7 @@ from app.services.datasource_specs import (
     validate_file_type,
     workspace_data_path,
 )
-from app.services.workflow_datasets import datasource_file_dataset_ref
+from app.workflow.services.datasets import datasource_file_dataset_ref
 from app.sandbox.docker_sandbox import DockerSandbox
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec

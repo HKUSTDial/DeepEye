@@ -8,7 +8,7 @@ from typing import Any
 from app.infra import RedisEventBus
 from app.core.config import settings
 from app.sandbox import sandbox_manager
-from app.services.workflow_datasets import compact_workflow_outputs
+from app.workflow.services.datasets import compact_workflow_outputs
 from app.services.workflow_engine import build_engine
 from app.services.workflow_run_preparation import (
     prepare_tracked_workflow_draft_run as prepare_tracked_workflow_draft_run,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from app.services.workflow_datasets import compact_value_for_transport, compact_workflow_result
+from app.workflow.services.datasets import compact_value_for_transport, compact_workflow_result
 
 
 _SUMMARY_ARTIFACT_REFERENCE_KEYS = (

@@ -15,7 +15,7 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 from langchain_core.messages import AIMessage
 
 from app.models import DataSource
-from app.services.workflow_datasets import materialize_rows_to_sandbox_dataset
+from app.workflow.services.datasets import materialize_rows_to_sandbox_dataset
 from app.services.workflow_engine import build_engine
 from app.test.test_workflow_dataset_ref_integration import (
     _FakeSandbox,

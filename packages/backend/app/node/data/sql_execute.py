@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.repositories import DataSourceRepository
 from app.node.core.base import BaseNode
 from app.node.core.db_utils import create_engine, fetch_rows, validate_datasource_type
-from app.services.workflow_datasets import build_dataset_ref, materialize_sql_query_to_sandbox_result
+from app.workflow.services.datasets import build_dataset_ref, materialize_sql_query_to_sandbox_result
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 

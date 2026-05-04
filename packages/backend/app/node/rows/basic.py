@@ -4,7 +4,7 @@ from collections import Counter
 from typing import Any
 
 from app.node.core.base import BaseNode
-from app.services.workflow_datasets import build_tabular_node_result, is_dataset_ref, read_dataset_ref_rows
+from app.workflow.services.datasets import build_tabular_node_result, is_dataset_ref, read_dataset_ref_rows
 from deepeye.workflows.models import Node, Port
 from deepeye.workflows.registry import NodeSpec
 

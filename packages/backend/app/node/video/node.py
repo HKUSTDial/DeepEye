@@ -13,7 +13,7 @@ from typing import Any
 
 from app.core.config import get_video_session_root, settings
 from app.node.core.base import BaseNode
-from app.services.workflow_datasets import dataset_ref_preview, is_dataset_ref, read_dataset_ref_rows
+from app.workflow.services.datasets import dataset_ref_preview, is_dataset_ref, read_dataset_ref_rows
 from app.node.video.config.generator import create_generator
 from app.services.workflow_file_service import (
     get_progress_publisher_by_workflow_id,

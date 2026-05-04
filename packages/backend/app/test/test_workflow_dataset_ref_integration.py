@@ -28,7 +28,7 @@ from app.node.data.datasource_read import DataSourceReadHandler
 from app.node.data.sql_execute import SqlExecuteHandler
 from app.node.report.node import ReportGenerateHandler
 from app.node.video.node import VideoGeneratorHandler
-from app.services.workflow_datasets import materialize_rows_to_sandbox_dataset
+from app.workflow.services.datasets import materialize_rows_to_sandbox_dataset
 from deepeye.workflows.models import Node
 
 
@@ -460,7 +460,7 @@ def test_sql_execute_materializes_preview_and_dataset_in_single_query(tmp_path, 
             del args, kwargs
             query_count["value"] += 1
 
-        monkeypatch.setattr("app.services.workflow_datasets.create_engine", lambda connection_string: engine)
+        monkeypatch.setattr("app.workflow.services.datasets.create_engine", lambda connection_string: engine)
         datasource = DataSource(
             user_id=user.id,
             name="sales.db",

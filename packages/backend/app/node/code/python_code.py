@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import base64
 import json
 from typing import Any
 
 from app.node.core.base import BaseNode
 from app.sandbox.docker_sandbox import DockerSandbox
-from app.services.workflow_datasets import (
+from app.workflow.services.datasets import (
     compact_dataset_ref,
     compact_value_for_transport,
     is_dataset_ref,

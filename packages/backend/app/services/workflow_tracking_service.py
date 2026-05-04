@@ -16,7 +16,7 @@ from app.repositories import (
     WorkflowDraftRepository,
     WorkflowRunRepository,
 )
-from app.services.workflow_datasets import compact_value_for_transport, compact_workflow_result
+from app.workflow.services.datasets import compact_value_for_transport, compact_workflow_result
 from app.workflow.artifacts import normalize_workflow_artifact
 from app.workflow.lifecycle import next_turn_status_after_run_finalized
 

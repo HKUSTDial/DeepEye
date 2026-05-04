@@ -6,7 +6,7 @@ from typing import Any
 
 from app.infra import EventBus
 from app.schemas import AgentEvent, AgentEventType
-from app.services.workflow_datasets import compact_node_outputs
+from app.workflow.services.datasets import compact_node_outputs
 from app.workflow.events import build_workflow_event_data
 
 TrackingRefsProvider = Callable[[], dict[str, str | None]]

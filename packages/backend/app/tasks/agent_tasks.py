@@ -13,7 +13,7 @@ from app.sandbox import sandbox_manager
 from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, SandboxEvent, SandboxEventType
 from app.services.workflow_engine import build_registry
 from app.services.agent_prompts import build_supervisor_prompt
-from app.services.workflow_prompts import build_workflow_prompt
+from app.workflow.prompts import build_workflow_prompt
 from app.services.workflow_tracking_service import (
     complete_chat_turn_record,
     create_chat_turn_record,

@@ -20,7 +20,7 @@ except ImportError:
     pd = None
 
 from app.node.core.base import BaseNode
-from app.services.workflow_datasets import dataset_ref_columns, dataset_ref_preview, download_dataset_ref_to_local_csv, is_dataset_ref
+from app.workflow.services.datasets import dataset_ref_columns, dataset_ref_preview, download_dataset_ref_to_local_csv, is_dataset_ref
 from deepeye.workflows.registry import NodeSpec
 from deepeye.workflows.models import Port
 from app.node.dashboard.nl2dashboard.design import DashboardDesigner

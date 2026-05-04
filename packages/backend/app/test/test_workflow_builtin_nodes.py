@@ -25,7 +25,7 @@ from app.node.rows.basic import (
     RowsSelectHandler,
     RowsSortHandler,
 )
-from app.services.workflow_datasets import dataset_ref_preview, materialize_rows_to_sandbox_dataset
+from app.workflow.services.datasets import dataset_ref_preview, materialize_rows_to_sandbox_dataset
 from deepeye.workflows.models import Edge, EdgeEndpoint, Graph, Node, Port, Workflow
 from deepeye.workflows.registry import NodeSpec
 
