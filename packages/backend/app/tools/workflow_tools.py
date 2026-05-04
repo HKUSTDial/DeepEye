@@ -5,7 +5,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.db.session import SessionLocal
-from app.services.agent_prompts import build_workflow_summary_prompt
+from app.agent.prompts import build_workflow_summary_prompt
 from app.workflow.services.agent_drafts import read_workflow_definition, save_agent_workflow_draft
 from app.workflow.services.agent_response import (
     build_workflow_agent_response,

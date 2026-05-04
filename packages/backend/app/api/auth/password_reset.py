@@ -16,8 +16,8 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models import User
 from app.repositories import AuthActionTokenRepository, RefreshTokenRepository
-from app.services.auth_audit import log_auth_event
-from app.services.auth_email import send_password_reset_email
+from app.auth.services.audit import log_auth_event
+from app.auth.services.email import send_password_reset_email
 
 router = APIRouter()
 

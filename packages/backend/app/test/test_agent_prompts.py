@@ -7,7 +7,7 @@ os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
-from app.services.agent_prompts import (
+from app.agent.prompts import (
     build_supervisor_prompt,
     build_workflow_summary_prompt,
 )

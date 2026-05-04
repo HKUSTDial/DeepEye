@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories import RefreshTokenRepository, UserEmailVerificationRepository
-from app.services.auth_audit import log_auth_event
+from app.auth.services.audit import log_auth_event
 
 router = APIRouter()
 

@@ -10,7 +10,7 @@ from app.api.auth.token_utils import get_refresh_token_from_request
 from app.core.auth import verify_token
 from app.db.session import get_db
 from app.repositories import RefreshTokenRepository
-from app.services.auth_audit import log_auth_event
+from app.auth.services.audit import log_auth_event
 
 router = APIRouter()
 

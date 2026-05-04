@@ -8,9 +8,19 @@ from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[1]
 SERVICES_DIR = APP_DIR / "services"
+AGENT_DIR = APP_DIR / "agent"
+AUTH_DIR = APP_DIR / "auth"
 DATASOURCE_DIR = APP_DIR / "datasource"
 RUNTIME_DIR = APP_DIR / "runtime"
+SESSION_DIR = APP_DIR / "session"
 WORKFLOW_DIR = APP_DIR / "workflow"
+LEGACY_AGENT_SERVICE_MODULES = {
+    "app.services.agent_prompts",
+}
+LEGACY_AUTH_SERVICE_MODULES = {
+    "app.services.auth_audit",
+    "app.services.auth_email",
+}
 LEGACY_DATASOURCE_SERVICE_MODULES = {
     "app.services.datasource_connection_service",
     "app.services.datasource_file_service",
@@ -41,6 +51,11 @@ LEGACY_RUNTIME_SERVICE_MODULES = {
     "app.services.preview_runtime",
     "app.services.preview_runtime_manager",
     "app.services.runtime_metrics",
+}
+LEGACY_SESSION_SERVICE_MODULES = {
+    "app.services.chat_service",
+    "app.services.session_attachment_service",
+    "app.services.session_service",
 }
 
 
@@ -104,6 +119,19 @@ def test_runtime_domain_does_not_depend_on_tools_layer() -> None:
     assert violations == []
 
 
+def test_auth_session_agent_domains_do_not_depend_on_tools_layer() -> None:
+    violations: list[str] = []
+    for domain_dir in (AGENT_DIR, AUTH_DIR, SESSION_DIR):
+        for path in sorted(domain_dir.rglob("*.py")):
+            if path.name == "__init__.py":
+                continue
+            for module in sorted(_imported_modules(path)):
+                if module == "app.tools" or module.startswith("app.tools."):
+                    violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
 def test_services_root_does_not_contain_workflow_modules() -> None:
     workflow_modules = sorted(path.name for path in SERVICES_DIR.glob("workflow_*.py"))
 
@@ -126,6 +154,16 @@ def test_services_root_does_not_contain_runtime_modules() -> None:
     assert runtime_modules == []
 
 
+def test_services_root_does_not_contain_auth_session_agent_modules() -> None:
+    moved_modules = sorted(
+        path.name
+        for pattern in ("agent_prompts.py", "auth_*.py", "chat_service.py", "session_*.py")
+        for path in SERVICES_DIR.glob(pattern)
+    )
+
+    assert moved_modules == []
+
+
 def test_moved_datasource_services_use_domain_import_paths() -> None:
     violations: list[str] = []
     for path in sorted(APP_DIR.rglob("*.py")):
@@ -140,6 +178,17 @@ def test_moved_runtime_services_use_domain_import_paths() -> None:
     violations: list[str] = []
     for path in sorted(APP_DIR.rglob("*.py")):
         legacy_imports = sorted(_imported_modules(path) & LEGACY_RUNTIME_SERVICE_MODULES)
+        for module in legacy_imports:
+            violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
+def test_moved_auth_session_agent_services_use_domain_import_paths() -> None:
+    legacy_modules = LEGACY_AGENT_SERVICE_MODULES | LEGACY_AUTH_SERVICE_MODULES | LEGACY_SESSION_SERVICE_MODULES
+    violations: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        legacy_imports = sorted(_imported_modules(path) & legacy_modules)
         for module in legacy_imports:
             violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
 
