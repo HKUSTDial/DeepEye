@@ -157,10 +157,26 @@ def test_deploy_and_infra_domains_do_not_depend_on_tools_layer() -> None:
     assert violations == []
 
 
-def test_services_root_contains_only_package_initializer() -> None:
+def test_services_root_contains_no_modules() -> None:
     root_modules = sorted(path.name for path in SERVICES_DIR.glob("*.py"))
 
-    assert root_modules == ["__init__.py"]
+    assert root_modules == []
+
+
+def test_production_code_does_not_import_services_facade() -> None:
+    violations: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        if APP_DIR / "test" in path.parents:
+            continue
+        legacy_imports = sorted(
+            module
+            for module in _imported_modules(path)
+            if module == "app.services" or module.startswith("app.services.")
+        )
+        for module in legacy_imports:
+            violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
 
 
 def test_services_root_does_not_contain_workflow_modules() -> None:

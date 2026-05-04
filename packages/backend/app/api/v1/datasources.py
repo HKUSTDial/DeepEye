@@ -20,7 +20,6 @@ from app.schemas import (
     SandboxEvent,
     SandboxEventType,
 )
-from app.services import attach_datasource_to_session
 from app.datasource.services.connection import validate_database_connection
 from app.datasource.services.file import create_file_datasource
 from app.datasource.services.preview import build_datasource_preview
@@ -35,6 +34,7 @@ from app.datasource.services.specs import (
 )
 from app.infra.event_bus import RedisEventBus
 from app.core.config import settings
+from app.session.services.attachment import attach_datasource_to_session
 
 router = APIRouter(prefix="/datasources", tags=["datasources"])
 
