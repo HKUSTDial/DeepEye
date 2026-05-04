@@ -21,7 +21,7 @@ from app.services.workflow_workspace_state import (
     serialize_workspace_state,
 )
 from app.tools.workflow.payloads import _normalize_workflow_payload_shape
-from app.tools.workflow.repairs import (
+from app.services.workflow_repair_state import (
     _build_tool_failure,
     _guard_repair_limit,
     _mark_terminal_failure,
