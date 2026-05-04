@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 from sqlalchemy import text
 
-from app.services.datasource_specs import validate_database_datasource_type
+from app.datasource.services.specs import validate_database_datasource_type
 
 
 def normalize_connection_string(connection_string: str) -> str:

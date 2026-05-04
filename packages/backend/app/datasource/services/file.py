@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.datasource import DataSource
 from app.services.minio_service import upload_bytes
-from app.services.datasource_specs import (
+from app.datasource.services.specs import (
     ensure_supported_filename,
     infer_file_type,
     sanitize_filename,

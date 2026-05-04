@@ -13,7 +13,7 @@ os.environ.setdefault("LLM_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.sandbox.manager import SandboxManager, _DATASOURCE_SYNC_MANIFEST_PATH, _get_datasource_filename
-from app.services.datasource_specs import workspace_data_path
+from app.datasource.services.specs import workspace_data_path
 
 
 class _FakeResult(SimpleNamespace):

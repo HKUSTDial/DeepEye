@@ -21,10 +21,10 @@ from app.schemas import (
     SandboxEventType,
 )
 from app.services import attach_datasource_to_session
-from app.services.datasource_connection_service import validate_database_connection
-from app.services.datasource_file_service import create_file_datasource
-from app.services.datasource_preview_service import build_datasource_preview
-from app.services.datasource_specs import (
+from app.datasource.services.connection import validate_database_connection
+from app.datasource.services.file import create_file_datasource
+from app.datasource.services.preview import build_datasource_preview
+from app.datasource.services.specs import (
     DataSourceCategory,
     get_datasource_filename,
     normalize_datasource_category,

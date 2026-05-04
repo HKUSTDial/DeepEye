@@ -4,14 +4,14 @@ import sqlite3
 import uuid
 from types import SimpleNamespace
 
-from app.services.datasource_preview_service import build_datasource_preview
+from app.datasource.services.preview import build_datasource_preview
 
 
 def test_build_datasource_preview_paginates_csv_file(monkeypatch) -> None:
     raw_csv = b"id,name\n1,Ada\n2,Bob\n3,Cleo\n4,Dylan\n"
 
     monkeypatch.setattr(
-        "app.services.datasource_preview_service.download_bytes",
+        "app.datasource.services.preview.download_bytes",
         lambda bucket_name, object_name: raw_csv,
     )
 

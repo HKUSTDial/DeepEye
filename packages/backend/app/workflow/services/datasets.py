@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from app.node.core.db_utils import create_engine, json_safe_row
 from app.repositories import DataSourceRepository
-from app.services.datasource_specs import (
+from app.datasource.services.specs import (
     get_datasource_filename,
     infer_file_type,
     normalize_datasource_type,

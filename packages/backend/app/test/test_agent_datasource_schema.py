@@ -15,7 +15,7 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 
 from app.tasks import agent_datasources
 from app.tasks.datasource_schema_cache import clear_datasource_schema_cache
-from app.services.datasource_specs import normalize_datasource_type
+from app.datasource.services.specs import normalize_datasource_type
 
 
 class _FakeSessionContext:

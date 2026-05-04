@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories import DataSourceRepository
 from app.node.core.base import BaseNode
-from app.services.datasource_specs import (
+from app.datasource.services.specs import (
     infer_file_type,
     normalize_datasource_type,
     validate_file_type,

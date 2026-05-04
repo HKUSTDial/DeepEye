@@ -8,7 +8,14 @@ from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[1]
 SERVICES_DIR = APP_DIR / "services"
+DATASOURCE_DIR = APP_DIR / "datasource"
 WORKFLOW_DIR = APP_DIR / "workflow"
+LEGACY_DATASOURCE_SERVICE_MODULES = {
+    "app.services.datasource_connection_service",
+    "app.services.datasource_file_service",
+    "app.services.datasource_preview_service",
+    "app.services.datasource_specs",
+}
 LEGACY_WORKFLOW_SERVICE_MODULES = {
     "app.services.workflow_agent_drafts",
     "app.services.workflow_agent_response",
@@ -67,10 +74,38 @@ def test_workflow_domain_does_not_depend_on_tools_layer() -> None:
     assert violations == []
 
 
+def test_datasource_domain_does_not_depend_on_tools_layer() -> None:
+    violations: list[str] = []
+    for path in sorted(DATASOURCE_DIR.rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        for module in sorted(_imported_modules(path)):
+            if module == "app.tools" or module.startswith("app.tools."):
+                violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
+
+
 def test_services_root_does_not_contain_workflow_modules() -> None:
     workflow_modules = sorted(path.name for path in SERVICES_DIR.glob("workflow_*.py"))
 
     assert workflow_modules == []
+
+
+def test_services_root_does_not_contain_datasource_modules() -> None:
+    datasource_modules = sorted(path.name for path in SERVICES_DIR.glob("datasource_*.py"))
+
+    assert datasource_modules == []
+
+
+def test_moved_datasource_services_use_domain_import_paths() -> None:
+    violations: list[str] = []
+    for path in sorted(APP_DIR.rglob("*.py")):
+        legacy_imports = sorted(_imported_modules(path) & LEGACY_DATASOURCE_SERVICE_MODULES)
+        for module in legacy_imports:
+            violations.append(f"{path.relative_to(APP_DIR)} imports {module}")
+
+    assert violations == []
 
 
 def test_moved_workflow_services_use_domain_import_paths() -> None:

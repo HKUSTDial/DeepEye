@@ -7,7 +7,7 @@ from typing import Any
 from deepeye.utils.logger import logger
 
 from app.sandbox.docker_sandbox import DockerSandbox
-from app.services.datasource_specs import workspace_data_path
+from app.datasource.services.specs import workspace_data_path
 
 DATASOURCE_SYNC_MANIFEST_PATH = "/workspace/.deepeye/datasource_sync_manifest.json"
 

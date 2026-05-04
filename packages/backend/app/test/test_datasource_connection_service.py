@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.datasource_connection_service import validate_database_connection
+from app.datasource.services.connection import validate_database_connection
 
 
 def test_validate_database_connection_returns_table_metadata(monkeypatch) -> None:
@@ -25,9 +25,9 @@ def test_validate_database_connection_returns_table_metadata(monkeypatch) -> Non
         def dispose(self):
             return None
 
-    monkeypatch.setattr("app.services.datasource_connection_service.create_engine", lambda _: DummyEngine())
+    monkeypatch.setattr("app.datasource.services.connection.create_engine", lambda _: DummyEngine())
     monkeypatch.setattr(
-        "app.services.datasource_connection_service.inspect",
+        "app.datasource.services.connection.inspect",
         lambda engine: SimpleNamespace(get_table_names=lambda: ["stores", "daily_store_sales"]),
     )
 
@@ -50,7 +50,7 @@ def test_validate_database_connection_surfaces_connection_errors(monkeypatch) ->
         def dispose(self):
             return None
 
-    monkeypatch.setattr("app.services.datasource_connection_service.create_engine", lambda _: DummyEngine())
+    monkeypatch.setattr("app.datasource.services.connection.create_engine", lambda _: DummyEngine())
 
     with pytest.raises(ValueError, match="Failed to connect to database: boom"):
         validate_database_connection(
