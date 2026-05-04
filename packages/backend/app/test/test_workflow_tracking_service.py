@@ -241,7 +241,7 @@ def test_workspace_state_falls_back_to_latest_session_run_without_turn():
         assert len(state["artifacts"]) == 1
         assert state["artifacts"][0].payload["kind"] == "dashboard"
         assert state["artifacts"][0].payload["preview"] == {
-            "type": "iframe",
+            "type": "url",
             "url": "http://localhost:3000/dashboard/manual",
         }
     finally:

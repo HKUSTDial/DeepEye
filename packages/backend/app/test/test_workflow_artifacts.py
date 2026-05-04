@@ -57,7 +57,7 @@ def test_normalize_video_artifact_distinguishes_running_task_from_ready_preview(
     assert running["preview"] == {"type": "none"}
     assert ready["status"] == "ready"
     assert ready["preview"] == {
-        "type": "iframe",
+        "type": "url",
         "url": "/video-previews/deepeye-video-task-1/",
     }
     assert ready["video_url"] == "/video-previews/deepeye-video-task-1/"
@@ -111,6 +111,7 @@ def test_normalized_artifact_payload_matches_typed_protocol_model():
     assert payload.status == "ready"
     assert payload.node_id == "dashboard_node"
     assert payload.preview.url == "/dashboards/demo/"
+    assert payload.preview.type == "url"
     assert payload.payload["dashboard_url"] == "/dashboards/demo/"
 
 

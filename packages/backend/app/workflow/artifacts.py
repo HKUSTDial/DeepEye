@@ -205,11 +205,11 @@ def _derive_preview(kind: str, fields: Mapping[str, Any]) -> dict[str, Any]:
             }
 
     if kind == "dashboard" and not _is_empty(fields.get("dashboard_url")):
-        return {"type": "iframe", "url": fields["dashboard_url"]}
+        return {"type": "url", "url": fields["dashboard_url"]}
 
     if kind == "video":
         if not _is_empty(fields.get("video_url")):
-            return {"type": "iframe", "url": fields["video_url"]}
+            return {"type": "url", "url": fields["video_url"]}
         if not _is_empty(fields.get("video_path")):
             return {"path": fields["video_path"], "type": "video"}
 

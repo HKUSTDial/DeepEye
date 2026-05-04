@@ -10,7 +10,21 @@ from app.schemas import AgentEvent, AgentEventType
 from app.workflow.artifacts import (
     extract_workflow_artifacts as extract_normalized_workflow_artifacts,
     normalize_workflow_artifact,
+    normalize_workflow_artifacts,
 )
+
+
+def _normalize_event_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not payload:
+        return {}
+    normalized = dict(payload)
+    artifact = normalized.get("artifact")
+    if isinstance(artifact, dict):
+        normalized["artifact"] = normalize_workflow_artifact(artifact.get("kind"), artifact)
+    artifacts = normalized.get("artifacts")
+    if isinstance(artifacts, list):
+        normalized["artifacts"] = normalize_workflow_artifacts(artifacts)
+    return normalized
 
 
 def build_workflow_event_data(
@@ -34,7 +48,7 @@ def build_workflow_event_data(
         "run_id": run_id,
         "phase": phase,
         "metadata": metadata,
-        "payload": payload or {},
+        "payload": _normalize_event_payload(payload),
     }
 
 

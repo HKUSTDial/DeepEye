@@ -28,7 +28,43 @@ def test_build_workflow_event_data_includes_standard_fields():
     assert data["run_id"] == "run-1"
     assert data["phase"] == "artifact_ready"
     assert data["metadata"] == {"file_path": "/workspace/workflow/report.json"}
-    assert data["payload"] == {"artifact": {"kind": "report"}}
+    assert data["payload"]["artifact"] == {
+        "files": [],
+        "kind": "report",
+        "payload": {},
+        "preview": {"type": "none"},
+        "status": "pending",
+        "title": "Report",
+    }
+
+
+def test_build_workflow_event_data_normalizes_legacy_artifact_payloads():
+    data = build_workflow_event_data(
+        "session-1",
+        "artifact_ready",
+        {
+            "artifact": {
+                "kind": "dashboard",
+                "dashboard_url": "/dashboards/demo/",
+            },
+            "artifacts": [
+                {
+                    "kind": "video",
+                    "video_url": "/video-previews/demo/",
+                }
+            ],
+        },
+    )
+
+    assert data["payload"]["artifact"]["preview"] == {
+        "type": "url",
+        "url": "/dashboards/demo/",
+    }
+    assert data["payload"]["artifact"]["payload"]["dashboard_url"] == "/dashboards/demo/"
+    assert data["payload"]["artifacts"][0]["preview"] == {
+        "type": "url",
+        "url": "/video-previews/demo/",
+    }
 
 
 def test_extract_workflow_artifacts_from_outputs():
@@ -55,9 +91,9 @@ def test_extract_workflow_artifacts_from_outputs():
     assert artifacts[0]["preview"]["type"] == "html"
     assert artifacts[0]["payload"]["report_path"] == "/workspace/analysis_report.html"
     assert artifacts[1]["dashboard_url"] == "/dashboards/demo/"
-    assert artifacts[1]["preview"] == {"type": "iframe", "url": "/dashboards/demo/"}
+    assert artifacts[1]["preview"] == {"type": "url", "url": "/dashboards/demo/"}
     assert artifacts[2]["task_id"] == "20260306_120000"
     assert artifacts[2]["preview"] == {
-        "type": "iframe",
+        "type": "url",
         "url": "/video-previews/deepeye-video-20260306_120000/",
     }
