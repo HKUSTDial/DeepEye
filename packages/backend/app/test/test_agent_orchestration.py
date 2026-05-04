@@ -746,7 +746,7 @@ async def test_workflow_agent_uses_compact_toolset(monkeypatch) -> None:
 
     monkeypatch.setattr("app.tools.workflow_tools.SessionLocal", lambda: _FakeDb())
     monkeypatch.setattr(
-        "app.tools.workflow_tools._get_session",
+        "app.tools.workflow_tools.get_workflow_session",
         lambda db, session_id: type("Session", (), {"user_id": "user-1"})(),
     )
     monkeypatch.setattr("app.tools.workflow_tools.WorkflowAgent", _FakeWorkflowAgent)
@@ -799,7 +799,7 @@ async def test_workflow_agent_returns_terminal_failure_without_summary(monkeypat
 
     monkeypatch.setattr("app.tools.workflow_tools.SessionLocal", lambda: _FakeDb())
     monkeypatch.setattr(
-        "app.tools.workflow_tools._get_session",
+        "app.tools.workflow_tools.get_workflow_session",
         lambda db, session_id: type("Session", (), {"user_id": "user-1"})(),
     )
     monkeypatch.setattr(

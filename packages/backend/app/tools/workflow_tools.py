@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.db.session import SessionLocal
-from app.repositories import SessionRepository
 from app.services.agent_prompts import build_workflow_summary_prompt
 from app.services.workflow_agent_drafts import read_workflow_definition, save_agent_workflow_draft
-from app.services.workflow_file_service import (
-    service_run_workflow_draft,
-    service_run_workflow_from_file,
+from app.services.workflow_agent_runs import (
+    WorkflowAgentRunOutcome,
+    create_and_run_agent_workflow_draft,
+    get_workflow_session,
+    run_agent_workflow_draft,
+    run_agent_workflow_file,
 )
-from app.services.workflow_targets import save_workflow_draft, resolve_workflow_target
 from app.services.workflow_tracking_service import build_workspace_state, build_workspace_state_for_turn
 from app.tools.workflow.payloads import _normalize_workflow_payload_shape
 from app.tools.workflow.repairs import (
@@ -38,13 +38,39 @@ from deepeye.tools.base import tool
 from deepeye.utils.logger import logger
 
 
-def _get_session(db, session_id: str):
-    try:
-        session_uuid = uuid.UUID(session_id)
-    except (TypeError, ValueError):
-        logger.warning("[workflow_tools] Invalid session_id=%s", session_id)
-        return None
-    return SessionRepository(db).get(session_uuid)
+def _build_run_failure_response(
+    outcome: WorkflowAgentRunOutcome,
+    repair_state: dict[str, Any] | None,
+) -> dict:
+    failure = _build_tool_failure(
+        draft_id=outcome.draft_id,
+        error_type=outcome.error_type or "workflow_run_failed",
+        error_summary=outcome.error_summary or outcome.error or "Workflow run failed.",
+        repairable=outcome.repairable,
+        error=outcome.error or "Workflow run failed.",
+    )
+    if repair_state:
+        return _mark_terminal_failure(repair_state, failure)
+    return failure
+
+
+def _finalize_workflow_run_result(
+    normalized: dict,
+    repair_state: dict[str, Any] | None,
+    draft_id: str,
+) -> dict:
+    if repair_state:
+        if normalized["status"] == "success":
+            _note_successful_run(repair_state, draft_id)
+        elif normalized["repairable"]:
+            limit_failure = _register_repairable_failure(repair_state, draft_id)
+            if limit_failure:
+                return limit_failure
+            if repair_state.get("limit_exhausted"):
+                return _repair_limit_failure(repair_state, normalized)
+        else:
+            return _mark_terminal_failure(repair_state, normalized)
+    return normalized
 
 
 def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | None = None) -> callable:
@@ -152,25 +178,7 @@ def create_run_workflow_from_file_tool(session_id: str, turn_id: str | None = No
         Args:
             file_path: Workflow JSON file path for an explicitly file-based workflow.
         """
-        db = SessionLocal()
-        try:
-            session = _get_session(db, session_id)
-            if not session:
-                return {"status": "error", "error": "Session not found."}
-            _, norm_path = resolve_workflow_target(
-                db,
-                session_id,
-                file_path=file_path,
-            )
-            return await service_run_workflow_from_file(
-                db,
-                session.user_id,
-                session_id,
-                norm_path,
-                turn_id=turn_id,
-            )
-        finally:
-            db.close()
+        return await run_agent_workflow_file(session_id=session_id, file_path=file_path, turn_id=turn_id)
 
     return run_workflow_from_file
 
@@ -195,62 +203,15 @@ def create_run_workflow_tool(
             reuse_failure = _require_reuse_after_failure(repair_state, draft_id)
             if reuse_failure:
                 return reuse_failure
-        db = SessionLocal()
-        try:
-            session = _get_session(db, session_id)
-            if not session:
-                failure = _build_tool_failure(
-                    draft_id=draft_id,
-                    error_type="session_not_found",
-                    error_summary="Session not found.",
-                    repairable=False,
-                    error="Session not found.",
-                )
-                if repair_state:
-                    return _mark_terminal_failure(repair_state, failure)
-                return failure
-            existing_draft, norm_path = resolve_workflow_target(
-                db,
-                session_id,
-                draft_id=draft_id,
-            )
-            if not existing_draft or not isinstance(existing_draft.definition, dict):
-                failure = _build_tool_failure(
-                    draft_id=draft_id,
-                    error_type="draft_not_found",
-                    error_summary="Workflow draft not found.",
-                    repairable=False,
-                    error="Workflow draft not found.",
-                )
-                if repair_state:
-                    return _mark_terminal_failure(repair_state, failure)
-                return failure
-            result = await service_run_workflow_draft(
-                db,
-                session.user_id,
-                session_id,
-                str(existing_draft.id),
-                turn_id=turn_id,
-            )
-            normalized = _normalize_workflow_run_result(
-                result,
-                draft_id=str(existing_draft.id),
-                workflow_definition=existing_draft.definition,
-            )
-            if repair_state:
-                if normalized["status"] == "success":
-                    _note_successful_run(repair_state, str(existing_draft.id))
-                elif normalized["repairable"]:
-                    limit_failure = _register_repairable_failure(repair_state, str(existing_draft.id))
-                    if limit_failure:
-                        return limit_failure
-                    if repair_state.get("limit_exhausted"):
-                        return _repair_limit_failure(repair_state, normalized)
-                else:
-                    return _mark_terminal_failure(repair_state, normalized)
-            return normalized
-        finally:
-            db.close()
+        outcome = await run_agent_workflow_draft(session_id=session_id, draft_id=draft_id, turn_id=turn_id)
+        if outcome.is_failure:
+            return _build_run_failure_response(outcome, repair_state)
+        normalized = _normalize_workflow_run_result(
+            outcome.raw_result or {},
+            draft_id=outcome.draft_id or draft_id,
+            workflow_definition=outcome.workflow_definition or {},
+        )
+        return _finalize_workflow_run_result(normalized, repair_state, outcome.draft_id or draft_id)
 
     return run_workflow
 
@@ -288,57 +249,22 @@ def create_workflow_and_run_tool(
             if reuse_failure:
                 return reuse_failure
         workflow = _normalize_workflow_payload_shape(workflow)
-        db = SessionLocal()
-        try:
-            session = _get_session(db, session_id)
-            if not session:
-                failure = _build_tool_failure(
-                    draft_id=draft_id,
-                    error_type="session_not_found",
-                    error_summary="Session not found.",
-                    repairable=False,
-                    error="Session not found.",
-                )
-                if repair_state:
-                    return _mark_terminal_failure(repair_state, failure)
-                return failure
-            draft = save_workflow_draft(
-                db,
-                session_id=session_id,
-                user_id=str(session.user_id),
-                definition=workflow,
-                turn_id=turn_id,
-                draft_id=draft_id,
-                file_path=file_path,
-                name=name,
-                source="workflow_agent",
-            )
-            result = await service_run_workflow_draft(
-                db,
-                session.user_id,
-                session_id,
-                str(draft.id),
-                turn_id=turn_id,
-            )
-            normalized = _normalize_workflow_run_result(
-                result,
-                draft_id=str(draft.id),
-                workflow_definition=workflow,
-            )
-            if repair_state:
-                if normalized["status"] == "success":
-                    _note_successful_run(repair_state, str(draft.id))
-                elif normalized["repairable"]:
-                    limit_failure = _register_repairable_failure(repair_state, str(draft.id))
-                    if limit_failure:
-                        return limit_failure
-                    if repair_state.get("limit_exhausted"):
-                        return _repair_limit_failure(repair_state, normalized)
-                else:
-                    return _mark_terminal_failure(repair_state, normalized)
-            return normalized
-        finally:
-            db.close()
+        outcome = await create_and_run_agent_workflow_draft(
+            session_id=session_id,
+            definition=workflow,
+            turn_id=turn_id,
+            draft_id=draft_id,
+            file_path=file_path,
+            name=name,
+        )
+        if outcome.is_failure:
+            return _build_run_failure_response(outcome, repair_state)
+        normalized = _normalize_workflow_run_result(
+            outcome.raw_result or {},
+            draft_id=outcome.draft_id or draft_id,
+            workflow_definition=outcome.workflow_definition or workflow,
+        )
+        return _finalize_workflow_run_result(normalized, repair_state, outcome.draft_id or draft_id or "")
 
     return create_workflow_and_run
 
@@ -359,7 +285,7 @@ def create_design_workflow_tool(
         """
         db = SessionLocal()
         try:
-            session = _get_session(db, session_id)
+            session = get_workflow_session(db, session_id)
             if not session:
                 return {"status": "error", "error": "Session not found."}
             repair_state = _new_repair_state()
