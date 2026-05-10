@@ -432,6 +432,9 @@ export default function ChatBox({
             sourceStatusText={sourceStatusText}
             contextChips={emptyContextChips}
             starterPrompts={starterPrompts}
+            addDataLabel={t('common.addData')}
+            addDataDescription={t('chat.addDataCtaDescription')}
+            onOpenDataSourceManager={openDataSourceManager}
             onApplyStarterPrompt={applyStarterPrompt}
           />
         )}

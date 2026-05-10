@@ -1,5 +1,10 @@
 import type { Message, MessageTimelineItem, ToolStep } from '../types'
 import type { AgentEvent } from '../api'
+import {
+  parseReportProgressStage,
+  REPORT_PROGRESS_STAGE_FALLBACK_LABELS,
+  REPORT_PROGRESS_TOTAL_STEPS,
+} from '../utils/reportProgress'
 
 interface SerializedSessionChat {
   id: string
@@ -191,25 +196,16 @@ export class SessionChat {
       if (!message.timeline) message.timeline = []
       message.timeline.push({ kind: 'step', step })
     }
-    const REPORT_STAGE_LABELS: Record<number, string> = {
-      0: 'Load and parse data files',
-      1: 'Generate dataset context',
-      2: 'Perform deep exploratory analysis (EDA)',
-      3: 'Calculate key business indicators (KPI)',
-      4: 'Plan and generate visual charts',
-      5: 'Write analysis summary and conclusions',
-      6: 'Render final HTML report',
-    }
     let lastReportStage = -1
     const appendReportStepToTimeline = (message: Message, stageIndex: number) => {
       if (stageIndex <= lastReportStage) return
       lastReportStage = stageIndex
-      const label = REPORT_STAGE_LABELS[stageIndex] ?? `Step ${stageIndex + 1}`
+      const label = REPORT_PROGRESS_STAGE_FALLBACK_LABELS[stageIndex] ?? `Step ${stageIndex + 1}`
       if (!message.timeline) message.timeline = []
       message.timeline.push({
         kind: 'report_step',
         stepIndex: stageIndex + 1,
-        totalSteps: 7,
+        totalSteps: REPORT_PROGRESS_TOTAL_STEPS,
         label,
       })
     }
@@ -285,9 +281,8 @@ export class SessionChat {
         if (artifactKind === 'report' && phase === 'artifact_progress') {
           const messageText = typeof payload.message === 'string' ? payload.message.trim() : ''
           if (messageText) {
-            const stageMatch = messageText.match(/\[(\d+)\/7\]/)
-            if (stageMatch) {
-              const stageIndex = Math.min(parseInt(stageMatch[1], 10), 6)
+            const stageIndex = parseReportProgressStage(messageText)
+            if (stageIndex !== null) {
               appendReportStepToTimeline(current, stageIndex)
             }
           }

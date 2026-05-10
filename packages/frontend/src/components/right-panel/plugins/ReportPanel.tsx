@@ -3,73 +3,16 @@ import { Download, FileText, Loader2, Sparkles, TriangleAlert } from 'lucide-rea
 import { ArtifactProgressCard } from '../ArtifactProgressCard'
 import { useReportStore } from '../../../stores/report'
 import { useLocale } from '../../../locale'
+import { createReportGeneration } from '../../../utils/artifactGeneration'
+import {
+  deriveReportProgressState,
+  REPORT_PROGRESS_STAGE_END_PCT,
+} from '../../../utils/reportProgress'
 
 const REPORT_IFRAME_SANDBOX = 'allow-scripts'
 
-const STAGE_END_PCT = [8, 22, 42, 58, 82, 93, 100]
-
-type StageStatus = 'done' | 'active' | 'warning' | 'pending'
-
-function getStageDetail(status: StageStatus, t: (key: string) => string) {
-  switch (status) {
-    case 'done':
-      return t('report.stageDone')
-    case 'active':
-      return t('report.stageActive')
-    case 'warning':
-      return t('report.stageWarning')
-    default:
-      return t('report.stagePending')
-  }
-}
-
-function parseStages(
-  steps: string[],
-  isDone: boolean,
-  stageCount: number,
-): { stageStatuses: StageStatus[]; maxStage: number } {
-  let maxStage = -1
-  const warningStages = new Set<number>()
-  let lastStageIdx = -1
-
-  for (const line of steps) {
-    const match = line.match(/\[(\d+)\/7\]/)
-    if (match) {
-      const idx = Math.min(parseInt(match[1], 10), 6)
-      if (idx > maxStage) maxStage = idx
-      lastStageIdx = idx
-    }
-    if (
-      lastStageIdx >= 0 &&
-      (line.includes('△') ||
-        line.includes('❌') ||
-        line.toLowerCase().includes('failed') ||
-        line.toLowerCase().includes('error'))
-    ) {
-      warningStages.add(lastStageIdx)
-    }
-  }
-
-  const stageStatuses: StageStatus[] = Array.from({ length: stageCount }, (_, index) => {
-    if (isDone || index < maxStage) return warningStages.has(index) ? 'warning' : 'done'
-    if (index === maxStage) return isDone ? (warningStages.has(index) ? 'warning' : 'done') : 'active'
-    return 'pending'
-  })
-
-  return { stageStatuses, maxStage }
-}
-
 export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   const { t } = useLocale()
-  const STAGES = [
-    { label: t('report.stage1'), icon: '📂' },
-    { label: t('report.stage2'), icon: '🔍' },
-    { label: t('report.stage3'), icon: '🕵️' },
-    { label: t('report.stage4'), icon: '📊' },
-    { label: t('report.stage5'), icon: '📈' },
-    { label: t('report.stage6'), icon: '✍️' },
-    { label: t('report.stage7'), icon: '🎨' },
-  ]
   const sessionReport = useReportStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
@@ -86,7 +29,10 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   const showProgress = !isDone && (isGenerating || reportSteps.length > 0) && !reportError
   const isWaiting = isGenerating && reportSteps.length === 0 && !reportError
 
-  const { stageStatuses, maxStage } = parseStages(reportSteps, isDone, STAGES.length)
+  const { maxStage } = deriveReportProgressState(
+    reportSteps,
+    isDone,
+  )
 
   useEffect(() => {
     if (maxStage > committedStageRef.current) {
@@ -105,8 +51,8 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
     const id = window.setInterval(() => {
       setDisplayPercent((prev) => {
         const stage = committedStageRef.current
-        const floor = stage <= 0 ? 0 : STAGE_END_PCT[stage - 1]
-        const ceiling = STAGE_END_PCT[Math.min(Math.max(stage, 0), STAGE_END_PCT.length - 1)] - 0.8
+        const floor = stage <= 0 ? 0 : REPORT_PROGRESS_STAGE_END_PCT[stage - 1]
+        const ceiling = REPORT_PROGRESS_STAGE_END_PCT[Math.min(Math.max(stage, 0), REPORT_PROGRESS_STAGE_END_PCT.length - 1)] - 0.8
         const current = Math.max(prev, floor)
         if (current >= ceiling) return current
         const gap = ceiling - current
@@ -138,18 +84,14 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
   }
 
   const roundedPct = isDone ? 100 : Math.round(displayPercent)
-  const progressedCount = stageStatuses.filter((status) => status !== 'pending').length
-  const currentStageLabel =
-    maxStage >= 0 && maxStage < STAGES.length
-      ? STAGES[maxStage].label
-      : t('report.preparingPipeline')
-  const reportStepsProgress = STAGES.map((stage, index) => ({
-    id: stage.label,
-    label: stage.label,
-    detail: getStageDetail(stageStatuses[index], t),
-    icon: stageStatuses[index] === 'done' ? '✓' : stage.icon,
-    status: stageStatuses[index],
-  }))
+  const reportGeneration = createReportGeneration({
+    t,
+    steps: reportSteps,
+    isGenerating,
+    isDone,
+    error: reportError,
+    percent: roundedPct,
+  })
 
   if (!reportHtml && reportSteps.length === 0 && !isGenerating) {
     return (
@@ -168,24 +110,7 @@ export function ReportPanel({ sessionId }: { sessionId: string | null }) {
     <div className="panel-view">
       {showProgress && (
         <div className="artifact-progress-shell">
-          <ArtifactProgressCard
-            artifact={t('panel.report.title')}
-            title={t('report.generatingTitle')}
-            description={t('report.generatingDescription')}
-            icon={<FileText size={18} />}
-            variant="report"
-            signature={t('report.signature')}
-            status={isWaiting ? 'waiting' : 'running'}
-            statusLabel={isWaiting ? t('common.queued') : t('common.running')}
-            percent={roundedPct}
-            currentLabel={currentStageLabel}
-            metrics={[
-              { label: t('report.phasesMetric'), value: `${progressedCount}/7` },
-              { label: 'Output', value: t('report.outputMetric') },
-            ]}
-            steps={reportStepsProgress}
-            tone="#c2410c"
-          />
+          {reportGeneration ? <ArtifactProgressCard icon={<FileText size={18} />} {...reportGeneration.card} /> : null}
         </div>
       )}
 

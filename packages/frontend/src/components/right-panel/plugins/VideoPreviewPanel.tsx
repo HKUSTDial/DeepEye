@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Film, Loader2, PlayCircle, Sparkles, TriangleAlert } from 'lucide-react'
-import {
-  ArtifactProgressCard,
-  type ArtifactProgressStep,
-  type ArtifactProgressStepStatus,
-} from '../ArtifactProgressCard'
+import { ArtifactProgressCard } from '../ArtifactProgressCard'
 import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { useLocale } from '../../../locale'
 import { deferEffectWork } from '../../../utils/effects'
 import { getArtifactTaskId, latestArtifactByKind } from '../../../utils/artifactUtils'
+import { createVideoGeneration } from '../../../utils/artifactGeneration'
+import {
+  VIDEO_PROGRESS_STAGE_ICONS,
+  VIDEO_PROGRESS_STAGE_MESSAGE_KEYS,
+} from '../../../utils/videoProgress'
 
 interface VideoPreviewPanelProps {
   taskId?: string
@@ -47,26 +48,6 @@ function extractTaskIdFromOutput(runOutput: string): string | undefined {
 
 const PREVIEW_IFRAME_SANDBOX = 'allow-same-origin allow-scripts'
 
-function getVideoStepStatus(index: number, currentStep: number, failed: boolean): ArtifactProgressStepStatus {
-  if (failed && index === currentStep) return 'warning'
-  if (index < currentStep) return 'done'
-  if (index === currentStep) return 'active'
-  return 'pending'
-}
-
-function getStepDetail(status: ArtifactProgressStepStatus, t: (key: string) => string) {
-  switch (status) {
-    case 'done':
-      return t('video.stepDone')
-    case 'active':
-      return t('video.stepActive')
-    case 'warning':
-      return t('video.stepWarning')
-    default:
-      return t('video.stepPending')
-  }
-}
-
 function getLogEntryType(message: string): 'success' | 'warn' | 'error' | 'info' | null {
   const text = message.trim()
   if (text.includes('✅') || text.includes('✓')) return 'success'
@@ -101,18 +82,9 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
-  const STEP_LABELS = [
-    { icon: '📹', label: t('video.step1'), index: 0 },
-    { icon: '🎵', label: t('video.step2'), index: 1 },
-    { icon: '💾', label: t('video.step3'), index: 2 },
-    { icon: '🎬', label: t('video.step4'), index: 3 },
-  ]
-  const STEP_MESSAGES: Record<number, string> = {
-    0: `📹 ${t('video.stepMessage1')}`,
-    1: `🎵 ${t('video.stepMessage2')}`,
-    2: `💾 ${t('video.stepMessage3')}`,
-    3: `🎬 ${t('video.stepMessage4')}`,
-  }
+  const STEP_MESSAGES = VIDEO_PROGRESS_STAGE_MESSAGE_KEYS.map(
+    (key, index) => `${VIDEO_PROGRESS_STAGE_ICONS[index]} ${t(key)}`,
+  )
   const latestVideoArtifact = useMemo(
     () => latestArtifactByKind(sessionState?.artifacts, 'video'),
     [sessionState?.artifacts],
@@ -236,43 +208,30 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
   const runInProgress = runStatus === 'running' || runStatus === null
   const runFailed = runStatus === 'failed'
-  const generationStepNumber = Math.min(videoProgress.step + 1, STEP_LABELS.length)
-  const latestVideoLog = videoProgress.logs.length > 0 ? videoProgress.logs[videoProgress.logs.length - 1]?.message : null
-  const videoProgressSteps: ArtifactProgressStep[] = STEP_LABELS.map((step) => {
-    const status = getVideoStepStatus(step.index, videoProgress.step, runFailed)
-    return {
-      id: `${step.index}`,
-      label: step.label,
-      detail: getStepDetail(status, t),
-      icon: runFailed && step.index === videoProgress.step ? '⚠️' : step.icon,
-      status,
-    }
+  const renderGeneration = createVideoGeneration({
+    t,
+    isRendering: !!(sessionId && videoProgress.visible && runInProgress),
+    isPreviewWarming: false,
+    isPreviewReady,
+    runFailed,
+    step: videoProgress.step,
+    percent: videoProgress.percent,
+    logs: videoProgress.logs,
+    taskId: displayTaskId,
+    previewCheckCount,
   })
-  const previewWarmupPercent = isPreviewReady ? 100 : Math.min(34 + previewCheckCount * 14, 86)
-  const previewWarmupSteps = [
-    { id: 'artifact', label: t('video.openPreview'), icon: '🔗', status: 'done' as const, detail: t('common.ready') },
-    {
-      id: 'boot',
-      label: t('video.overlayTitle'),
-      icon: '🚀',
-      status: isPreviewReady ? 'done' as const : previewCheckCount <= 1 ? 'active' as const : 'done' as const,
-      detail: isPreviewReady ? t('common.ready') : previewCheckCount <= 1 ? t('common.starting') : t('common.ready'),
-    },
-    {
-      id: 'probe',
-      label: t('video.metricChecks'),
-      icon: '🩺',
-      status: isPreviewReady ? 'done' as const : previewCheckCount > 1 ? 'active' as const : 'pending' as const,
-      detail: isPreviewReady ? t('common.ready') : previewCheckCount > 1 ? t('common.checking') : t('common.queued'),
-    },
-    {
-      id: 'mount',
-      label: t('video.livePreview'),
-      icon: '🖥️',
-      status: isPreviewReady ? 'done' as const : 'pending' as const,
-      detail: isPreviewReady ? t('common.ready') : t('common.queued'),
-    },
-  ]
+  const previewGeneration = createVideoGeneration({
+    t,
+    isRendering: false,
+    isPreviewWarming: !!effectivePreviewUrlWithSession && !isPreviewReady,
+    isPreviewReady,
+    runFailed: false,
+    step: videoProgress.step,
+    percent: videoProgress.percent,
+    logs: videoProgress.logs,
+    taskId: displayTaskId,
+    previewCheckCount,
+  })
 
   if (effectivePreviewUrlWithSession) {
     return (
@@ -313,28 +272,7 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
         {!isPreviewReady ? (
           <div className="artifact-progress-shell">
-            <ArtifactProgressCard
-              artifact={t('video.label')}
-              title={t('video.startingLiveTitle')}
-              description={t('video.startingLiveDescription')}
-              icon={<Film size={18} />}
-              variant="video"
-              signature={t('video.signaturePlayback')}
-              status={previewCheckCount > 0 ? 'running' : 'waiting'}
-              statusLabel={previewCheckCount > 0 ? t('dashboard.connecting') : t('common.starting')}
-              percent={previewWarmupPercent}
-              currentLabel={
-                previewCheckCount > 1
-                  ? t('video.waitingPreviewChecks')
-                  : t('video.allocatingPreview')
-              }
-              metrics={[
-                ...(displayTaskId ? [{ label: t('video.metricTask'), value: displayTaskId }] : []),
-                { label: t('video.metricChecks'), value: previewCheckCount > 0 ? String(previewCheckCount) : t('video.pending') },
-              ]}
-              steps={previewWarmupSteps}
-              tone="#2563eb"
-            />
+            {previewGeneration ? <ArtifactProgressCard icon={<Film size={18} />} {...previewGeneration.card} /> : null}
           </div>
         ) : null}
 
@@ -388,33 +326,12 @@ export function VideoPreviewPanel({ taskId, sessionId }: VideoPreviewPanelProps)
 
         <div className="panel-surface">
           <div className="panel-stack">
-            <ArtifactProgressCard
-              artifact={t('video.label')}
-              title={runFailed ? t('video.generationFailedTitle') : t('video.renderingTitle')}
-              description={
-                runFailed
-                  ? t('video.generationFailedDescription')
-                  : t('video.renderingDescription')
-              }
-              icon={runFailed ? <TriangleAlert size={18} /> : <PlayCircle size={18} />}
-              variant="video"
-              signature={t('video.signatureRender')}
-              status={runFailed ? 'failed' : videoProgress.percent > 0 || videoProgress.logs.length > 0 ? 'running' : 'waiting'}
-              statusLabel={runFailed ? t('common.failed') : videoProgress.percent > 0 || videoProgress.logs.length > 0 ? t('video.rendering') : t('common.queued')}
-              percent={videoProgress.percent}
-              currentLabel={
-                runFailed
-                  ? t('video.generationFailedDescription')
-                  : latestVideoLog || STEP_MESSAGES[videoProgress.step] || t('video.renderingDescription')
-              }
-              metrics={[
-                { label: t('dashboard.metricStage'), value: `${generationStepNumber}/4` },
-                { label: 'Logs', value: String(videoProgress.logs.length) },
-                ...(displayTaskId ? [{ label: t('video.metricTask'), value: displayTaskId }] : []),
-              ]}
-              steps={videoProgressSteps}
-              tone="#2563eb"
-            />
+            {renderGeneration ? (
+              <ArtifactProgressCard
+                icon={runFailed ? <TriangleAlert size={18} /> : <PlayCircle size={18} />}
+                {...renderGeneration.card}
+              />
+            ) : null}
 
             {runError ? (
               <div className="panel-state-card panel-state-card--error">

@@ -89,6 +89,7 @@ function App() {
   )
   const showWorkspacePanel = !isMobileLayout || mobileWorkspaceView === 'workspace'
   const showAssistantPanel = !chatCollapsed && (!isMobileLayout || mobileWorkspaceView === 'assistant')
+  const isPersistentSidebar = !isMobileLayout
 
   const toggleSidebarCollapse = () => {
     setSidebarCollapsed((current) => !current)
@@ -144,7 +145,11 @@ function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const updateMobileLayout = () => {
-      setIsMobileLayout(window.innerWidth <= 900)
+      const nextIsMobileLayout = window.innerWidth <= 900
+      setIsMobileLayout(nextIsMobileLayout)
+      if (!nextIsMobileLayout) {
+        setSidebarOpen(false)
+      }
     }
     updateMobileLayout()
     window.addEventListener('resize', updateMobileLayout)
@@ -312,8 +317,8 @@ function App() {
   )
 
   return (
-    <div className="app-shell">
-      {sidebarOpen && (
+    <div className={`app-shell ${isPersistentSidebar ? 'has-persistent-sidebar' : ''} ${sidebarCollapsed ? 'is-sidebar-collapsed' : 'is-sidebar-expanded'}`}>
+      {sidebarOpen && isMobileLayout && (
         <button
           type="button"
           className="sidebar-overlay"
@@ -323,7 +328,7 @@ function App() {
       )}
 
       <aside
-        className={`sidebar-drawer ${sidebarOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'is-collapsed' : 'is-expanded'}`}
+        className={`sidebar-drawer ${sidebarOpen || isPersistentSidebar ? 'is-open' : ''} ${isPersistentSidebar ? 'is-persistent' : ''} ${sidebarCollapsed ? 'is-collapsed' : 'is-expanded'}`}
         style={{ width: sidebarCollapsed ? '96px' : '304px' }}
       >
         <div className="app-sidebar-panel">
@@ -354,7 +359,13 @@ function App() {
                     <button
                       type="button"
                       className="workspace-shell-btn"
-                      onClick={() => setSidebarOpen(true)}
+                      onClick={() => {
+                        if (isPersistentSidebar) {
+                          toggleSidebarCollapse()
+                        } else {
+                          setSidebarOpen(true)
+                        }
+                      }}
                       aria-label={t('app.openNavigation')}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

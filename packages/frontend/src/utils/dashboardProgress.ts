@@ -7,6 +7,15 @@ export const DASHBOARD_PROGRESS_STAGES = [
   'Implement and deploy preview',
 ] as const
 
+export const DASHBOARD_PROGRESS_STAGE_KEYS = [
+  'dashboard.stage1',
+  'dashboard.stage2',
+  'dashboard.stage3',
+  'dashboard.stage4',
+  'dashboard.stage5',
+  'dashboard.stage6',
+] as const
+
 const DASHBOARD_STAGE_RULES: Array<{ stage: number; patterns: RegExp[] }> = [
   {
     stage: 0,

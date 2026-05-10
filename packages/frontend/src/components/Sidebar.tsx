@@ -368,8 +368,9 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                           <div className="session-item-actions">
                             <button
                               onClick={(event) => togglePinnedSession(session.id, event)}
-                              className="session-action-btn"
+                              className="session-action-btn session-pin-btn"
                               title={t('sidebar.unpinConversation')}
+                              aria-label={t('sidebar.unpinConversation')}
                             >
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="m11.49 2.19 5.32 5.32a1 1 0 0 1-1.42 1.42l-.66-.66-2.7 2.7 3.06 4.08a1 1 0 0 1-1.48 1.33L9.5 13.14l-3.79 3.79a1 1 0 0 1-1.42-1.42l3.79-3.79-3.24-4.1a1 1 0 0 1 1.31-1.47l4.14 3.11 2.7-2.7-.66-.66a1 1 0 0 1 1.42-1.42Z" />
@@ -379,6 +380,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                               onClick={(event) => startRenamingSession(session, event)}
                               className="session-action-btn"
                               title={t('common.rename')}
+                              aria-label={t('common.rename')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L8.25 19.463 4 20l.537-4.25 12.325-11.263Z" />
@@ -388,6 +390,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                               onClick={(e) => handleDeleteSession(session.id, session.title, e)}
                               className="session-action-btn session-delete-btn"
                               title={t('common.delete')}
+                              aria-label={t('common.delete')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -450,8 +453,9 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                           <div className="session-item-actions">
                             <button
                               onClick={(event) => togglePinnedSession(session.id, event)}
-                              className="session-action-btn"
+                              className="session-action-btn session-pin-btn"
                               title={t('sidebar.pinConversation')}
+                              aria-label={t('sidebar.pinConversation')}
                             >
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="m11.49 2.19 5.32 5.32a1 1 0 0 1-1.42 1.42l-.66-.66-2.7 2.7 3.06 4.08a1 1 0 0 1-1.48 1.33L9.5 13.14l-3.79 3.79a1 1 0 0 1-1.42-1.42l3.79-3.79-3.24-4.1a1 1 0 0 1 1.31-1.47l4.14 3.11 2.7-2.7-.66-.66a1 1 0 0 1 1.42-1.42Z" />
@@ -461,6 +465,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                               onClick={(event) => startRenamingSession(session, event)}
                               className="session-action-btn"
                               title={t('common.rename')}
+                              aria-label={t('common.rename')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L8.25 19.463 4 20l.537-4.25 12.325-11.263Z" />
@@ -470,6 +475,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, currentUser = nul
                               onClick={(e) => handleDeleteSession(session.id, session.title, e)}
                               className="session-action-btn session-delete-btn"
                               title={t('common.delete')}
+                              aria-label={t('common.delete')}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

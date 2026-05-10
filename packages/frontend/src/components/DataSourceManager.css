@@ -54,7 +54,7 @@
 .data-source-link-btn,
 .data-source-dropzone {
   border: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent);
-  background: #ffffff;
+  background: var(--card-bg);
   color: var(--main-text);
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
   transition: transform 0.16s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
@@ -69,6 +69,19 @@
   border-color: var(--border-hover);
   background: var(--card-bg-hover);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+}
+
+.data-source-toolbar-btn:focus-visible,
+.data-source-icon-btn:focus-visible,
+.data-source-secondary-btn:focus-visible,
+.data-source-link-btn:focus-visible,
+.data-source-dropzone:focus-visible,
+.data-source-select-option:focus-visible,
+.data-source-preview-tab:focus-visible,
+.data-source-preview-page-btn:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-color));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .data-source-toolbar-btn,
@@ -113,17 +126,20 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 18px;
-  border-radius: 20px;
+  padding: 18px;
+  border-radius: 16px;
   border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--card-bg)) 0%, color-mix(in srgb, var(--main-bg) 78%, var(--card-bg)) 100%);
   cursor: pointer;
   text-align: left;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 10%, transparent), 0 10px 22px rgba(15, 23, 42, 0.04);
 }
 
 .data-source-dropzone.is-dragover {
-  border-color: var(--border-hover);
-  background: var(--main-bg);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-hover));
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
 }
 
@@ -135,7 +151,7 @@
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  background: var(--main-bg);
+  background: color-mix(in srgb, var(--accent) 10%, var(--main-bg));
   color: var(--main-text);
   display: inline-flex;
   align-items: center;
@@ -201,8 +217,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--main-bg) 74%, #ffffff) 100%);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--card-bg) 0%, color-mix(in srgb, var(--main-bg) 74%, var(--card-bg)) 100%);
   border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
 }
 
@@ -278,7 +294,7 @@
   align-items: center;
   justify-content: space-between;
   padding-right: 42px;
-  background: #ffffff;
+  background: var(--card-bg);
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
@@ -330,7 +346,7 @@
   padding: 6px;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent);
-  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--main-bg) 76%, #ffffff) 100%);
+  background: linear-gradient(180deg, var(--card-bg) 0%, color-mix(in srgb, var(--main-bg) 76%, var(--card-bg)) 100%);
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.1);
   transform-origin: top center;
   animation: data-source-pop-in 190ms var(--ease-out-expo);
@@ -479,7 +495,7 @@
 .data-source-card {
   border-radius: 18px;
   border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
-  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--main-bg) 74%, #ffffff) 100%);
+  background: linear-gradient(180deg, var(--card-bg) 0%, color-mix(in srgb, var(--main-bg) 74%, var(--card-bg)) 100%);
   overflow: hidden;
   transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -650,7 +666,7 @@
 .data-source-preview-tab,
 .data-source-preview-page-btn {
   border: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent);
-  background: #ffffff;
+  background: var(--card-bg);
   color: var(--main-text);
   cursor: pointer;
   transition: transform 0.16s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
@@ -674,7 +690,7 @@
 
 .data-source-preview-tab.is-active {
   border-color: color-mix(in srgb, var(--accent) 38%, var(--border-color));
-  background: color-mix(in srgb, var(--accent) 12%, #ffffff);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
   color: color-mix(in srgb, var(--accent) 92%, var(--main-text));
 }
 
@@ -698,7 +714,7 @@
   z-index: 1;
   padding: 11px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent);
-  background: color-mix(in srgb, var(--main-bg) 74%, #ffffff);
+  background: color-mix(in srgb, var(--main-bg) 74%, var(--card-bg));
   text-align: left;
   vertical-align: bottom;
 }
@@ -714,7 +730,7 @@
 }
 
 .data-source-preview-table tbody tr:nth-child(even) td {
-  background: color-mix(in srgb, var(--main-bg) 36%, #ffffff);
+  background: color-mix(in srgb, var(--main-bg) 36%, var(--card-bg));
 }
 
 .data-source-preview-col {

@@ -29,13 +29,6 @@ function renderLazyPanel(node: ReactNode, title: string) {
 
 export const panelRegistry: PanelPlugin[] = [
   {
-    id: 'files',
-    title: () => translateApp('panel.files.title'),
-    description: () => translateApp('panel.files.description'),
-    icon: <FolderOpen className="h-4 w-4" />,
-    render: (context) => renderLazyPanel(<FilesPanel sessionId={context.sessionId} />, translateApp('panel.files.title')),
-  },
-  {
     id: 'workflow',
     title: () => translateApp('panel.workflow.title'),
     description: () => translateApp('panel.workflow.description'),
@@ -47,6 +40,13 @@ export const panelRegistry: PanelPlugin[] = [
       />,
       translateApp('panel.workflow.title'),
     ),
+  },
+  {
+    id: 'files',
+    title: () => translateApp('panel.files.title'),
+    description: () => translateApp('panel.files.description'),
+    icon: <FolderOpen className="h-4 w-4" />,
+    render: (context) => renderLazyPanel(<FilesPanel sessionId={context.sessionId} />, translateApp('panel.files.title')),
   },
   {
     id: 'report',

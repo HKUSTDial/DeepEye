@@ -174,6 +174,15 @@
   transform: scale(0.98);
 }
 
+.sidebar-toggle-btn:focus-visible,
+.nav-item:focus-visible,
+.session-action-btn:focus-visible,
+.sidebar-account-logout:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--sidebar-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .nav-item svg,
 .sidebar-toggle-btn svg {
   flex-shrink: 0;
@@ -336,6 +345,10 @@
   cursor: pointer;
 }
 
+.session-pin-btn {
+  opacity: 0.36;
+}
+
 .session-item:hover .session-action-btn,
 .session-item:focus-within .session-action-btn,
 .session-item.active .session-action-btn {
@@ -352,7 +365,7 @@
   height: 32px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--sidebar-border));
-  background: #ffffff;
+  background: var(--sidebar-bg);
   color: var(--sidebar-text);
   padding: 0 10px;
   font-size: var(--ui-font-sm);
@@ -374,7 +387,7 @@
   gap: 10px;
   border: 1px solid color-mix(in srgb, var(--sidebar-border) 88%, transparent);
   border-radius: 16px;
-  background: linear-gradient(180deg, color-mix(in srgb, #ffffff 96%, var(--sidebar-bg)) 0%, color-mix(in srgb, var(--sidebar-hover) 62%, var(--sidebar-bg)) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-bg) 96%, var(--sidebar-bg)) 0%, color-mix(in srgb, var(--sidebar-hover) 62%, var(--sidebar-bg)) 100%);
   padding: 9px;
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
   transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -478,7 +491,7 @@
 
 .sidebar-delete-dialog {
   width: min(100%, 400px);
-  border-radius: 22px;
+  border-radius: 16px;
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   color: var(--main-text);

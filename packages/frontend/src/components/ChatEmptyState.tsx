@@ -1,3 +1,5 @@
+import { Database, Sparkles } from 'lucide-react'
+
 interface StarterPrompt {
   label: string
   description: string
@@ -11,6 +13,9 @@ interface ChatEmptyStateProps {
   sourceStatusText: string
   contextChips: string[]
   starterPrompts: StarterPrompt[]
+  addDataLabel: string
+  addDataDescription: string
+  onOpenDataSourceManager?: () => void
   onApplyStarterPrompt: (prompt: string) => void
 }
 
@@ -21,6 +26,9 @@ export function ChatEmptyState({
   sourceStatusText,
   contextChips,
   starterPrompts,
+  addDataLabel,
+  addDataDescription,
+  onOpenDataSourceManager,
   onApplyStarterPrompt,
 }: ChatEmptyStateProps) {
   return (
@@ -35,6 +43,22 @@ export function ChatEmptyState({
       </svg>
       <h2 className="chat-empty-title">{emptyTitle}</h2>
       <p className="chat-empty-subtitle">{emptySubtitle}</p>
+      {dataSourceCount === 0 && onOpenDataSourceManager && (
+        <button
+          type="button"
+          className="chat-empty-primary-action"
+          onClick={onOpenDataSourceManager}
+        >
+          <span className="chat-empty-primary-icon" aria-hidden="true">
+            <Database className="h-4 w-4" />
+          </span>
+          <span className="chat-empty-primary-copy">
+            <span className="chat-empty-primary-title">{addDataLabel}</span>
+            <span className="chat-empty-primary-desc">{addDataDescription}</span>
+          </span>
+          <Sparkles className="chat-empty-primary-spark h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
       <div className={`chat-empty-status ${dataSourceCount > 0 ? 'is-active' : ''}`}>
         <span className="chat-empty-status-dot" aria-hidden="true"></span>
         <span>{sourceStatusText}</span>

@@ -93,7 +93,7 @@
 .right-panel-tab-button:focus-visible,
 .right-panel-tab-close:focus-visible {
   outline: none;
-  box-shadow: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .right-panel-tab-icon {
@@ -162,7 +162,7 @@
   min-width: 32px;
   height: 32px;
   padding: 0 10px;
-  border-radius: 12px;
+  border-radius: 10px;
   background: color-mix(in srgb, var(--main-bg-alt) 88%, transparent);
   border: 1px solid transparent;
   color: var(--main-text-muted);
@@ -284,7 +284,7 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: 24px;
+  padding: 28px;
   text-align: center;
   animation: panel-empty-in 260ms ease;
 }
@@ -339,7 +339,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 11px 12px;
-  border-radius: 14px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--card-bg) 96%, var(--main-bg-alt));
   border: 1px solid color-mix(in srgb, var(--border-color) 86%, transparent);
   color: var(--main-text);
@@ -348,7 +348,14 @@
   cursor: pointer;
   text-align: left;
   transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.035);
+}
+
+.right-panel-empty-action:first-child {
+  grid-column: 1 / -1;
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, var(--card-bg)) 0%, color-mix(in srgb, var(--main-bg-alt) 90%, var(--card-bg)) 100%);
 }
 
 .right-panel-entry-icon {

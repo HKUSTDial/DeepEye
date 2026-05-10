@@ -25,6 +25,7 @@ import {
   createTokenPhase,
 } from '../features/workflow/runPhase'
 import { getDashboardProgressStage, isDashboardProgressMessage } from '../utils/dashboardProgress'
+import { parseVideoProgressStep } from '../utils/videoProgress'
 import {
   getArtifactError,
   getArtifactFileName,
@@ -430,14 +431,11 @@ function handleWorkflowToken(sessionId: string, event: AgentEvent) {
     openOrFocusPluginTabIfCurrent(sessionId, 'video-preview', { taskId: taskIdMatch[1] })
   }
 
-  const stepMatch = data.content.match(/Step\s*(\d)\s*\/\s*4/)
-  if (stepMatch?.[1]) {
+  const videoStep = parseVideoProgressStep(data.content)
+  if (videoStep !== null) {
     workflowStore.setVideoProgressVisible(sessionId, true)
     openOrFocusPluginTabIfCurrent(sessionId, 'video-preview')
-    const stepIndex = parseInt(stepMatch[1], 10) - 1
-    if (stepIndex >= 0 && stepIndex <= 3) {
-      workflowStore.setVideoProgressStep(sessionId, stepIndex)
-    }
+    workflowStore.setVideoProgressStep(sessionId, videoStep)
   }
 
   if (/Step\s*4\s*\/\s*4\s*Done|Video generation completed|🎉/.test(data.content)) {

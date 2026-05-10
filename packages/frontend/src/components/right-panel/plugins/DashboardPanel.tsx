@@ -5,6 +5,7 @@ import { useWorkflowSessionsStore } from '../../../stores/workflowSessions'
 import { config } from '../../../config'
 import { useLocale } from '../../../locale'
 import { getArtifactNodeId, getArtifactPreviewUrl } from '../../../utils/artifactUtils'
+import { createDashboardGeneration } from '../../../utils/artifactGeneration'
 
 function extractDashboardNodeIds(definition: unknown): string[] {
   if (!definition || typeof definition !== 'object') return []
@@ -41,14 +42,6 @@ export function DashboardPanel({
   const sessionState = useWorkflowSessionsStore((state) =>
     sessionId ? state.sessions[sessionId] : undefined,
   )
-  const progressStages = [
-    t('dashboard.stage1'),
-    t('dashboard.stage2'),
-    t('dashboard.stage3'),
-    t('dashboard.stage4'),
-    t('dashboard.stage5'),
-    t('dashboard.stage6'),
-  ]
   const dashboardProgress = sessionState?.dashboardProgress ?? {
     visible: false,
     stage: 0,
@@ -88,33 +81,6 @@ export function DashboardPanel({
       dashboardNodeIds.some((nodeId) => sessionState?.nodeStatus?.[nodeId]?.status === 'running') ||
       (sessionState?.runStatus === 'running' && dashboardNodeIds.length > 0)
     )
-  const generationStageIndex = Math.min(
-    Math.max(dashboardProgress.stage ?? 0, 0),
-    progressStages.length - 1,
-  )
-  const generationCurrentLabel =
-    dashboardProgress.logs[dashboardProgress.logs.length - 1]?.message ||
-    progressStages[generationStageIndex] ||
-    t('dashboard.preparingGeneration')
-  const generationPercent = Math.max(
-    dashboardProgress.percent || 0,
-    isDashboardGenerating ? 14 : 0,
-  )
-  const generationSteps = progressStages.map((label, index) => {
-    const status =
-      index < generationStageIndex
-        ? 'done'
-        : index === generationStageIndex
-          ? 'active'
-          : 'pending'
-    return {
-      id: label,
-      label,
-      detail: status === 'done' ? t('common.completed') : status === 'active' ? t('common.running') : t('common.queued'),
-      icon: status === 'done' ? '✓' : ['🧭', '📊', '🧮', '🔗', '🧩', '🚀'][index] || '•',
-      status,
-    } as const
-  })
 
   const fullDashboardUrl = useMemo(() => {
     if (!latestDashboard?.url) return ''
@@ -193,33 +159,21 @@ export function DashboardPanel({
     return () => observer.disconnect()
   }, [])
 
-  const dashboardWarmupPercent = isReady ? 100 : Math.min(28 + healthCheckCount * 16, 84)
-  const dashboardWarmupSteps = [
-    { id: 'artifact', label: 'Resolve dashboard artifact', icon: '🧩', status: 'done' as const, detail: 'Ready' },
-    {
-      id: 'boot',
-      label: 'Warm preview service',
-      icon: '🚀',
-      status: isReady ? 'done' as const : healthCheckCount <= 1 ? 'active' as const : 'done' as const,
-      detail: isReady ? 'Ready' : healthCheckCount <= 1 ? 'Starting' : 'Warmed',
-    },
-    {
-      id: 'probe',
-      label: 'Run health checks',
-      icon: '🩺',
-      status: isReady ? 'done' as const : healthCheckCount > 1 ? 'active' as const : 'pending' as const,
-      detail: isReady ? 'Healthy' : healthCheckCount > 1 ? 'Checking' : 'Queued',
-    },
-    {
-      id: 'mount',
-      label: 'Mount interactive frame',
-      icon: '📊',
-      status: isReady ? 'done' as const : 'pending' as const,
-      detail: isReady ? 'Visible' : 'Queued',
-    },
-  ]
   const isDashboardWarming = !!latestDashboard && !isReady
-  const showDashboardProgress = isDashboardGenerating || isDashboardWarming
+  const dashboardGeneration = createDashboardGeneration({
+    t,
+    isGenerating: isDashboardGenerating,
+    isWarming: isDashboardWarming,
+    isReady,
+    stage: dashboardProgress.stage ?? 0,
+    percent: dashboardProgress.percent || 0,
+    logs: dashboardProgress.logs,
+    nodeId: isDashboardGenerating
+      ? dashboardNodeIds[dashboardNodeIds.length - 1]
+      : latestDashboard?.nodeId,
+    healthCheckCount,
+  })
+  const showDashboardProgress = !!dashboardGeneration
   const toolbarTitle = latestDashboard
     ? t('dashboard.livePreview')
     : isDashboardGenerating
@@ -307,49 +261,7 @@ export function DashboardPanel({
 
       {showDashboardProgress ? (
         <div className="artifact-progress-shell">
-          {isDashboardGenerating ? (
-            <ArtifactProgressCard
-              artifact={t('panel.dashboard.title')}
-              title={t('dashboard.generatingTitle')}
-              description={t('dashboard.generatingDescription')}
-              icon={<LayoutDashboard size={18} />}
-              variant="dashboard"
-              signature={t('dashboard.generatingSignature')}
-              status="running"
-              statusLabel={t('common.running')}
-              percent={generationPercent}
-              currentLabel={generationCurrentLabel}
-              metrics={[
-                { label: t('dashboard.metricStage'), value: `${Math.min(generationStageIndex + 1, generationSteps.length)}/${generationSteps.length}` },
-                { label: t('dashboard.metricNode'), value: dashboardNodeIds[dashboardNodeIds.length - 1] || t('dashboard.nodeFallback') },
-              ]}
-              steps={generationSteps}
-              tone="#0f766e"
-            />
-          ) : (
-            <ArtifactProgressCard
-              artifact={t('panel.dashboard.title')}
-              title={t('dashboard.startingLiveTitle')}
-              description={t('dashboard.startingLiveDescription')}
-              icon={<LayoutDashboard size={18} />}
-              variant="dashboard"
-              signature={t('dashboard.startingLiveSignature')}
-              status={healthCheckCount > 0 ? 'running' : 'waiting'}
-              statusLabel={healthCheckCount > 0 ? t('dashboard.connecting') : t('common.starting')}
-              percent={dashboardWarmupPercent}
-              currentLabel={
-                healthCheckCount > 1
-                  ? t('dashboard.pollingPreview')
-                  : t('dashboard.allocatingPreview')
-              }
-              metrics={[
-                { label: t('dashboard.metricNode'), value: latestDashboard?.nodeId || t('dashboard.nodeFallback') },
-                { label: t('dashboard.metricChecks'), value: healthCheckCount > 0 ? String(healthCheckCount) : t('dashboard.pendingChecks') },
-              ]}
-              steps={dashboardWarmupSteps}
-              tone="#0f766e"
-            />
-          )}
+          {dashboardGeneration ? <ArtifactProgressCard icon={<LayoutDashboard size={18} />} {...dashboardGeneration.card} /> : null}
         </div>
       ) : null}
 
