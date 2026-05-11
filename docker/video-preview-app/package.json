@@ -12,7 +12,7 @@
     "@remotion/player": "^4.0.456",
     "d3": "^7.9.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.5",
+    "react-dom": "^19.2.6",
     "remotion": "^4.0.456"
   },
   "devDependencies": {
