@@ -26,7 +26,7 @@
     "remark-gfm": "^4.0.1",
     "remotion": "^4.0.456",
     "shiki": "^4.0.2",
-    "zustand": "^5.0.12"
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
