@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@remotion/player": "^4.0.459",
+    "@remotion/player": "^4.0.462",
     "d3": "^7.9.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
