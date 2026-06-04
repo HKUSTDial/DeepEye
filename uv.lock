@@ -689,10 +689,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "langchain", specifier = ">=0.3.0" },
-    { name = "langchain-anthropic", marker = "extra == 'anthropic'", specifier = ">=1.4.3" },
+    { name = "langchain-anthropic", marker = "extra == 'anthropic'", specifier = ">=0.1.0" },
     { name = "langchain-community", specifier = ">=0.3.0" },
     { name = "langchain-openai", marker = "extra == 'openai'", specifier = ">=0.1.0" },
-    { name = "langfuse", specifier = ">=4.6.1" },
+    { name = "langfuse", specifier = ">=2.0.0" },
     { name = "langgraph", specifier = ">=0.2.0" },
     { name = "langgraph-prebuilt", specifier = "<1.0.9" },
     { name = "pydantic", specifier = ">=2.0.0" },
@@ -757,11 +757,11 @@ requires-dist = [
     { name = "deepeye", extras = ["openai"], editable = "packages/core" },
     { name = "docker", specifier = ">=7.0.0" },
     { name = "email-validator", specifier = ">=2.0.0" },
-    { name = "fastapi", specifier = ">=0.136.1" },
+    { name = "fastapi", specifier = ">=0.109.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jinja2" },
     { name = "json5" },
-    { name = "langgraph-checkpoint-postgres", specifier = ">=3.0.5" },
+    { name = "langgraph-checkpoint-postgres", specifier = ">=1.0.0" },
     { name = "minio", specifier = ">=7.2.0" },
     { name = "openai" },
     { name = "openpyxl" },
@@ -769,17 +769,17 @@ requires-dist = [
     { name = "passlib", extras = ["bcrypt"], specifier = "==1.7.4" },
     { name = "plotly" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.1.8" },
-    { name = "psycopg2-binary", specifier = ">=2.9.12" },
+    { name = "psycopg2-binary", specifier = ">=2.9.9" },
     { name = "pyarrow" },
-    { name = "pydantic-settings", specifier = ">=2.14.1" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pyecharts" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10.1" },
     { name = "pymysql", specifier = ">=1.1.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "python-multipart", specifier = ">=0.0.26" },
-    { name = "redis", specifier = ">=7.4.0" },
+    { name = "redis", specifier = ">=5.0.1" },
     { name = "statsmodels" },
-    { name = "uvicorn", specifier = ">=0.46.0" },
+    { name = "uvicorn", specifier = ">=0.27.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -3346,15 +3346,15 @@ wheels = [
 
 [[package]]
 name = "starlette"
-version = "0.52.1"
+version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/a3/84e821cc54b4ab50ae6dbc6ac3800a651b65ec35f045cc73785380654057/starlette-1.0.1.tar.gz", hash = "sha256:512399c5f1de7fac99c88572212ded9ddeddef2fb32afa82d724000e88b38f4f", size = 2659596, upload-time = "2026-05-21T21:58:58.433Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/e1/b2df4bc09a1e51ff664c1e17018a4274b42e5e9352e4a478ea540512dc88/starlette-1.0.1-py3-none-any.whl", hash = "sha256:7c0e69b2ee1c848bd54669d908500117a3ee13de603a21427e5c6fc1adf98dcd", size = 72802, upload-time = "2026-05-21T21:58:56.551Z" },
 ]
 
 [[package]]
