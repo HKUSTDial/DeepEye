@@ -40,6 +40,13 @@ from deepeye.agents import WorkflowAgent
 from deepeye.tools.base import tool
 
 
+def _empty_to_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
 def _build_run_failure_response(
     outcome: WorkflowAgentRunOutcome,
     repair_state: dict[str, Any] | None,
@@ -79,10 +86,10 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
     @tool
     async def create_workflow(
         workflow: dict,
-        draft_id: str | None = None,
-        name: str | None = None,
-        file_path: str | None = None,
-        planning_notes: str | None = None,
+        draft_id: str = "",
+        name: str = "",
+        file_path: str = "",
+        planning_notes: str = "",
     ) -> dict:
         """
         Create a workflow draft or replace an existing draft.
@@ -100,9 +107,9 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
             user_id=user_id,
             definition=workflow,
             turn_id=turn_id,
-            draft_id=draft_id,
-            file_path=file_path,
-            name=name,
+            draft_id=_empty_to_none(draft_id),
+            file_path=_empty_to_none(file_path),
+            name=_empty_to_none(name),
         )
         return {"status": "success", "draft_id": saved.draft_id}
 
@@ -111,7 +118,7 @@ def create_create_workflow_tool(session_id: str, user_id: str, turn_id: str | No
 
 def create_read_workflow_tool(session_id: str) -> callable:
     @tool
-    async def read_workflow(draft_id: str | None = None, file_path: str | None = None) -> dict:
+    async def read_workflow(draft_id: str = "", file_path: str = "") -> dict:
         """
         Read an existing workflow draft.
 
@@ -119,7 +126,11 @@ def create_read_workflow_tool(session_id: str) -> callable:
             draft_id: Workflow draft id. Preferred.
             file_path: Explicit legacy sandbox workflow JSON file path. Fallback only.
         """
-        result = await read_workflow_definition(session_id=session_id, draft_id=draft_id, file_path=file_path)
+        result = await read_workflow_definition(
+            session_id=session_id,
+            draft_id=_empty_to_none(draft_id),
+            file_path=_empty_to_none(file_path),
+        )
         return result.to_tool_response()
 
     return read_workflow
@@ -134,10 +145,10 @@ def create_update_workflow_tool(
     @tool
     async def update_workflow(
         workflow: dict,
-        draft_id: str | None = None,
-        name: str | None = None,
-        file_path: str | None = None,
-        planning_notes: str | None = None,
+        draft_id: str = "",
+        name: str = "",
+        file_path: str = "",
+        planning_notes: str = "",
     ) -> dict:
         """
         Update an existing workflow draft or overwrite a file-backed workflow.
@@ -153,7 +164,7 @@ def create_update_workflow_tool(
             blocked = _guard_repair_limit(repair_state)
             if blocked:
                 return blocked
-            reuse_failure = _require_reuse_after_failure(repair_state, draft_id)
+            reuse_failure = _require_reuse_after_failure(repair_state, _empty_to_none(draft_id))
             if reuse_failure:
                 return reuse_failure
         workflow = _normalize_workflow_payload_shape(workflow)
@@ -162,9 +173,9 @@ def create_update_workflow_tool(
             user_id=user_id,
             definition=workflow,
             turn_id=turn_id,
-            draft_id=draft_id,
-            file_path=file_path,
-            name=name,
+            draft_id=_empty_to_none(draft_id),
+            file_path=_empty_to_none(file_path),
+            name=_empty_to_none(name),
         )
         return {"status": "success", "draft_id": saved.draft_id}
 
@@ -228,10 +239,10 @@ def create_workflow_and_run_tool(
     @tool
     async def create_workflow_and_run(
         workflow: dict,
-        draft_id: str | None = None,
-        name: str | None = None,
-        file_path: str | None = None,
-        planning_notes: str | None = None,
+        draft_id: str = "",
+        name: str = "",
+        file_path: str = "",
+        planning_notes: str = "",
     ) -> dict:
         """
         Create or update a workflow draft and run it immediately.
@@ -247,7 +258,7 @@ def create_workflow_and_run_tool(
             blocked = _guard_repair_limit(repair_state)
             if blocked:
                 return blocked
-            reuse_failure = _require_reuse_after_failure(repair_state, draft_id)
+            reuse_failure = _require_reuse_after_failure(repair_state, _empty_to_none(draft_id))
             if reuse_failure:
                 return reuse_failure
         workflow = _normalize_workflow_payload_shape(workflow)
@@ -255,15 +266,15 @@ def create_workflow_and_run_tool(
             session_id=session_id,
             definition=workflow,
             turn_id=turn_id,
-            draft_id=draft_id,
-            file_path=file_path,
-            name=name,
+            draft_id=_empty_to_none(draft_id),
+            file_path=_empty_to_none(file_path),
+            name=_empty_to_none(name),
         )
         if outcome.is_failure:
             return _build_run_failure_response(outcome, repair_state)
         normalized = _normalize_workflow_run_result(
             outcome.raw_result or {},
-            draft_id=outcome.draft_id or draft_id,
+            draft_id=outcome.draft_id or _empty_to_none(draft_id),
             workflow_definition=outcome.workflow_definition or workflow,
         )
         return _finalize_workflow_run_result(normalized, repair_state, outcome.draft_id or draft_id or "")
