@@ -25,6 +25,7 @@ from app.tools.workflow_tools import (
     _normalize_workflow_run_result,
     _require_reuse_after_failure,
     create_workflow_and_run_tool,
+    create_read_workflow_tool,
     create_update_workflow_tool,
     create_design_workflow_tool,
     create_summarize_workflow_result_tool,
@@ -724,6 +725,22 @@ def test_workflow_tools_expose_planning_notes_field() -> None:
 
     assert "planning_notes" in create_schema["properties"]
     assert "planning_notes" in update_schema["properties"]
+
+
+def test_workflow_tool_optional_strings_use_plain_string_schema() -> None:
+    tools = [
+        create_workflow_and_run_tool("session-1"),
+        create_update_workflow_tool("session-1", "user-1"),
+        create_read_workflow_tool("session-1"),
+    ]
+
+    for tool_obj in tools:
+        schema = tool_obj.args_schema.model_json_schema()
+        for field_name in ("draft_id", "name", "file_path", "planning_notes"):
+            field_schema = schema["properties"].get(field_name)
+            if field_schema is not None:
+                assert field_schema.get("type") == "string"
+                assert "anyOf" not in field_schema
 
 
 @pytest.mark.anyio
