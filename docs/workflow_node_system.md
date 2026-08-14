@@ -23,19 +23,19 @@ Workflow Node 系统负责：
 - 领域内代码内聚：
   - Dashboard 节点入口：`packages/backend/app/node/dashboard/node.py`
   - Dashboard 内部实现：`packages/backend/app/node/dashboard/nl2dashboard/*`
-  - Dashboard 部署服务：`packages/backend/app/services/dashboard_deploy_service.py`（按任务拉起独立容器，镜像来自 `docker/Dockerfile.dashboard`）
+  - Dashboard 部署服务：`packages/backend/app/deploy/services/dashboard.py`（按任务拉起独立容器，镜像来自 `docker/Dockerfile.dashboard`）
   - Video 节点入口：`packages/backend/app/node/video/node.py`
   - Video 内部实现：`packages/backend/app/node/video/config/*` 与 `packages/backend/app/node/video/render/*`
 
 ### 3) Engine 与校验
-路径：`packages/backend/app/services/workflow_engine.py`  
+路径：`packages/backend/app/workflow/services/engine.py`  
 职责：
 - 构建 `ExecutionEngine`
 - 注册 Node handler
 - 注册 condition/transform（always/identity）
 
 执行入口：
-`packages/backend/app/services/workflow_file_service.py`  
+`packages/backend/app/workflow/services/file_service.py`  
 负责读取 workflow JSON → 校验 → 执行 → 发布事件
 
 ## 核心功能类说明
