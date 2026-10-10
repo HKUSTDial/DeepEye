@@ -6,6 +6,10 @@ dist/
 wheels/
 *.egg-info
 
+# Test/tooling caches
+.pytest_cache/
+.ruff_cache/
+
 # OS
 .DS_Store
 

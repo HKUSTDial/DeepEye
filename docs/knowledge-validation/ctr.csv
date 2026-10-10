@@ -1,0 +1,5 @@
+period,user_id,clicks,impressions
+before,u,2,5
+before,v,4,10
+after,u,3,5
+after,v,6,40

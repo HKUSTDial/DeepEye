@@ -9,6 +9,32 @@
   --workflow-grid: var(--border-color);
 }
 
+.workflow-evidence-strip {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--card-bg));
+  color: var(--main-text-muted);
+  font-size: 11px;
+}
+
+.workflow-evidence-strip strong { color: var(--main-text); font-size: 11px; }
+.workflow-evidence-strip em { margin-left: auto; font-style: normal; font-size: 10px; }
+.workflow-evidence-strip-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
 /* Toolbar */
 .workflow-toolbar {
   display: flex;

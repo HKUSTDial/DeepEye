@@ -126,6 +126,7 @@ def build_workflow_prompt(
     registry: NodeRegistry,
     datasource: dict[str, str] | list[dict[str, str]] | None = None,
     tables: list[dict[str, object]] | None = None,
+    knowledge_context: str = "",
 ) -> str:
     specs_text = render_node_specs(registry.all())
     datasource_text = _truncate(_render_datasource_context(datasource), _MAX_DATASOURCE_CHARS)
@@ -148,6 +149,7 @@ The latest user request asks for an answer grounded in the attached data sources
 
 ## Available Nodes
 {specs_text}
+{knowledge_context}
 
 # Instructions
 ## Explicit Planning Notes

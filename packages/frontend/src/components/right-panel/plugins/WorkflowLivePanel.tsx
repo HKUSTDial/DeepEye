@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { BackgroundVariant } from 'reactflow'
 import 'reactflow/dist/style.css'
 import '../../workflow/Workflow.css'
@@ -11,6 +11,8 @@ import { WorkflowLiveToolbar } from './WorkflowLiveToolbar'
 import { useTransientWorkflowHighlights } from './useTransientWorkflowHighlights'
 import { useWorkflowLiveController } from './useWorkflowLiveController'
 import { useWorkflowViewportFit } from './useWorkflowViewportFit'
+import { sessionApi } from '../../../api/session'
+import type { StoredMessage } from '../../../api/session'
 import {
   getWorkflowMiniMapNodeColor,
   hasRenderableWorkflow,
@@ -26,6 +28,40 @@ export function WorkflowLivePanel({
   sessionId: string | null,
   dataSourceIds?: string[]
 }) {
+  const [evidenceSummary, setEvidenceSummary] = useState<{ ids: string[]; status: string } | null>(null)
+
+  useEffect(() => {
+    if (!sessionId || sessionId === 'draft') {
+      setEvidenceSummary(null)
+      return
+    }
+    let cancelled = false
+    const loadEvidence = async () => {
+      try {
+        const response = await sessionApi.getMessages(sessionId)
+        const messages = response.messages as StoredMessage[]
+        const latest = [...messages].reverse().find((message) => message.role === 'assistant')
+        const step = latest?.steps?.find((item) => item.name === 'analysis_knowledge')
+        if (!step?.output || cancelled) {
+          if (!cancelled) setEvidenceSummary(null)
+          return
+        }
+        const trace = JSON.parse(step.output) as { status?: string; matches?: Array<{ id: string }> }
+        setEvidenceSummary({
+          ids: trace.matches?.map((match) => match.id) || [],
+          status: trace.status === 'matched' ? '已检索候选，适用性待审阅' : '未匹配案例',
+        })
+      } catch {
+        // Evidence is an enhancement to the graph; a failed refresh must not hide the workflow.
+      }
+    }
+    void loadEvidence()
+    const timer = window.setInterval(() => void loadEvidence(), 4000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [sessionId])
   const {
     displaySessionId,
     isViewSwitching,
@@ -174,6 +210,14 @@ export function WorkflowLivePanel({
           await handleRun(flow.nodes, flow.edges)
         }}
       />
+      {evidenceSummary && (
+        <div className="workflow-evidence-strip" role="status">
+          <span className="workflow-evidence-strip-mark" aria-hidden="true">↗</span>
+          <strong>分析依据</strong>
+          <span>{evidenceSummary.ids.length ? evidenceSummary.ids.join(' · ') : '无匹配卡片'}</span>
+          <em>{evidenceSummary.status}</em>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
         <div ref={graphHostRef} className="min-w-0 flex-1">
           <WorkflowGraph

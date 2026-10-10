@@ -14,6 +14,8 @@ from app.schemas import AgentEvent, AgentEventType, AgentInput, UserMessage, San
 from app.workflow.services.engine import build_registry
 from app.agent.prompts import build_supervisor_prompt
 from app.workflow.prompts import build_workflow_prompt
+from app.knowledge.retrieval import retrieve_knowledge
+from app.tasks.analysis_knowledge import publish_knowledge_selection
 from app.workflow.services.tracking import (
     complete_chat_turn_record,
     create_chat_turn_record,
@@ -91,25 +93,26 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         turn_id=turn_id,
         collector=collector,
     )
-    # Get existing sandbox or create new one (reuse within session)
-    channel = f"session:{session_id}"
-    logger.info(f"[AgentTask] Getting or creating sandbox for session: {session_id}")
-    await sandbox_manager.get_or_create_sandbox(session_id)
-    
-    # Notify frontend that sandbox is ready (to open files panel)
-    logger.info("[AgentTask] Sandbox ready, publishing STARTED event")
-    await event_bus.publish(
-        channel, 
-        SandboxEvent(type=SandboxEventType.STARTED, source="sandbox").model_dump_json()
-    )
-    
     # Build tool - handle data sources
     datasource_ids = (
         list(dict.fromkeys(agent_input.datasource_ids))
         if agent_input.datasource_ids is not None
         else get_session_attachment_ids(session_id)
     )
-    
+
+    if datasource_ids:
+        # Get existing sandbox or create new one (reuse within session)
+        channel = f"session:{session_id}"
+        logger.info(f"[AgentTask] Getting or creating sandbox for session: {session_id}")
+        await sandbox_manager.get_or_create_sandbox(session_id)
+
+        # Notify frontend that sandbox is ready (to open files panel)
+        logger.info("[AgentTask] Sandbox ready, publishing STARTED event")
+        await event_bus.publish(
+            channel,
+            SandboxEvent(type=SandboxEventType.STARTED, source="sandbox").model_dump_json()
+        )
+
     # Sync file datasources
     file_datasources = list_file_datasources(datasource_ids, user_id)
     
@@ -123,28 +126,35 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
     datasources_info = get_datasources_info(datasource_ids, user_id)
     datasources_schema = get_datasources_schema(datasource_ids, user_id)
     datasources_context = build_datasources_context(datasources_info)
+    knowledge = retrieve_knowledge(
+        agent_input.user_input,
+        enabled=settings.ANALYSIS_KNOWLEDGE_ENABLED,
+    )
+    knowledge_context = knowledge.prompt_context()
 
-    workflow_prompt = build_workflow_prompt(
-        build_registry(),
-        datasource=datasources_info,  # Now a list
-        tables=datasources_schema,    # Now includes datasource_id/name
-    )
-    tools.append(
-        create_design_workflow_tool(
-            model,
-            session_id,
-            workflow_prompt,
-            callbacks=[cb_workflow],
-            turn_id=turn_id,
+    if datasource_ids:
+        workflow_prompt = build_workflow_prompt(
+            build_registry(),
+            datasource=datasources_info,  # Now a list
+            tables=datasources_schema,    # Now includes datasource_id/name
+            knowledge_context=knowledge_context,
         )
-    )
-    tools.append(
-        create_summarize_workflow_result_tool(
-            model,
-            session_id,
-            turn_id=turn_id,
+        tools.append(
+            create_design_workflow_tool(
+                model,
+                session_id,
+                workflow_prompt,
+                callbacks=[cb_workflow],
+                turn_id=turn_id,
+            )
         )
-    )
+        tools.append(
+            create_summarize_workflow_result_tool(
+                model,
+                session_id,
+                turn_id=turn_id,
+            )
+        )
 
     user_input = agent_input.user_input
 
@@ -156,12 +166,13 @@ async def _run_agent_async(agent_input: AgentInput) -> None:
         factory = AgentFactory(model, checkpointer)
         supervisor = factory.create_supervisor(
             tools,
-            system_prompt_template=build_supervisor_prompt(),
+            system_prompt_template=build_supervisor_prompt(knowledge_context=knowledge_context),
         )
 
         try:
             logger.info("[AgentTask] Starting agent execution...")
             await cb_supervisor._publish(AgentEvent(type=AgentEventType.AGENT_START))
+            await publish_knowledge_selection(cb_supervisor, knowledge)
             await supervisor.ainvoke(
                 user_input,
                 thread_id=session_id,

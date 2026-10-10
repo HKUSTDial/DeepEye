@@ -7,6 +7,7 @@
 日期: 2026-03-06
 
 关联文档:
+
 - `docs/chat_workflow_knowledge_flow.md`
 - `docs/workflow_node_system.md`
 - `docs/panel_system.md`
@@ -14,15 +15,18 @@
 ## 1. 背景
 
 当前系统已经具备以下基础能力:
+
 - 用户通过 chat 提出问题
 - 用户可以上传文件、连接数据库、引用知识库
 - 后端存在 `Supervisor -> WorkflowAgent -> Workflow Engine` 主链路
 - 前端 workspace 可以展示 files / workflow / report / dashboard / video preview
 
 但当前实现仍然偏向:
+
 - `chat-native product + workflow execution shell`
 
 而不是目标中的:
+
 - `workflow-native agent system`
 
 也就是说，workflow 目前更多承担“部分执行容器”的角色，而不是系统内统一的规划与执行抽象。
@@ -77,18 +81,19 @@
 ## 5. 设计原则
 
 1. Single source of truth
+
    - node contract、workflow draft、workflow run、artifact metadata 都必须有明确主真相。
-
 2. Workflow first
+
    - 简单问答可 direct answer，复杂任务必须进入 workflow lifecycle。
-
 3. Session-scoped context
+
    - 数据源、运行状态、artifact 显示都围绕 session/turn，而不是围绕用户全局资源。
-
 4. Contract over convention
-   - 不允许靠 `file_path includes "data_video"`、`dashboard_url exists` 这类启发式驱动 UI。
 
+   - 不允许靠 `file_path includes "data_video"`、`dashboard_url exists` 这类启发式驱动 UI。
 5. Recoverable state
+
    - 页面刷新后，chat/workspace/artifact 状态应能从后端恢复，而不是依赖 SSE 临时事件重放。
 
 ## 6. 目标系统架构
@@ -112,14 +117,17 @@ Chat UI
 ### 6.2 核心模块
 
 #### Chat UI
+
 - 只负责收集用户输入和显示过程
 - 不再内嵌 workflow 私有逻辑
 
 #### Session Attachment Service
+
 - 管理当前 session 已附加的数据源
 - 提供 planner 可消费的数据上下文
 
 #### Supervisor
+
 - 只负责决策
 - 决定:
   - direct answer
@@ -128,6 +136,7 @@ Chat UI
   - run workflow
 
 #### Workflow Planner
+
 - 输入:
   - 用户目标
   - session attachments
@@ -137,18 +146,22 @@ Chat UI
   - 结构化 workflow draft
 
 #### Workflow Validator
+
 - 使用 node spec 和 schema rules 校验 draft
 - 失败则返回结构化 validation issues
 
 #### Workflow Repair Loop
+
 - 将 validation issue 反馈给 planner/repair agent
 - 最多有限次修复
 
 #### Workflow Executor
+
 - 只负责执行通过校验的 workflow
 - 发布标准化节点生命周期事件
 
 #### Artifact Extractor
+
 - 从 node outputs 中提取统一 artifact
 - artifact 类型包括:
   - `report`
@@ -159,6 +172,7 @@ Chat UI
   - `text`
 
 #### Run Summarizer
+
 - 基于真实 run outputs / artifacts 总结回答
 - 禁止在 workflow 未执行完成前生成“已完成”式回答
 
@@ -171,6 +185,7 @@ Chat UI
 表示当前 session 附加的数据源引用。
 
 建议字段:
+
 - `id`
 - `session_id`
 - `datasource_id`
@@ -179,6 +194,7 @@ Chat UI
 - `metadata`
 
 语义:
+
 - attachment 是会话级上下文
 - 用户删除 attachment，不影响 datasource 全局资源本体
 
@@ -187,6 +203,7 @@ Chat UI
 表示一次用户输入驱动的一轮处理过程。
 
 建议字段:
+
 - `id`
 - `session_id`
 - `user_message_id`
@@ -200,6 +217,7 @@ Chat UI
 表示某个 turn 生成的 workflow 定义版本。
 
 建议字段:
+
 - `id`
 - `turn_id`
 - `version`
@@ -214,6 +232,7 @@ Chat UI
 表示某个 draft 的执行记录。
 
 建议字段:
+
 - `id`
 - `draft_id`
 - `status`
@@ -227,6 +246,7 @@ Chat UI
 表示 workflow 产出的标准化结果对象。
 
 建议字段:
+
 - `id`
 - `run_id`
 - `node_id`
@@ -274,9 +294,11 @@ planning/validating/running
 ### 9.1 Chat API
 
 当前:
+
 - `POST /api/v1/chat`
 
 目标:
+
 - `POST /api/v1/chat/turns`
   - 请求:
     - `session_id`
@@ -289,6 +311,7 @@ planning/validating/running
 ### 9.2 Session Attachments API
 
 新增:
+
 - `GET /api/v1/sessions/{session_id}/attachments`
 - `POST /api/v1/sessions/{session_id}/attachments`
 - `DELETE /api/v1/sessions/{session_id}/attachments/{attachment_id}`
@@ -296,9 +319,11 @@ planning/validating/running
 ### 9.3 Workspace State API
 
 新增:
+
 - `GET /api/v1/sessions/{session_id}/workspace-state`
 
 返回:
+
 - active turn
 - latest draft
 - latest run
@@ -308,6 +333,7 @@ planning/validating/running
 ### 9.4 Workflow Draft API
 
 新增:
+
 - `GET /api/v1/workflow-drafts/{draft_id}`
 - `POST /api/v1/workflow-drafts/{draft_id}/execute`
 - `POST /api/v1/workflow-drafts/{draft_id}/repair`
@@ -361,27 +387,29 @@ planning/validating/running
 ## 11.1 总体规则
 
 1. `params`
+
    - 用于静态配置和用户文字约束
    - 例如:
      - `datasource_id`
      - `query`
      - `template`
      - `language`
-
 2. `inputs`
-   - 仅表示上游节点传入数据
 
+   - 仅表示上游节点传入数据
 3. `outputs`
+
    - handler 返回值中必须全部提前声明
    - 不允许 runtime 返回 spec 未声明字段
-
 4. `metadata`
+
    - 只存 UI 和调试信息
    - 不参与业务执行语义
 
 ### 11.2 NodeSpec 增强字段
 
 建议 `NodeSpec` 至少包含:
+
 - `type`
 - `version`
 - `description`
@@ -404,12 +432,14 @@ planning/validating/running
 ```
 
 短期兼容期:
+
 - 仍允许 handler 直接返回 outputs dict
 - 但 executor 层要统一归一化成标准结构
 
 ### 11.4 Validator 强化要求
 
 validator 需要真正检查:
+
 - node type 是否存在
 - source/target port 是否存在
 - required input 是否满足
@@ -421,9 +451,11 @@ validator 需要真正检查:
 ## 12. Node 分层建议
 
 ### 12.1 Source Nodes
+
 - `datasource.read`
 
 ### 12.2 Transform Nodes
+
 - `rows.profile`
 - `rows.select`
 - `rows.filter`
@@ -432,18 +464,22 @@ validator 需要真正检查:
 - `rows.join`
 
 ### 12.3 Analysis Nodes
+
 - `sql.execute`
 - `python.code`
 
 ### 12.4 Artifact Nodes
+
 - `report.generate`
 - `data.generate_dashboard`
 - `video.generator`
 
 ### 12.5 Answer Nodes
+
 - `llm.answer`
 
 `llm.answer` 的目的:
+
 - 让“根据 workflow 执行结果回答用户问题”也成为 workflow 内部的显式一步
 - 避免所有最终总结都发生在 workflow 外部
 
@@ -454,52 +490,63 @@ validator 需要真正检查:
 ### 13.1 Supervisor Prompt
 
 职责:
+
 - 判断任务是否需要 workflow
 - 判断是否需要补充信息
 - 判断是否缺少数据
 
 不负责:
+
 - 具体 node wiring
 - workflow JSON 细节
 
 ### 13.2 Workflow Planner Prompt
 
 职责:
+
 - 基于 node catalog 与 session context 生成 workflow draft
 
 输入:
+
 - 用户目标
 - session attachments
 - node catalog summary
 - 常见编排模板
 
 输出:
+
 - workflow draft
 
 ### 13.3 Workflow Repair Prompt
 
 职责:
+
 - 根据 validator 错误修复 draft
 
 输入:
+
 - invalid workflow
 - validation issues
 
 输出:
+
 - repaired workflow draft
 
 ### 13.4 Run Summarizer Prompt
 
 职责:
+
 - 根据真实 outputs / artifacts 组织最终回复
 
 输入:
+
 - 用户问题
 - run outputs
 - artifact summary
 - failure info
 
 输出:
+
 - concise assistant answer
 
 ### 13.5 Prompt 规则
@@ -514,6 +561,7 @@ validator 需要真正检查:
 ### 14.1 Chat Store
 
 负责:
+
 - session list
 - current session
 - chat messages
@@ -522,12 +570,14 @@ validator 需要真正检查:
 ### 14.2 Attachment Store
 
 负责:
+
 - session attachments
 - attachment CRUD
 
 ### 14.3 Workspace Store
 
 负责:
+
 - active turn
 - workflow draft
 - workflow run
@@ -547,35 +597,43 @@ validator 需要真正检查:
 ### Phase 0: RFC
 
 目标:
+
 - 明确目标架构、契约、迁移阶段
 
 产出:
+
 - 本 RFC
 
 ### Phase 1: Session Attachments
 
 目标:
+
 - 将 datasource 使用模式从 user-global 改为 session-scoped attachment
 
 主要工作:
+
 - 新增 attachment 表和 API
 - 前端 chat composer 改为 attachment 驱动
 
 ### Phase 2: Unified Workflow Event Contract
 
 目标:
+
 - 建立单一 `workflow_event` 协议
 
 主要工作:
+
 - report/dashboard/video 迁移到统一 phase
 - 前端去除大部分节点私有特判
 
 ### Phase 3: Node Spec & Validation Hardening
 
 目标:
+
 - 让 node spec 成为唯一事实源
 
 主要工作:
+
 - 修正 validator
 - 修正 API 输出
 - 收紧 runtime outputs
@@ -583,33 +641,40 @@ validator 需要真正检查:
 ### Phase 4: Turn / Draft / Run / Artifact 主链路
 
 目标:
+
 - 建立 workflow-native 的主状态模型
 
 主要工作:
+
 - 新增 turn/draft/run/artifact 持久化
 - workflow file 从主真相降级为调试导出
 
 ### Phase 5: Agent Orchestration Refactor
 
 目标:
+
 - 引入真正的 `Supervisor -> Planner -> Repair -> Executor -> Summarizer`
 
 ### Phase 6: Frontend Workspace Binding
 
 目标:
+
 - 前端改为绑定 turn/run/artifact，而不是 file_path / 特殊事件
 
 ### Phase 7: Cleanup
 
 目标:
+
 - 清理旧 prompt、旧事件、旧 heuristic、旧 workflow file 主链路
 
 ## 16. 分支策略
 
 集成分支:
+
 - `refactor/workflow-native-agent`
 
 后续阶段建议子分支:
+
 - `feat/session-attachments-context`
 - `refactor/unified-workflow-events`
 - `refactor/node-spec-validation-contract`
@@ -619,6 +684,7 @@ validator 需要真正检查:
 - `test/workflow-golden-scenarios`
 
 合并规则:
+
 1. 每个阶段单独 PR
 2. 先合入集成分支
 3. 集成联调与回归通过后，再合回 `master`
@@ -626,10 +692,12 @@ validator 需要真正检查:
 ## 17. 测试策略
 
 ### 17.1 Core
+
 - workflow engine tests
 - validation tests
 
 ### 17.2 Backend Contract
+
 - node registry response tests
 - workflow validator tests
 - event contract tests
@@ -639,6 +707,7 @@ validator 需要真正检查:
 ### 17.3 Golden Scenarios
 
 至少覆盖:
+
 1. 无数据源时 ask for data
 2. 文件数据 profile
 3. 数据库 SQL 查询
@@ -648,6 +717,7 @@ validator 需要真正检查:
 7. clarification path
 
 ### 17.4 Frontend
+
 - 当前没有成熟 UI test 框架时，至少补:
   - workspace state recovery manual checklist
   - event replay manual checklist
@@ -676,9 +746,11 @@ validator 需要真正检查:
 ## 20. 实施起点
 
 本 RFC 通过后，下一步默认进入:
+
 - `Phase 1: Session Attachments`
 
 在进入编码前，需要先补一份 implementation checklist，明确:
+
 - 数据库 schema 变更
 - API 兼容策略
 - 前端 store 拆分策略

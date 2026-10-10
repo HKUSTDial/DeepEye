@@ -274,8 +274,9 @@ body.light-theme :disabled {
 
 /* Selection */
 body.light-theme ::selection {
-  background: rgba(17, 24, 39, 0.12);
-  color: #111827;
+  /* Opaque colors keep selected text readable inside dark user bubbles too. */
+  background: #bfdbfe;
+  color: #0f172a;
 }
 
 /* Workflow Styles */

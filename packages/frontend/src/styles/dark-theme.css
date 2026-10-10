@@ -242,8 +242,9 @@ body.dark-theme a:hover {
 
 /* Selection */
 body.dark-theme ::selection {
-  background: rgba(73, 182, 166, 0.28);
-  color: #e4e4e7;
+  /* Independent of the underlying message, code or input background. */
+  background: #99f6e4;
+  color: #0f172a;
 }
 
 /* Workflow Styles */

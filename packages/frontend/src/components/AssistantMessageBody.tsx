@@ -8,6 +8,7 @@ import { useLocale } from '../locale'
 import StepItem from './StepItem'
 import { hasText } from './chatBoxUtils'
 import { splitAssistantMessageSections } from './assistantMessageBodyUtils'
+import AnalysisEvidence from './AnalysisEvidence'
 
 interface AssistantMessageBodyProps {
   message: Message
@@ -65,6 +66,8 @@ export function AssistantMessageBody({
           )}
         </section>
       )}
+
+      <AnalysisEvidence message={message} />
 
       {hasFinalContent && (
         <section className="assistant-answer-card">

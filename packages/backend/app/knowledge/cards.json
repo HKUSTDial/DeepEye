@@ -1,0 +1,650 @@
+[
+  {
+    "id": "C01",
+    "title": "MSN 轮播改版：机器人过滤误导实验",
+    "kind": "enterprise_case",
+    "tags": [
+      "SRM",
+      "样本比例",
+      "机器人过滤"
+    ],
+    "keywords": [
+      "sample ratio mismatch",
+      "bot filtering",
+      "样本分配",
+      "分流异常",
+      "分组人数",
+      "过滤异常",
+      "参与度下降",
+      "分配比例",
+      "随机分配比例"
+    ],
+    "case_summary": "MSN 将轮播图片从 12 张增加到 16 张，实验看似参与度下降且实验组人数不足。部分高活跃真实用户被机器人规则排除；调整过滤后 SRM 消失，参与度结论反转。属于作者报告，不是本项目复现实验。",
+    "required_data": [
+      "实验随机化单位、设计分配比例",
+      "分配、曝光、日志及过滤前后的组别计数",
+      "机器人或异常过滤规则"
+    ],
+    "metric_questions": [
+      "人数还是事件数？设计比例是多少？",
+      "哪个阶段开始出现样本减少？过滤是否受实验影响？"
+    ],
+    "steps": [
+      "确认设计比例与随机化单位",
+      "核对各处理阶段的组别计数和过滤规则",
+      "条件满足时检验 SRM 并按预先定义维度排查",
+      "先说明数据可信度，再解释效果"
+    ],
+    "limits": [
+      "比例不完全相等不自动表示 SRM；不能默认 1:1 或擅设阈值",
+      "SRM 只是信号，不能直接断言机器人规则是原因",
+      "SRM 通过也不能证明实验无偏"
+    ],
+    "sources": [
+      {
+        "title": "A Dirty Dozen (Dmitriev et al., KDD 2017)",
+        "url": "https://doi.org/10.1145/3097983.3098024",
+        "locator": "§5.9, PDF p.7"
+      },
+      {
+        "title": "Microsoft: Diagnosing Sample Ratio Mismatch in A/B Testing",
+        "url": "https://www.microsoft.com/en-us/research/articles/diagnosing-sample-ratio-mismatch-in-a-b-testing/",
+        "locator": "How Do SRMs Impact A/B Tests?"
+      }
+    ],
+    "evidence_status": "来源正文已核对；E04合成SQLite示例及另一组分流计数验证通过；未复现企业原始实验，不保证Agent统计解释正确",
+    "examples": [
+      {
+        "id": "E04",
+        "question": "设计比例为 1:1 时，过滤前后样本比例如何变化？",
+        "assumptions": [
+          "仅本例：用户级随机化；assigned 为分配人数，kept 为过滤后人数；设计比例明确是 1:1；展示 Pearson 统计量，不擅自指定检验阈值。"
+        ],
+        "dialect": "sqlite",
+        "setup_sql": "CREATE TABLE counts(stage TEXT,arm TEXT,n INTEGER); INSERT INTO counts VALUES ('assigned','control',100),('assigned','treatment',100),('kept','control',100),('kept','treatment',50);",
+        "query_sql": "WITH totals AS (SELECT stage,SUM(n) AS total FROM counts GROUP BY stage) SELECT c.stage,SUM(c.n) AS total,SUM((c.n-t.total*0.5)*(c.n-t.total*0.5)/(t.total*0.5)) AS chi_square FROM counts c JOIN totals t ON t.stage=c.stage GROUP BY c.stage ORDER BY c.stage;",
+        "expected_columns": [
+          "stage",
+          "total",
+          "chi_square"
+        ],
+        "expected_rows": [
+          [
+            "assigned",
+            200,
+            0.0
+          ],
+          [
+            "kept",
+            150,
+            16.666666666666668
+          ]
+        ],
+        "limitations": [
+          "完全合成的教学样例；不得替代当前任务数据，也不得自动采用本示例口径。",
+          "过滤后不平衡只能定位异常阶段；不能确诊机器人过滤，不平衡不等于处理效果。"
+        ]
+      }
+    ],
+    "metric_definitions": [
+      {
+        "name": "样本分配比例",
+        "definition": "当前阶段各随机化组的独立随机化单位数 / 该阶段总单位数，对照实验设计比例。",
+        "grain": "随机化单位×组别×处理阶段",
+        "requires_confirmation": [
+          "设计比例与分配单位",
+          "过滤规则和处理阶段",
+          "检验阈值与最小预期频数适用性"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "C02",
+    "title": "MSN 模块前移：CTR 下降与点击增长可以并存",
+    "kind": "enterprise_case",
+    "tags": [
+      "CTR",
+      "点击率",
+      "分母变化"
+    ],
+    "keywords": [
+      "曝光",
+      "点击",
+      "click-through",
+      "click through",
+      "impressions",
+      "denominator",
+      "比率指标"
+    ],
+    "case_summary": "MSN 将模块移到更高位置，平均用户 CTR 下降约 40%，但点击和曝光均增长，曝光增长更快；全页 CTR 基本不变，收入提高。原文是用户 CTR 的平均，不可替换成总点击除以总曝光。",
+    "required_data": [
+      "相同口径和周期下的点击、曝光及覆盖人数",
+      "计算平均用户 CTR 时需用户粒度数据",
+      "如需商业价值判断，需全页或收入等目标指标"
+    ],
+    "metric_questions": [
+      "用户平均比率还是总体比率？",
+      "曝光是否可见、如何去重？人群或位置是否变化？"
+    ],
+    "steps": [
+      "核对公式、去重和曝光定义",
+      "同时报告分子、分母及比率",
+      "检查覆盖人群、位置和全页指标",
+      "将数值涨跌与业务价值判断分开"
+    ],
+    "limits": [
+      "不能把 CTR 下降等同体验变差，也不能默认它是好事",
+      "用户平均比率与总体比率可能相同或不同；人群结构改变不意味着两者必然背离，需实际计算",
+      "观察性前后对比不自动支持因果结论",
+      "缺收入数据不能照搬原案例的收入改善结论"
+    ],
+    "sources": [
+      {
+        "title": "A Dirty Dozen (Dmitriev et al., KDD 2017)",
+        "url": "https://doi.org/10.1145/3097983.3098024",
+        "locator": "§5.2, PDF p.4"
+      }
+    ],
+    "evidence_status": "来源正文已核对；E01合成SQLite示例通过；另一组合成CSV已通过真实浏览器、Agent工作流计算和历史恢复；不是企业数据或收益复现",
+    "examples": [
+      {
+        "id": "E01",
+        "question": "点击增长但总体 CTR 降低时，两个口径分别是多少？",
+        "assumptions": [
+          "period 为 before/after；每行是一位用户在该期的聚合；clicks<=impressions，曝光为正；不进行因果推断。"
+        ],
+        "dialect": "sqlite",
+        "setup_sql": "CREATE TABLE metrics(period TEXT,user_id TEXT,clicks INTEGER,impressions INTEGER); INSERT INTO metrics VALUES ('before','a',1,2),('before','b',9,18),('after','a',2,4),('after','b',10,40);",
+        "query_sql": "SELECT period,SUM(clicks) AS clicks,SUM(impressions) AS impressions,1.0*SUM(clicks)/NULLIF(SUM(impressions),0) AS overall_ctr,AVG(1.0*clicks/NULLIF(impressions,0)) AS mean_user_ctr FROM metrics GROUP BY period ORDER BY period;",
+        "expected_columns": [
+          "period",
+          "clicks",
+          "impressions",
+          "overall_ctr",
+          "mean_user_ctr"
+        ],
+        "expected_rows": [
+          [
+            "after",
+            12,
+            44,
+            0.2727272727272727,
+            0.375
+          ],
+          [
+            "before",
+            10,
+            20,
+            0.5,
+            0.5
+          ]
+        ],
+        "limitations": [
+          "完全合成的教学样例；不得替代当前任务数据，也不得自动采用本示例口径。",
+          "零曝光用户如何纳入均值需另行确认；没有收入、体验或随机化数据，不能判定业务收益与因果。"
+        ]
+      }
+    ],
+    "metric_definitions": [
+      {
+        "name": "总体CTR",
+        "definition": "相同口径和周期下，总点击次数 / 总曝光次数；分母为0时未定义。",
+        "grain": "事件聚合比率",
+        "requires_confirmation": [
+          "曝光是否可见、如何去重及归因",
+          "周期、时区、过滤与统计范围"
+        ]
+      },
+      {
+        "name": "平均用户CTR",
+        "definition": "先计算每位合格用户的点击/曝光，再对用户等权平均；不是将总点击除以总曝光。",
+        "grain": "用户×统计周期",
+        "requires_confirmation": [
+          "零曝光用户处理方式",
+          "身份合并与用户资格",
+          "是否确实需要等权用户均值"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "C03",
+    "title": "Skype 推送改造：事件上报变化伪装成业务变化",
+    "kind": "enterprise_case",
+    "tags": [
+      "埋点",
+      "日志丢失",
+      "上报"
+    ],
+    "keywords": [
+      "telemetry",
+      "event loss",
+      "客户端",
+      "client events",
+      "采集异常",
+      "事件数量突变"
+    ],
+    "case_summary": "Skype iPhone 新推送协议让应用唤醒后运行更久，客户端有更多时间上传缓冲事件，降低日志丢失率。客户端和服务端来源的通话指标因此呈现不同变化。",
+    "required_data": [
+      "指标采集、发送、清洗链及版本信息",
+      "定义可比的客户端和服务端事件，或事件序列号",
+      "组别、设备和网络信息（如需分层）"
+    ],
+    "metric_questions": [
+      "计数变化来自真实行为还是日志覆盖？",
+      "服务端对照的定义与覆盖是否可比？"
+    ],
+    "steps": [
+      "检查变更对采集和上报的影响",
+      "区分客户端与服务端来源的指标",
+      "有可比对照时计算回传比例；有序号时检查缺口和重置",
+      "按版本和网络排查，报告仍缺少的证据"
+    ],
+    "limits": [
+      "不能把事件增多自动解释为更活跃",
+      "缺少日志证据不能确诊埋点故障",
+      "服务端事件也不保证天然完整"
+    ],
+    "sources": [
+      {
+        "title": "A Dirty Dozen (Dmitriev et al., KDD 2017)",
+        "url": "https://doi.org/10.1145/3097983.3098024",
+        "locator": "§5.3, PDF pp.4–5"
+      }
+    ],
+    "evidence_status": "来源正文已核对；独立模拟算术已核对；事件匹配与 Agent 效果未验证"
+  },
+  {
+    "id": "C04",
+    "title": "Bing 分群：各群改善不等于整体改善",
+    "kind": "enterprise_case",
+    "tags": [
+      "分群",
+      "辛普森悖论",
+      "实验后变量"
+    ],
+    "keywords": [
+      "simpson",
+      "segments",
+      "segment",
+      "subgroup",
+      "分层",
+      "整体没变化",
+      "群体构成"
+    ],
+    "case_summary": "Bing 排序实验按是否看到 deeplink 分群，两群 Sessions per User 都显著增加，整体未显著变化。实验改变了分群归属与活跃度构成。",
+    "required_data": [
+      "分群条件、记录时点、组别",
+      "各群样本数及指标",
+      "整体指标与实验设计"
+    ],
+    "metric_questions": [
+      "分群条件是否被实验改变？",
+      "是事先定义的对比还是事后寻找显著子群？"
+    ],
+    "steps": [
+      "先检查整体，再报告各群人数、占比和指标",
+      "检查分群条件是否受实验影响",
+      "区分构成变化与效应异质性",
+      "多次探索分群时说明多重比较与探索性质"
+    ],
+    "limits": [
+      "实验后行为分群不能直接支持因果异质性",
+      "并非所有整体与分群差异都是辛普森悖论",
+      "整体不显著不等于严格零效应"
+    ],
+    "sources": [
+      {
+        "title": "A Dirty Dozen (Dmitriev et al., KDD 2017)",
+        "url": "https://doi.org/10.1145/3097983.3098024",
+        "locator": "§5.8, PDF p.7"
+      }
+    ],
+    "evidence_status": "来源正文已核对；独立加权均值样例已核对；未复现原案例显著性或 Agent 效果"
+  },
+  {
+    "id": "C05",
+    "title": "MSN 实验：不显著不能解释为没有影响",
+    "kind": "enterprise_case",
+    "tags": [
+      "不显著",
+      "统计功效",
+      "置信区间"
+    ],
+    "keywords": [
+      "not significant",
+      "non-significant",
+      "underpowered",
+      "power",
+      "confidence interval",
+      "p值",
+      "p-value",
+      "没有影响",
+      "样本量"
+    ],
+    "case_summary": "MSN 每用户浏览量估计增加 0.5% 但不显著。论文指出区间宽约 ±5%，80% 功效下只能检测约 7.8% 或更大的变化，因此不能认定没有业务重要影响。数字来自论文，不是本项目复算。",
+    "required_data": [
+      "随机化单位、样本量、方差或单位级指标",
+      "效应估计、区间和设计信息",
+      "事先关心的最小业务重要变化"
+    ],
+    "metric_questions": [
+      "相对百分比还是百分点？",
+      "按什么单位随机化和估计不确定性？",
+      "阈值和停止规则如何预设？"
+    ],
+    "steps": [
+      "报告效应和区间",
+      "对照业务重要变化范围",
+      "区分证据不足与等效或非劣结论",
+      "有设计和方差依据时才讨论追加样本"
+    ],
+    "limits": [
+      "p>0.05 不代表两组一样",
+      "不能把重复事件当作独立随机化单位",
+      "不使用事后观察功效包装确定性结论"
+    ],
+    "sources": [
+      {
+        "title": "A Dirty Dozen (Dmitriev et al., KDD 2017)",
+        "url": "https://doi.org/10.1145/3097983.3098024",
+        "locator": "§5.4, PDF p.5"
+      }
+    ],
+    "evidence_status": "来源正文已核对；统计计算实现与 Agent 效果未验证"
+  },
+  {
+    "id": "M01",
+    "title": "漏斗分析：先确认事件、顺序与窗口",
+    "kind": "method_documentation",
+    "tags": [
+      "漏斗",
+      "转化",
+      "funnel"
+    ],
+    "keywords": [
+      "conversion",
+      "注册到支付",
+      "注册转化",
+      "支付转化",
+      "转化率",
+      "conversion rate"
+    ],
+    "case_summary": "Amplitude 文档要求选择起始和后续事件、路径顺序及人群，区分指定顺序、任意顺序与严格顺序；其分群过滤针对起始事件。这是产品方法文档，不是企业效果案例。",
+    "required_data": [
+      "用户、会话或订单实体标识",
+      "事件类型和时间戳",
+      "人群属性及数据覆盖时间"
+    ],
+    "metric_questions": [
+      "分析单位和去重规则？",
+      "哪些事件、顺序和窗口构成转化？",
+      "时区、同时间事件与排除规则？"
+    ],
+    "steps": [
+      "先确认事件到字段的映射",
+      "明确顺序、窗口、身份合并和分群口径",
+      "检查重复、倒序、缺步骤与超窗口事件",
+      "按确认口径计算各步人数和转化"
+    ],
+    "limits": [
+      "事件总次数相除不能替代用户路径漏斗",
+      "不能把第三方产品默认规则自动当本项目口径",
+      "缺少实体和事件时间时应说明无法恢复路径"
+    ],
+    "sources": [
+      {
+        "title": "Amplitude: Build a funnel analysis",
+        "url": "https://amplitude.com/docs/analytics/charts/funnel-analysis/funnel-analysis-build",
+        "locator": "Set up a funnel analysis"
+      }
+    ],
+    "evidence_status": "官方文档正文已核对；E02合成SQLite示例及另一组模型SQL验证通过；真实业务口径未预设，未做本场景完整页面工作流验收",
+    "examples": [
+      {
+        "id": "E02",
+        "question": "按首次注册后 24 小时内支付定义用户漏斗，转化人数是多少？",
+        "assumptions": [
+          "仅本例：时间为 UTC 整数小时；用户首次 signup 为起点；pay 必须严格晚于起点且不超过 24 小时；按用户去重；所有起点观察期完整。"
+        ],
+        "dialect": "sqlite",
+        "setup_sql": "CREATE TABLE events(user_id TEXT,event TEXT,hour INTEGER); INSERT INTO events VALUES ('a','signup',0),('a','signup',0),('a','pay',1),('a','pay',2),('b','signup',0),('b','pay',25),('c','pay',0),('c','signup',2),('d','signup',0),('d','pay',24),('e','signup',0),('e','pay',0);",
+        "query_sql": "WITH starts AS (SELECT user_id,MIN(hour) AS start_hour FROM events WHERE event='signup' GROUP BY user_id), paths AS (SELECT s.user_id,EXISTS(SELECT 1 FROM events e WHERE e.user_id=s.user_id AND e.event='pay' AND e.hour>s.start_hour AND e.hour<=s.start_hour+24) AS converted FROM starts s) SELECT COUNT(*) AS started,SUM(converted) AS converted,1.0*SUM(converted)/NULLIF(COUNT(*),0) AS conversion_rate FROM paths;",
+        "expected_columns": [
+          "started",
+          "converted",
+          "conversion_rate"
+        ],
+        "expected_rows": [
+          [
+            5,
+            2,
+            0.4
+          ]
+        ],
+        "limitations": [
+          "完全合成的教学样例；不得替代当前任务数据，也不得自动采用本示例口径。",
+          "该例不是任意多步骤漏斗；同时间事件、重复起点与身份合并采用其他定义时必须重写查询。"
+        ]
+      }
+    ],
+    "metric_definitions": [
+      {
+        "name": "用户路径转化率",
+        "definition": "符合已确认事件顺序与窗口的去重用户数 / 合格起点去重用户数；多步漏斗须另外说明相邻步或起点分母。",
+        "grain": "用户路径（也可另选会话或订单）",
+        "requires_confirmation": [
+          "起点和终点事件、顺序",
+          "转化窗、重复起点、同时间事件规则",
+          "起点观察完整性和身份合并"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "M02",
+    "title": "留存分析：区分入组时间和回访观察",
+    "kind": "method_documentation",
+    "tags": [
+      "留存",
+      "retention",
+      "回访"
+    ],
+    "keywords": [
+      "次日",
+      "七日",
+      "7日",
+      "流失",
+      "churn",
+      "cohort",
+      "新用户",
+      "活跃用户"
+    ],
+    "case_summary": "Amplitude 按起始事件与回访事件的时间关系计算留存，入组日期筛选与回访期间不同。需明确用户范围；官方产品规则不自动成为本项目定义。",
+    "required_data": [
+      "用户标识与起始事件时间",
+      "回访事件和时间",
+      "数据覆盖范围和观察截止点"
+    ],
+    "metric_questions": [
+      "新用户按注册、首次访问还是关键行为定义？",
+      "什么事件算回访？第 N 日、N 日内还是以后？",
+      "自然日或固定时长、时区及未满观察期如何处理？"
+    ],
+    "steps": [
+      "确定入组事件、人群与回访定义",
+      "分别设定 cohort 窗口和回访观察窗口",
+      "核对身份去重和观察期完整性",
+      "按已确认口径计算并报告覆盖局限"
+    ],
+    "limits": [
+      "日活汇总和重复订单占比不等于用户留存",
+      "未满观察期不能默认算作未回访",
+      "文档没有替本项目确定 N 日或滚动留存口径",
+      "第N日、N日内、N日及以后是不同定义；不能把N日内直接等同于所有产品中的滚动留存。生存分析的首次回访目标不等于精确D7活跃率。"
+    ],
+    "sources": [
+      {
+        "title": "Amplitude: Build a retention analysis",
+        "url": "https://amplitude.com/docs/analytics/charts/retention-analysis/retention-analysis-build",
+        "locator": "Set up a retention analysis"
+      }
+    ],
+    "evidence_status": "官方文档正文已核对；E03合成SQLite示例及另一组模型SQL验证通过；真实业务口径未预设，未做本场景完整页面工作流验收",
+    "examples": [
+      {
+        "id": "E03",
+        "question": "按 UTC 自然日精确 D7 回访，排除观察不足的用户后留存是多少？",
+        "assumptions": [
+          "仅本例：signup 是已去重的首次注册日期；visit 为回访；完整日志截止 2026-01-10 当日结束；只计算第 7 个自然日回访，非滚动留存。"
+        ],
+        "dialect": "sqlite",
+        "setup_sql": "CREATE TABLE users(user_id TEXT,signup TEXT); CREATE TABLE visits(user_id TEXT,day TEXT); INSERT INTO users VALUES ('a','2026-01-01'),('b','2026-01-01'),('c','2026-01-03'),('d','2026-01-04'); INSERT INTO visits VALUES ('a','2026-01-08'),('a','2026-01-08'),('b','2026-01-07'),('c','2026-01-10'),('d','2026-01-10');",
+        "query_sql": "WITH eligible AS (SELECT * FROM users WHERE date(signup,'+7 days')<='2026-01-10'), retained AS (SELECT e.user_id,EXISTS(SELECT 1 FROM visits v WHERE v.user_id=e.user_id AND v.day=date(e.signup,'+7 days')) AS returned FROM eligible e) SELECT COUNT(*) AS eligible,SUM(returned) AS retained,1.0*SUM(returned)/NULLIF(COUNT(*),0) AS retention FROM retained;",
+        "expected_columns": [
+          "eligible",
+          "retained",
+          "retention"
+        ],
+        "expected_rows": [
+          [
+            3,
+            2,
+            0.6666666666666666
+          ]
+        ],
+        "limitations": [
+          "完全合成的教学样例；不得替代当前任务数据，也不得自动采用本示例口径。",
+          "未满观察期的 d 不记为流失；自然日时区、日志完整性、首次事件定义需由实际任务确认。"
+        ]
+      }
+    ],
+    "metric_definitions": [
+      {
+        "name": "精确第N日留存",
+        "definition": "已满规定观察窗的入组用户中，在第N日满足回访事件定义的去重人数 / 同一成熟入组人群人数。",
+        "grain": "入组用户×cohort",
+        "requires_confirmation": [
+          "N、自然日或固定时长与时区",
+          "入组及回访事件",
+          "完整日志截止点；未成熟人群单列"
+        ]
+      },
+      {
+        "name": "N日内与N日及以后回访",
+        "definition": "N日内是有界窗口内回访；N日及以后是从阈值起至观察截止的回访。二者与精确第N日不同。",
+        "grain": "用户×入组时间×观察截止点",
+        "requires_confirmation": [
+          "窗口左右端点是否包含",
+          "观察长度可比性",
+          "产品对滚动留存的具体定义"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "C06",
+    "title": "Spotify：重复查看实验与用户内重复测量",
+    "kind": "enterprise_case",
+    "tags": [
+      "序贯检验",
+      "提前停止",
+      "反复查看"
+    ],
+    "keywords": [
+      "peeking",
+      "sequential testing",
+      "每天看p值",
+      "显著就停止",
+      "重复测量",
+      "多次查看",
+      "提前结束"
+    ],
+    "case_summary": "Spotify 工程团队讨论实验连续监测：普通固定样本检验的反复查看可增加假阳性；即使用序贯检验，同一用户持续贡献新观测时，也需要处理用户内相关与估计目标变化。文中模拟结果不是本项目复现。",
+    "required_data": [
+      "随机化单位、用户级重复观测及时间",
+      "预先设计的停止规则、分析时间点和检验方法",
+      "指标观察窗口、入组时间和估计目标"
+    ],
+    "metric_questions": [
+      "固定观察窗还是使用截至当前的全部数据？",
+      "当前序贯方法是否允许同一用户更新观测？",
+      "是否预设停止规则与假阳性控制？"
+    ],
+    "steps": [
+      "区分固定样本检验和有效的序贯设计",
+      "检查同一用户是否被当作多份独立样本",
+      "核对固定窗口的成熟样本与动态窗口的目标差异",
+      "没有适用的序贯设计时，不以首次显著作为成功停止依据"
+    ],
+    "limits": [
+      "不是所有序贯检验都适用纵向数据",
+      "不能单凭每日 p 值序列追认一个有效的停止规则",
+      "不能把作者模拟假阳性率直接视为当前系统的错误率"
+    ],
+    "sources": [
+      {
+        "title": "Spotify Engineering: Bringing Sequential Testing to Experiments with Longitudinal Data (Part 1)",
+        "url": "https://engineering.atspotify.com/2023/7/bringing-sequential-testing-to-experiments-with-longitudinal-data-part-1-the-peeking-problem-2-0",
+        "locator": "The Peeking Problem 2.0; Cohort-based metrics; Results; Conclusion"
+      }
+    ],
+    "evidence_status": "2026-09-22 已核对官方正文；数学公式网页提取不完整，不复述公式；未复现模拟与平台效果"
+  },
+  {
+    "id": "C07",
+    "title": "Spotify Search：多个功能的收益不能直接相加",
+    "kind": "enterprise_case",
+    "tags": [
+      "累计效果",
+      "季度留出",
+      "实验叠加"
+    ],
+    "keywords": [
+      "holdback",
+      "holdout",
+      "累积收益",
+      "收益相加",
+      "效果相加",
+      "总业务影响",
+      "多个实验",
+      "cumulative impact",
+      "实验收益",
+      "季度收益",
+      "组合收益",
+      "累计收益"
+    ],
+    "case_summary": "Spotify Search 在实践文章中描述季度 holdback：一组用户在季度内不接收产品变更，季末在留出用户中比较全部已发布变更与无变更，评估组合效果。来源没有为本项目提供收益数字。",
+    "required_data": [
+      "产品变更清单与用户实际曝光",
+      "随机化、留出及交叉实验协调方案",
+      "目标指标、观察窗和用户分配记录"
+    ],
+    "metric_questions": [
+      "想估计单功能效果还是组合效果？",
+      "实验覆盖人群、基线、时间和指标是否可比？",
+      "用户是否同时参与会相互干扰的实验？"
+    ],
+    "steps": [
+      "列出单实验效果的目标人群和基线差异",
+      "检查功能交互及重叠曝光",
+      "将简单加总标成有条件的近似而不是已测组合因果效果",
+      "有已批准留出设计时比较组合变更；否则说明缺少直接识别证据"
+    ],
+    "limits": [
+      "不能自动替用户新建或分配留出组",
+      "季度 holdback 是该团队方案而非通用默认",
+      "不能把组合效果无条件分摊给每个功能",
+      "同一基线的相对提升不能无条件相乘；是否可加或可乘取决于明确的效应模型，不能把9%直接改成9.26%就当组合真实效果。"
+    ],
+    "sources": [
+      {
+        "title": "Spotify Engineering: Search Journey Towards Better Experimentation Practices",
+        "url": "https://engineering.atspotify.com/2022/2/search-journey-towards-better-experimentation-practices",
+        "locator": "Step 2 — Cross-experiments quality; Step 3 — Measure total business impact"
+      }
+    ],
+    "evidence_status": "2026-09-22 已核对官方正文；企业自述，无原始实验数据，未复现因果效果"
+  }
+]

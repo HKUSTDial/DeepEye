@@ -7,6 +7,7 @@ import re
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "DeepEye API"
+    ANALYSIS_KNOWLEDGE_ENABLED: bool = True
     API_V1_STR: str = "/api"
     
     # CORS
